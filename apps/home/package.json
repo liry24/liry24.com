@@ -20,19 +20,23 @@
         "@nuxt/content": "^3.11.2",
         "@nuxt/image": "^2.0.0",
         "@nuxt/ui": "^4.4.0",
+        "@nuxtjs/sitemap": "7.6.0",
         "@repo/database": "workspace:*",
         "@repo/nuxt": "workspace:*",
         "@repo/utils": "workspace:*",
+        "@takumi-rs/core": "0.67.1",
         "@vercel/analytics": "^1.6.1",
         "@vercel/config": "^0.0.28",
         "@vercel/functions": "^3.4.1",
         "@yeger/vue-masonry-wall": "^5.1.5",
         "motion-v": "^1.10.2",
         "nuxt": "^4.3.0",
+        "nuxt-og-image": "^6.0.0-beta.15",
         "zod": "^4.3.6"
     },
     "devDependencies": {
         "@nuxt/a11y": "^1.0.0-alpha.1",
+        "@nuxt/fonts": "^0.13.0",
         "@nuxt/hints": "^1.0.0-alpha.6",
         "vue-tsc": "^3.2.4"
     },
