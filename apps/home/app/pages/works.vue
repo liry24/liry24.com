@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { MasonryWall } from '@yeger/vue-masonry-wall'
+
 const { data } = useFetch('/api/works')
 
 defineSeo({

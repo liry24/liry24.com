@@ -1,4 +1,4 @@
-import { createInsertSchema, createSelectSchema, createUpdateSchema } from 'drizzle-zod'
+import { createInsertSchema, createSelectSchema, createUpdateSchema } from 'drizzle-orm/zod'
 import { z } from 'zod'
 
 import { artImages, arts, careers, posts, postTags, ranks, skills, socials, works } from './schema'

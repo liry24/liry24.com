@@ -22,11 +22,10 @@
     },
     "dependencies": {
         "@libsql/client": "^0.17.0",
-        "drizzle-orm": "1.0.0-beta.14-56118cc",
-        "drizzle-zod": "1.0.0-beta.14-a36c63d",
+        "drizzle-orm": "1.0.0-beta.15-dd8e5d4",
         "zod": "^4.3.6"
     },
     "devDependencies": {
-        "drizzle-kit": "1.0.0-beta.14-56118cc"
+        "drizzle-kit": "1.0.0-beta.15-dd8e5d4"
     }
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ArtViewer } from '#components'
+import { MasonryWall } from '@yeger/vue-masonry-wall'
 
 const route = useRoute()
 const overlay = useOverlay()

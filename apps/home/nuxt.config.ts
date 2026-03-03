@@ -6,7 +6,7 @@ const title = 'Liry24'
 export default defineNuxtConfig({
     extends: ['@repo/nuxt'],
 
-    modules: ['motion-v/nuxt'],
+    modules: ['motion-v/nuxt', 'nuxt-og-image', '@nuxtjs/sitemap'],
 
     css: ['~/assets/css/main.css'],
 
@@ -50,15 +50,31 @@ export default defineNuxtConfig({
         },
     },
 
+    site: {
+        url: process.env.HOME_DOMAIN,
+        name: title,
+        trailingSlash: false,
+    },
+
     fonts: {
         families: [
-            { name: 'Geist', provider: 'google' },
-            { name: 'Geist Mono', provider: 'google' },
-            { name: 'Special Gothic Expanded One', provider: 'google' },
+            {
+                name: 'Geist',
+                weights: [100, 200, 300, 300, 400, 500, 600, 700, 800],
+                provider: 'google',
+            },
+            {
+                name: 'Geist Mono',
+                weights: [300, 300, 400, 500, 600, 700],
+                provider: 'google',
+            },
+            {
+                name: 'Special Gothic Expanded One',
+                weights: [400],
+                provider: 'google',
+                global: true,
+            },
         ],
-        defaults: {
-            weights: [100, 200, 300, 300, 400, 500, 600, 700, 800, 900],
-        },
     },
 
     icon: {
@@ -72,5 +88,15 @@ export default defineNuxtConfig({
             parseURL(process.env.TIGRIS_STORAGE_DOMAIN).host!,
             'avatars.githubusercontent.com',
         ],
+    },
+
+    ogImage: {
+        defaults: { renderer: 'takumi' },
+        zeroRuntime: true,
+    },
+
+    sitemap: {
+        sitemaps: true,
+        sources: ['/api/__sitemap__/urls'],
     },
 })

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { LazyStacksModal, NuxtImg, USeparator } from '#components'
 import { motion } from 'motion-v'
+
+import { LazyStacksModal, NuxtImg, USeparator } from '#components'
 
 const { app } = useAppConfig()
 const overlay = useOverlay()
+const config = useRuntimeConfig()
 
 const modalStacks = overlay.create(LazyStacksModal)
 const MotionNuxtImg = motion.create(NuxtImg)
@@ -11,7 +13,7 @@ const MotionUSeparator = motion.create(USeparator)
 
 const { data } = useFetch('/api/home')
 
-const rotateArray = <T,>(arr: T[], n: number): T[] => {
+const rotateArray = <T>(arr: T[], n: number): T[] => {
     const len = arr.length
     if (len === 0) return arr
 
@@ -25,6 +27,10 @@ useKeyCommand(modalStacks.open)
 defineSeo({
     title: 'Liry24',
     type: 'website',
+})
+
+defineOgImage('Home', {
+    title: 'Liry24',
 })
 </script>
 
