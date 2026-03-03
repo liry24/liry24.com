@@ -60,12 +60,12 @@ export default defineNuxtConfig({
         families: [
             {
                 name: 'Geist',
-                weights: [100, 200, 300, 300, 400, 500, 600, 700, 800],
+                weights: [100, 200, 300, 400, 500, 600, 700, 800],
                 provider: 'google',
             },
             {
                 name: 'Geist Mono',
-                weights: [300, 300, 400, 500, 600, 700],
+                weights: [300, 400, 500, 600, 700],
                 provider: 'google',
             },
             {

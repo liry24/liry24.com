@@ -26,11 +26,13 @@ useKeyCommand(modalStacks.open)
 
 defineSeo({
     title: 'Liry24',
+    description: 'Personal website of Liry24.',
     type: 'website',
-})
-
-defineOgImage('Home', {
-    title: 'Liry24',
+    image: {
+        component: 'Home.takumi',
+        props: { title: 'Liry24' },
+        options: [{ key: 'og' }, { key: 'whatsapp', width: 800, height: 800 }],
+    },
 })
 </script>
 
