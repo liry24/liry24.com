@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ArtViewer } from '#components'
 import { MasonryWall } from '@yeger/vue-masonry-wall'
+
+import { ArtViewer } from '#components'
 
 const route = useRoute()
 const overlay = useOverlay()
@@ -18,6 +19,12 @@ onMounted(() => {
 defineSeo({
     title: 'Arts',
     titleTemplate: '%s | Liry24',
+    description: 'A collection of artworks by Liry24.',
+    image: {
+        component: 'Home.takumi',
+        props: { title: 'Liry24', subpath: 'arts' },
+        options: [{ key: 'og' }, { key: 'whatsapp', width: 800, height: 800 }],
+    },
 })
 </script>
 

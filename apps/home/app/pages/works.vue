@@ -6,6 +6,12 @@ const { data } = useFetch('/api/works')
 defineSeo({
     title: 'Works',
     titleTemplate: '%s | Liry24',
+    description: 'A collection of works by Liry24.',
+    image: {
+        component: 'Home.takumi',
+        props: { title: 'Liry24', subpath: 'works' },
+        options: [{ key: 'og' }, { key: 'whatsapp', width: 800, height: 800 }],
+    },
 })
 </script>
 
