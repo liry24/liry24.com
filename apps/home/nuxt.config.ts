@@ -92,7 +92,6 @@ export default defineNuxtConfig({
 
     ogImage: {
         defaults: { renderer: 'takumi' },
-        zeroRuntime: true,
     },
 
     sitemap: {
