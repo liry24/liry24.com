@@ -90,10 +90,6 @@ export default defineNuxtConfig({
         ],
     },
 
-    ogImage: {
-        defaults: { renderer: 'takumi' },
-    },
-
     sitemap: {
         sitemaps: true,
         sources: ['/api/__sitemap__/urls'],

@@ -1,15 +1,16 @@
-import { db, schema } from '#imports'
+import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { passkey } from '@better-auth/passkey'
-import { betterAuth } from 'better-auth'
-import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { db, schema } from '@repo/database'
+import { betterAuth } from 'better-auth/minimal'
 import { admin, lastLoginMethod } from 'better-auth/plugins'
 
-const config = useRuntimeConfig()
-
 export const auth = betterAuth({
-    baseURL: config.public.adminDomain,
-    secret: config.betterAuth.secret,
     appName: 'liry24',
+    secret: process.env.BETTER_AUTH_SECRET,
+
+    baseURL: {
+        allowedHosts: ['localhost:3000', process.env.ADMIN_DOMAIN!, '*.vercel.app'],
+    },
 
     database: drizzleAdapter(db, {
         provider: 'sqlite',
@@ -17,11 +18,41 @@ export const auth = betterAuth({
         usePlural: true,
     }),
 
-    trustedOrigins: [
-        config.public.adminDomain,
-        'https://liry24com-*-liria.vercel.app',
-        'http://localhost:*',
-    ],
+    secondaryStorage: {
+        get: async (key) => await useStorage('auth').get(encodeURIComponent(key)),
+        set: async (key, value, ttl) => {
+            if (ttl) await useStorage('auth').set(encodeURIComponent(key), value, { ttl })
+            else await useStorage('auth').set(encodeURIComponent(key), value)
+        },
+        delete: async (key) => {
+            await useStorage('auth').del(encodeURIComponent(key))
+        },
+    },
+
+    account: {
+        storeStateStrategy: 'cookie',
+        updateAccountOnSignIn: true,
+        accountLinking: {
+            enabled: true,
+            trustedProviders: ['github'],
+            allowDifferentEmails: true,
+        },
+    },
+
+    verification: {
+        storeInDatabase: false,
+    },
+
+    session: {
+        storeSessionInDatabase: false,
+        expiresIn: 60 * 60 * 24 * 30,
+        updateAge: 60 * 60 * 24,
+        freshAge: 0,
+        cookieCache: {
+            enabled: true,
+            maxAge: 60 * 5,
+        },
+    },
 
     rateLimit: {
         enabled: true,
@@ -45,8 +76,8 @@ export const auth = betterAuth({
 
     socialProviders: {
         github: {
-            clientId: config.github.clientId,
-            clientSecret: config.github.clientSecret,
+            clientId: process.env.GITHUB_CLIENT_ID!,
+            clientSecret: process.env.GITHUB_CLIENT_SECRET,
             mapProfileToUser: async (profile) => ({
                 email: profile.email,
                 username: profile.login,
@@ -55,11 +86,11 @@ export const auth = betterAuth({
                 image: profile.avatar_url,
                 emailVerified: true,
             }),
-            disableSignUp: config.allowSignup !== 'true',
+            disableSignUp: process.env.ALLOW_SIGNUP !== 'true',
         },
         vercel: {
-            clientId: config.vercel.clientId,
-            clientSecret: config.vercel.clientSecret,
+            clientId: process.env.VERCEL_CLIENT_ID!,
+            clientSecret: process.env.VERCEL_CLIENT_SECRET,
             mapProfileToUser: async (profile) => ({
                 email: profile.email,
                 username: profile.preferred_username,
@@ -68,30 +99,11 @@ export const auth = betterAuth({
                 image: profile.picture,
                 emailVerified: true,
             }),
-            disableSignUp: config.allowSignup !== 'true',
-        },
-    },
-
-    account: {
-        updateAccountOnSignIn: true,
-        accountLinking: {
-            enabled: true,
-            trustedProviders: ['github'],
-            allowDifferentEmails: true,
+            disableSignUp: process.env.ALLOW_SIGNUP !== 'true',
         },
     },
 
     plugins: [passkey(), lastLoginMethod(), admin()],
-
-    session: {
-        expiresIn: 60 * 60 * 24 * 30,
-        updateAge: 60 * 60 * 24,
-        freshAge: 0,
-        cookieCache: {
-            enabled: true,
-            maxAge: 60 * 5,
-        },
-    },
 
     user: {
         changeEmail: {

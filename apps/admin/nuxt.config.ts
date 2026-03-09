@@ -47,6 +47,15 @@ export default defineNuxtConfig({
         },
     },
 
+    nitro: {
+        storage: {
+            auth: {
+                driver: 'vercel-runtime-cache',
+                tags: ['auth'],
+            },
+        },
+    },
+
     routeRules: {
         '/**': { appMiddleware: 'admin' },
     },
@@ -64,7 +73,7 @@ export default defineNuxtConfig({
             { name: 'Geist Mono', provider: 'google' },
         ],
         defaults: {
-            weights: [100, 200, 300, 300, 400, 500, 600, 700, 800, 900],
+            weights: [100, 200, 300, 400, 500, 600, 700, 800, 900],
         },
     },
 

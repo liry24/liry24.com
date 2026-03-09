@@ -1,6 +1,7 @@
 import { passkeyClient } from '@better-auth/passkey/client'
 import { adminClient, lastLoginMethodClient, twoFactorClient } from 'better-auth/client/plugins'
 import { createAuthClient } from 'better-auth/vue'
+import { withoutHost } from 'ufo'
 
 export const authClient = createAuthClient({
     plugins: [twoFactorClient(), passkeyClient(), adminClient(), lastLoginMethodClient()],
@@ -16,7 +17,7 @@ export const useAuth = () => {
 
         const headers = useRequestHeaders()
         const { data } = await authClient.useSession((url, options) =>
-            useFetch(url, { ...options, dedupe: 'defer', headers })
+            useFetch(withoutHost(url), { ...options, dedupe: 'defer', headers })
         )
 
         globalSession.value = data.value
@@ -26,7 +27,7 @@ export const useAuth = () => {
     const refreshSession = async () => {
         const headers = useRequestHeaders()
         const { data } = await authClient.useSession((url, options) =>
-            useFetch(url, {
+            useFetch(withoutHost(url), {
                 ...options,
                 dedupe: 'defer',
                 credentials: 'include',
