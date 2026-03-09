@@ -20,33 +20,6 @@ export const users = table('users', {
     banExpires: integer('ban_expires', { mode: 'timestamp_ms' }),
 })
 
-export const sessions = table(
-    'sessions',
-    {
-        id: text().primaryKey(),
-        createdAt: integer('created_at', { mode: 'timestamp_ms' })
-            .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
-            .notNull(),
-        updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
-            .$onUpdate(() => /* @__PURE__ */ new Date())
-            .notNull(),
-        expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
-        userId: text('user_id').notNull(),
-        token: text().notNull().unique(),
-        ipAddress: text('ip_address'),
-        userAgent: text('user_agent'),
-        impersonatedBy: text('impersonated_by'),
-    },
-    (table) => [
-        index('sessions_userId_idx').on(table.userId),
-        foreignKey({
-            name: 'sessions_userId_fkey',
-            columns: [table.userId],
-            foreignColumns: [users.id],
-        }).onDelete('cascade'),
-    ]
-)
-
 export const accounts = table(
     'accounts',
     {
@@ -80,24 +53,6 @@ export const accounts = table(
             foreignColumns: [users.id],
         }).onDelete('cascade'),
     ]
-)
-
-export const verifications = table(
-    'verifications',
-    {
-        id: text().primaryKey(),
-        createdAt: integer('created_at', { mode: 'timestamp_ms' })
-            .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
-            .notNull(),
-        updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
-            .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
-            .$onUpdate(() => /* @__PURE__ */ new Date())
-            .notNull(),
-        expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
-        identifier: text().notNull(),
-        value: text().notNull(),
-    },
-    (table) => [index('verifications_identifier_idx').on(table.identifier)]
 )
 
 export const passkeys = table(

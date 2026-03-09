@@ -14,7 +14,7 @@
         "typecheck": "nuxt typecheck"
     },
     "dependencies": {
-        "@iconify-json/lucide": "^1.2.95",
+        "@iconify-json/lucide": "^1.2.96",
         "@iconify-json/mingcute": "^1.2.7",
         "@iconify-json/simple-icons": "^1.2.72",
         "@nuxt/content": "^3.12.0",
@@ -24,14 +24,14 @@
         "@repo/database": "workspace:*",
         "@repo/nuxt": "workspace:*",
         "@repo/utils": "workspace:*",
-        "@takumi-rs/core": "0.70.3",
+        "@takumi-rs/core": "0.70.4",
         "@vercel/analytics": "^1.6.1",
-        "@vercel/config": "^0.0.36",
+        "@vercel/config": "^0.0.37",
         "@vercel/functions": "^3.4.3",
         "@yeger/vue-masonry-wall": "^6.1.0",
         "motion-v": "^2.0.0",
         "nuxt": "^4.3.1",
-        "nuxt-og-image": "^6.0.0-beta.46",
+        "nuxt-og-image": "^6.0.0-beta.47",
         "zod": "^4.3.6"
     },
     "devDependencies": {

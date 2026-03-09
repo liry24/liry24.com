@@ -3,12 +3,6 @@ import { defineRelations } from 'drizzle-orm'
 import * as schema from './schema'
 
 export const relations = defineRelations(schema, (r) => ({
-    users: {
-        sessions: r.many.sessions({
-            from: r.users.id,
-            to: r.sessions.userId,
-        }),
-    },
     arts: {
         images: r.many.artImages({
             from: r.arts.slug,

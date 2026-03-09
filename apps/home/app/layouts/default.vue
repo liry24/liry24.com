@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { NuxtLink } from '#components'
 import { motion } from 'motion-v'
+
+import { NuxtLink } from '#components'
 
 const route = useRoute()
 
@@ -106,14 +107,33 @@ const handleMouseLeave = () => {
             <footer
                 class="fade-in @container mx-8 mb-10 flex flex-col items-center gap-3 md:mx-12 lg:mx-24"
             >
+                <USeparator />
+
+                <div class="text-dimmed mt-8 flex w-full justify-between gap-3 px-10 text-sm">
+                    <p>
+                        Avatar illustration:
+                        <UButton
+                            to="https://x.com/terano_naa"
+                            target="_blank"
+                            external
+                            variant="link"
+                            label="寺乃なあ"
+                            trailing-icon="mingcute:arrow-right-up-line"
+                            class="gap-0.5 p-0"
+                            :ui="{
+                                label: 'leading-none',
+                                trailingIcon: 'text-dimmed size-4.5',
+                            }"
+                        />
+                    </p>
+                    <p class="leading-none text-nowrap">{{ new Date().getFullYear() }} © Liry24</p>
+                </div>
+
                 <span
                     class="text-dimmed/30 max-w-dvw overflow-clip mask-b-from-40% mask-b-to-80% font-[Special_Gothic_Expanded_One] text-[28cqw] select-none"
                 >
                     Liry24
                 </span>
-                <p class="text-dimmed text-sm leading-none text-nowrap">
-                    {{ new Date().getFullYear() }} © Liry24
-                </p>
             </footer>
         </div>
     </MotionConfig>
