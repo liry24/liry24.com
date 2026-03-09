@@ -1,7 +1,7 @@
+import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { passkey } from '@better-auth/passkey'
 import { db, schema } from '@repo/database'
-import { betterAuth } from 'better-auth'
-import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { betterAuth } from 'better-auth/minimal'
 import { admin, lastLoginMethod } from 'better-auth/plugins'
 
 export const auth = betterAuth({
