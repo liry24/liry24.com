@@ -48,11 +48,20 @@ export default defineNuxtConfig({
     },
 
     nitro: {
+        externals: {
+            inline: ['drizzle-orm'],
+        },
         storage: {
             auth: {
                 driver: 'vercel-runtime-cache',
                 tags: ['auth'],
             },
+        },
+    },
+
+    vite: {
+        optimizeDeps: {
+            include: ['drizzle-orm'],
         },
     },
 
