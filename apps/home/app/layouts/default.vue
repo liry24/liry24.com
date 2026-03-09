@@ -109,7 +109,9 @@ const handleMouseLeave = () => {
             >
                 <USeparator />
 
-                <div class="text-dimmed mt-8 flex w-full justify-between gap-3 px-10 text-sm">
+                <div
+                    class="text-dimmed mt-8 flex w-full items-center justify-between gap-3 text-sm sm:px-10"
+                >
                     <p>
                         Avatar illustration:
                         <UButton
