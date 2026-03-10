@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 
 const request = {
     params: worksSelectSchema.required({ slug: true }),
-    body: worksUpdateSchema.required({ slug: true }),
+    body: worksUpdateSchema,
 }
 
 export default adminSessionEventHandler(async () => {

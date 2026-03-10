@@ -3,12 +3,16 @@ import { z } from 'zod'
 
 import { artImages, arts, careers, posts, postTags, ranks, skills, socials, works } from './schema'
 
-export const socialsSelectSchema = createSelectSchema(socials)
+export const socialsSelectSchema = createSelectSchema(socials, {
+    id: z.coerce.number().int().positive(),
+})
 export const socialsInsertSchema = createInsertSchema(socials).omit({ id: true })
 export const socialsUpdateSchema = createUpdateSchema(socials)
 export type Social = z.infer<typeof socialsSelectSchema>
 
-export const careersSelectSchema = createSelectSchema(careers)
+export const careersSelectSchema = createSelectSchema(careers, {
+    id: z.coerce.number().int().positive(),
+})
 export const careersInsertSchema = createInsertSchema(careers).omit({ id: true })
 export const careersUpdateSchema = createUpdateSchema(careers)
 export type Career = z.infer<typeof careersSelectSchema>
@@ -72,12 +76,16 @@ export const worksUpdateSchema = createUpdateSchema(works, {
 })
 export type Work = z.infer<typeof worksSelectSchema>
 
-export const skillsSelectSchema = createSelectSchema(skills)
+export const skillsSelectSchema = createSelectSchema(skills, {
+    id: z.coerce.number().int().positive(),
+})
 export const skillsInsertSchema = createInsertSchema(skills).omit({ id: true })
 export const skillsUpdateSchema = createUpdateSchema(skills)
 export type Skill = z.infer<typeof skillsSelectSchema>
 
-export const ranksSelectSchema = createSelectSchema(ranks)
+export const ranksSelectSchema = createSelectSchema(ranks, {
+    id: z.coerce.number().int().positive(),
+})
 export const ranksInsertSchema = createInsertSchema(ranks).omit({ id: true })
 export const ranksUpdateSchema = createUpdateSchema(ranks)
 export type Rank = z.infer<typeof ranksSelectSchema>

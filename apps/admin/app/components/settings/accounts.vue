@@ -3,7 +3,7 @@ const accounts = ref<{ providerId: string }[]>([])
 
 const config = useRuntimeConfig()
 const toast = useToast()
-const { refreshSession } = useAuth()
+const { client, refreshSession } = useAuth()
 
 const list = [
     {
@@ -11,16 +11,21 @@ const list = [
         name: 'GitHub',
         icon: 'simple-icons:github',
     },
+    {
+        providerId: 'vercel',
+        name: 'Vercel',
+        icon: 'simple-icons:vercel',
+    },
 ]
 
 const unlink = async (providerId: string) => {
     try {
         await refreshSession()
-        const { error } = await authClient.unlinkAccount({
+        const { error } = await client.unlinkAccount({
             providerId,
         })
         if (error) throw error
-        accounts.value = (await authClient.listAccounts()).data || []
+        accounts.value = (await client.listAccounts()).data || []
 
         toast.add({
             icon: 'lucide:check',
@@ -38,7 +43,7 @@ const unlink = async (providerId: string) => {
 }
 
 onMounted(async () => {
-    accounts.value = (await authClient.listAccounts()).data || []
+    accounts.value = (await client.listAccounts()).data || []
 })
 </script>
 
@@ -79,7 +84,7 @@ onMounted(async () => {
                     block
                     class="ml-auto w-fit min-w-48"
                     @click="
-                        authClient.linkSocial({
+                        client.linkSocial({
                             provider: item.providerId,
                             callbackURL: `${config.public.adminDomain}/settings#accounts`,
                         })

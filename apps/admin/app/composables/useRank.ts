@@ -1,13 +1,13 @@
+import equal from 'fast-deep-equal'
 import type z from 'zod'
 
-import { AdminModalRank } from '#components'
-import equal from 'fast-deep-equal'
+import { LazyAdminModalRank } from '#components'
 
 export const useRank = () => {
     const toast = useToast()
     const overlay = useOverlay()
 
-    const modalRank = overlay.create(AdminModalRank)
+    const modalRank = overlay.create(LazyAdminModalRank)
 
     const { data: ranks, refresh: fetchRanks } = useFetch('/api/ranks', {
         dedupe: 'defer',
@@ -48,7 +48,7 @@ export const useRank = () => {
             toast.add({
                 icon: 'mingcute:close-line',
                 title: 'Error',
-                description: 'An error occurred while saving the work',
+                description: 'An error occurred while saving the rank',
                 color: 'error',
             })
             throw e
@@ -77,7 +77,7 @@ export const useRank = () => {
             toast.add({
                 icon: 'mingcute:close-line',
                 title: 'Error',
-                description: 'An error occurred while saving the work',
+                description: 'An error occurred while saving the rank',
                 color: 'error',
             })
             throw e

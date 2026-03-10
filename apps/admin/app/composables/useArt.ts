@@ -1,13 +1,13 @@
+import equal from 'fast-deep-equal'
 import type { z } from 'zod'
 
-import { AdminModalArt } from '#components'
-import equal from 'fast-deep-equal'
+import { LazyAdminModalArt } from '#components'
 
 export const useArt = () => {
     const toast = useToast()
     const overlay = useOverlay()
 
-    const modalArt = overlay.create(AdminModalArt)
+    const modalArt = overlay.create(LazyAdminModalArt)
 
     const { data: arts, refresh: fetchArts } = useFetch('/api/arts', {
         dedupe: 'defer',
@@ -38,7 +38,7 @@ export const useArt = () => {
             toast.add({
                 icon: 'mingcute:check-line',
                 title: 'Success',
-                description: 'Work saved successfully',
+                description: 'Art saved successfully',
                 color: 'success',
             })
 
@@ -48,7 +48,7 @@ export const useArt = () => {
             toast.add({
                 icon: 'mingcute:close-line',
                 title: 'Error',
-                description: 'An error occurred while saving the work',
+                description: 'An error occurred while saving the art',
                 color: 'error',
             })
             throw e
@@ -69,7 +69,7 @@ export const useArt = () => {
             toast.add({
                 icon: 'mingcute:check-line',
                 title: 'Success',
-                description: 'Work saved successfully',
+                description: 'Art saved successfully',
                 color: 'success',
             })
         } catch (e) {
@@ -77,7 +77,7 @@ export const useArt = () => {
             toast.add({
                 icon: 'mingcute:close-line',
                 title: 'Error',
-                description: 'An error occurred while saving the work',
+                description: 'An error occurred while saving the art',
                 color: 'error',
             })
             throw e
@@ -132,7 +132,7 @@ export const useArt = () => {
             toast.add({
                 icon: 'mingcute:close-line',
                 title: 'Error',
-                description: 'An error occurred while deleting the work',
+                description: 'An error occurred while deleting the art',
                 color: 'error',
             })
             throw e

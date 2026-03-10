@@ -2,6 +2,7 @@
 const { socials, changed, fetchSocials, reorderSocials, deleteSocial, modalSocial } = useSocial()
 
 const location = useBrowserLocation()
+const config = useRuntimeConfig()
 
 defineShortcuts({
     n: () => {
@@ -22,6 +23,7 @@ defineShortcuts({
 
                         <UButton
                             loading-auto
+                            aria-label="Refresh"
                             icon="mingcute:refresh-2-line"
                             variant="ghost"
                             size="sm"
@@ -75,13 +77,14 @@ defineShortcuts({
                                     <Icon name="mingcute:arrow-right-line" />
                                     <span class="text-muted text-sm">
                                         {{
-                                            `${location.origin?.replace('https://', '')}/${social.alias}`
+                                            `${config.public.homeDomain.replace('https://', '')}/${social.alias}`
                                         }}
                                     </span>
                                 </template>
 
                                 <div class="ml-auto flex items-center">
                                     <UButton
+                                        aria-label="Edit"
                                         icon="mingcute:edit-3-fill"
                                         variant="ghost"
                                         size="sm"
@@ -89,6 +92,7 @@ defineShortcuts({
                                     />
 
                                     <UButton
+                                        aria-label="Delete"
                                         icon="mingcute:close-line"
                                         variant="ghost"
                                         size="sm"

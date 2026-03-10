@@ -57,6 +57,12 @@ export default defineNuxtConfig({
                 tags: ['auth'],
             },
         },
+        devStorage: {
+            auth: {
+                driver: 'fs-lite',
+                base: '.data/devStorage/auth',
+            },
+        },
     },
 
     vite: {

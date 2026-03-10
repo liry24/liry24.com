@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 
 const request = {
     params: artsSelectSchema.required({ slug: true }),
-    body: artsUpdateSchema.required({ slug: true }),
+    body: artsUpdateSchema,
 }
 
 export default adminSessionEventHandler(async () => {
@@ -27,7 +27,7 @@ export default adminSessionEventHandler(async () => {
 
             await tx.insert(artImages).values(
                 images.map((image) => ({
-                    artSlug: slug,
+                    artSlug: slug || workSlug,
                     src: image.src,
                     alt: image.alt,
                 }))

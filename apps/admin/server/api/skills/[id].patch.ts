@@ -2,8 +2,8 @@ import { skills } from '@repo/database/schema'
 import { eq } from 'drizzle-orm'
 
 const request = {
-    params: skillsSelectSchema.required({ id: true }),
-    body: skillsUpdateSchema.required({ id: true }),
+    params: skillsSelectSchema.pick({ id: true }).required({ id: true }),
+    body: skillsUpdateSchema.omit({ id: true }),
 }
 
 export default adminSessionEventHandler(async () => {

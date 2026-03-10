@@ -1,7 +1,7 @@
+import equal from 'fast-deep-equal'
 import type { z } from 'zod'
 
-import { AdminModalSkill } from '#components'
-import equal from 'fast-deep-equal'
+import { LazyAdminModalSkill } from '#components'
 
 export const useSkill = () => {
     const toast = useToast()
@@ -30,7 +30,7 @@ export const useSkill = () => {
 
     const submitting = ref(false)
 
-    const modalSkill = overlay.create(AdminModalSkill, {
+    const modalSkill = overlay.create(LazyAdminModalSkill, {
         props: {
             categories: categories.value,
         },
@@ -48,7 +48,7 @@ export const useSkill = () => {
             toast.add({
                 icon: 'mingcute:check-line',
                 title: 'Success',
-                description: 'Work saved successfully',
+                description: 'Skill saved successfully',
                 color: 'success',
             })
 
@@ -58,7 +58,7 @@ export const useSkill = () => {
             toast.add({
                 icon: 'mingcute:close-line',
                 title: 'Error',
-                description: 'An error occurred while saving the work',
+                description: 'An error occurred while saving the skill',
                 color: 'error',
             })
             throw e
@@ -79,7 +79,7 @@ export const useSkill = () => {
             toast.add({
                 icon: 'mingcute:check-line',
                 title: 'Success',
-                description: 'Work saved successfully',
+                description: 'Skill saved successfully',
                 color: 'success',
             })
         } catch (e) {
@@ -87,7 +87,7 @@ export const useSkill = () => {
             toast.add({
                 icon: 'mingcute:close-line',
                 title: 'Error',
-                description: 'An error occurred while saving the work',
+                description: 'An error occurred while saving the skill',
                 color: 'error',
             })
             throw e
@@ -142,7 +142,7 @@ export const useSkill = () => {
             toast.add({
                 icon: 'mingcute:close-line',
                 title: 'Error',
-                description: 'An error occurred while deleting the work',
+                description: 'An error occurred while deleting the skill',
                 color: 'error',
             })
             throw e

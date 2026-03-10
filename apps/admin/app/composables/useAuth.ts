@@ -9,7 +9,7 @@ export const authClient = createAuthClient({
 
 type Session = typeof authClient.$Infer.Session
 
-export const useAuth = () => {
+export const _useAuth = () => {
     const globalSession = useState<Session | null | undefined>('auth:session', () => undefined)
 
     const getSession = async () => {
@@ -50,7 +50,7 @@ export const useAuth = () => {
         if (result.data?.success) navigateTo('/', { external: true })
     }
 
-    return {
+    const returnObject = {
         client: authClient,
         session: globalSession,
         getSession,
@@ -58,4 +58,20 @@ export const useAuth = () => {
         signIn,
         signOut,
     }
+
+    const initPromise = Promise.all([getSession()]).then(() => returnObject)
+
+    // Merge promise with return object (same pattern as Nuxt's useFetch/useAsyncData)
+    const awaitableResult = Object.assign(initPromise, returnObject)
+
+    // Make Promise methods enumerable
+    Object.defineProperties(awaitableResult, {
+        then: { enumerable: true, value: initPromise.then.bind(initPromise) },
+        catch: { enumerable: true, value: initPromise.catch.bind(initPromise) },
+        finally: { enumerable: true, value: initPromise.finally.bind(initPromise) },
+    })
+
+    return awaitableResult
 }
+
+export const useAuth = createSharedComposable(_useAuth)
