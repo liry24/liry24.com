@@ -1,13 +1,13 @@
+import equal from 'fast-deep-equal'
 import type z from 'zod'
 
-import { AdminModalWork } from '#components'
-import equal from 'fast-deep-equal'
+import { LazyAdminModalWork } from '#components'
 
 export const useWork = () => {
     const toast = useToast()
     const overlay = useOverlay()
 
-    const modalWork = overlay.create(AdminModalWork)
+    const modalWork = overlay.create(LazyAdminModalWork)
 
     const { data: works, refresh: fetchWorks } = useFetch('/api/works', {
         dedupe: 'defer',

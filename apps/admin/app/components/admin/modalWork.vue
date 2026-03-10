@@ -6,12 +6,7 @@ const open = defineModel<boolean>('open', {
 })
 
 interface Props {
-    data?: Serialized<Work> & {
-        image: {
-            src: string
-            alt: string | undefined
-        }
-    }
+    data?: Serialized<Work> & { image: string | null }
     fields?: {
         slug?: boolean
     }
@@ -39,8 +34,8 @@ const state = reactive<Schema>({
     title: props.data?.title || '',
     description: props.data?.description || '',
     category: props.data?.category || '',
-    image: props.data?.image || {
-        src: '',
+    image: {
+        src: props.data?.image || '',
         alt: undefined,
     },
     icon: props.data?.icon || '',

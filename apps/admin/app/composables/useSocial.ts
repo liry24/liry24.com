@@ -1,13 +1,13 @@
+import equal from 'fast-deep-equal'
 import type { z } from 'zod'
 
-import { AdminModalSocial } from '#components'
-import equal from 'fast-deep-equal'
+import { LazyAdminModalSocial } from '#components'
 
 export const useSocial = () => {
     const toast = useToast()
     const overlay = useOverlay()
 
-    const modalSocial = overlay.create(AdminModalSocial)
+    const modalSocial = overlay.create(LazyAdminModalSocial)
 
     const { data: socials, refresh: fetchSocials } = useFetch('/api/socials', {
         dedupe: 'defer',

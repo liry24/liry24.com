@@ -1,6 +1,5 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-    const { getSession } = useAuth()
-    const session = await getSession()
+    const { session } = await useAuth()
 
     if (!session.value || session.value.user.role !== 'admin') {
         if (to.fullPath !== '/login') return navigateTo('/login')

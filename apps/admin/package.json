@@ -27,7 +27,7 @@
         "@repo/utils": "workspace:*",
         "@tigrisdata/storage": "^2.15.2",
         "@vercel/analytics": "^1.6.1",
-        "@vercel/config": "^0.0.37",
+        "@vercel/config": "^0.0.38",
         "ai": "^6.0.116",
         "aws4fetch": "^1.0.20",
         "better-auth": "1.5.4",

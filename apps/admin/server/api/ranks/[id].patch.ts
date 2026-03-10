@@ -2,8 +2,8 @@ import { ranks } from '@repo/database/schema'
 import { eq } from 'drizzle-orm'
 
 const request = {
-    params: ranksSelectSchema.required({ id: true }),
-    body: ranksUpdateSchema.required({ id: true }),
+    params: ranksSelectSchema.pick({ id: true }).required({ id: true }),
+    body: ranksUpdateSchema.omit({ id: true }),
 }
 
 export default adminSessionEventHandler(async () => {

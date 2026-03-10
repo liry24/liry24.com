@@ -1,13 +1,13 @@
+import equal from 'fast-deep-equal'
 import type { z } from 'zod'
 
-import { AdminModalCareer } from '#components'
-import equal from 'fast-deep-equal'
+import { LazyAdminModalCareer } from '#components'
 
 export const useCareer = () => {
     const toast = useToast()
     const overlay = useOverlay()
 
-    const modalCareer = overlay.create(AdminModalCareer)
+    const modalCareer = overlay.create(LazyAdminModalCareer)
 
     const { data: careers, refresh: fetchCareers } = useFetch('/api/careers', {
         dedupe: 'defer',
@@ -132,7 +132,7 @@ export const useCareer = () => {
             toast.add({
                 icon: 'mingcute:close-line',
                 title: 'Error',
-                description: 'An error occurred while deleting the work',
+                description: 'An error occurred while deleting the career',
                 color: 'error',
             })
             throw e

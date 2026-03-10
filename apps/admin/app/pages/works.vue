@@ -76,7 +76,7 @@ defineShortcuts({
 
                                 <div class="ml-auto flex items-center">
                                     <UButton
-                                        aria-label="Edit Work"
+                                        aria-label="Edit"
                                         icon="mingcute:edit-3-fill"
                                         variant="ghost"
                                         size="sm"
@@ -84,7 +84,7 @@ defineShortcuts({
                                     />
 
                                     <UButton
-                                        aria-label="Delete Work"
+                                        aria-label="Delete"
                                         icon="mingcute:close-line"
                                         variant="ghost"
                                         size="sm"

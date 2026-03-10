@@ -2,8 +2,8 @@ import { socials } from '@repo/database/schema'
 import { eq } from 'drizzle-orm'
 
 const request = {
-    params: socialsSelectSchema.required({ id: true }),
-    body: socialsUpdateSchema.required({ id: true }),
+    params: socialsSelectSchema.pick({ id: true }).required({ id: true }),
+    body: socialsUpdateSchema.omit({ id: true }),
 }
 
 export default adminSessionEventHandler(async () => {
