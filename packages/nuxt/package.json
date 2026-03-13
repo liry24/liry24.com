@@ -8,17 +8,21 @@
         "check-types": "tsc --noEmit"
     },
     "dependencies": {
-        "@repo/utils": "workspace:*",
-        "remark-breaks": "^4.0.0"
-    },
-    "peerDependencies": {
-        "@nuxt/content": "^3.11.0",
+        "@nuxt/content": "^3.12.0",
         "@nuxt/image": "^2.0.0",
-        "@nuxt/ui": "^4.4.0",
+        "@nuxt/ui": "^4.5.1",
         "@repo/database": "workspace:*",
-        "@vueuse/nuxt": "^14.1.0",
+        "@repo/utils": "workspace:*",
+        "@vercel/analytics": "^2.0.1",
+        "@vueuse/nuxt": "^14.2.1",
         "clsx": "^2.1.1",
-        "nuxt": "^4.3.0",
-        "tailwind-merge": "^3.4.0"
+        "nuxt": "^4.4.2",
+        "remark-breaks": "^4.0.0",
+        "tailwind-merge": "^3.5.0"
+    },
+    "devDependencies": {
+        "@nuxt/a11y": "^1.0.0-alpha.1",
+        "@nuxt/hints": "^1.0.0",
+        "vue-tsc": "^3.2.5"
     }
 }

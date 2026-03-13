@@ -14,31 +14,18 @@
         "typecheck": "nuxt typecheck"
     },
     "dependencies": {
-        "@iconify-json/lucide": "^1.2.96",
+        "@iconify-json/lucide": "^1.2.97",
         "@iconify-json/mingcute": "^1.2.7",
-        "@iconify-json/simple-icons": "^1.2.72",
-        "@nuxt/content": "^3.12.0",
-        "@nuxt/image": "^2.0.0",
-        "@nuxt/ui": "^4.5.1",
+        "@iconify-json/simple-icons": "^1.2.73",
         "@nuxtjs/sitemap": "7.6.0",
-        "@repo/database": "workspace:*",
         "@repo/nuxt": "workspace:*",
-        "@repo/utils": "workspace:*",
         "@takumi-rs/core": "0.71.7",
-        "@vercel/analytics": "^1.6.1",
-        "@vercel/config": "^0.0.38",
+        "@vercel/config": "^0.0.39",
         "@vercel/functions": "^3.4.3",
         "@yeger/vue-masonry-wall": "^6.1.0",
         "motion-v": "^2.0.0",
-        "nuxt": "^4.3.1",
-        "nuxt-og-image": "^6.0.0-beta.47",
+        "nuxt-og-image": "^6.0.1",
         "zod": "^4.3.6"
-    },
-    "devDependencies": {
-        "@nuxt/a11y": "^1.0.0-alpha.1",
-        "@nuxt/fonts": "^0.14.0",
-        "@nuxt/hints": "^1.0.0-alpha.10",
-        "vue-tsc": "^3.2.5"
     },
     "engines": {
         "node": "24.x"

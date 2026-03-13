@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { NuxtError } from '#app'
-import { Analytics } from '@vercel/analytics/nuxt'
 
 const props = defineProps({
     error: {
@@ -17,7 +16,6 @@ const props = defineProps({
     <UApp>
         <NuxtRouteAnnouncer />
         <NuxtLoadingIndicator />
-        <Analytics />
         <UMain class="flex min-h-dvh w-full flex-col items-center justify-center gap-4">
             <h1 class="font-[Geist] text-9xl leading-none font-extralight text-nowrap">
                 {{ props.error.status }}
