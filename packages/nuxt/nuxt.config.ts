@@ -2,6 +2,10 @@
 export default defineNuxtConfig({
     compatibilityDate: 'latest',
 
+    future: {
+        compatibilityVersion: 5,
+    },
+
     devtools: {
         enabled: true,
         timeline: {
@@ -14,6 +18,7 @@ export default defineNuxtConfig({
         '@nuxt/image',
         '@nuxt/content',
         '@vueuse/nuxt',
+        '@vercel/analytics',
         '@nuxt/hints',
         '@nuxt/a11y',
     ],
@@ -64,6 +69,7 @@ export default defineNuxtConfig({
         inlineRouteRules: true,
         sharedPrerenderData: true,
         typescriptPlugin: true,
+        nitroAutoImports: true,
     },
 
     app: {

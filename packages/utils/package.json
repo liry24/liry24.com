@@ -24,10 +24,5 @@
     },
     "devDependencies": {
         "@types/sanitize-html": "^2.16.1"
-    },
-    "peerDependencies": {
-        "destr": "^2.0.5",
-        "nuxt": "^4.3.0",
-        "tailwind-merge": "^3.4.0"
     }
 }
