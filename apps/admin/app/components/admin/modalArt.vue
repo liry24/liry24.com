@@ -28,7 +28,7 @@ const schema = artsInsertSchema.extend({
         })
         .array(),
 })
-type Schema = z.infer<typeof schema>
+type Schema = { [K in keyof z.infer<typeof schema>]: NonNullable<z.infer<typeof schema>[K]> }
 
 const state = reactive<Schema>({
     slug: props.data?.slug || undefined,
