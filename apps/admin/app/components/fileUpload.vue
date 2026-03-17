@@ -143,9 +143,9 @@ const isImage = (url: string) => {
 const uploadedFiles = computed(() => {
     if (!model.value) return []
     const items = Array.isArray(model.value) ? model.value : [model.value]
-    return items.map((url) => ({
-        url,
-        isImage: isImage(url),
+    return items.map((item) => ({
+        url: item.src,
+        isImage: isImage(item.src),
     }))
 })
 </script>
