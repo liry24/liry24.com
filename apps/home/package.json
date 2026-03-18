@@ -20,11 +20,11 @@
         "@nuxtjs/sitemap": "7.6.0",
         "@repo/nuxt": "workspace:*",
         "@takumi-rs/core": "0.73.1",
-        "@vercel/config": "^0.0.39",
+        "@vercel/config": "^0.0.40",
         "@vercel/functions": "^3.4.3",
         "@yeger/vue-masonry-wall": "^6.1.0",
         "motion-v": "^2.0.1",
-        "nuxt-og-image": "^6.0.2",
+        "nuxt-og-image": "^6.0.3",
         "zod": "^4.3.6"
     },
     "engines": {
