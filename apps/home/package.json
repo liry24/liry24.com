@@ -14,17 +14,17 @@
         "typecheck": "nuxt typecheck"
     },
     "dependencies": {
-        "@iconify-json/lucide": "^1.2.97",
+        "@iconify-json/lucide": "^1.2.98",
         "@iconify-json/mingcute": "^1.2.7",
-        "@iconify-json/simple-icons": "^1.2.73",
+        "@iconify-json/simple-icons": "^1.2.74",
         "@nuxtjs/sitemap": "7.6.0",
         "@repo/nuxt": "workspace:*",
-        "@takumi-rs/core": "0.71.7",
-        "@vercel/config": "^0.0.39",
+        "@takumi-rs/core": "0.73.1",
+        "@vercel/config": "^0.0.40",
         "@vercel/functions": "^3.4.3",
         "@yeger/vue-masonry-wall": "^6.1.0",
-        "motion-v": "^2.0.0",
-        "nuxt-og-image": "^6.0.1",
+        "motion-v": "^2.0.1",
+        "nuxt-og-image": "^6.0.3",
         "zod": "^4.3.6"
     },
     "engines": {
