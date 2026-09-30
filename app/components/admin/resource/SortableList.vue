@@ -21,7 +21,7 @@ watch(
 </script>
 
 <template>
-    <ul ref="parent" class="grid gap-3">
-        <li v-for="item in items" :key="item.id"><slot :item /></li>
+    <ul ref="parent" class="grid min-w-0 grid-cols-1 gap-2">
+        <li v-for="item in items" :key="item.id" class="min-w-0"><slot :item /></li>
     </ul>
 </template>

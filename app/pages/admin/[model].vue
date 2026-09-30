@@ -9,9 +9,10 @@ definePageMeta({
     key: (route) => route.params.model as string,
 })
 const modelName = String(useRoute().params.model)
+const presentation = adminModels[modelName as keyof typeof adminModels]
 const { data: descriptors } = await useFetch<SiteAdminDescriptor>('/api/site-admin/models')
 const descriptor = descriptors.value?.models[modelName]
-if (!descriptor) throw createError({ statusCode: 404 })
+if (!descriptor || !presentation) throw createError({ statusCode: 404 })
 const {
     data: entries,
     refresh,
@@ -41,9 +42,23 @@ async function history(entry: EntryRecord) {
     )
 }
 async function edit(data?: EntryRecord) {
-    await modal.open({ modelName, descriptor: descriptor!, data }).result
+    await modal.open({
+        modelName,
+        descriptor: descriptor!,
+        data,
+        categories: [
+            ...new Set(
+                items.value
+                    .map((entry) => entry.data.category)
+                    .filter(
+                        (value): value is string => typeof value === 'string' && Boolean(value),
+                    ),
+            ),
+        ],
+    }).result
     await refresh()
 }
+defineShortcuts({ n: () => edit() })
 async function operation(entry: EntryRecord, action: string, extra: Record<string, unknown> = {}) {
     busy.value = true
     failure.value = ''
@@ -100,10 +115,30 @@ function move(index: number, offset: number) {
 </script>
 
 <template>
-    <AdminResourcePage :title="modelName" :count="items.length">
+    <AdminResourcePage :title="presentation.label" :icon="presentation.icon" :count="items.length">
+        <template #trailing>
+            <UButton
+                aria-label="Reload latest"
+                title="Refresh"
+                icon="mingcute:refresh-2-line"
+                variant="ghost"
+                size="sm"
+                :disabled="busy"
+                loading-auto
+                @click="refresh()"
+            />
+        </template>
         <template #actions>
-            <UButton label="Reload latest" :disabled="busy" @click="refresh()" />
-            <UButton label="Create" @click="edit()" />
+            <UButton
+                :label="`New ${presentation.singular}`"
+                icon="mingcute:add-line"
+                variant="outline"
+                color="neutral"
+                :ui="{ leadingIcon: 'size-4.5' }"
+                @click="edit()"
+            >
+                <template #trailing><UKbd value="n" class="hidden sm:inline-flex" /></template>
+            </UButton>
         </template>
 
         <UAlert v-if="failure || error" :title="failure || error?.message" color="error" />
@@ -116,82 +151,185 @@ function move(index: number, offset: number) {
             <template #default="{ item }">
                 <AdminResourceSortableItem
                     :sortable="descriptor?.sortable"
+                    :class="modelName === 'works' && 'bg-muted/70 ring-muted/50 rounded-xl px-3'"
                     @up="move(items.indexOf(item), -1)"
                     @down="move(items.indexOf(item), 1)"
                 >
-                    <p>{{ item.data[descriptor?.displayFields?.title || 'title'] || item.slug }}</p>
-
-                    <div class="mt-2 flex flex-wrap gap-2">
-                        <AdminResourceMeta label="current" :value="item.currentRevisionId" />
-                        <AdminResourceMeta label="published" :value="item.publishedRevisionId" />
-                        <AdminResourceMeta label="scheduled" :value="item.scheduledRevisionId" />
-                    </div>
-
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        <UButton
-                            label="Publish"
-                            :disabled="busy"
-                            @click="operation(item, 'publish')"
-                        />
-                        <UButton
-                            v-if="item.publishedRevisionId"
-                            label="Unpublish"
-                            :disabled="busy"
-                            @click="operation(item, 'unpublish')"
-                        />
-                        <input
-                            v-model="schedule[item.id]"
-                            type="datetime-local"
-                            aria-label="Schedule publish time"
-                        />
-                        <UButton
-                            label="Schedule Publish"
-                            :disabled="busy || !schedule[item.id]"
-                            @click="
-                                operation(item, 'schedule', {
-                                    at: new Date(schedule[item.id]!).toISOString(),
-                                })
+                    <template #leading>
+                        <img
+                            v-if="
+                                adminAssetUrl(
+                                    item.data[descriptor.displayFields?.image || 'images'],
+                                )
                             "
+                            :src="
+                                adminAssetUrl(
+                                    item.data[descriptor.displayFields?.image || 'images'],
+                                )
+                            "
+                            alt=""
+                            class="size-12 shrink-0 rounded-lg object-cover"
                         />
-                        <UButton
-                            v-if="item.scheduledRevisionId"
-                            label="Cancel Schedule"
-                            :disabled="busy"
-                            @click="operation(item, 'cancel-schedule')"
+                        <UIcon
+                            v-else-if="typeof item.data.icon === 'string' && item.data.icon"
+                            :name="item.data.icon"
+                            class="size-5 shrink-0"
                         />
-                        <UButton label="Revision history" :disabled="busy" @click="history(item)" />
-
-                        <template v-if="revisions[item.id]">
-                            <select
-                                v-model="selectedRevision[item.id]"
-                                aria-label="Revision to restore"
-                            >
-                                <option
-                                    v-for="revision in revisions[item.id]"
-                                    :key="revision.id"
-                                    :value="revision.id"
-                                >
-                                    {{ revision.createdAt }} — {{ revision.id }}
-                                </option>
-                            </select>
-                            <UButton
-                                label="Restore as draft"
-                                :disabled="busy || !selectedRevision[item.id]"
-                                @click="
-                                    operation(
-                                        item,
-                                        `revisions/${selectedRevision[item.id]}/restore`,
-                                    )
+                    </template>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <p class="text-sm leading-snug">
+                            {{
+                                item.data[descriptor?.displayFields?.title || 'title'] || item.slug
+                            }}
+                        </p>
+                        <UBadge
+                            :label="
+                                item.publishedRevisionId
+                                    ? item.currentRevisionId === item.publishedRevisionId
+                                        ? 'Published'
+                                        : 'Unpublished changes'
+                                    : 'Draft'
+                            "
+                            color="neutral"
+                            variant="subtle"
+                            size="sm"
+                        />
+                        <UBadge
+                            v-if="item.scheduledAt"
+                            label="Scheduled"
+                            icon="mingcute:time-line"
+                            color="neutral"
+                            variant="subtle"
+                            size="sm"
+                        />
+                    </div>
+                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                        <template v-for="field in presentation.fields" :key="field">
+                            <AdminResourceMeta
+                                v-if="
+                                    modelName === 'works' &&
+                                    (field === 'slug' ? item.slug : item.data[field])
                                 "
+                                :label="field"
+                                :value="field === 'slug' ? item.slug : item.data[field]"
                             />
+                            <span
+                                v-else-if="
+                                    modelName !== 'works' &&
+                                    (field === 'slug' ? item.slug : item.data[field])
+                                "
+                                class="text-muted text-sm break-words"
+                                >{{ field === 'slug' ? item.slug : item.data[field] }}</span
+                            >
                         </template>
                     </div>
+                    <details class="group mt-3">
+                        <summary
+                            class="text-muted hover:text-default flex w-fit cursor-pointer list-none items-center gap-1 text-xs"
+                        >
+                            <UIcon
+                                name="mingcute:down-line"
+                                class="size-3.5 transition-transform group-open:rotate-180"
+                            />
+                            Publishing &amp; history
+                        </summary>
+                        <div
+                            class="border-default mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
+                        >
+                            <UButton
+                                label="Publish"
+                                icon="mingcute:upload-3-fill"
+                                variant="soft"
+                                color="neutral"
+                                size="sm"
+                                :disabled="busy"
+                                @click="operation(item, 'publish')"
+                            />
+                            <UButton
+                                v-if="item.publishedRevisionId"
+                                label="Unpublish"
+                                variant="ghost"
+                                color="neutral"
+                                size="sm"
+                                :disabled="busy"
+                                @click="operation(item, 'unpublish')"
+                            />
+                            <UInput
+                                v-model="schedule[item.id]"
+                                type="datetime-local"
+                                aria-label="Schedule publish time"
+                                variant="soft"
+                                size="sm"
+                            />
+                            <UButton
+                                label="Schedule Publish"
+                                variant="soft"
+                                color="neutral"
+                                size="sm"
+                                :disabled="busy || !schedule[item.id]"
+                                @click="
+                                    operation(item, 'schedule', {
+                                        at: new Date(schedule[item.id]!).toISOString(),
+                                    })
+                                "
+                            />
+                            <UButton
+                                v-if="item.scheduledRevisionId"
+                                label="Cancel Schedule"
+                                variant="ghost"
+                                color="neutral"
+                                size="sm"
+                                :disabled="busy"
+                                @click="operation(item, 'cancel-schedule')"
+                            />
+                            <UButton
+                                label="Revision history"
+                                icon="mingcute:history-line"
+                                variant="ghost"
+                                color="neutral"
+                                size="sm"
+                                :disabled="busy"
+                                @click="history(item)"
+                            />
+
+                            <template v-if="revisions[item.id]">
+                                <USelect
+                                    v-model="selectedRevision[item.id]"
+                                    aria-label="Revision to restore"
+                                    :items="
+                                        revisions[item.id]?.map((revision) => ({
+                                            label: `${new Date(revision.createdAt).toLocaleString()} — ${revision.slug}`,
+                                            value: revision.id,
+                                        }))
+                                    "
+                                    placeholder="Select a revision"
+                                    variant="soft"
+                                    size="sm"
+                                    class="w-full sm:max-w-72"
+                                />
+                                <UButton
+                                    label="Restore as draft"
+                                    variant="soft"
+                                    color="neutral"
+                                    size="sm"
+                                    :disabled="busy || !selectedRevision[item.id]"
+                                    @click="
+                                        operation(
+                                            item,
+                                            `revisions/${selectedRevision[item.id]}/restore`,
+                                        )
+                                    "
+                                />
+                            </template>
+                        </div>
+                    </details>
 
                     <template #actions>
                         <UButton
                             aria-label="Edit"
                             icon="mingcute:edit-3-fill"
                             variant="ghost"
+                            size="sm"
                             :disabled="busy"
                             @click="edit(item)"
                         />
@@ -199,6 +337,7 @@ function move(index: number, offset: number) {
                             aria-label="Delete"
                             icon="mingcute:close-line"
                             variant="ghost"
+                            size="sm"
                             :disabled="busy"
                             @click="operation(item, 'delete')"
                         />

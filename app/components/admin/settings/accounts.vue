@@ -4,6 +4,7 @@ const accounts = ref<{ id: string; providerId: string }[]>([])
 const toast = useToast()
 const client = useAuthClient()
 const { fetchSession } = useUserSession()
+const isPreview = String(useRuntimeConfig().public.preview) === 'true'
 
 const list = [
     {
@@ -60,7 +61,7 @@ onMounted(async () => {
 
         <div class="mx-auto flex w-fit flex-col gap-6">
             <UPageCard
-                v-for="item in list"
+                v-for="item in list.filter((item) => !isPreview || item.providerId === 'github')"
                 :key="item.providerId"
                 orientation="horizontal"
                 variant="naked"
