@@ -1,0 +1,2194 @@
+{
+    "version": "7",
+    "dialect": "sqlite",
+    "id": "6013802b-e3ca-470d-87f7-45137959b87d",
+    "prevIds": ["4defb399-bf63-43d3-a298-1fefd669e9c6"],
+    "ddl": [
+        {
+            "name": "accounts",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_asset_refs",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_assets",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_content_arts",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_content_careers",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_content_posts",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_content_ranks",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_content_skills",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_content_socials",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_content_works",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_entries",
+            "entityType": "tables"
+        },
+        {
+            "name": "jwks",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_meta",
+            "entityType": "tables"
+        },
+        {
+            "name": "passkeys",
+            "entityType": "tables"
+        },
+        {
+            "name": "rate_limits",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_relations",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_revisions",
+            "entityType": "tables"
+        },
+        {
+            "name": "site_admin_routes",
+            "entityType": "tables"
+        },
+        {
+            "name": "sessions",
+            "entityType": "tables"
+        },
+        {
+            "name": "users",
+            "entityType": "tables"
+        },
+        {
+            "name": "verifications",
+            "entityType": "tables"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "id",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "account_id",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "provider_id",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "user_id",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "access_token",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "refresh_token",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "id_token",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "integer",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "access_token_expires_at",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "integer",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "refresh_token_expires_at",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "scope",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "password",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": "(cast(unixepoch('subsecond') * 1000 as integer))",
+            "generated": null,
+            "name": "created_at",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "updated_at",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "issuer",
+            "entityType": "columns",
+            "table": "accounts"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "revision_id",
+            "entityType": "columns",
+            "table": "site_admin_asset_refs"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_path",
+            "entityType": "columns",
+            "table": "site_admin_asset_refs"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "asset_id",
+            "entityType": "columns",
+            "table": "site_admin_asset_refs"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "position",
+            "entityType": "columns",
+            "table": "site_admin_asset_refs"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "id",
+            "entityType": "columns",
+            "table": "site_admin_assets"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "storage",
+            "entityType": "columns",
+            "table": "site_admin_assets"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "key",
+            "entityType": "columns",
+            "table": "site_admin_assets"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "content_type",
+            "entityType": "columns",
+            "table": "site_admin_assets"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "size",
+            "entityType": "columns",
+            "table": "site_admin_assets"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "checksum",
+            "entityType": "columns",
+            "table": "site_admin_assets"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": "'{}'",
+            "generated": null,
+            "name": "metadata",
+            "entityType": "columns",
+            "table": "site_admin_assets"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "state",
+            "entityType": "columns",
+            "table": "site_admin_assets"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "operation_token",
+            "entityType": "columns",
+            "table": "site_admin_assets"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "lease_expires_at",
+            "entityType": "columns",
+            "table": "site_admin_assets"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "created_at",
+            "entityType": "columns",
+            "table": "site_admin_assets"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "updated_at",
+            "entityType": "columns",
+            "table": "site_admin_assets"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "revision_id",
+            "entityType": "columns",
+            "table": "site_admin_content_arts"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_title",
+            "entityType": "columns",
+            "table": "site_admin_content_arts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_description",
+            "entityType": "columns",
+            "table": "site_admin_content_arts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_href",
+            "entityType": "columns",
+            "table": "site_admin_content_arts"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_images",
+            "entityType": "columns",
+            "table": "site_admin_content_arts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_createdAt",
+            "entityType": "columns",
+            "table": "site_admin_content_arts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "revision_id",
+            "entityType": "columns",
+            "table": "site_admin_content_careers"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_period",
+            "entityType": "columns",
+            "table": "site_admin_content_careers"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_position",
+            "entityType": "columns",
+            "table": "site_admin_content_careers"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_company",
+            "entityType": "columns",
+            "table": "site_admin_content_careers"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "revision_id",
+            "entityType": "columns",
+            "table": "site_admin_content_posts"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_title",
+            "entityType": "columns",
+            "table": "site_admin_content_posts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_excerpt",
+            "entityType": "columns",
+            "table": "site_admin_content_posts"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_content",
+            "entityType": "columns",
+            "table": "site_admin_content_posts"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_tags",
+            "entityType": "columns",
+            "table": "site_admin_content_posts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_image",
+            "entityType": "columns",
+            "table": "site_admin_content_posts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_authorUserId",
+            "entityType": "columns",
+            "table": "site_admin_content_posts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_createdAt",
+            "entityType": "columns",
+            "table": "site_admin_content_posts"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "revision_id",
+            "entityType": "columns",
+            "table": "site_admin_content_ranks"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_game",
+            "entityType": "columns",
+            "table": "site_admin_content_ranks"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_season",
+            "entityType": "columns",
+            "table": "site_admin_content_ranks"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_rank",
+            "entityType": "columns",
+            "table": "site_admin_content_ranks"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_image",
+            "entityType": "columns",
+            "table": "site_admin_content_ranks"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_href",
+            "entityType": "columns",
+            "table": "site_admin_content_ranks"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "revision_id",
+            "entityType": "columns",
+            "table": "site_admin_content_skills"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_name",
+            "entityType": "columns",
+            "table": "site_admin_content_skills"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_icon",
+            "entityType": "columns",
+            "table": "site_admin_content_skills"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_category",
+            "entityType": "columns",
+            "table": "site_admin_content_skills"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "revision_id",
+            "entityType": "columns",
+            "table": "site_admin_content_socials"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_href",
+            "entityType": "columns",
+            "table": "site_admin_content_socials"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_icon",
+            "entityType": "columns",
+            "table": "site_admin_content_socials"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_label",
+            "entityType": "columns",
+            "table": "site_admin_content_socials"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "revision_id",
+            "entityType": "columns",
+            "table": "site_admin_content_works"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_title",
+            "entityType": "columns",
+            "table": "site_admin_content_works"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_description",
+            "entityType": "columns",
+            "table": "site_admin_content_works"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_category",
+            "entityType": "columns",
+            "table": "site_admin_content_works"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_image",
+            "entityType": "columns",
+            "table": "site_admin_content_works"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_icon",
+            "entityType": "columns",
+            "table": "site_admin_content_works"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_href",
+            "entityType": "columns",
+            "table": "site_admin_content_works"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_price",
+            "entityType": "columns",
+            "table": "site_admin_content_works"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_style",
+            "entityType": "columns",
+            "table": "site_admin_content_works"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_createdAt",
+            "entityType": "columns",
+            "table": "site_admin_content_works"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "id",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "model",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": "''",
+            "generated": null,
+            "name": "locale",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "translation_group",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "current_revision_id",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "published_revision_id",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "scheduled_revision_id",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "scheduled_at",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "real",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "sort_order",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": "0",
+            "generated": null,
+            "name": "version",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "created_at",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "updated_at",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "published_at",
+            "entityType": "columns",
+            "table": "site_admin_entries"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "id",
+            "entityType": "columns",
+            "table": "jwks"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "public_key",
+            "entityType": "columns",
+            "table": "jwks"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "private_key",
+            "entityType": "columns",
+            "table": "jwks"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "created_at",
+            "entityType": "columns",
+            "table": "jwks"
+        },
+        {
+            "type": "integer",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "expires_at",
+            "entityType": "columns",
+            "table": "jwks"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "alg",
+            "entityType": "columns",
+            "table": "jwks"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "crv",
+            "entityType": "columns",
+            "table": "jwks"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "key",
+            "entityType": "columns",
+            "table": "site_admin_meta"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "value",
+            "entityType": "columns",
+            "table": "site_admin_meta"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "id",
+            "entityType": "columns",
+            "table": "passkeys"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "name",
+            "entityType": "columns",
+            "table": "passkeys"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "public_key",
+            "entityType": "columns",
+            "table": "passkeys"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "user_id",
+            "entityType": "columns",
+            "table": "passkeys"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "credential_id",
+            "entityType": "columns",
+            "table": "passkeys"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "counter",
+            "entityType": "columns",
+            "table": "passkeys"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "device_type",
+            "entityType": "columns",
+            "table": "passkeys"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "backed_up",
+            "entityType": "columns",
+            "table": "passkeys"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "transports",
+            "entityType": "columns",
+            "table": "passkeys"
+        },
+        {
+            "type": "integer",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "created_at",
+            "entityType": "columns",
+            "table": "passkeys"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "aaguid",
+            "entityType": "columns",
+            "table": "passkeys"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "id",
+            "entityType": "columns",
+            "table": "rate_limits"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "key",
+            "entityType": "columns",
+            "table": "rate_limits"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "count",
+            "entityType": "columns",
+            "table": "rate_limits"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "last_request",
+            "entityType": "columns",
+            "table": "rate_limits"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "revision_id",
+            "entityType": "columns",
+            "table": "site_admin_relations"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "field_path",
+            "entityType": "columns",
+            "table": "site_admin_relations"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "target_entry_id",
+            "entityType": "columns",
+            "table": "site_admin_relations"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "position",
+            "entityType": "columns",
+            "table": "site_admin_relations"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "required",
+            "entityType": "columns",
+            "table": "site_admin_relations"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "id",
+            "entityType": "columns",
+            "table": "site_admin_revisions"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "entry_id",
+            "entityType": "columns",
+            "table": "site_admin_revisions"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "slug",
+            "entityType": "columns",
+            "table": "site_admin_revisions"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "actor_id",
+            "entityType": "columns",
+            "table": "site_admin_revisions"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "created_at",
+            "entityType": "columns",
+            "table": "site_admin_revisions"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "path",
+            "entityType": "columns",
+            "table": "site_admin_routes"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": "''",
+            "generated": null,
+            "name": "locale",
+            "entityType": "columns",
+            "table": "site_admin_routes"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "entry_id",
+            "entityType": "columns",
+            "table": "site_admin_routes"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "revision_id",
+            "entityType": "columns",
+            "table": "site_admin_routes"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "kind",
+            "entityType": "columns",
+            "table": "site_admin_routes"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "target_path",
+            "entityType": "columns",
+            "table": "site_admin_routes"
+        },
+        {
+            "type": "integer",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "status",
+            "entityType": "columns",
+            "table": "site_admin_routes"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "created_at",
+            "entityType": "columns",
+            "table": "site_admin_routes"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "id",
+            "entityType": "columns",
+            "table": "sessions"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "expires_at",
+            "entityType": "columns",
+            "table": "sessions"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "token",
+            "entityType": "columns",
+            "table": "sessions"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": "(cast(unixepoch('subsecond') * 1000 as integer))",
+            "generated": null,
+            "name": "created_at",
+            "entityType": "columns",
+            "table": "sessions"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "updated_at",
+            "entityType": "columns",
+            "table": "sessions"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "ip_address",
+            "entityType": "columns",
+            "table": "sessions"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "user_agent",
+            "entityType": "columns",
+            "table": "sessions"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "user_id",
+            "entityType": "columns",
+            "table": "sessions"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "impersonated_by",
+            "entityType": "columns",
+            "table": "sessions"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "id",
+            "entityType": "columns",
+            "table": "users"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "name",
+            "entityType": "columns",
+            "table": "users"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "email",
+            "entityType": "columns",
+            "table": "users"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": "false",
+            "generated": null,
+            "name": "email_verified",
+            "entityType": "columns",
+            "table": "users"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "image",
+            "entityType": "columns",
+            "table": "users"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": "(cast(unixepoch('subsecond') * 1000 as integer))",
+            "generated": null,
+            "name": "created_at",
+            "entityType": "columns",
+            "table": "users"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": "(cast(unixepoch('subsecond') * 1000 as integer))",
+            "generated": null,
+            "name": "updated_at",
+            "entityType": "columns",
+            "table": "users"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "role",
+            "entityType": "columns",
+            "table": "users"
+        },
+        {
+            "type": "integer",
+            "notNull": false,
+            "autoincrement": false,
+            "default": "false",
+            "generated": null,
+            "name": "banned",
+            "entityType": "columns",
+            "table": "users"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "ban_reason",
+            "entityType": "columns",
+            "table": "users"
+        },
+        {
+            "type": "integer",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "ban_expires",
+            "entityType": "columns",
+            "table": "users"
+        },
+        {
+            "type": "text",
+            "notNull": false,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "id",
+            "entityType": "columns",
+            "table": "verifications"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "identifier",
+            "entityType": "columns",
+            "table": "verifications"
+        },
+        {
+            "type": "text",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "value",
+            "entityType": "columns",
+            "table": "verifications"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": null,
+            "generated": null,
+            "name": "expires_at",
+            "entityType": "columns",
+            "table": "verifications"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": "(cast(unixepoch('subsecond') * 1000 as integer))",
+            "generated": null,
+            "name": "created_at",
+            "entityType": "columns",
+            "table": "verifications"
+        },
+        {
+            "type": "integer",
+            "notNull": true,
+            "autoincrement": false,
+            "default": "(cast(unixepoch('subsecond') * 1000 as integer))",
+            "generated": null,
+            "name": "updated_at",
+            "entityType": "columns",
+            "table": "verifications"
+        },
+        {
+            "columns": ["user_id"],
+            "tableTo": "users",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_accounts_user_id_users_id_fk",
+            "entityType": "fks",
+            "table": "accounts"
+        },
+        {
+            "columns": ["revision_id"],
+            "tableTo": "site_admin_revisions",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_site_admin_asset_refs_revision_id_site_admin_revisions_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_asset_refs"
+        },
+        {
+            "columns": ["asset_id"],
+            "tableTo": "site_admin_assets",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "RESTRICT",
+            "nameExplicit": false,
+            "name": "fk_site_admin_asset_refs_asset_id_site_admin_assets_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_asset_refs"
+        },
+        {
+            "columns": ["revision_id"],
+            "tableTo": "site_admin_revisions",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_site_admin_content_arts_revision_id_site_admin_revisions_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_content_arts"
+        },
+        {
+            "columns": ["revision_id"],
+            "tableTo": "site_admin_revisions",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_site_admin_content_careers_revision_id_site_admin_revisions_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_content_careers"
+        },
+        {
+            "columns": ["revision_id"],
+            "tableTo": "site_admin_revisions",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_site_admin_content_posts_revision_id_site_admin_revisions_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_content_posts"
+        },
+        {
+            "columns": ["revision_id"],
+            "tableTo": "site_admin_revisions",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_site_admin_content_ranks_revision_id_site_admin_revisions_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_content_ranks"
+        },
+        {
+            "columns": ["revision_id"],
+            "tableTo": "site_admin_revisions",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_site_admin_content_skills_revision_id_site_admin_revisions_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_content_skills"
+        },
+        {
+            "columns": ["revision_id"],
+            "tableTo": "site_admin_revisions",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_site_admin_content_socials_revision_id_site_admin_revisions_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_content_socials"
+        },
+        {
+            "columns": ["revision_id"],
+            "tableTo": "site_admin_revisions",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_site_admin_content_works_revision_id_site_admin_revisions_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_content_works"
+        },
+        {
+            "columns": ["user_id"],
+            "tableTo": "users",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_passkeys_user_id_users_id_fk",
+            "entityType": "fks",
+            "table": "passkeys"
+        },
+        {
+            "columns": ["revision_id"],
+            "tableTo": "site_admin_revisions",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_site_admin_relations_revision_id_site_admin_revisions_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_relations"
+        },
+        {
+            "columns": ["target_entry_id"],
+            "tableTo": "site_admin_entries",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "RESTRICT",
+            "nameExplicit": false,
+            "name": "fk_site_admin_relations_target_entry_id_site_admin_entries_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_relations"
+        },
+        {
+            "columns": ["entry_id"],
+            "tableTo": "site_admin_entries",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_site_admin_revisions_entry_id_site_admin_entries_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_revisions"
+        },
+        {
+            "columns": ["entry_id"],
+            "tableTo": "site_admin_entries",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_site_admin_routes_entry_id_site_admin_entries_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_routes"
+        },
+        {
+            "columns": ["revision_id"],
+            "tableTo": "site_admin_revisions",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_site_admin_routes_revision_id_site_admin_revisions_id_fk",
+            "entityType": "fks",
+            "table": "site_admin_routes"
+        },
+        {
+            "columns": ["user_id"],
+            "tableTo": "users",
+            "columnsTo": ["id"],
+            "onUpdate": "NO ACTION",
+            "onDelete": "CASCADE",
+            "nameExplicit": false,
+            "name": "fk_sessions_user_id_users_id_fk",
+            "entityType": "fks",
+            "table": "sessions"
+        },
+        {
+            "columns": ["revision_id", "field_path", "position"],
+            "nameExplicit": false,
+            "name": "site_admin_asset_refs_pk",
+            "entityType": "pks",
+            "table": "site_admin_asset_refs"
+        },
+        {
+            "columns": ["revision_id", "field_path", "position"],
+            "nameExplicit": false,
+            "name": "site_admin_relations_pk",
+            "entityType": "pks",
+            "table": "site_admin_relations"
+        },
+        {
+            "columns": ["locale", "path"],
+            "nameExplicit": false,
+            "name": "site_admin_routes_pk",
+            "entityType": "pks",
+            "table": "site_admin_routes"
+        },
+        {
+            "columns": ["id"],
+            "nameExplicit": false,
+            "name": "accounts_pk",
+            "table": "accounts",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["id"],
+            "nameExplicit": false,
+            "name": "site_admin_assets_pk",
+            "table": "site_admin_assets",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["revision_id"],
+            "nameExplicit": false,
+            "name": "site_admin_content_arts_pk",
+            "table": "site_admin_content_arts",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["revision_id"],
+            "nameExplicit": false,
+            "name": "site_admin_content_careers_pk",
+            "table": "site_admin_content_careers",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["revision_id"],
+            "nameExplicit": false,
+            "name": "site_admin_content_posts_pk",
+            "table": "site_admin_content_posts",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["revision_id"],
+            "nameExplicit": false,
+            "name": "site_admin_content_ranks_pk",
+            "table": "site_admin_content_ranks",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["revision_id"],
+            "nameExplicit": false,
+            "name": "site_admin_content_skills_pk",
+            "table": "site_admin_content_skills",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["revision_id"],
+            "nameExplicit": false,
+            "name": "site_admin_content_socials_pk",
+            "table": "site_admin_content_socials",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["revision_id"],
+            "nameExplicit": false,
+            "name": "site_admin_content_works_pk",
+            "table": "site_admin_content_works",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["id"],
+            "nameExplicit": false,
+            "name": "site_admin_entries_pk",
+            "table": "site_admin_entries",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["id"],
+            "nameExplicit": false,
+            "name": "jwks_pk",
+            "table": "jwks",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["key"],
+            "nameExplicit": false,
+            "name": "site_admin_meta_pk",
+            "table": "site_admin_meta",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["id"],
+            "nameExplicit": false,
+            "name": "passkeys_pk",
+            "table": "passkeys",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["id"],
+            "nameExplicit": false,
+            "name": "rate_limits_pk",
+            "table": "rate_limits",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["id"],
+            "nameExplicit": false,
+            "name": "site_admin_revisions_pk",
+            "table": "site_admin_revisions",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["id"],
+            "nameExplicit": false,
+            "name": "sessions_pk",
+            "table": "sessions",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["id"],
+            "nameExplicit": false,
+            "name": "users_pk",
+            "table": "users",
+            "entityType": "pks"
+        },
+        {
+            "columns": ["id"],
+            "nameExplicit": false,
+            "name": "verifications_pk",
+            "table": "verifications",
+            "entityType": "pks"
+        },
+        {
+            "columns": [
+                {
+                    "value": "user_id",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": false,
+            "where": null,
+            "origin": "manual",
+            "name": "accounts_userId_idx",
+            "entityType": "indexes",
+            "table": "accounts"
+        },
+        {
+            "columns": [
+                {
+                    "value": "asset_id",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": false,
+            "where": null,
+            "origin": "manual",
+            "name": "site_admin_asset_refs_asset",
+            "entityType": "indexes",
+            "table": "site_admin_asset_refs"
+        },
+        {
+            "columns": [
+                {
+                    "value": "storage",
+                    "isExpression": false
+                },
+                {
+                    "value": "key",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": true,
+            "where": null,
+            "origin": "manual",
+            "name": "site_admin_assets_key",
+            "entityType": "indexes",
+            "table": "site_admin_assets"
+        },
+        {
+            "columns": [
+                {
+                    "value": "state",
+                    "isExpression": false
+                },
+                {
+                    "value": "created_at",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": false,
+            "where": null,
+            "origin": "manual",
+            "name": "site_admin_assets_gc",
+            "entityType": "indexes",
+            "table": "site_admin_assets"
+        },
+        {
+            "columns": [
+                {
+                    "value": "model",
+                    "isExpression": false
+                },
+                {
+                    "value": "translation_group",
+                    "isExpression": false
+                },
+                {
+                    "value": "locale",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": true,
+            "where": null,
+            "origin": "manual",
+            "name": "site_admin_entries_translation",
+            "entityType": "indexes",
+            "table": "site_admin_entries"
+        },
+        {
+            "columns": [
+                {
+                    "value": "model",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": false,
+            "where": null,
+            "origin": "manual",
+            "name": "site_admin_entries_model",
+            "entityType": "indexes",
+            "table": "site_admin_entries"
+        },
+        {
+            "columns": [
+                {
+                    "value": "scheduled_at",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": false,
+            "where": "\"site_admin_entries\".\"scheduled_revision_id\" IS NOT NULL",
+            "origin": "manual",
+            "name": "site_admin_entries_schedule",
+            "entityType": "indexes",
+            "table": "site_admin_entries"
+        },
+        {
+            "columns": [
+                {
+                    "value": "user_id",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": false,
+            "where": null,
+            "origin": "manual",
+            "name": "passkeys_userId_idx",
+            "entityType": "indexes",
+            "table": "passkeys"
+        },
+        {
+            "columns": [
+                {
+                    "value": "credential_id",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": false,
+            "where": null,
+            "origin": "manual",
+            "name": "passkeys_credentialID_idx",
+            "entityType": "indexes",
+            "table": "passkeys"
+        },
+        {
+            "columns": [
+                {
+                    "value": "target_entry_id",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": false,
+            "where": null,
+            "origin": "manual",
+            "name": "site_admin_relations_target",
+            "entityType": "indexes",
+            "table": "site_admin_relations"
+        },
+        {
+            "columns": [
+                {
+                    "value": "entry_id",
+                    "isExpression": false
+                },
+                {
+                    "value": "created_at",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": false,
+            "where": null,
+            "origin": "manual",
+            "name": "site_admin_revisions_entry",
+            "entityType": "indexes",
+            "table": "site_admin_revisions"
+        },
+        {
+            "columns": [
+                {
+                    "value": "entry_id",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": false,
+            "where": null,
+            "origin": "manual",
+            "name": "site_admin_routes_entry",
+            "entityType": "indexes",
+            "table": "site_admin_routes"
+        },
+        {
+            "columns": [
+                {
+                    "value": "user_id",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": false,
+            "where": null,
+            "origin": "manual",
+            "name": "sessions_userId_idx",
+            "entityType": "indexes",
+            "table": "sessions"
+        },
+        {
+            "columns": [
+                {
+                    "value": "identifier",
+                    "isExpression": false
+                }
+            ],
+            "isUnique": false,
+            "where": null,
+            "origin": "manual",
+            "name": "verifications_identifier_idx",
+            "entityType": "indexes",
+            "table": "verifications"
+        },
+        {
+            "columns": ["key"],
+            "nameExplicit": false,
+            "name": "rate_limits_key_unique",
+            "entityType": "uniques",
+            "table": "rate_limits"
+        },
+        {
+            "columns": ["token"],
+            "nameExplicit": false,
+            "name": "sessions_token_unique",
+            "entityType": "uniques",
+            "table": "sessions"
+        },
+        {
+            "columns": ["email"],
+            "nameExplicit": false,
+            "name": "users_email_unique",
+            "entityType": "uniques",
+            "table": "users"
+        }
+    ],
+    "renames": []
+}

@@ -27,5 +27,7 @@ logs
 .agent
 
 .wrangler
+.cloudflare
+.dev.vars*
 workers/**/worker-configuration.d.ts
 .tmp
