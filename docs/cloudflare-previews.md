@@ -17,7 +17,7 @@ bun run preview
 
 - 名前はブランチ名の短縮slugとSHA-256先頭12桁から決定。同一ブランチへの再pushでは同じURL、D1、R2を使う。
 - 新規ブランチは専用D1へschemaのみ適用し、専用R2は空で開始。本番、ローカル、他ブランチのデータや認証行はコピーしない。
-- PreviewのCronとcustom domainは無効。画像は同じPreview originのfiles APIから配信。HTMLとレスポンスはnoindex。
+- PreviewのCronとcustom domainは無効。画像は同じPreview originのcontent assets APIから配信。HTMLとレスポンスはnoindex。
 - `main` のproduction deploymentやmigrationはこのworkflowでは実行しない。
 - `dev` に特別な役割はない。現在のURL: <https://p-dev-ef260e9aa3c6-liry24-com.liry.workers.dev>
 
@@ -46,6 +46,8 @@ GitHub Environment `Preview` のSecrets:
 
 Cloudflare tokenと権限照会PATは **2026-12-30失効**。期限前に更新し、Environment Secretsを置換する。Cloudflare tokenは同accountの他のWorkers/D1/R2も編集可能な範囲を持つ。信頼できるブランチのコードだけをこのrepositoryへpushすること。Secretはgitへ保存しない。手元の `.env` ではCloudflare tokenを `PREVIEW_CLOUDFLARE_API_TOKEN` として読み込める。
 
+auth moduleがビルド時に取り込むローカル `.env` のsecretは、PreviewのNitro設定から除外する。認証にはデプロイ済みの `BETTER_AUTH_SECRET` を使い、ローカルとActionsのビルドで値が変わらないようにする。
+
 ## ブランチ削除
 
 branch deleteイベントでPreview、R2内object、R2 bucket、D1の順に削除する。GitHub上にブランチが残っている場合とmainは拒否する。workflowのdeleteイベントはdefault branch上の定義を使用するため、**mainへこのworkflowを取り込むまでは手動で削除する**。
@@ -61,3 +63,11 @@ node --env-file=.env scripts/preview.mjs delete codex/example
 旧Cloudflare Buildsのmain以外用triggerは `liry24-com` と `liry24-com-admin` の2件を停止済み。main用triggerは従来設定を維持しており、root統合後の本番切替は別途必要。mainへマージする前に本番DB backup・移行・旧trigger更新を準備する。本番D1/R2へ今回のmigrationは適用していない。
 
 親WorkerはPreview URLsのみ有効化済みで、productionのworkers.dev URLは無効のまま。`previewUrls: true` を本番設定にも維持し、将来の本番デプロイでPreview URLを無効化しない。
+
+## 2026-10-01 検証
+
+- format/lint/typecheck、unit 5件、Worker 2件、固定lockfile install、cf buildが成功。
+- devと一時ブランチ `codex/preview-check` のpushからActionsが成功。専用D1/R2の分離、同一ブランチの再デプロイでデータと画像の保持を確認。
+- 実際のGitHub管理者ログイン、作品保存/公開、R2画像アップロードと配信byte一致、匿名管理APIの401、Previewのnoindexを確認。
+- 非admin・権限変更・ID不一致・GitHub API障害はunit testで拒否を確認。他人のGitHubアカウントを使う実ログイン検証は行っていない。
+- 一時ブランチ削除後、Preview・検証objectを含むR2・D1を削除済み。cf betaのprefix削除は `--body '[]'` も必要で、成功時の空レスポンスを許容する。

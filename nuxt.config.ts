@@ -54,6 +54,14 @@ export default defineNuxtConfig({
         },
     },
 
+    hooks: {
+        'nitro:config'(config) {
+            // The auth module copies local .env secrets into runtimeConfig during a build.
+            // Previews must use their deployed BETTER_AUTH_SECRET on every build machine.
+            if (isPreview && config.runtimeConfig) config.runtimeConfig.betterAuthSecret = ''
+        },
+    },
+
     routeRules: {
         '/': { swr: 300 },
         '/arts/**': { swr: 300 },

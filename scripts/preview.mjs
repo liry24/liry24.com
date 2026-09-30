@@ -41,7 +41,7 @@ function run(executable, args, { input, json = false, env = environment } = {}) 
                     ),
                 )
             try {
-                resolve(json ? JSON.parse(stdout) : stdout)
+                resolve(json && stdout.trim() ? JSON.parse(stdout) : stdout)
             } catch (error) {
                 reject(error)
             }
@@ -169,6 +169,9 @@ if (action === 'deploy') {
             '--bucket-name',
             target.resourceName,
             '--prefix=',
+            // cf beta requires a body even in prefix mode; the API ignores it in that mode.
+            '--body',
+            '[]',
             '--force',
         )
         const deadline = Date.now() + 10 * 60 * 1000
