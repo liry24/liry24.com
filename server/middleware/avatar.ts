@@ -10,7 +10,6 @@ const formatToWsrv = {
 type AvatarFormat = keyof typeof formatToWsrv
 
 export default defineEventHandler(async (event) => {
-    const config = useRuntimeConfig(event)
     const path = getRequestURL(event).pathname
     const match = path.match(AVATAR_REGEX)
 
@@ -29,7 +28,7 @@ export default defineEventHandler(async (event) => {
     if (!size) throw createError({ status: 400, statusText: 'Bad Request' })
 
     const params = new URLSearchParams({
-        url: `${config.public.imagesDomain}/avatar.png`,
+        url: 'https://images.liry24.com/avatar.png',
         w: String(size),
         h: String(size),
         fit: 'inside',

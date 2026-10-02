@@ -1,3 +1,21 @@
+CREATE TABLE `accounts` (
+	`id` text PRIMARY KEY,
+	`account_id` text NOT NULL,
+	`provider_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`access_token` text,
+	`refresh_token` text,
+	`id_token` text,
+	`access_token_expires_at` integer,
+	`refresh_token_expires_at` integer,
+	`scope` text,
+	`password` text,
+	`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,
+	`updated_at` integer NOT NULL,
+	`issuer` text,
+	CONSTRAINT `fk_accounts_user_id_users_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+);
+--> statement-breakpoint
 CREATE TABLE `site_admin_asset_refs` (
 	`revision_id` text NOT NULL,
 	`field_path` text NOT NULL,
@@ -109,9 +127,41 @@ CREATE TABLE `site_admin_entries` (
 	`published_at` text
 );
 --> statement-breakpoint
+CREATE TABLE `jwks` (
+	`id` text PRIMARY KEY,
+	`public_key` text NOT NULL,
+	`private_key` text NOT NULL,
+	`created_at` integer NOT NULL,
+	`expires_at` integer,
+	`alg` text,
+	`crv` text
+);
+--> statement-breakpoint
 CREATE TABLE `site_admin_meta` (
 	`key` text PRIMARY KEY,
 	`value` text NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `passkeys` (
+	`id` text PRIMARY KEY,
+	`name` text,
+	`public_key` text NOT NULL,
+	`user_id` text NOT NULL,
+	`credential_id` text NOT NULL,
+	`counter` integer NOT NULL,
+	`device_type` text NOT NULL,
+	`backed_up` integer NOT NULL,
+	`transports` text,
+	`created_at` integer,
+	`aaguid` text,
+	CONSTRAINT `fk_passkeys_user_id_users_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+);
+--> statement-breakpoint
+CREATE TABLE `rate_limits` (
+	`id` text PRIMARY KEY,
+	`key` text NOT NULL UNIQUE,
+	`count` integer NOT NULL,
+	`last_request` integer NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE `site_admin_relations` (
@@ -148,65 +198,42 @@ CREATE TABLE `site_admin_routes` (
 	CONSTRAINT `fk_site_admin_routes_revision_id_site_admin_revisions_id_fk` FOREIGN KEY (`revision_id`) REFERENCES `site_admin_revisions`(`id`) ON DELETE CASCADE
 );
 --> statement-breakpoint
-PRAGMA foreign_keys=OFF;--> statement-breakpoint
-CREATE TABLE `__new_accounts` (
+CREATE TABLE `sessions` (
 	`id` text PRIMARY KEY,
-	`account_id` text NOT NULL,
-	`issuer` text,
-	`provider_id` text NOT NULL,
-	`user_id` text NOT NULL,
-	`access_token` text,
-	`refresh_token` text,
-	`id_token` text,
-	`access_token_expires_at` integer,
-	`refresh_token_expires_at` integer,
-	`scope` text,
-	`password` text,
+	`expires_at` integer NOT NULL,
+	`token` text NOT NULL UNIQUE,
 	`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,
 	`updated_at` integer NOT NULL,
-	CONSTRAINT `accounts_userId_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+	`ip_address` text,
+	`user_agent` text,
+	`user_id` text NOT NULL,
+	`impersonated_by` text,
+	CONSTRAINT `fk_sessions_user_id_users_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 );
 --> statement-breakpoint
-INSERT INTO `__new_accounts`(`id`, `account_id`, `issuer`, `provider_id`, `user_id`, `access_token`, `refresh_token`, `id_token`, `access_token_expires_at`, `refresh_token_expires_at`, `scope`, `password`, `created_at`, `updated_at`) SELECT `id`, `account_id`, `issuer`, `provider_id`, `user_id`, `access_token`, `refresh_token`, `id_token`, `access_token_expires_at`, `refresh_token_expires_at`, `scope`, `password`, `created_at`, `updated_at` FROM `accounts`;--> statement-breakpoint
-DROP TABLE `accounts`;--> statement-breakpoint
-ALTER TABLE `__new_accounts` RENAME TO `accounts`;--> statement-breakpoint
-PRAGMA foreign_keys=ON;--> statement-breakpoint
-DROP INDEX IF EXISTS `admin_action_plans_actorUserId_createdAt_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `admin_action_plans_status_expiresAt_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `admin_audit_events_planId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `admin_audit_events_actorUserId_createdAt_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `art_images_artSlug_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `arts_sortIndex_createdAt_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `careers_sortIndex_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_access_tokens_clientId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_access_tokens_sessionId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_access_tokens_userId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_access_tokens_authorizationCodeId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_access_tokens_refreshId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_client_resources_clientId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_client_resources_resourceId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_clients_userId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_consents_clientId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_consents_userId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_refresh_tokens_clientId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_refresh_tokens_sessionId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_refresh_tokens_userId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `oauth_refresh_tokens_authorizationCodeId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `person_links_personId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `post_review_jobs_status_availableAt_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `post_review_jobs_postSlug_createdAt_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `post_reviews_postSlug_createdAt_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `post_reviews_jobId_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `post_tags_postSlug_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `posts_createdAt_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `posts_status_publishedAt_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `posts_status_scheduledAt_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `ranks_sortIndex_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `skills_sortIndex_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `socials_alias_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `socials_sortIndex_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `work_persons_workSlug_idx`;--> statement-breakpoint
-DROP INDEX IF EXISTS `works_sortIndex_createdAt_idx`;--> statement-breakpoint
+CREATE TABLE `users` (
+	`id` text PRIMARY KEY,
+	`name` text NOT NULL,
+	`email` text NOT NULL UNIQUE,
+	`email_verified` integer DEFAULT false NOT NULL,
+	`image` text,
+	`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,
+	`updated_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,
+	`role` text,
+	`banned` integer DEFAULT false,
+	`ban_reason` text,
+	`ban_expires` integer
+);
+--> statement-breakpoint
+CREATE TABLE `verifications` (
+	`id` text PRIMARY KEY,
+	`identifier` text NOT NULL,
+	`value` text NOT NULL,
+	`expires_at` integer NOT NULL,
+	`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,
+	`updated_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL
+);
+--> statement-breakpoint
 CREATE INDEX `accounts_userId_idx` ON `accounts` (`user_id`);--> statement-breakpoint
 CREATE INDEX `site_admin_asset_refs_asset` ON `site_admin_asset_refs` (`asset_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `site_admin_assets_key` ON `site_admin_assets` (`storage`,`key`);--> statement-breakpoint
@@ -214,29 +241,10 @@ CREATE INDEX `site_admin_assets_gc` ON `site_admin_assets` (`state`,`created_at`
 CREATE UNIQUE INDEX `site_admin_entries_translation` ON `site_admin_entries` (`model`,`translation_group`,`locale`);--> statement-breakpoint
 CREATE INDEX `site_admin_entries_model` ON `site_admin_entries` (`model`);--> statement-breakpoint
 CREATE INDEX `site_admin_entries_schedule` ON `site_admin_entries` (`scheduled_at`) WHERE "site_admin_entries"."scheduled_revision_id" IS NOT NULL;--> statement-breakpoint
+CREATE INDEX `passkeys_userId_idx` ON `passkeys` (`user_id`);--> statement-breakpoint
+CREATE INDEX `passkeys_credentialID_idx` ON `passkeys` (`credential_id`);--> statement-breakpoint
 CREATE INDEX `site_admin_relations_target` ON `site_admin_relations` (`target_entry_id`);--> statement-breakpoint
 CREATE INDEX `site_admin_revisions_entry` ON `site_admin_revisions` (`entry_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `site_admin_routes_entry` ON `site_admin_routes` (`entry_id`);--> statement-breakpoint
-DROP TABLE `admin_action_plans`;--> statement-breakpoint
-DROP TABLE `admin_audit_events`;--> statement-breakpoint
-DROP TABLE `art_images`;--> statement-breakpoint
-DROP TABLE `arts`;--> statement-breakpoint
-DROP TABLE `careers`;--> statement-breakpoint
-DROP TABLE `oauth_access_tokens`;--> statement-breakpoint
-DROP TABLE `oauth_client_assertions`;--> statement-breakpoint
-DROP TABLE `oauth_client_resources`;--> statement-breakpoint
-DROP TABLE `oauth_clients`;--> statement-breakpoint
-DROP TABLE `oauth_consents`;--> statement-breakpoint
-DROP TABLE `oauth_refresh_tokens`;--> statement-breakpoint
-DROP TABLE `oauth_resources`;--> statement-breakpoint
-DROP TABLE `person_links`;--> statement-breakpoint
-DROP TABLE `persons`;--> statement-breakpoint
-DROP TABLE `post_review_jobs`;--> statement-breakpoint
-DROP TABLE `post_reviews`;--> statement-breakpoint
-DROP TABLE `post_tags`;--> statement-breakpoint
-DROP TABLE `posts`;--> statement-breakpoint
-DROP TABLE `ranks`;--> statement-breakpoint
-DROP TABLE `skills`;--> statement-breakpoint
-DROP TABLE `socials`;--> statement-breakpoint
-DROP TABLE `work_persons`;--> statement-breakpoint
-DROP TABLE `works`;
+CREATE INDEX `sessions_userId_idx` ON `sessions` (`user_id`);--> statement-breakpoint
+CREATE INDEX `verifications_identifier_idx` ON `verifications` (`identifier`);

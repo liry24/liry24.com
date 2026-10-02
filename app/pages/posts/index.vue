@@ -44,7 +44,7 @@ defineSeo({
                     class="text-muted font-mono text-sm"
                 />
                 <UBadge
-                    v-for="(tag, tagIndex) in post.tags"
+                    v-for="(tag, tagIndex) in post.tags.filter((tag) => tag !== null)"
                     :key="`tag-${tagIndex}`"
                     :label="tag"
                     icon="mingcute:hashtag-line"

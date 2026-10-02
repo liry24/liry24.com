@@ -57,8 +57,8 @@ export default defineNuxtConfig({
     hooks: {
         'nitro:config'(config) {
             // The auth module copies local .env secrets into runtimeConfig during a build.
-            // Previews must use their deployed BETTER_AUTH_SECRET on every build machine.
-            if (isPreview && config.runtimeConfig) config.runtimeConfig.betterAuthSecret = ''
+            // Every deployment uses its own secret binding, never the build machine's secret.
+            if (config.runtimeConfig) config.runtimeConfig.betterAuthSecret = ''
         },
     },
 
@@ -98,7 +98,7 @@ export default defineNuxtConfig({
             nodeCompat: true,
             dev: {
                 configPath: './wrangler.local.jsonc',
-                persistDir: './.data/unified/v3',
+                persistDir: './.data/unified',
             },
         },
         prerender: {
@@ -163,6 +163,7 @@ export default defineNuxtConfig({
     siteAdmin: {
         assets: {
             storage: 'content',
+            separateDrafts: false,
             cleanup: { minimumAge: 60 * 60 * 24 },
         },
     },

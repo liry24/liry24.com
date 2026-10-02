@@ -10,7 +10,7 @@ assert(!/"remote"\s*:\s*true/.test(await readFile('wrangler.local.jsonc', 'utf8'
 const proxy = await getPlatformProxy({
     remoteBindings: false,
     configPath: 'wrangler.local.jsonc',
-    persist: { path: resolve('.data/unified/v3') },
+    persist: { path: resolve('.data/unified') },
 })
 try {
     await migrate(drizzle(proxy.env.DB), { migrationsFolder: 'drizzle' })

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SiteAdminDescriptor } from '@liria24/site-admin'
-import type { EntryRecord, RevisionRecord } from '@liria24/site-admin/server'
+import type { EntryPage, EntryRecord, RevisionRecord } from '@liria24/site-admin/server'
 
 import { LazyAdminFormEntryModal } from '#components'
 definePageMeta({
@@ -13,15 +13,21 @@ const presentation = adminModels[modelName as keyof typeof adminModels]
 const { data: descriptors } = await useFetch<SiteAdminDescriptor>('/api/site-admin/models')
 const descriptor = descriptors.value?.models[modelName]
 if (!descriptor || !presentation) throw createError({ statusCode: 404 })
+const request = useRequestFetch()
 const {
     data: entries,
     refresh,
     error,
-} = await useFetch<EntryRecord[]>('/api/site-admin/entries', {
-    query: { model: modelName },
-    key: `admin:${modelName}`,
-    default: () => [],
-})
+} = await useAsyncData(
+    `admin:${modelName}`,
+    () =>
+        loadAdminEntries((offset) =>
+            request<EntryPage>('/api/site-admin/entries', {
+                query: { model: modelName, limit: 100, offset },
+            }),
+        ),
+    { default: () => [] },
+)
 const items = ref<EntryRecord[]>([])
 watch(
     entries,

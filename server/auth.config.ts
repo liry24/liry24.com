@@ -1,6 +1,6 @@
 import { passkey } from '@better-auth/passkey'
 import { defineServerAuth } from '@nuxtjs/better-auth/config'
-import { jwt, lastLoginMethod, oAuthProxy } from 'better-auth/plugins'
+import { jwt, lastLoginMethod } from 'better-auth/plugins'
 
 import { isPreviewGitHubAccountAdmin, validatePreviewIdentity } from './utils/previewAuthorization'
 
@@ -87,15 +87,6 @@ export default defineServerAuth(() => {
         plugins: [
             ...(!isPreview ? [passkey()] : []),
             lastLoginMethod(),
-            ...(!isPreview
-                ? [
-                      oAuthProxy({
-                          productionURL: 'https://liry24.com',
-                          secret: process.env.OAUTH_PROXY_SECRET ?? process.env.BETTER_AUTH_SECRET,
-                          maxAge: 60,
-                      }),
-                  ]
-                : []),
             jwt({
                 schema: { jwks: { modelName: 'jwk' } },
                 disableSettingJwtHeader: true,

@@ -1,0 +1,65 @@
+diff --git a/dist/api/index.mjs b/dist/api/index.mjs
+index 0d900725e88edfaa232944cd528f2b42199d2907..4ba7902ee031462711e248ddf67b288b26e62d64 100644
+--- a/dist/api/index.mjs
++++ b/dist/api/index.mjs
+@@ -152,7 +152,7 @@ const router = (ctx, options) => {
+ 	const withSpan = createWithSpan(options);
+ 	const { api, middlewares } = getEndpoints(ctx, options);
+ 	const basePath = new URL(ctx.baseURL).pathname;
+-	return createRouter(api, {
++	const authRouter = createRouter(api, {
+ 		routerContext: ctx,
+ 		openapi: { disabled: true },
+ 		basePath,
+@@ -169,7 +169,7 @@ const router = (ctx, options) => {
+ 			const pendingSchemaCheck = ctx.checkSchema?.();
+ 			if (pendingSchemaCheck) await pendingSchemaCheck;
+ 			let currentRequest = req;
+-			const rateLimitResponse = await onRequestRateLimit(currentRequest, ctx);
++			const rateLimitResponse = await onRequestRateLimit(currentRequest, ctx, authRouter.match(currentRequest)?.route.data.path);
+ 			if (rateLimitResponse) return rateLimitResponse;
+ 			for (const plugin of ctx.options.plugins || []) if (plugin.onRequest) {
+ 				const response = await withSpan(`onRequest ${plugin.id}`, {
+@@ -215,6 +215,7 @@ const router = (ctx, options) => {
+ 			}
+ 		}
+ 	});
++	return authRouter;
+ };
+ //#endregion
+ export { APIError, NO_STORE_HEADERS, accountInfo, addOAuthServerContext, callbackOAuth, changeEmail, changePassword, checkEndpointConflicts, createAuthEndpoint, createAuthMiddleware, createEmailVerificationToken, deleteUser, deleteUserCallback, dispatchAuthEndpoint, error, formCsrfMiddleware, freshSessionMiddleware, getAccessToken, getAuthoritativeSessionFromCtx, getEndpoints, getIP, getOAuthState, getSession, getSessionFromCtx, getShouldSkipSessionRefresh, isAPIError, isStateful, linkSocialAccount, listSessions, listUserAccounts, ok, optionsMiddleware, originCheck, originCheckMiddleware, refreshToken, requestOnlySessionMiddleware, requestPasswordReset, requestPasswordResetCallback, requireOrgRole, requireResourceOwnership, resetPassword, revokeOtherSessions, revokeSession, revokeSessions, router, sendVerificationEmail, sendVerificationEmailFn, sensitiveSessionMiddleware, sessionMiddleware, setPassword, setShouldSkipSessionRefresh, signInEmail, signInSocial, signOut, signUpEmail, unlinkAccount, updateSession, updateUser, verifyEmail, verifyPassword };
+diff --git a/dist/api/rate-limiter/index.mjs b/dist/api/rate-limiter/index.mjs
+index 458880650cc26fb2ad57be0634a660d2840024c3..a0cae727f55b83ce126f97fc37b425004c88f83b 100644
+--- a/dist/api/rate-limiter/index.mjs
++++ b/dist/api/rate-limiter/index.mjs
+@@ -234,7 +234,7 @@ function getRateLimitStorage(ctx, rateLimitSettings) {
+ }
+ let ipWarningLogged = false;
+ const NO_TRUSTED_IP_KEY = "no-trusted-ip";
+-async function resolveRateLimitConfig(req, ctx) {
++async function resolveRateLimitConfig(req, ctx, routePath) {
+ 	const basePath = new URL(ctx.baseURL).pathname;
+ 	const path = normalizePathname(req.url, basePath);
+ 	let currentWindow = ctx.rateLimit.window;
+@@ -245,7 +245,8 @@ async function resolveRateLimitConfig(req, ctx) {
+ 		ctx.logger.warn("Rate limiting could not determine a client IP and is falling back to a single shared per-path bucket. Ensure your runtime forwards a trusted client IP header, then set `advanced.ipAddress.ipAddressHeaders` or `advanced.ipAddress.trustedProxies` so the address can be resolved.");
+ 		ipWarningLogged = true;
+ 	}
+-	const key = createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path);
++	// Keep ingress rule matching; only registered templates may allocate counters.
++	const key = createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, routePath === undefined ? "unknown" : `route:${routePath}`);
+ 	const specialRule = getDefaultSpecialRules().find((rule) => rule.pathMatcher(path));
+ 	if (specialRule) {
+ 		currentWindow = specialRule.window;
+@@ -289,9 +290,9 @@ async function resolveRateLimitConfig(req, ctx) {
+ * response-phase write-back, so concurrent requests cannot all pass a stale
+ * read before any increment lands.
+ */
+-async function onRequestRateLimit(req, ctx) {
++async function onRequestRateLimit(req, ctx, routePath) {
+ 	if (!ctx.rateLimit.enabled) return;
+-	const config = await resolveRateLimitConfig(req, ctx);
++	const config = await resolveRateLimitConfig(req, ctx, routePath);
+ 	if (!config) return;
+ 	const { key, currentWindow, currentMax } = config;
+ 	const storage = getRateLimitStorage(ctx, { window: currentWindow });

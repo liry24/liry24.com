@@ -187,7 +187,7 @@ try {
                 () => document.querySelector('#__nuxt')?.__vue_app__?.$nuxt?.isHydrating === false,
             )
             for (const title of ['Browser draft one', 'Browser draft two']) {
-                const row = page.locator('li').filter({ hasText: entry.currentRevisionId }).last()
+                const row = page.locator('li').filter({ hasText: entry.slug }).last()
                 await row.getByRole('button', { name: 'Edit', exact: true }).click()
                 const dialog = page.getByRole('dialog')
                 await dialog
@@ -222,11 +222,10 @@ try {
                     assert.equal(response.status(), 201)
                     uploadedAsset = (await response.json()).id
                     assert(uploadedAsset)
-                    await dialog.locator('p').filter({ hasText: uploadedAsset }).waitFor()
-                    assert.equal(
-                        await dialog.getByLabel('Upload progress').getAttribute('value'),
-                        '1',
-                    )
+                    await dialog
+                        .locator(`img[src="/api/site-admin/assets/${uploadedAsset}/content"]`)
+                        .waitFor()
+                    await dialog.getByText('local-probe.png', { exact: true }).waitFor()
                 } else {
                     await dialog.getByRole('button', { name: 'Clear reference' }).click()
                 }
@@ -249,7 +248,7 @@ try {
             await request(`/api/site-admin/assets/${uploadedAsset}/content`)
             assert.deepEqual(errors, [])
             console.log(
-                'PASS: Chrome overlay, Form two saves, XHR upload progress, reference clear preserves Blob, Save Draft does not publish',
+                'PASS: Chrome overlay, Form two saves, uploaded image preview, reference clear preserves Blob, Save Draft does not publish',
             )
         } finally {
             await browser.close()

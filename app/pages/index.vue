@@ -14,9 +14,7 @@ const client = useSiteAdminClient()
 const [{ data: arts }, { data: socials }, { data: careers }, { data: ranks }, { data: posts }] =
     await Promise.all([
         useAsyncData('public:arts', async () =>
-            (await client.list<ContentEntry<'arts'>>('arts')).map((entry) =>
-                presentArt(entry, client),
-            ),
+            (await client.list<ContentEntry<'arts'>>('arts')).map(presentArt),
         ),
         useAsyncData('public:socials', async () =>
             (await client.list<ContentEntry<'socials'>>('socials')).map((entry) => entry.data),
@@ -27,7 +25,7 @@ const [{ data: arts }, { data: socials }, { data: careers }, { data: ranks }, { 
         useAsyncData('public:ranks', async () =>
             (await client.list<ContentEntry<'ranks'>>('ranks')).map((entry) => ({
                 ...entry.data,
-                imageUrl: contentAssetSrc(entry.data.image, client),
+                imageUrl: entry.data.image?.url,
             })),
         ),
         useAsyncData('public:posts', async () =>
@@ -297,7 +295,7 @@ defineSeo({
                                 class="text-muted font-mono text-sm leading-none text-nowrap"
                             />
                             <UBadge
-                                v-for="(tag, index) in post.tags"
+                                v-for="(tag, index) in post.tags.filter((tag) => tag !== null)"
                                 :key="`tag-${index}`"
                                 :label="tag"
                                 icon="mingcute:hashtag-line"

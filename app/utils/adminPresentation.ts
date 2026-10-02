@@ -41,7 +41,20 @@ export function adminAssetUrl(value: unknown): string | undefined {
             : value && typeof value === 'object' && 'id' in value
               ? value.id
               : undefined
-    return typeof id === 'string' && id
-        ? `/api/site-admin/assets/${encodeURIComponent(id)}/content`
-        : undefined
+    return typeof id === 'string' && id ? managementAssetUrl(id) : undefined
 }
+
+export async function loadAdminEntries(fetchPage: (offset: number) => Promise<EntryPage>) {
+    const items: EntryRecord[] = []
+    let total: number
+    do {
+        const page = await fetchPage(items.length)
+        items.push(...page.items)
+        total = page.total
+        if (!page.items.length && items.length < total)
+            throw new Error('Entry list changed. Reload latest.')
+    } while (items.length < total)
+    return items
+}
+import { managementAssetUrl } from '@liria24/site-admin/client'
+import type { EntryPage, EntryRecord } from '@liria24/site-admin/server'

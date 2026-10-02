@@ -9,7 +9,7 @@ bun run build
 bun run preview
 ```
 
-ローカルD1は `.data/unified/v3` を継続使用する。ローカルWorker用secretはルートのignored `.dev.vars` に置く。`cf dev` はNuxtへ委譲されるため、ビルド済みWorkerの検証だけは `bun run preview` (Wrangler) を使う。`getPlatformProxy`、Preview secretsと削除もcf betaに相当操作がないためWranglerを残す。
+ローカルpersistの指定は `.data/unified`、Wranglerが追加する `v3` 以下が実データ。ローカルWorker用secretはルートのignored `.dev.vars` に置く。`cf dev` はNuxtへ委譲されるため、ビルド済みWorkerの検証だけは `bun run preview` (Wrangler) を使う。`getPlatformProxy`、Preview secretsと削除もcf betaに相当操作がないためWranglerを残す。
 
 ## ブランチごとの作成と更新
 
@@ -46,7 +46,7 @@ GitHub Environment `Preview` のSecrets:
 
 Cloudflare tokenと権限照会PATは **2026-12-30失効**。期限前に更新し、Environment Secretsを置換する。Cloudflare tokenは同accountの他のWorkers/D1/R2も編集可能な範囲を持つ。信頼できるブランチのコードだけをこのrepositoryへpushすること。Secretはgitへ保存しない。手元の `.env` ではCloudflare tokenを `PREVIEW_CLOUDFLARE_API_TOKEN` として読み込める。
 
-auth moduleがビルド時に取り込むローカル `.env` のsecretは、PreviewのNitro設定から除外する。認証にはデプロイ済みの `BETTER_AUTH_SECRET` を使い、ローカルとActionsのビルドで値が変わらないようにする。
+auth moduleがビルド時に取り込むローカル `.env` のsecretは、Nitro設定から除外する。認証にはデプロイ済みの `BETTER_AUTH_SECRET` を使い、ローカルとActionsのビルドで値が変わらないようにする。
 
 ## ブランチ削除
 

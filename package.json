@@ -27,23 +27,23 @@
         "content:migrate": "node scripts/migrate-local-database.mjs"
     },
     "dependencies": {
-        "@better-auth/drizzle-adapter": "1.7.6",
-        "@better-auth/passkey": "1.7.6",
+        "@better-auth/drizzle-adapter": "1.7.7",
+        "@better-auth/passkey": "1.7.7",
         "@comark/nuxt": "0.7.0",
         "@formkit/drag-and-drop": "^0.6.1",
         "@iconify-json/mingcute": "^1.2.8",
         "@iconify-json/simple-icons": "^1.2.97",
-        "@liria24/site-admin": "0.0.0",
+        "@liria24/site-admin": "0.0.1",
         "@nuxt/image": "^2.1.0",
         "@nuxt/ui": "^4.11.2",
-        "@nuxtjs/better-auth": "^0.3.5",
+        "@nuxtjs/better-auth": "^0.3.6",
         "@repo/database": "workspace:*",
         "@takumi-rs/core": "2.14.0",
         "@takumi-rs/wasm": "2.14.0",
         "@tanstack/vue-form": "2.0.0-alpha.2",
         "@vueuse/nuxt": "^15.0.0",
         "@yeger/vue-masonry-wall": "^6.1.4",
-        "better-auth": "1.7.6",
+        "better-auth": "1.7.7",
         "cn": "^0.4.0",
         "drizzle-orm": "1.0.0-rc.4",
         "files-sdk": "^2.6.0",
@@ -54,7 +54,6 @@
         "vue": "3.6.0-rc.9"
     },
     "devDependencies": {
-        "@cloudflare/vitest-pool-workers": "^0.22.0",
         "@cloudflare/workers-types": "^5.20260927.1",
         "@nuxt/a11y": "^1.0.0-alpha.1",
         "@nuxt/hints": "^1.1.4",
@@ -71,11 +70,17 @@
         "typescript": "^6.0.3",
         "vitest": "^5.0.2",
         "vue-tsc": "^3.3.11",
-        "wrangler": "^4.142.0"
+        "wrangler": "^4.145.0"
     },
     "overrides": {
         "@vue/compiler-sfc": "3.6.0-rc.9",
+        "auth": "1.7.7",
+        "fontless>esbuild": "0.28.2",
         "vue": "3.6.0-rc.9"
     },
-    "packageManager": "bun@1.4.2"
+    "packageManager": "bun@1.4.2",
+    "patchedDependencies": {
+        "better-auth@1.7.7": "patches/better-auth@1.7.7.patch",
+        "better-call@1.4.0": "patches/better-call@1.4.0.patch"
+    }
 }

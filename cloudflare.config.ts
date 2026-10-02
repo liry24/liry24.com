@@ -35,14 +35,17 @@ export default defineConfig(({ isPreview }) => {
                     isPreview ? siteURL : 'https://images.liry24.com',
                 ),
                 R2_DOMAIN: bindings.text(isPreview ? siteURL : 'https://images.liry24.com'),
+                BETTER_AUTH_SECRET: bindings.secret(),
+                GITHUB_CLIENT_ID: bindings.secret(),
+                GITHUB_CLIENT_SECRET: bindings.secret(),
                 ...(isPreview
                     ? {
-                          BETTER_AUTH_SECRET: bindings.secret(),
-                          GITHUB_CLIENT_ID: bindings.secret(),
-                          GITHUB_CLIENT_SECRET: bindings.secret(),
                           PREVIEW_GITHUB_TOKEN: bindings.secret(),
                       }
-                    : {}),
+                    : {
+                          VERCEL_CLIENT_ID: bindings.secret(),
+                          VERCEL_CLIENT_SECRET: bindings.secret(),
+                      }),
             },
         },
     }

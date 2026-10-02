@@ -6,7 +6,7 @@ const { data } = await useAsyncData('public:works', async () =>
     (await client.list<ContentEntry<'works'>>('works')).map((entry) => ({
         ...entry.data,
         slug: entry.slug,
-        image: contentAssetSrc(entry.data.image, client),
+        image: entry.data.image?.url,
     })),
 )
 

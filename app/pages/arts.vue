@@ -8,7 +8,7 @@ const overlay = useOverlay()
 
 const client = useSiteAdminClient()
 const { data } = await useAsyncData('public:arts', async () =>
-    (await client.list<ContentEntry<'arts'>>('arts')).map((entry) => presentArt(entry, client)),
+    (await client.list<ContentEntry<'arts'>>('arts')).map(presentArt),
 )
 
 const modalArtViewer = overlay.create(ArtViewer)
