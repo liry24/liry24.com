@@ -22,7 +22,7 @@ bun run build
 bun run preview
 ```
 
-persistの指定は `.data/unified`。Wranglerが追加する `v3` 以下が実データであり、指定自体に `v3` を追加しない。Nuxt開発時のassetは `.data/files/content`、Worker検証時はローカルR2を使用する。migrationは明示コマンドで実行し、HTTP requestでDDLを実行しない。
+CLIのpersist指定は `.data/unified`。CLIが追加する `v3` 以下が実データであり、CLIの指定自体に `v3` を追加しない。Nitroの `getPlatformProxy` はpathをそのまま使うため `.data/unified/v3` を指定する。`content:migrate` は `cf d1 migrations apply --local` を実行し、`d1_migrations` 台帳を使用する。Nuxt開発時のassetは `.data/files/content`、Worker検証時はローカルR2を使用する。migrationは明示コマンドで実行し、HTTP requestでDDLを実行しない。
 
 ## 移行の照合
 

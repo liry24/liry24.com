@@ -8,7 +8,7 @@
     "type": "module",
     "scripts": {
         "postinstall": "nuxt prepare",
-        "dev": "nuxt dev",
+        "dev": "cf dev",
         "build": "cf build",
         "build:nuxt": "nuxt build",
         "preview": "wrangler dev --experimental-new-config --persist-to .data/unified",
@@ -24,7 +24,7 @@
         "test:worker": "vitest run --config vitest.worker.config.ts",
         "test:local": "node --env-file=.env scripts/test-site-admin-local.mjs",
         "content:generate": "site-admin generate --auth server/auth.config.ts --auth-use-plural --out packages/database/src/schema.ts && oxfmt packages/database/src/schema.ts --write && drizzle-kit generate --config drizzle.config.ts",
-        "content:migrate": "node scripts/migrate-local-database.mjs"
+        "content:migrate": "cf d1 migrations apply 227d818f-cd40-4fca-9710-b57273be94ca --local --persist-to .data/unified --dir drizzle --pattern 'drizzle/*/migration.sql'"
     },
     "dependencies": {
         "@better-auth/drizzle-adapter": "1.7.7",

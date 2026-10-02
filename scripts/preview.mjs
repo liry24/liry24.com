@@ -51,7 +51,8 @@ function run(executable, args, { input, json = false, env = environment } = {}) 
 }
 
 const cf = (...args) => run(process.execPath, ['node_modules/cf/bin/cf', ...args], { json: true })
-const wrangler = (args, input) =>
+// cf beta.7 has no Preview secret or delete operation; keep this fallback Preview-only.
+const wranglerPreview = (args, input) =>
     run(process.execPath, ['node_modules/wrangler/bin/wrangler.js', ...args], { input })
 const listDatabase = async () => {
     const databases = await cf('d1', 'list', '--name', target.resourceName)
@@ -115,7 +116,7 @@ if (action === 'deploy') {
         'drizzle/*/migration.sql',
     ])
     const secretInput = JSON.stringify(secrets)
-    await wrangler(
+    await wranglerPreview(
         ['preview', 'base-config', 'secret', 'bulk', '--worker-name', workerName],
         secretInput,
     )
@@ -125,7 +126,7 @@ if (action === 'deploy') {
         'Unexpected Preview deployment target',
     )
     // Base secrets only initialize new Previews. Refresh existing ones on every deployment too.
-    await wrangler(
+    await wranglerPreview(
         ['preview', 'secret', 'bulk', '--worker-name', workerName, '--name', target.name],
         secretInput,
     )
@@ -148,7 +149,7 @@ if (action === 'deploy') {
     assert(!remote.trim(), 'Refusing to delete resources for an existing branch')
     assert(target.resourceName.startsWith(`${workerName}-p-`), 'Not a Preview resource')
     try {
-        await wrangler([
+        await wranglerPreview([
             'preview',
             'delete',
             '--worker-name',

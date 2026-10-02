@@ -9,7 +9,16 @@ bun run build
 bun run preview
 ```
 
-ローカルpersistの指定は `.data/unified`、Wranglerが追加する `v3` 以下が実データ。ローカルWorker用secretはルートのignored `.dev.vars` に置く。`cf dev` はNuxtへ委譲されるため、ビルド済みWorkerの検証だけは `bun run preview` (Wrangler) を使う。`getPlatformProxy`、Preview secretsと削除もcf betaに相当操作がないためWranglerを残す。
+`bun run dev` は `cf dev`、`bun run build` は `cf build`、`bun run deploy` は `cf deploy` を実行する。ローカルmigrationも `cf d1 migrations apply --local` を使用し、production・Previewと同じ `d1_migrations` 台帳を持つ。CLIのpersist指定は `.data/unified` で、CLIが追加する `v3` 以下が実データ。Nitroの `getPlatformProxy` はpathをそのまま使うため `.data/unified/v3` を指定する。ローカルWorker用secretはルートのignored `.dev.vars` に置く。
+
+Wranglerを残すのは次の技術的制約がある箇所だけ。
+
+- Nitro 2のcompiled hook: cf Build Outputを生成するためのbundler連携。`wrangler.config.ts` とNuxt開発用 `wrangler.local.jsonc` もこの連携に必要。
+- `bun run preview`: cf beta.7の `cf dev` はNuxtへ委譲され、ビルド済みWorkerを起動するモードがないため。
+- Worker testの `getPlatformProxy`: native D1/R2 bindingをテストへ渡すAPIがcfにはないため。
+- Previewのsecretと削除: cf beta.7には相当コマンドがないため。通常のproduction secretは `cf workers secrets bulk` または `cf deploy --secrets-file` で管理する。
+
+対応状況は [cfのproject commands](https://developers.cloudflare.com/cf/projects/) と [Wrangler対応表](https://developers.cloudflare.com/cf/wrangler/reference/) を参照。
 
 ## ブランチごとの作成と更新
 
@@ -60,7 +69,7 @@ node --env-file=.env scripts/preview.mjs delete codex/example
 
 ## 既存環境との境界
 
-旧Cloudflare Buildsのmain以外用triggerは `liry24-com` と `liry24-com-admin` の2件を停止済み。main用triggerは従来設定を維持しており、root統合後の本番切替は別途必要。mainへマージする前に本番DB backup・移行・旧trigger更新を準備する。本番D1/R2へ今回のmigrationは適用していない。
+旧Cloudflare Buildsのmain以外用triggerは `liry24-com` と `liry24-com-admin` の2件を停止済み。productionのmain用triggerは `bun run build` / `bun run deploy` に更新済み。mainへの統合前に旧書込み停止・最終backup・D1移行を実施し、公開後に旧admin専用資源を削除する。
 
 親WorkerはPreview URLsのみ有効化済みで、productionのworkers.dev URLは無効のまま。`previewUrls: true` を本番設定にも維持し、将来の本番デプロイでPreview URLを無効化しない。
 

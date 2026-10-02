@@ -98,7 +98,8 @@ export default defineNuxtConfig({
             nodeCompat: true,
             dev: {
                 configPath: './wrangler.local.jsonc',
-                persistDir: './.data/unified',
+                // getPlatformProxy uses this path directly; CLI --persist-to appends v3.
+                persistDir: './.data/unified/v3',
             },
         },
         prerender: {
