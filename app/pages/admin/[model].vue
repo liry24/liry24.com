@@ -1,0 +1,355 @@
+<script setup lang="ts">
+import type { SiteAdminDescriptor } from '@liria24/site-admin'
+import type { EntryPage, EntryRecord, RevisionRecord } from '@liria24/site-admin/server'
+
+import { LazyAdminFormEntryModal } from '#components'
+definePageMeta({
+    middleware: 'admin',
+    layout: 'admin',
+    key: (route) => route.params.model as string,
+})
+const modelName = String(useRoute().params.model)
+const presentation = adminModels[modelName as keyof typeof adminModels]
+const { data: descriptors } = await useFetch<SiteAdminDescriptor>('/api/site-admin/models')
+const descriptor = descriptors.value?.models[modelName]
+if (!descriptor || !presentation) throw createError({ statusCode: 404 })
+const request = useRequestFetch()
+const {
+    data: entries,
+    refresh,
+    error,
+} = await useAsyncData(
+    `admin:${modelName}`,
+    () =>
+        loadAdminEntries((offset) =>
+            request<EntryPage>('/api/site-admin/entries', {
+                query: { model: modelName, limit: 100, offset },
+            }),
+        ),
+    { default: () => [] },
+)
+const items = ref<EntryRecord[]>([])
+watch(
+    entries,
+    (value) => {
+        items.value = [...value]
+    },
+    { immediate: true },
+)
+const modal = useOverlay().create(LazyAdminFormEntryModal)
+const failure = ref('')
+const busy = ref(false)
+const schedule = ref<Record<string, string>>({})
+const revisions = ref<Record<string, RevisionRecord[]>>({})
+const selectedRevision = ref<Record<string, string>>({})
+async function history(entry: EntryRecord) {
+    revisions.value[entry.id] = await $fetch(
+        `/api/site-admin/entries/${encodeURIComponent(entry.id)}/revisions`,
+    )
+}
+async function edit(data?: EntryRecord) {
+    await modal.open({
+        modelName,
+        descriptor: descriptor!,
+        data,
+        categories: [
+            ...new Set(
+                items.value
+                    .map((entry) => entry.data.category)
+                    .filter(
+                        (value): value is string => typeof value === 'string' && Boolean(value),
+                    ),
+            ),
+        ],
+    }).result
+    await refresh()
+}
+defineShortcuts({ n: () => edit() })
+async function operation(entry: EntryRecord, action: string, extra: Record<string, unknown> = {}) {
+    busy.value = true
+    failure.value = ''
+    try {
+        await $fetch(
+            `/api/site-admin/entries/${encodeURIComponent(entry.id)}${action === 'delete' ? '' : `/${action}`}`,
+            {
+                method: action === 'delete' ? 'DELETE' : 'POST',
+                ...(action === 'delete'
+                    ? { headers: { 'if-match': `"${entry.version}"` } }
+                    : { body: { expectedVersion: entry.version, ...extra } }),
+            },
+        )
+        await refresh()
+    } catch (error: any) {
+        failure.value =
+            error.data?.error?.code === 'SITE_ADMIN_CONFLICT'
+                ? 'Conflict detected. Reload latest.'
+                : error.data?.error?.message || error.message
+    } finally {
+        busy.value = false
+    }
+}
+async function reorder(order: EntryRecord[]) {
+    if (busy.value) return
+    busy.value = true
+    failure.value = ''
+    try {
+        await $fetch(`/api/site-admin/entries/${encodeURIComponent(modelName)}/reorder`, {
+            method: 'POST',
+            body: {
+                items: order.map((entry, sortOrder) => ({
+                    id: entry.id,
+                    sortOrder,
+                    expectedVersion: entry.version,
+                })),
+            },
+        })
+    } catch (error: any) {
+        failure.value = error.data?.error?.message || error.message
+    } finally {
+        await refresh()
+        busy.value = false
+    }
+}
+function move(index: number, offset: number) {
+    const target = index + offset
+    if (busy.value || target < 0 || target >= items.value.length) return
+    const order = [...items.value]
+    ;[order[index], order[target]] = [order[target]!, order[index]!]
+    items.value = order
+    void reorder(order)
+}
+</script>
+
+<template>
+    <AdminResourcePage :title="presentation.label" :icon="presentation.icon" :count="items.length">
+        <template #trailing>
+            <UButton
+                aria-label="Reload latest"
+                title="Refresh"
+                icon="mingcute:refresh-2-line"
+                variant="ghost"
+                size="sm"
+                :disabled="busy"
+                loading-auto
+                @click="refresh()"
+            />
+        </template>
+        <template #actions>
+            <UButton
+                :label="`New ${presentation.singular}`"
+                icon="mingcute:add-line"
+                variant="outline"
+                color="neutral"
+                :ui="{ leadingIcon: 'size-4.5' }"
+                @click="edit()"
+            >
+                <template #trailing><UKbd value="n" class="hidden sm:inline-flex" /></template>
+            </UButton>
+        </template>
+
+        <UAlert v-if="failure || error" :title="failure || error?.message" color="error" />
+
+        <AdminResourceSortableList
+            v-model="items"
+            :disabled="!descriptor?.sortable || busy"
+            @reorder="reorder"
+        >
+            <template #default="{ item }">
+                <AdminResourceSortableItem
+                    :sortable="descriptor?.sortable"
+                    :class="modelName === 'works' && 'bg-muted/70 ring-muted/50 rounded-xl px-3'"
+                    @up="move(items.indexOf(item), -1)"
+                    @down="move(items.indexOf(item), 1)"
+                >
+                    <template #leading>
+                        <img
+                            v-if="
+                                adminAssetUrl(
+                                    item.data[descriptor.displayFields?.image || 'images'],
+                                )
+                            "
+                            :src="
+                                adminAssetUrl(
+                                    item.data[descriptor.displayFields?.image || 'images'],
+                                )
+                            "
+                            alt=""
+                            class="size-12 shrink-0 rounded-lg object-cover"
+                        />
+                        <UIcon
+                            v-else-if="typeof item.data.icon === 'string' && item.data.icon"
+                            :name="item.data.icon"
+                            class="size-5 shrink-0"
+                        />
+                    </template>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <p class="text-sm leading-snug">
+                            {{
+                                item.data[descriptor?.displayFields?.title || 'title'] || item.slug
+                            }}
+                        </p>
+                        <UBadge
+                            :label="
+                                item.publishedRevisionId
+                                    ? item.currentRevisionId === item.publishedRevisionId
+                                        ? 'Published'
+                                        : 'Unpublished changes'
+                                    : 'Draft'
+                            "
+                            color="neutral"
+                            variant="subtle"
+                            size="sm"
+                        />
+                        <UBadge
+                            v-if="item.scheduledAt"
+                            label="Scheduled"
+                            icon="mingcute:time-line"
+                            color="neutral"
+                            variant="subtle"
+                            size="sm"
+                        />
+                    </div>
+                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                        <template v-for="field in presentation.fields" :key="field">
+                            <AdminResourceMeta
+                                v-if="
+                                    modelName === 'works' &&
+                                    (field === 'slug' ? item.slug : item.data[field])
+                                "
+                                :label="field"
+                                :value="field === 'slug' ? item.slug : item.data[field]"
+                            />
+                            <span
+                                v-else-if="
+                                    modelName !== 'works' &&
+                                    (field === 'slug' ? item.slug : item.data[field])
+                                "
+                                class="text-muted text-sm break-words"
+                                >{{ field === 'slug' ? item.slug : item.data[field] }}</span
+                            >
+                        </template>
+                    </div>
+                    <details class="group mt-3">
+                        <summary
+                            class="text-muted hover:text-default flex w-fit cursor-pointer list-none items-center gap-1 text-xs"
+                        >
+                            <UIcon
+                                name="mingcute:down-line"
+                                class="size-3.5 transition-transform group-open:rotate-180"
+                            />
+                            Publishing &amp; history
+                        </summary>
+                        <div
+                            class="border-default mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
+                        >
+                            <UButton
+                                label="Publish"
+                                icon="mingcute:upload-3-fill"
+                                variant="soft"
+                                color="neutral"
+                                size="sm"
+                                :disabled="busy"
+                                @click="operation(item, 'publish')"
+                            />
+                            <UButton
+                                v-if="item.publishedRevisionId"
+                                label="Unpublish"
+                                variant="ghost"
+                                color="neutral"
+                                size="sm"
+                                :disabled="busy"
+                                @click="operation(item, 'unpublish')"
+                            />
+                            <UInput
+                                v-model="schedule[item.id]"
+                                type="datetime-local"
+                                aria-label="Schedule publish time"
+                                variant="soft"
+                                size="sm"
+                            />
+                            <UButton
+                                label="Schedule Publish"
+                                variant="soft"
+                                color="neutral"
+                                size="sm"
+                                :disabled="busy || !schedule[item.id]"
+                                @click="
+                                    operation(item, 'schedule', {
+                                        at: new Date(schedule[item.id]!).toISOString(),
+                                    })
+                                "
+                            />
+                            <UButton
+                                v-if="item.scheduledRevisionId"
+                                label="Cancel Schedule"
+                                variant="ghost"
+                                color="neutral"
+                                size="sm"
+                                :disabled="busy"
+                                @click="operation(item, 'cancel-schedule')"
+                            />
+                            <UButton
+                                label="Revision history"
+                                icon="mingcute:history-line"
+                                variant="ghost"
+                                color="neutral"
+                                size="sm"
+                                :disabled="busy"
+                                @click="history(item)"
+                            />
+
+                            <template v-if="revisions[item.id]">
+                                <USelect
+                                    v-model="selectedRevision[item.id]"
+                                    aria-label="Revision to restore"
+                                    :items="
+                                        revisions[item.id]?.map((revision) => ({
+                                            label: `${new Date(revision.createdAt).toLocaleString()} — ${revision.slug}`,
+                                            value: revision.id,
+                                        }))
+                                    "
+                                    placeholder="Select a revision"
+                                    variant="soft"
+                                    size="sm"
+                                    class="w-full sm:max-w-72"
+                                />
+                                <UButton
+                                    label="Restore as draft"
+                                    variant="soft"
+                                    color="neutral"
+                                    size="sm"
+                                    :disabled="busy || !selectedRevision[item.id]"
+                                    @click="
+                                        operation(
+                                            item,
+                                            `revisions/${selectedRevision[item.id]}/restore`,
+                                        )
+                                    "
+                                />
+                            </template>
+                        </div>
+                    </details>
+
+                    <template #actions>
+                        <UButton
+                            aria-label="Edit"
+                            icon="mingcute:edit-3-fill"
+                            variant="ghost"
+                            size="sm"
+                            :disabled="busy"
+                            @click="edit(item)"
+                        />
+                        <UButton
+                            aria-label="Delete"
+                            icon="mingcute:close-line"
+                            variant="ghost"
+                            size="sm"
+                            :disabled="busy"
+                            @click="operation(item, 'delete')"
+                        />
+                    </template>
+                </AdminResourceSortableItem>
+            </template>
+        </AdminResourceSortableList>
+    </AdminResourcePage>
+</template>

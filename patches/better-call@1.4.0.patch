@@ -1,0 +1,66 @@
+diff --git a/dist/router.d.mts b/dist/router.d.mts
+index ac5d18d3b091369455cc3a15da0a9335a71dca37..151d45ed46e8155d5677fa3f8a8eb8fd01dea756 100644
+--- a/dist/router.d.mts
++++ b/dist/router.d.mts
+@@ -93,6 +93,7 @@ interface RouterConfig {
+   };
+ }
+ declare const createRouter: <E extends Record<string, Endpoint>, Config extends RouterConfig>(endpoints: E, config?: Config) => {
++  match: (request: Request) => { path: string; route: { data: E[keyof E]; params?: Record<string, string> } } | undefined;
+   handler: (request: Request) => Promise<Response>;
+   endpoints: E;
+ };
+diff --git a/dist/router.mjs b/dist/router.mjs
+index a03d364e3b0df5a9031d4b7821a67b16a15106c8..c66e1de344852b290a42028db1fefc7cd5847df3 100644
+--- a/dist/router.mjs
++++ b/dist/router.mjs
+@@ -25,30 +25,27 @@ const createRouter$1 = (endpoints, config) => {
+ 	}
+ 	if (config?.routerMiddleware?.length) for (const { path, middleware } of config.routerMiddleware) addRoute(middlewareRouter, "*", path, middleware);
+ 	const basePath = config?.basePath && config.basePath !== "/" ? config.basePath.replace(/\/+$/, "") : "";
+-	const processRequest = async (request) => {
++	const match = (request) => {
+ 		const url = new URL(request.url);
+ 		const pathname = url.pathname;
+ 		let path;
+ 		if (basePath) {
+-			if (!pathname.startsWith(`${basePath}/`)) return new Response(null, {
+-				status: 404,
+-				statusText: "Not Found"
+-			});
++			if (!pathname.startsWith(`${basePath}/`)) return;
+ 			path = pathname.slice(basePath.length);
+ 		} else path = pathname;
+-		if (path.length === 0 || /\/{2,}/.test(path)) return new Response(null, {
+-			status: 404,
+-			statusText: "Not Found"
+-		});
++		if (path.length === 0 || /\/{2,}/.test(path)) return;
+ 		const route = findRoute(router, request.method, path);
+-		if (path.endsWith("/") !== route?.data?.path?.endsWith("/") && !config?.skipTrailingSlashes) return new Response(null, {
+-			status: 404,
+-			statusText: "Not Found"
+-		});
+-		if (!route?.data) return new Response(null, {
++		if (path.endsWith("/") !== route?.data?.path?.endsWith("/") && !config?.skipTrailingSlashes) return;
++		if (route?.data) return { path, route };
++	};
++	const processRequest = async (request) => {
++		const matched = match(request);
++		if (!matched) return new Response(null, {
+ 			status: 404,
+ 			statusText: "Not Found"
+ 		});
++		const { path, route } = matched;
++		const url = new URL(request.url);
+ 		const query = {};
+ 		url.searchParams.forEach((value, key) => {
+ 			if (key in query) if (Array.isArray(query[key])) query[key].push(value);
+@@ -98,6 +95,7 @@ const createRouter$1 = (endpoints, config) => {
+ 		}
+ 	};
+ 	return {
++		match,
+ 		handler: async (request) => {
+ 			const onReq = await config?.onRequest?.(request);
+ 			if (onReq instanceof Response) return onReq;

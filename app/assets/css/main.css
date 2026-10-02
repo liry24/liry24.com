@@ -1,0 +1,99 @@
+@import 'tailwindcss';
+@import '@nuxt/ui';
+
+@theme static {
+    --font-sans: 'Geist', sans-serif;
+    --font-mono: 'Geist Mono', monospace;
+}
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+        filter: blur(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
+
+@layer utilities {
+    .sentence {
+        text-autospace: normal;
+        text-spacing-trim: trim-start;
+        line-break: strict;
+        overflow-wrap: anywhere;
+    }
+
+    .rounded-xs {
+        border-radius: var(--radius-xs);
+        @supports (-webkit-appearance: none) and (not (-moz-appearance: none)) {
+            corner-shape: squircle;
+            border-radius: 0.25rem;
+        }
+    }
+    .rounded-sm {
+        border-radius: var(--radius-sm);
+        @supports (-webkit-appearance: none) and (not (-moz-appearance: none)) {
+            corner-shape: squircle;
+            border-radius: 0.5rem;
+        }
+    }
+    .rounded-md {
+        border-radius: var(--radius-md);
+        @supports (-webkit-appearance: none) and (not (-moz-appearance: none)) {
+            corner-shape: squircle;
+            border-radius: 0.75rem;
+        }
+    }
+    .rounded-lg {
+        border-radius: var(--radius-lg);
+        @supports (-webkit-appearance: none) and (not (-moz-appearance: none)) {
+            corner-shape: squircle;
+            border-radius: 1rem;
+        }
+    }
+    .rounded-xl {
+        border-radius: var(--radius-xl);
+        @supports (-webkit-appearance: none) and (not (-moz-appearance: none)) {
+            corner-shape: squircle;
+            border-radius: 1.5rem;
+        }
+    }
+    .rounded-2xl {
+        border-radius: var(--radius-2xl);
+        @supports (-webkit-appearance: none) and (not (-moz-appearance: none)) {
+            corner-shape: squircle;
+            border-radius: 2rem;
+        }
+    }
+    .rounded-3xl {
+        border-radius: var(--radius-3xl);
+        @supports (-webkit-appearance: none) and (not (-moz-appearance: none)) {
+            corner-shape: squircle;
+            border-radius: 2.5rem;
+        }
+    }
+    .rounded-4xl {
+        border-radius: var(--radius-4xl);
+        @supports (-webkit-appearance: none) and (not (-moz-appearance: none)) {
+            corner-shape: squircle;
+            border-radius: 3rem;
+        }
+    }
+}
+
+.dark {
+    --ui-bg: oklch(0.1 0 0);
+    --ui-bg-muted: oklch(0.21 0 0);
+}
+
+:where(h1, h2, h3, h4, h5, h6, section) {
+    scroll-margin-top: calc(var(--ui-header-height) + 0.5rem);
+}
+
+html {
+    @apply scroll-smooth;
+}

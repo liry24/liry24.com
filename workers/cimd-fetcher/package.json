@@ -1,9 +1,0 @@
-{
-    "name": "liry24-cimd-fetcher",
-    "private": true,
-    "type": "module",
-    "dependencies": {
-        "@better-auth/cimd": "1.7.0-rc.4",
-        "better-auth": "1.7.0-rc.4"
-    }
-}

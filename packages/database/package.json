@@ -9,18 +9,12 @@
         "./schema": {
             "import": "./src/schema.ts",
             "types": "./src/schema.ts"
-        },
-        "./types": {
-            "import": "./src/types.ts",
-            "types": "./src/types.ts"
         }
     },
     "dependencies": {
-        "drizzle-orm": "1.0.0-rc.4",
-        "nanoid": "^6.0.1",
-        "zod": "^4.4.3"
+        "drizzle-orm": "1.0.0-rc.4"
     },
     "devDependencies": {
-        "@cloudflare/workers-types": "^5.20260804.1"
+        "@cloudflare/workers-types": "^5.20260927.1"
     }
 }
