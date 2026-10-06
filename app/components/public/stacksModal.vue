@@ -2,6 +2,8 @@
 const colorMode = useColorMode()
 const isLight = computed(() => colorMode.preference === 'light')
 
+const logoSource = (name: string) => 'https://svgl.app/library/' + name + '.svg'
+
 const logos = [
     {
         name: 'TypeScript',
@@ -133,11 +135,7 @@ const logos = [
                     :delay-duration="50"
                 >
                     <NuxtLink :to="logo.href" target="_blank">
-                        <NuxtImg
-                            :src="`https://svgl.app/library/${logo.logo}.svg`"
-                            alt=""
-                            class="size-9"
-                        />
+                        <NuxtImg :src="logoSource(logo.logo)" alt="" class="size-9" />
                     </NuxtLink>
                 </UTooltip>
             </div>

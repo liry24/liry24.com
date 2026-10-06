@@ -6,9 +6,9 @@ import { LazyAdminFormEntryModal } from '#components'
 definePageMeta({
     middleware: 'admin',
     layout: 'admin',
-    key: (route) => route.params.model as string,
+    key: (route) => ('model' in route.params ? String(route.params.model) : route.path),
 })
-const modelName = String(useRoute().params.model)
+const modelName = String(useRoute('admin-model').params.model)
 const presentation = adminModels[modelName as keyof typeof adminModels]
 const { data: descriptors } = await useFetch<SiteAdminDescriptor>('/api/site-admin/models')
 const descriptor = descriptors.value?.models[modelName]

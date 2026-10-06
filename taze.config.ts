@@ -9,6 +9,7 @@ export default defineConfig({
     includeLocked: true,
     ignorePaths: ['**/node_modules/**'],
     ignoreOtherWorkspaces: true,
+    exclude: ['typescript@7'],
     depFields: {
         overrides: false,
         'bun-workspace': true,

@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process'
 
+import type { Nitro } from 'nitropack'
 import { parseURL } from 'ufo'
 
 const isPreview = process.env.CLOUDFLARE_PREVIEW_BUILD === 'true'
 const baseURL =
-    (isPreview ? process.env.PREVIEW_URL : import.meta.env.NUXT_PUBLIC_SITE_URL) ||
-    'https://liry24.com'
+    (isPreview ? process.env.PREVIEW_URL : process.env.NUXT_PUBLIC_SITE_URL) || 'https://liry24.com'
 const imagesDomain = isPreview ? baseURL : 'https://images.liry24.com'
 const title = 'Liry24'
 
@@ -46,6 +46,25 @@ export default defineNuxtConfig({
         prefetchPreloadTags: true,
     },
 
+    vite: {
+        optimizeDeps: {
+            // Nuxt 4.6 module entries expose virtual #components imports to Vite's dependency scanner.
+            noDiscovery: true,
+            include: [
+                '@unhead/schema-org/vue',
+                '@better-auth/passkey/client',
+                'better-auth/client/plugins',
+                'better-auth/plugins',
+                '@comark/vue',
+                '@formkit/drag-and-drop',
+                '@formkit/drag-and-drop/vue',
+                '@tanstack/vue-form',
+                '@yeger/vue-masonry-wall',
+                'cn',
+            ],
+        },
+    },
+
     runtimeConfig: {
         public: {
             siteUrl: baseURL,
@@ -76,12 +95,14 @@ export default defineNuxtConfig({
 
     nitro: {
         preset: 'cloudflare_module',
+        // Nuxt 4.6 renderer subpaths contain stubs that Nitro must replace during bundling.
+        externals: { inline: ['nuxt/internal'] },
         // Passkey certificate verification needs this polyfill before tsyringe initializes.
         moduleSideEffects: ['reflect-metadata'],
         compressPublicAssets: true,
         experimental: { asyncContext: true },
         hooks: {
-            compiled(nitro) {
+            compiled(nitro: Nitro) {
                 // Nitro 2 does not emit cf Build Output yet; Wrangler bundles its final output.
                 if (!nitro.options.dev)
                     execFileSync(

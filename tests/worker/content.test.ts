@@ -6,7 +6,7 @@ import { migrate } from 'drizzle-orm/d1/migrator'
 import { afterEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 
-import * as schema from '../../packages/database/src/schema'
+import * as schema from '../../server/database/schema'
 import config from '../../site-admin.config'
 let proxy: Awaited<ReturnType<typeof getPlatformProxy>> | undefined
 afterEach(async () => {

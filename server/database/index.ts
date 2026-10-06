@@ -16,5 +16,5 @@ const createDB = (d1: D1Database) => {
 
 type Database = ReturnType<typeof createDB>
 
-export { createDB, relations, schema }
+export { createDB }
 export type { Database }

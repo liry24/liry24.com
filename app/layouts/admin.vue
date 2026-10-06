@@ -6,6 +6,15 @@ const links = Object.entries(adminModels).map(([name, model]) => ({
     icon: model.icon,
     to: `/admin/${name}`,
 }))
+const extraLinks = [
+    {
+        to: 'https://github.com/Liry24/liry24.com',
+        target: '_blank',
+        icon: 'mingcute:github-fill',
+        label: 'GitHub',
+    },
+    { to: '/', icon: 'mingcute:arrow-left-line', label: 'Back to site' },
+]
 </script>
 
 <template>
@@ -70,19 +79,7 @@ const links = Object.entries(adminModels).map(([name, model]) => ({
                             :collapsed
                         />
                     </AdminNavSection>
-                    <AdminNav
-                        :links="[
-                            {
-                                to: 'https://github.com/Liry24/liry24.com',
-                                target: '_blank',
-                                icon: 'mingcute:github-fill',
-                                label: 'GitHub',
-                            },
-                            { to: '/', icon: 'mingcute:arrow-left-line', label: 'Back to site' },
-                        ]"
-                        :collapsed
-                        class="mt-auto"
-                    />
+                    <AdminNav :links="extraLinks" :collapsed class="mt-auto" />
                 </template>
                 <template #footer="{ collapsed }">
                     <UDropdownMenu

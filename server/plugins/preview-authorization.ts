@@ -1,6 +1,7 @@
 import type {} from '@liria24/site-admin/nuxt'
-import { schema } from '@repo/database'
 import { and, eq } from 'drizzle-orm'
+
+import * as schema from '../database/schema'
 
 export default defineNitroPlugin((nitroApp) => {
     nitroApp.hooks.hook('site-admin:authorize', async ({ event, actor }) => {

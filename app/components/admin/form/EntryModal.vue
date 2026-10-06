@@ -218,7 +218,7 @@ async function upload(
                                 v-else-if="['textarea', 'markdown'].includes(descriptor.kind)"
                                 :model-value="String(field.value ?? '')"
                                 :rows="descriptor.kind === 'markdown' ? 16 : 3"
-                                :placeholder="`${singular} ${fieldLabel(name)}`"
+                                :placeholder="singular + ' ' + fieldLabel(name)"
                                 variant="soft"
                                 autoresize
                                 class="w-full"
@@ -236,7 +236,7 @@ async function upload(
                                 :placeholder="
                                     name === 'href'
                                         ? 'https://example.com'
-                                        : `${singular} ${fieldLabel(name)}`
+                                        : singular + ' ' + fieldLabel(name)
                                 "
                                 variant="soft"
                                 :size="name === props.descriptor.displayFields?.title ? 'xl' : 'md'"
@@ -267,7 +267,7 @@ async function upload(
                 <UFormField label="Slug" description="Leave empty to generate an identifier."
                     ><UInput
                         v-model="slug"
-                        :placeholder="`${singular.toLowerCase()}-slug`"
+                        :placeholder="singular.toLowerCase() + '-slug'"
                         variant="soft"
                         class="w-full"
                 /></UFormField>

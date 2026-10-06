@@ -2,7 +2,10 @@ import { passkey } from '@better-auth/passkey'
 import { defineServerAuth } from '@nuxtjs/better-auth/config'
 import { jwt, lastLoginMethod } from 'better-auth/plugins'
 
-import { isPreviewGitHubAccountAdmin, validatePreviewIdentity } from './utils/previewAuthorization'
+import {
+    isPreviewGitHubAccountAdmin,
+    validatePreviewIdentity,
+} from './utils/previewAuthorization.js'
 
 export default defineServerAuth(() => {
     const isPreview = process.env.APP_ENV === 'preview'

@@ -2,8 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { H3Event } from 'h3'
 
-const { attachCloudflareContext, getCloudflareEnvironment } =
-    await import('../server/utils/cloudflareContext')
+import { getCloudflareEnvironment } from '../server/utils/cloudflareContext'
 
 describe('Cloudflare module-worker request context', () => {
     const readDatabase = (event: H3Event) => getCloudflareEnvironment<{ DB: unknown }>(event).DB
@@ -30,8 +29,22 @@ describe('Cloudflare module-worker request context', () => {
             },
         } as unknown as H3Event
 
-        attachCloudflareContext(event)
-
         expect(readDatabase(event)).toBe('module-worker-binding')
+    })
+
+    test('prefers the request binding without changing its context', () => {
+        const event = {
+            context: {
+                cloudflare: { env: { DB: 'request-binding' } },
+                _platform: { cloudflare: { env: { DB: 'platform-binding' } } },
+            },
+        } as unknown as H3Event
+        Object.freeze(event.context)
+        expect(readDatabase(event)).toBe('request-binding')
+    })
+
+    test('uses runtime bindings for scheduled tasks and events without platform context', () => {
+        expect(getCloudflareEnvironment()).toBe(process.env)
+        expect(getCloudflareEnvironment({ context: {} } as H3Event)).toBe(process.env)
     })
 })

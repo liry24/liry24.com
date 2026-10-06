@@ -91,7 +91,7 @@ try {
     if (process.argv.includes('--worker')) {
         await mutate('/schedule', { at: new Date(Date.now() + 1500).toISOString() })
         await new Promise((resolve) => setTimeout(resolve, 1600))
-        await request('/__scheduled', { authenticated: false })
+        await request('/cdn-cgi/local/scheduled', { authenticated: false })
         for (let attempt = 0; attempt < 30; attempt++) {
             entry = await request(base)
             if (entry.publishedRevisionId === entry.currentRevisionId) break

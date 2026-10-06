@@ -7,7 +7,7 @@ import { readMigrationFiles } from 'drizzle-orm/migrator'
 import { drizzle } from 'drizzle-orm/node-sqlite'
 import { expect, test } from 'vitest'
 
-import * as schema from '../../packages/database/src/schema'
+import * as schema from '../../server/database/schema'
 
 test('auth counters bound unknown paths and dynamic routes while preserving ingress rules', async () => {
     const db = new DatabaseSync(':memory:')
