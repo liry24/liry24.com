@@ -1,10 +1,11 @@
 import type {} from '@liria24/site-admin/nuxt'
 import { and, eq } from 'drizzle-orm'
+import { createError, useServerHooks } from 'nuxt/server'
 
 import * as schema from '../database/schema'
 
-export default defineNitroPlugin((nitroApp) => {
-    nitroApp.hooks.hook('site-admin:authorize', async ({ event, actor }) => {
+export default defineNitroPlugin(() => {
+    useServerHooks().hook('site-admin:authorize', async ({ event, actor }) => {
         if (process.env.APP_ENV !== 'preview') return
         const [account] = await useDB(event)
             .select({ accountId: schema.accounts.accountId })
@@ -15,8 +16,8 @@ export default defineNitroPlugin((nitroApp) => {
             .limit(1)
         if (!account || !(await isPreviewGitHubAccountAdmin(account.accountId))) {
             throw createError({
-                statusCode: 403,
-                statusMessage: 'Preview access requires repository admin permission',
+                status: 403,
+                statusText: 'Preview access requires repository admin permission',
             })
         }
     })

@@ -1,9 +1,12 @@
-import type { H3Event } from 'h3'
+import type { RequestEvent } from 'nuxt/server'
 
-export const getCloudflareEnvironment = <Environment>(event?: H3Event) => {
-    const cloudflare = event?.context.cloudflare ?? event?.context._platform?.cloudflare
+type CloudflareContext = { env: Record<string, unknown> }
+
+export const getCloudflareEnvironment = <Environment>(event?: Pick<RequestEvent, 'context'>) => {
+    const cloudflare = event?.context.cloudflare as CloudflareContext | undefined
+    const platform = event?.context._platform as { cloudflare?: CloudflareContext } | undefined
 
     // The module-worker entry exposes bindings through `process.env`. Prefer the
     // request context when it is available so local development stays compatible.
-    return (cloudflare?.env ?? process.env) as Environment
+    return (cloudflare?.env ?? platform?.cloudflare?.env ?? process.env) as Environment
 }

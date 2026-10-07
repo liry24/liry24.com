@@ -95,8 +95,14 @@ export default defineNuxtConfig({
 
     nitro: {
         preset: 'cloudflare_module',
-        // Nuxt 4.6 renderer subpaths contain stubs that Nitro must replace during bundling.
-        externals: { inline: ['nuxt/internal'] },
+        externals: {
+            inline: [
+                // Nuxt 4.6 renderer subpaths contain stubs that Nitro replaces during bundling.
+                'nuxt/internal',
+                // Keep Better Auth's generated provider in the same Site Admin runtime instance.
+                /\/better-auth\/database\.mjs$/,
+            ],
+        },
         // Passkey certificate verification needs this polyfill before tsyringe initializes.
         moduleSideEffects: ['reflect-metadata'],
         compressPublicAssets: true,

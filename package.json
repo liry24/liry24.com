@@ -28,7 +28,7 @@
         "@formkit/drag-and-drop": "^0.6.1",
         "@iconify-json/mingcute": "^1.2.8",
         "@iconify-json/simple-icons": "^1.2.99",
-        "@liria24/site-admin": "0.0.1",
+        "@liria24/site-admin": "0.0.2",
         "@nuxt/image": "^2.1.0",
         "@nuxt/ui": "^4.11.3",
         "@nuxtjs/better-auth": "^0.3.7",
