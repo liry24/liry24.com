@@ -113,6 +113,12 @@ if (action === 'deploy') {
         ),
     )
     await run('bun', ['--no-env-file', 'run', 'build'], { env: buildEnvironment })
+    // Validate the actual emitted v2 Worker on isolated local D1/R2 before any remote changes.
+    await run(
+        process.execPath,
+        ['node_modules/vitest/vitest.mjs', 'run', 'tests/worker/built-app.test.ts'],
+        { env: { ...buildEnvironment, LIRY24_TEST_BUILT_WORKER: 'true' } },
+    )
     // cf supports Drizzle's nested SQL layout; local Drizzle history is kept separate.
     await run(process.execPath, [
         'node_modules/cf/bin/cf',

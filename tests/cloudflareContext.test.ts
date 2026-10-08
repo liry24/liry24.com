@@ -1,6 +1,5 @@
-import { describe, expect, test } from 'bun:test'
-
 import type { H3Event } from 'h3'
+import { describe, expect, test } from 'vitest'
 
 import { getCloudflareEnvironment } from '../server/utils/cloudflareContext'
 

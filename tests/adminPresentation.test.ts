@@ -1,6 +1,5 @@
-import { expect, test } from 'bun:test'
-
 import type { EntryRecord } from '@liria24/site-admin/server'
+import { expect, test } from 'vitest'
 
 import { adminAssetUrl, loadAdminEntries } from '../app/utils/adminPresentation'
 

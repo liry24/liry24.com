@@ -1,3 +1,7 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import type { D1Database } from '@cloudflare/workers-types'
 import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
 import { createSiteAdmin } from '@liria24/site-admin/server'
@@ -9,14 +13,37 @@ import { getPlatformProxy } from 'wrangler'
 import * as schema from '../../server/database/schema'
 import config from '../../site-admin.config'
 let proxy: Awaited<ReturnType<typeof getPlatformProxy>> | undefined
+let fixtureDirectory: string | undefined
 afterEach(async () => {
-    await proxy?.dispose()
+    try {
+        await proxy?.dispose()
+    } finally {
+        proxy = undefined
+        if (fixtureDirectory) await rm(fixtureDirectory, { recursive: true, force: true })
+        fixtureDirectory = undefined
+    }
 }, 60_000)
 
 test('application-owned D1 uses explicit migration and preserves scheduled revisions', async () => {
+    fixtureDirectory = await mkdtemp(join(tmpdir(), 'liry24-content-test-'))
+    const configPath = join(fixtureDirectory, 'wrangler.json')
+    await writeFile(
+        configPath,
+        JSON.stringify({
+            name: 'liry24-content-test',
+            compatibility_date: '2026-07-30',
+            d1_databases: [
+                {
+                    binding: 'DB',
+                    database_name: 'liry24-content-test',
+                    database_id: '00000000-0000-0000-0000-000000000001',
+                },
+            ],
+        }),
+    )
     proxy = await getPlatformProxy({
         remoteBindings: false,
-        configPath: 'wrangler.local.jsonc',
+        configPath,
         persist: false,
     })
     const env = proxy.env as { DB: D1Database }

@@ -6,7 +6,7 @@
         "postinstall": "nuxt prepare",
         "dev": "nuxt dev",
         "build": "nuxt build",
-        "preview": "wrangler dev --persist-to .data/unified",
+        "preview": "wrangler dev --persist-to .data/worker-preview",
         "deploy": "wrangler deploy",
         "preview:deploy": "node scripts/preview.mjs deploy",
         "preview:delete": "node scripts/preview.mjs delete",
@@ -14,12 +14,9 @@
         "lint": "oxlint app server scripts tests",
         "format": "oxfmt . --write",
         "format:check": "oxfmt . --check",
-        "test": "bun run test:unit && bun run test:worker",
-        "test:unit": "bun test ./tests/*.test.ts",
-        "test:worker": "vitest run --config vitest.worker.config.ts",
-        "test:local": "node --env-file=.env scripts/test-site-admin-local.mjs",
-        "content:generate": "site-admin generate --auth server/auth.config.ts --auth-use-plural --out server/database/schema.ts && oxfmt server/database/schema.ts --write && drizzle-kit generate --config drizzle.config.ts",
-        "content:migrate": "cf d1 migrations apply 227d818f-cd40-4fca-9710-b57273be94ca --local --persist-to .data/unified --dir drizzle --pattern 'drizzle/*/migration.sql'"
+        "test": "vitest run",
+        "test:local": "node scripts/test-site-admin-local.mjs",
+        "content:generate": "site-admin generate --auth server/auth.config.ts --auth-use-plural --out server/database/schema.ts && oxfmt server/database/schema.ts --write && drizzle-kit generate --config drizzle.config.ts"
     },
     "dependencies": {
         "@better-auth/drizzle-adapter": "1.7.7",

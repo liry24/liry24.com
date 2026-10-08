@@ -1,4 +1,4 @@
-import { expect, spyOn, test } from 'bun:test'
+import { expect, test, vi } from 'vitest'
 
 import { previewBindings, previewTarget } from '../scripts/preview-target.mjs'
 import {
@@ -56,17 +56,19 @@ test('Preview login fails closed and rechecks a GitHub account after permission 
     let permission = 'admin'
     let returnedId = 42
     let status = 200
-    const fetchMock = spyOn(globalThis, 'fetch').mockImplementation(
-        async (input) =>
-            new Response(
-                JSON.stringify(
-                    String(input).endsWith('/user/42')
-                        ? { id: 42, login: 'renamed-admin' }
-                        : { permission, user: { id: returnedId } },
+    const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(
+            async (input) =>
+                new Response(
+                    JSON.stringify(
+                        String(input).endsWith('/user/42')
+                            ? { id: 42, login: 'renamed-admin' }
+                            : { permission, user: { id: returnedId } },
+                    ),
+                    { status },
                 ),
-                { status },
-            ),
-    )
+        )
     const source = {
         method: 'oauth',
         oauth: { providerId: 'github', profile: { id: 42, login: 'admin' } },

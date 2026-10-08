@@ -1,4 +1,6 @@
+import { defineNuxtConfig } from 'nuxt/config'
 import { parseURL } from 'ufo'
+import type { Unstable_RawConfig } from 'wrangler'
 
 import { previewBindings } from './scripts/preview-target.mjs'
 
@@ -7,6 +9,58 @@ const baseURL =
     (isPreview ? process.env.PREVIEW_URL : process.env.NUXT_PUBLIC_SITE_URL) || 'https://liry24.com'
 const imagesDomain = isPreview ? baseURL : 'https://images.liry24.com'
 const title = 'Liry24'
+
+const cloudflareConfig = {
+    name: 'liry24-com',
+    account_id: '422bd946004c77eb0d569ec489b40196',
+    compatibility_date: '2026-07-30',
+    // Explicit v2 prevents Nitro 2's opt-out. Enable the process features used by auth at this date.
+    compatibility_flags: [
+        'nodejs_compat_v2',
+        'enable_nodejs_process_v2',
+        'nodejs_compat_populate_process_env',
+    ],
+    workers_dev: false,
+    preview_urls: true,
+    routes: [{ pattern: 'liry24.com', custom_domain: true }],
+    triggers: { crons: ['* * * * *'] },
+    assets: { not_found_handling: '404-page' },
+    observability: { enabled: true, logs: { enabled: true, invocation_logs: true } },
+    vars: {
+        APP_ENV: 'production',
+        NUXT_PUBLIC_PREVIEW: 'false',
+        NUXT_PUBLIC_SITE_URL: 'https://liry24.com',
+        NUXT_PUBLIC_IMAGES_DOMAIN: 'https://images.liry24.com',
+        R2_DOMAIN: 'https://images.liry24.com',
+    },
+    secrets: {
+        required: [
+            'BETTER_AUTH_SECRET',
+            'GITHUB_CLIENT_ID',
+            'GITHUB_CLIENT_SECRET',
+            'VERCEL_CLIENT_ID',
+            'VERCEL_CLIENT_SECRET',
+        ],
+    },
+    d1_databases: [
+        {
+            binding: 'DB',
+            database_name: 'liry24-com',
+            database_id: '227d818f-cd40-4fca-9710-b57273be94ca',
+        },
+    ],
+    r2_buckets: [{ binding: 'R2', bucket_name: 'liry24-com' }],
+    dev: { ip: '127.0.0.1', port: 3100 },
+    ...(isPreview
+        ? {
+              previews: previewBindings({
+                  siteURL: process.env.PREVIEW_URL,
+                  databaseId: process.env.PREVIEW_D1_ID,
+                  resourceName: process.env.PREVIEW_RESOURCE_NAME,
+              }),
+          }
+        : {}),
+} satisfies Unstable_RawConfig
 
 export default defineNuxtConfig({
     compatibilityDate: '2026-07-30',
@@ -98,8 +152,9 @@ export default defineNuxtConfig({
             inline: [
                 // Nuxt 4.6 renderer subpaths contain stubs that Nitro replaces during bundling.
                 'nuxt/internal',
+                // A predicate takes precedence over Nitro-dev's external build directory.
                 // Keep Better Auth's generated provider in the same Site Admin runtime instance.
-                /\/better-auth\/database\.mjs$/,
+                (id: string) => /\/better-auth\/database\.mjs$/.test(id.replaceAll('\\', '/')),
             ],
         },
         // Passkey certificate verification needs this polyfill before tsyringe initializes.
@@ -109,22 +164,7 @@ export default defineNuxtConfig({
         cloudflare: {
             deployConfig: true,
             nodeCompat: true,
-            ...(isPreview
-                ? {
-                      wrangler: {
-                          previews: previewBindings({
-                              siteURL: process.env.PREVIEW_URL,
-                              databaseId: process.env.PREVIEW_D1_ID,
-                              resourceName: process.env.PREVIEW_RESOURCE_NAME,
-                          }),
-                      },
-                  }
-                : {}),
-            dev: {
-                configPath: './wrangler.local.jsonc',
-                // getPlatformProxy uses this path directly; CLI --persist-to appends v3.
-                persistDir: './.data/unified/v3',
-            },
+            wrangler: cloudflareConfig,
         },
         prerender: {
             crawlLinks: false,
@@ -213,6 +253,7 @@ export default defineNuxtConfig({
     },
 
     $development: {
+        nitro: { preset: 'nitro-dev' },
         runtimeConfig: { public: { siteUrl: '' } },
     },
 

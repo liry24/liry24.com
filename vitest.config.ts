@@ -1,4 +1,6 @@
 import { defineConfig } from 'vitest/config'
+
 export default defineConfig({
-    test: { include: ['tests/worker/**/*.test.ts'] },
+    envDir: false,
+    test: { include: ['tests/**/*.test.ts'] },
 })
