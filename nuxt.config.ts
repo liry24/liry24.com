@@ -1,7 +1,6 @@
-import { execFileSync } from 'node:child_process'
-
-import type { Nitro } from 'nitropack'
 import { parseURL } from 'ufo'
+
+import { previewBindings } from './scripts/preview-target.mjs'
 
 const isPreview = process.env.CLOUDFLARE_PREVIEW_BUILD === 'true'
 const baseURL =
@@ -107,22 +106,20 @@ export default defineNuxtConfig({
         moduleSideEffects: ['reflect-metadata'],
         compressPublicAssets: true,
         experimental: { asyncContext: true },
-        hooks: {
-            compiled(nitro: Nitro) {
-                // Nitro 2 does not emit cf Build Output yet; Wrangler bundles its final output.
-                if (!nitro.options.dev)
-                    execFileSync(
-                        process.execPath,
-                        ['node_modules/wrangler/bin/cf-wrangler.js', 'build'],
-                        {
-                            stdio: 'inherit',
-                        },
-                    )
-            },
-        },
         cloudflare: {
-            deployConfig: false,
+            deployConfig: true,
             nodeCompat: true,
+            ...(isPreview
+                ? {
+                      wrangler: {
+                          previews: previewBindings({
+                              siteURL: process.env.PREVIEW_URL,
+                              databaseId: process.env.PREVIEW_D1_ID,
+                              resourceName: process.env.PREVIEW_RESOURCE_NAME,
+                          }),
+                      },
+                  }
+                : {}),
             dev: {
                 configPath: './wrangler.local.jsonc',
                 // getPlatformProxy uses this path directly; CLI --persist-to appends v3.

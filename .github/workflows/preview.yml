@@ -28,7 +28,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.2'
-      - run: bun install --frozen-lockfile
+      - run: bun --no-env-file install --frozen-lockfile
       - if: github.event_name == 'push'
         run: |
           bun run format:check
@@ -39,6 +39,7 @@ jobs:
         if: github.event_name == 'push'
         run: node scripts/preview.mjs deploy "$PREVIEW_BRANCH"
         env:
+          NODE_OPTIONS: --max-old-space-size=4096
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           PREVIEW_BETTER_AUTH_SECRET: ${{ secrets.PREVIEW_BETTER_AUTH_SECRET }}

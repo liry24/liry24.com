@@ -1,7 +1,7 @@
 # Development constraints
 
 - Keep public pages, `/admin`, content APIs and Better Auth in the root Nuxt app and the single `liry24-com` Worker. Use the published `@liria24/site-admin` package, not a workspace copy.
-- Use `cf` for supported Cloudflare operations. Wrangler remains only for Nitro 2 bundling and development bindings, running the built Worker locally, native D1/R2 test bindings, and Preview secret updates/deletion that cf does not support. Recheck these limitations when upgrading cf or Nitro.
+- Build with Nuxt and deploy Nitro's standard generated configuration with Wrangler, including branch Previews. Adopt `cf` gradually for supported operations such as D1/R2 management; do not convert Wrangler output into cf Build Output. Recheck support when upgrading cf or Nitro.
 - CLI local persistence is `.data/unified`; the CLI appends `v3`. Nitro's `getPlatformProxy` receives `.data/unified/v3` directly. Keep both paths aligned.
 - Apply schema changes explicitly through migrations and the `d1_migrations` ledger. Never run DDL from HTTP requests or ordinary deployments. Back up existing databases and check schema compatibility before applying or aligning a baseline.
 - Keep published, scheduled and current revisions separate. Production runs `publishDue()` every minute; Previews have no Cron. This application explicitly disables draft Blob separation, so an unpublished original remains accessible to anyone who knows its public R2 URL.

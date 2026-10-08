@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { appendFile, mkdir, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 
 import { previewTarget, repository, workerName } from './preview-target.mjs'
@@ -51,7 +52,6 @@ function run(executable, args, { input, json = false, env = environment } = {}) 
 }
 
 const cf = (...args) => run(process.execPath, ['node_modules/cf/bin/cf', ...args], { json: true })
-// cf beta.7 has no Preview secret or delete operation; keep this fallback Preview-only.
 const wranglerPreview = (args, input) =>
     run(process.execPath, ['node_modules/wrangler/bin/wrangler.js', ...args], { input })
 const listDatabase = async () => {
@@ -97,12 +97,22 @@ if (action === 'deploy') {
     )
     if (!(await listBucket())) await cf('r2', 'buckets', 'create', '--name', target.resourceName)
     Object.assign(environment, {
+        CLOUDFLARE_PREVIEW_BUILD: 'true',
         APP_ENV: 'preview',
         PREVIEW_URL: target.url,
         PREVIEW_D1_ID: database.uuid,
         PREVIEW_RESOURCE_NAME: target.resourceName,
         NUXT_PUBLIC_SITE_URL: target.url,
     })
+    // Build with public Preview metadata only. OAuth/authentication credentials stay runtime bindings.
+    const buildEnvironment = Object.fromEntries(
+        Object.entries(environment).filter(([name]) =>
+            /^(?:PATH|HOME|TMPDIR|CI|NODE_OPTIONS|HTTP_PROXY|HTTPS_PROXY|NO_PROXY|CF_SEND_TELEMETRY|WRANGLER_SEND_METRICS|CLOUDFLARE_PREVIEW_BUILD|APP_ENV|PREVIEW_URL|PREVIEW_D1_ID|PREVIEW_RESOURCE_NAME|NUXT_PUBLIC_SITE_URL)$/.test(
+                name,
+            ),
+        ),
+    )
+    await run('bun', ['--no-env-file', 'run', 'build'], { env: buildEnvironment })
     // cf supports Drizzle's nested SQL layout; local Drizzle history is kept separate.
     await run(process.execPath, [
         'node_modules/cf/bin/cf',
@@ -120,9 +130,32 @@ if (action === 'deploy') {
         ['preview', 'base-config', 'secret', 'bulk', '--worker-name', workerName],
         secretInput,
     )
-    const deployed = await cf('previews', 'deploy', target.name)
+    // Wrangler's structured output excludes log lines and secret values.
+    await mkdir('.cloudflare', { recursive: true })
+    const outputPath = resolve('.cloudflare/preview-deploy-output.jsonl')
+    await writeFile(outputPath, '')
+    await run(
+        process.execPath,
+        [
+            'node_modules/wrangler/bin/wrangler.js',
+            'preview',
+            '--worker-name',
+            workerName,
+            '--name',
+            target.name,
+            '--json',
+        ],
+        { env: { ...environment, WRANGLER_OUTPUT_FILE_PATH: outputPath } },
+    )
+    const records = (await readFile(outputPath, 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+    const deployed = records.find((record) => record.type === 'preview')
     assert(
-        deployed.preview_name === target.name && deployed.preview_urls?.includes(target.url),
+        deployed?.worker_name === workerName &&
+            deployed.preview_name === target.name &&
+            deployed.preview_urls?.includes(target.url),
         'Unexpected Preview deployment target',
     )
     // Base secrets only initialize new Previews. Refresh existing ones on every deployment too.
@@ -130,7 +163,6 @@ if (action === 'deploy') {
         ['preview', 'secret', 'bulk', '--worker-name', workerName, '--name', target.name],
         secretInput,
     )
-    await mkdir('.cloudflare', { recursive: true })
     await writeFile(
         '.cloudflare/preview-result.json',
         JSON.stringify(
