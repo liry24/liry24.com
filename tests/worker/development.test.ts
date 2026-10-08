@@ -5,9 +5,10 @@ import { join } from 'node:path'
 import { drizzleAdapter as authAdapter } from '@better-auth/drizzle-adapter/relations-v2'
 import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
 import { createSiteAdmin } from '@liria24/site-admin/server'
-import { betterAuth } from 'better-auth'
 import { transform } from 'esbuild'
 import { expect, test } from 'vitest'
+
+import { betterAuth } from '#better-auth'
 
 import { openDevelopmentDB } from '../../server/database/development'
 import * as schema from '../../server/database/schema'

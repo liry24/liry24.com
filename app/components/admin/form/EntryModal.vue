@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ModelDescriptor } from '@liria24/site-admin'
+import { managementAssetUrl } from '@liria24/site-admin/client'
 import { useSiteAdminForm } from '@liria24/site-admin/form'
 import type { EntryRecord } from '@liria24/site-admin/server'
 const props = defineProps<{
@@ -65,7 +66,7 @@ async function upload(
         for (const file of Array.isArray(files) ? files : [files]) {
             const record = await asset.upload(file)
             uploaded.push(record.id)
-            uploadedNames.value[adminAssetUrl(record.id)!] = file.name
+            uploadedNames.value[record.id] = file.name
         }
         if (multiple) form.setFieldValue(name, [...references(current), ...uploaded])
         else if (uploaded[0]) asset.set(name, uploaded[0])
@@ -167,18 +168,22 @@ async function upload(
                                 </p>
                                 <div
                                     v-for="(reference, index) in references(field.value)"
-                                    :key="adminAssetUrl(reference)"
+                                    :key="adminAssetId(reference)"
                                     class="flex min-w-0 items-center gap-2"
                                 >
                                     <img
                                         v-if="descriptor.kind !== 'file'"
-                                        :src="adminAssetUrl(reference)"
+                                        :src="
+                                            adminAssetId(reference)
+                                                ? managementAssetUrl(adminAssetId(reference)!)
+                                                : undefined
+                                        "
                                         alt=""
                                         class="size-10 shrink-0 rounded-md object-cover"
                                     />
                                     <UIcon v-else name="mingcute:file-fill" class="size-5" />
                                     <span class="text-toned min-w-0 flex-1 truncate text-sm">{{
-                                        uploadedNames[adminAssetUrl(reference)!] ||
+                                        uploadedNames[adminAssetId(reference)!] ||
                                         `${descriptor.kind === 'file' ? 'File' : 'Image'} ${index + 1}`
                                     }}</span>
                                     <UButton

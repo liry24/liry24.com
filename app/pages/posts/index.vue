@@ -1,23 +1,14 @@
 <script setup lang="ts">
-const client = useSiteAdminClient()
-const { data } = await useAsyncData('public:posts', async () =>
-    (await client.list<ContentEntry<'posts'>>('posts')).map((entry) => ({
-        ...entry.data,
-        slug: entry.slug,
-        createdAt: entry.data.createdAt || entry.publishedAt,
-    })),
-)
-
-defineSeo({
-    title: 'Posts',
-    titleTemplate: '%s | Liry24',
-    description: 'Blog posts by Liry24.',
-    image: {
-        component: 'Home.takumi',
-        props: { title: 'Liry24', subpath: 'posts' },
-        options: [{ key: 'og' }, { key: 'whatsapp', width: 800, height: 800 }],
-    },
+const { data } = await useSiteAdminList('posts', {
+    transform: (entries) =>
+        entries.map((entry) => ({
+            ...entry.data,
+            slug: entry.slug,
+            createdAt: entry.data.createdAt || entry.publishedAt,
+        })),
 })
+
+useSeo()
 </script>
 
 <template>

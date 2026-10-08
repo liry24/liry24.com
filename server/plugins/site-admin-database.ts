@@ -1,15 +1,11 @@
 import { drizzleAdapter as authAdapter } from '@better-auth/drizzle-adapter/relations-v2'
-import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
 import type {} from '@liria24/site-admin/nuxt'
 import { useServerHooks } from 'nuxt/server'
 
 import { getDevelopmentDB, setDevelopmentDB, type Database } from '../database'
 import * as schema from '../database/schema'
 
-const adapters = new WeakMap<
-    Database,
-    { auth: ReturnType<typeof authAdapter>; siteAdmin: ReturnType<typeof drizzleAdapter> }
->()
+const adapters = new WeakMap<Database, ReturnType<typeof authAdapter>>()
 
 export default defineNitroPlugin(async (nitroApp) => {
     // Nitro replaces these flags before bundling; our development SQLite driver
@@ -26,21 +22,17 @@ export default defineNitroPlugin(async (nitroApp) => {
     }
 
     useServerHooks().hook('site-admin:database', (context) => {
-        const db = useDB(context.event)
+        const db = useDB(context.event, context.platformContext)
         let pair = adapters.get(db)
         if (!pair) {
-            pair = {
-                auth: authAdapter(db, {
-                    provider: 'sqlite',
-                    schema,
-                    transaction: false,
-                    usePlural: true,
-                }),
-                siteAdmin: drizzleAdapter(db, { schema }),
-            }
+            pair = authAdapter(db, {
+                provider: 'sqlite',
+                schema,
+                transaction: false,
+                usePlural: true,
+            })
             adapters.set(db, pair)
         }
-        context.authDatabase = pair.auth
-        context.database = pair.siteAdmin
+        context.authDatabase = pair
     })
 })

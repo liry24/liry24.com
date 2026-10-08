@@ -10,38 +10,28 @@ const overlay = useOverlay()
 const modalStacks = overlay.create(LazyStacksModal)
 const MotionUSeparator = motion.create('hr')
 
-const client = useSiteAdminClient()
-const [{ data: arts }, { data: socials }, { data: careers }, { data: ranks }, { data: posts }] =
-    await Promise.all([
-        useAsyncData('public:arts', async () =>
-            (await client.list<ContentEntry<'arts'>>('arts')).map(presentArt),
-        ),
-        useAsyncData('public:socials', async () =>
-            (await client.list<ContentEntry<'socials'>>('socials')).map((entry) => entry.data),
-        ),
-        useAsyncData('public:careers', async () =>
-            (await client.list<ContentEntry<'careers'>>('careers')).map((entry) => entry.data),
-        ),
-        useAsyncData('public:ranks', async () =>
-            (await client.list<ContentEntry<'ranks'>>('ranks')).map((entry) => ({
-                ...entry.data,
-                imageUrl: entry.data.image?.url,
-            })),
-        ),
-        useAsyncData('public:posts', async () =>
-            (await client.list<ContentEntry<'posts'>>('posts')).map((entry) => ({
-                ...entry.data,
-                slug: entry.slug,
-                createdAt: entry.data.createdAt || entry.publishedAt,
-            })),
-        ),
-    ])
+const { data: batch } = await useSiteAdminBatch({
+    arts: { list: 'arts' },
+    socials: { list: 'socials' },
+    careers: { list: 'careers' },
+    ranks: { list: 'ranks' },
+    posts: { list: 'posts' },
+})
 const data = computed(() => ({
-    arts: arts.value || [],
-    socials: socials.value || [],
-    careers: careers.value || [],
-    ranks: ranks.value || [],
-    posts: posts.value || [],
+    arts: batch.value?.arts.data || [],
+    socials: batch.value?.socials.data?.map((entry) => entry.data) || [],
+    careers: batch.value?.careers.data?.map((entry) => entry.data) || [],
+    ranks:
+        batch.value?.ranks.data?.map((entry) => ({
+            ...entry.data,
+            imageUrl: entry.data.image?.url,
+        })) || [],
+    posts:
+        batch.value?.posts.data?.map((entry) => ({
+            ...entry.data,
+            slug: entry.slug,
+            createdAt: entry.data.createdAt || entry.publishedAt,
+        })) || [],
 }))
 
 const rotateArray = <T>(arr: T[], n: number): T[] => {
@@ -55,16 +45,7 @@ const rotateArray = <T>(arr: T[], n: number): T[] => {
 
 useKeyCommand(modalStacks.open)
 
-defineSeo({
-    title: 'Liry24',
-    description: 'Personal website of Liry24.',
-    type: 'website',
-    image: {
-        component: 'Home.takumi',
-        props: { title: 'Liry24' },
-        options: [{ key: 'og' }, { key: 'whatsapp', width: 800, height: 800 }],
-    },
-})
+useSeo()
 </script>
 
 <template>
@@ -83,8 +64,8 @@ defineSeo({
             >
                 <NuxtLink :to="`/arts?open=${art.slug}`">
                     <NuxtImg
-                        :src="art.images[0]?.src"
-                        :alt="art.title"
+                        :src="art.data.images[0]?.url"
+                        :alt="art.data.title"
                         :height="320"
                         format="webp"
                         class="aspect-square size-64 cursor-pointer rounded-xl object-cover md:size-72 lg:size-80"

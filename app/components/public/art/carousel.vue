@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import type { PublicAsset } from '@liria24/site-admin/client'
+
 import { ImageViewer } from '#components'
-import type { ArtImage } from '~/utils/contentPresentation'
 
 const { data } = defineProps<{
-    data: ArtImage[]
+    data: PublicAsset[]
 }>()
 
 const overlay = useOverlay()
@@ -43,12 +44,12 @@ const select = (index: number) => {
             @select="onSelect"
         >
             <NuxtImg
-                :src="item.src"
+                :src="item.url"
                 :alt="item.alt || ''"
                 class="max-h-[70svh] rounded-lg"
                 @click="
                     imageViewer.open({
-                        src: item.src,
+                        src: item.url,
                         alt: item.alt || '',
                     })
                 "
@@ -64,7 +65,7 @@ const select = (index: number) => {
                 @click="select(index)"
             >
                 <NuxtImg
-                    :src="item.src"
+                    :src="item.url"
                     :alt="item.alt || ''"
                     :width="48"
                     :height="48"

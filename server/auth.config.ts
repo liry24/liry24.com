@@ -1,6 +1,7 @@
 import { passkey } from '@better-auth/passkey'
-import { defineServerAuth } from '@nuxtjs/better-auth/config'
-import { jwt, lastLoginMethod } from 'better-auth/plugins'
+
+import { jwt, lastLoginMethod } from '#better-auth/plugins'
+import { defineServerAuth } from '#nuxtjs/better-auth/config'
 
 import {
     isPreviewGitHubAccountAdmin,

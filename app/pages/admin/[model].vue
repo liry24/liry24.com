@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SiteAdminDescriptor } from '@liria24/site-admin'
-import type { EntryPage, EntryRecord, RevisionRecord } from '@liria24/site-admin/server'
+import { managementAssetUrl, type SiteAdminManagementModels } from '@liria24/site-admin/client'
+import type { EntryRecord, RevisionRecord } from '@liria24/site-admin/server'
 
 import { LazyAdminFormEntryModal } from '#components'
 definePageMeta({
@@ -13,19 +14,14 @@ const presentation = adminModels[modelName as keyof typeof adminModels]
 const { data: descriptors } = await useFetch<SiteAdminDescriptor>('/api/site-admin/models')
 const descriptor = descriptors.value?.models[modelName]
 if (!descriptor || !presentation) throw createError({ statusCode: 404 })
-const request = useRequestFetch()
+const management = useSiteAdminManagementClient()
 const {
     data: entries,
     refresh,
     error,
 } = await useAsyncData(
     `admin:${modelName}`,
-    () =>
-        loadAdminEntries((offset) =>
-            request<EntryPage>('/api/site-admin/entries', {
-                query: { model: modelName, limit: 100, offset },
-            }),
-        ),
+    () => management.listAllEntries(modelName as keyof SiteAdminManagementModels),
     { default: () => [] },
 )
 const items = ref<EntryRecord[]>([])
@@ -43,11 +39,13 @@ const schedule = ref<Record<string, string>>({})
 const revisions = ref<Record<string, RevisionRecord[]>>({})
 const selectedRevision = ref<Record<string, string>>({})
 async function history(entry: EntryRecord) {
-    revisions.value[entry.id] = await $fetch(
-        `/api/site-admin/entries/${encodeURIComponent(entry.id)}/revisions`,
-    )
+    revisions.value[entry.id] = await management.listRevisions(entry.id)
 }
 async function edit(data?: EntryRecord) {
+    if (modelName === 'posts') {
+        await navigateTo(data ? `/admin/posts/${encodeURIComponent(data.id)}` : '/admin/posts/new')
+        return
+    }
     await modal.open({
         modelName,
         descriptor: descriptor!,
@@ -164,13 +162,13 @@ function move(index: number, offset: number) {
                     <template #leading>
                         <img
                             v-if="
-                                adminAssetUrl(
-                                    item.data[descriptor.displayFields?.image || 'images'],
-                                )
+                                adminAssetId(item.data[descriptor.displayFields?.image || 'images'])
                             "
                             :src="
-                                adminAssetUrl(
-                                    item.data[descriptor.displayFields?.image || 'images'],
+                                managementAssetUrl(
+                                    adminAssetId(
+                                        item.data[descriptor.displayFields?.image || 'images'],
+                                    )!,
                                 )
                             "
                             alt=""

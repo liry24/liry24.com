@@ -1,31 +1,30 @@
 <script setup lang="ts">
 const route = useRoute()
 
-const client = useSiteAdminClient()
-const { data } = await useAsyncData(`public:post:${route.params.slug}`, async () => {
-    const entry = await client.get<ContentEntry<'posts'>>('posts', String(route.params.slug))
-    return entry
-        ? { ...entry.data, slug: entry.slug, createdAt: entry.data.createdAt || entry.publishedAt }
-        : null
-})
+const { data: entry, error } = await useSiteAdminEntry('posts', () => String(route.params.slug))
+if (error.value) throw error.value
+const data = computed(() =>
+    entry.value
+        ? {
+              ...entry.value.data,
+              slug: entry.value.slug,
+              createdAt: entry.value.data.createdAt || entry.value.publishedAt,
+          }
+        : null,
+)
 
 if (!data.value) throw createError({ statusCode: 404, statusMessage: 'Post not found' })
 
 const location = useBrowserLocation()
 
-const { isSupported: isShareSupported, share } = useShare({
+const { isSupported: isShareSupported, share } = useShare(() => ({
     title: data.value?.title,
     url: location.value.href,
-})
+}))
 
 const { isSupported: isCopySupported, copy, copied } = useClipboard()
 
-defineSeo({
-    type: 'article',
-    title: data.value?.title,
-    titleTemplate: '%s | Liry24',
-    description: data.value?.excerpt || undefined,
-})
+useSeo(() => entry.value?.seo)
 </script>
 
 <template>
@@ -54,23 +53,27 @@ defineSeo({
                     variant="soft"
                     class="ml-1"
                 />
-                <UButton
-                    v-if="isShareSupported"
-                    icon="mingcute:share-2-fill"
-                    variant="ghost"
-                    size="sm"
-                    class="ml-1"
-                    @click="share()"
-                />
-                <UButton
-                    v-if="isCopySupported && location.href"
-                    :icon="copied ? 'mingcute:check-fill' : 'mingcute:link-3-fill'"
-                    :label="copied ? 'URL Copied' : undefined"
-                    variant="ghost"
-                    size="sm"
-                    class="transition-all"
-                    @click="copy(location.href)"
-                />
+                <ClientOnly>
+                    <UButton
+                        v-if="isShareSupported"
+                        aria-label="Share post"
+                        icon="mingcute:share-2-fill"
+                        variant="ghost"
+                        size="sm"
+                        class="ml-1"
+                        @click="share()"
+                    />
+                    <UButton
+                        v-if="isCopySupported && location.href"
+                        aria-label="Copy post URL"
+                        :icon="copied ? 'mingcute:check-fill' : 'mingcute:link-3-fill'"
+                        :label="copied ? 'URL Copied' : undefined"
+                        variant="ghost"
+                        size="sm"
+                        class="transition-all"
+                        @click="copy(location.href)"
+                    />
+                </ClientOnly>
             </div>
 
             <div class="flex max-w-4xl flex-col gap-6">

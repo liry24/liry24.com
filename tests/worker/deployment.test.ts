@@ -14,6 +14,8 @@ test('the generated auth provider stays inline on POSIX and Windows paths', () =
     ) as (id: string) => boolean
     expect(inline('/app/.nuxt/better-auth/database.mjs')).toBe(true)
     expect(inline('C:\\app\\.nuxt\\better-auth\\database.mjs')).toBe(true)
+    expect(inline('/app/.nuxt/site-admin/better-auth-server-plugin.mjs')).toBe(true)
+    expect(inline('C:\\app\\.nuxt\\site-admin\\better-auth-server-plugin.mjs')).toBe(true)
     expect(inline('/app/node_modules/better-auth/dist/index.mjs')).toBe(false)
 })
 
@@ -38,6 +40,7 @@ test('Nitro owns production settings and preserves infrastructure and required s
         },
     ])
     expect(rawConfig.r2_buckets).toEqual([{ binding: 'R2', bucket_name: 'liry24-com' }])
+    expect(rawConfig.ai).toEqual({ binding: 'AI' })
     expect(rawConfig.secrets?.required).toEqual([
         'BETTER_AUTH_SECRET',
         'GITHUB_CLIENT_ID',
@@ -78,18 +81,20 @@ test('native Nitro generation preserves settings and v2 without an input Wrangle
             'secrets',
             'd1_databases',
             'r2_buckets',
+            'ai',
             'observability',
         ] as const)
             expect(output[key]).toEqual(input[key])
         expect(output.main).toBe('index.mjs')
         expect(output.assets).toMatchObject({
             binding: 'ASSETS',
-            directory: '../public',
             not_found_handling: '404-page',
         })
-        expect(
-            JSON.parse(await readFile(join(rootDir, '.wrangler/deploy/config.json'), 'utf8')),
-        ).toEqual({ configPath: '../../.output/server/wrangler.json' })
+        expect(output.assets.directory.replaceAll('\\', '/')).toBe('../public')
+        const redirect = JSON.parse(
+            await readFile(join(rootDir, '.wrangler/deploy/config.json'), 'utf8'),
+        )
+        expect(redirect.configPath.replaceAll('\\', '/')).toBe('../../.output/server/wrangler.json')
     } finally {
         await nitro.close()
         await rm(rootDir, { recursive: true, force: true })

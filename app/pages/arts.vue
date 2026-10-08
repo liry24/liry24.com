@@ -6,10 +6,7 @@ import { ArtViewer } from '#components'
 const route = useRoute()
 const overlay = useOverlay()
 
-const client = useSiteAdminClient()
-const { data } = await useAsyncData('public:arts', async () =>
-    (await client.list<ContentEntry<'arts'>>('arts')).map(presentArt),
-)
+const { data } = await useSiteAdminList('arts', { default: () => [] })
 
 const modalArtViewer = overlay.create(ArtViewer)
 
@@ -18,16 +15,7 @@ onMounted(() => {
         modalArtViewer.open({ item: data.value.find((i) => i.slug === route.query.open)! })
 })
 
-defineSeo({
-    title: 'Arts',
-    titleTemplate: '%s | Liry24',
-    description: 'A collection of artworks by Liry24.',
-    image: {
-        component: 'Home.takumi',
-        props: { title: 'Liry24', subpath: 'arts' },
-        options: [{ key: 'og' }, { key: 'whatsapp', width: 800, height: 800 }],
-    },
-})
+useSeo()
 </script>
 
 <template>
@@ -46,8 +34,8 @@ defineSeo({
                     @click="modalArtViewer.open({ item })"
                 >
                     <NuxtImg
-                        :src="item.images[0]?.src"
-                        :alt="item.title"
+                        :src="item.data.images[0]?.url"
+                        :alt="item.data.title"
                         :width="520"
                         format="webp"
                         class="size-full"
@@ -57,12 +45,12 @@ defineSeo({
                         class="absolute inset-0 flex flex-col gap-3 bg-black/50 p-4 text-zinc-100 opacity-0 transition-opacity group-hover:opacity-100"
                     >
                         <span class="font-[Special_Gothic_Expanded_One] text-3xl font-bold">
-                            {{ item.title }}
+                            {{ item.data.title }}
                         </span>
 
                         <div class="mt-auto ml-auto flex items-center gap-1">
                             <Icon name="mingcute:photo-album-fill" size="20" />
-                            <span class="font-bold">{{ item.images.length }}</span>
+                            <span class="font-bold">{{ item.data.images.length }}</span>
                         </div>
                     </div>
                 </div>

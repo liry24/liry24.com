@@ -12,6 +12,69 @@ import {
 } from '@liria24/site-admin'
 
 export default defineSiteAdminConfig({
+    assets: {
+        storage: 'content',
+        separateDrafts: false,
+        cleanup: { minimumAge: 60 * 60 * 24 },
+    },
+    database: async (context) => {
+        const { getSiteAdminDatabase } = await import('./server/utils/database')
+        return getSiteAdminDatabase(context)
+    },
+    ai: {
+        model: async (context) => {
+            const { getWorkersAIModel } = await import('./server/utils/workersAI')
+            return getWorkersAIModel(context)
+        },
+    },
+    seo: { titleTemplate: '%s | Liry24' },
+    routeRules: {
+        '/': {
+            seo: {
+                title: 'Liry24',
+                titleTemplate: null,
+                description: 'Personal website of Liry24.',
+                image: {
+                    component: 'Home.takumi',
+                    props: { title: 'Liry24' },
+                    options: [{ key: 'og' }, { key: 'whatsapp', width: 800, height: 800 }],
+                },
+            },
+        },
+        '/arts': {
+            seo: {
+                title: 'Arts',
+                description: 'A collection of artworks by Liry24.',
+                image: {
+                    component: 'Home.takumi',
+                    props: { title: 'Liry24', subpath: 'arts' },
+                    options: [{ key: 'og' }, { key: 'whatsapp', width: 800, height: 800 }],
+                },
+            },
+        },
+        '/works': {
+            seo: {
+                title: 'Works',
+                description: 'A collection of works by Liry24.',
+                image: {
+                    component: 'Home.takumi',
+                    props: { title: 'Liry24', subpath: 'works' },
+                    options: [{ key: 'og' }, { key: 'whatsapp', width: 800, height: 800 }],
+                },
+            },
+        },
+        '/posts': {
+            seo: {
+                title: 'Posts',
+                description: 'Blog posts by Liry24.',
+                image: {
+                    component: 'Home.takumi',
+                    props: { title: 'Liry24', subpath: 'posts' },
+                    options: [{ key: 'og' }, { key: 'whatsapp', width: 800, height: 800 }],
+                },
+            },
+        },
+    },
     models: {
         works: {
             sortable: true,
@@ -86,6 +149,7 @@ export default defineSiteAdminConfig({
         },
         posts: {
             route: '/posts/:slug',
+            seo: { type: 'article' },
             displayFields: { title: 'title', description: 'excerpt', image: 'image' },
             fields: {
                 title: text({ required: true }),

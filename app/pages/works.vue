@@ -1,25 +1,16 @@
 <script setup lang="ts">
 import { MasonryWall } from '@yeger/vue-masonry-wall'
 
-const client = useSiteAdminClient()
-const { data } = await useAsyncData('public:works', async () =>
-    (await client.list<ContentEntry<'works'>>('works')).map((entry) => ({
-        ...entry.data,
-        slug: entry.slug,
-        image: entry.data.image?.url,
-    })),
-)
-
-defineSeo({
-    title: 'Works',
-    titleTemplate: '%s | Liry24',
-    description: 'A collection of works by Liry24.',
-    image: {
-        component: 'Home.takumi',
-        props: { title: 'Liry24', subpath: 'works' },
-        options: [{ key: 'og' }, { key: 'whatsapp', width: 800, height: 800 }],
-    },
+const { data } = await useSiteAdminList('works', {
+    transform: (entries) =>
+        entries.map((entry) => ({
+            ...entry.data,
+            slug: entry.slug,
+            image: entry.data.image?.url,
+        })),
 })
+
+useSeo()
 </script>
 
 <template>

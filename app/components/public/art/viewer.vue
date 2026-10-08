@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { PublicArt } from '~/utils/contentPresentation'
+import type { SiteAdminPublicModels } from '@liria24/site-admin/client'
 
 const open = defineModel<boolean>('open', { default: false })
 
 const { item } = defineProps<{
-    item: PublicArt
+    item: SiteAdminPublicModels['arts']
 }>()
 
 const historyStateAdded = ref(false)
@@ -44,7 +44,7 @@ onUnmounted(() => {
     <UModal
         v-model:open="open"
         scrollable
-        :title="item.title"
+        :title="item.data.title"
         :ui="{
             content: 'max-w-full h-[calc(100dvh-4rem)] w-[calc(100dvw-4rem)] rounded-2xl',
         }"
@@ -54,12 +54,12 @@ onUnmounted(() => {
         <template #content>
             <div class="grid grid-cols-3 gap-12 p-16">
                 <div class="col-span-2 flex h-full flex-col gap-4">
-                    <ArtCarousel :data="item.images" />
+                    <ArtCarousel :data="item.data.images" />
                 </div>
 
                 <div class="flex flex-col gap-4">
                     <div class="flex items-start justify-between gap-2">
-                        <h1 class="text-4xl font-bold">{{ item.title }}</h1>
+                        <h1 class="text-4xl font-bold">{{ item.data.title }}</h1>
 
                         <UButton
                             aria-label="Close"
@@ -70,7 +70,7 @@ onUnmounted(() => {
                             @click="open = false"
                         />
                     </div>
-                    <p>{{ item.description }}</p>
+                    <p>{{ item.data.description }}</p>
                 </div>
             </div>
         </template>
