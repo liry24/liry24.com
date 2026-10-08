@@ -1,40 +1,39 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
 import { createHmac, randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 
-// Local-only integration probe. Run with node --env-file=.env scripts/test-site-admin-local.mjs.
+// Run against Nuxt dev started with a synthetic BETTER_AUTH_SECRET and an isolated
+// LIRY24_DEV_DB_PATH, passing those same variables to this local-only probe.
 const origin = new URL(process.argv[2] || 'http://localhost:3000')
 assert(
     ['localhost', '127.0.0.1'].includes(origin.hostname) && origin.protocol === 'http:',
     'Only local HTTP servers are allowed',
 )
-assert(process.env.BETTER_AUTH_SECRET, 'Load the same local environment as Nuxt')
+assert(!process.argv.includes('--worker'), 'Use the Vitest workerd suite for Worker integration')
+assert(
+    process.env.BETTER_AUTH_SECRET,
+    'Supply the same synthetic auth secret as the local Nuxt server',
+)
+assert(
+    process.env.LIRY24_DEV_DB_PATH,
+    'Supply the isolated SQLite path used by the local Nuxt server',
+)
+const databasePath = resolve(process.env.LIRY24_DEV_DB_PATH)
+const apiOnly = process.argv.includes('--api-only')
+assert(existsSync(databasePath), 'Start Nuxt dev and let its startup migrations finish first')
+const database = new DatabaseSync(databasePath)
+database.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;')
 const id = `local-probe-${randomUUID()}`
 const token = randomUUID()
 const signedToken = encodeURIComponent(
     `${token}.${createHmac('sha256', process.env.BETTER_AUTH_SECRET).update(token).digest('base64')}`,
 )
 const cookie = `better-auth.session_token=${signedToken}; __Secure-better-auth.session_token=${signedToken}`
-const persist = '.data/unified'
-const sql = (command) =>
-    execFileSync(
-        process.execPath,
-        [
-            'node_modules/cf/bin/cf',
-            'd1',
-            'raw',
-            '227d818f-cd40-4fca-9710-b57273be94ca',
-            '--local',
-            '--persist-to',
-            persist,
-            '--sql',
-            command,
-        ],
-        { stdio: 'pipe' },
-    )
 const request = async (
     path,
-    { method = 'GET', body, headers = {}, authenticated = true, status = 200 } = {},
+    { method = 'GET', body, rawBody, headers = {}, authenticated = true, status = 200 } = {},
 ) => {
     const response = await fetch(new URL(path, origin), {
         method,
@@ -43,8 +42,10 @@ const request = async (
             ...(authenticated ? { cookie } : {}),
             ...(body ? { 'content-type': 'application/json' } : {}),
         },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        ...(body ? { body: JSON.stringify(body) } : rawBody ? { body: rawBody } : {}),
         signal: AbortSignal.timeout(30000),
+    }).catch((cause) => {
+        throw new Error(`${method} ${path} failed`, { cause })
     })
     const text = await response.text()
     assert.equal(response.status, status, `${method} ${path}: ${text.slice(0, 300)}`)
@@ -54,27 +55,34 @@ const request = async (
 }
 let entry
 let uploadedAsset
+let httpAsset
 try {
     const now = Date.now()
-    sql(
-        `INSERT INTO users (id,name,email,email_verified,role,created_at,updated_at) VALUES ('${id}','Local probe','${id}@example.invalid',1,'admin',${now},${now}); INSERT INTO sessions (id,token,user_id,expires_at,created_at,updated_at) VALUES ('${id}','${token}','${id}',${now + 3600000},${now},${now});`,
-    )
+    database
+        .prepare(
+            'INSERT INTO users (id,name,email,email_verified,role,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
+        )
+        .run(id, 'Local probe', `${id}@example.invalid`, 1, 'admin', now, now)
+    database
+        .prepare(
+            'INSERT INTO sessions (id,token,user_id,expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?)',
+        )
+        .run(id, token, id, now + 3600000, now, now)
     await request('/api/site-admin/models', { authenticated: false, status: 401 })
-    await request('/admin/works', { authenticated: false, status: 404 })
+    if (!apiOnly) await request('/admin/works', { authenticated: false, status: 404 })
     const session = await request('/api/auth/get-session')
     assert.equal(session.user.id, id)
     const models = await request('/api/site-admin/models')
     assert.equal(Object.keys(models.models).length, 7)
-    if (!process.argv.includes('--worker')) {
-        await request('/__site-admin-devtools/snapshot', { authenticated: false, status: 401 })
-        const snapshot = await request('/__site-admin-devtools/snapshot')
-        assert.equal(snapshot.database.schemaReady, true)
-        assert.equal(snapshot.database.devDatabase, false)
-        assert.equal(snapshot.database.connector, 'application')
-        assert.equal(Object.keys(snapshot.models).length, 7)
-        assert.equal(snapshot.assets.cleanup.minimumAge, 86400)
-    }
-    for (const path of ['/', '/arts', '/works', '/posts', '/admin/works']) await request(path)
+    await request('/__site-admin-devtools/snapshot', { authenticated: false, status: 401 })
+    const snapshot = await request('/__site-admin-devtools/snapshot')
+    assert.equal(snapshot.database.schemaReady, true)
+    assert.equal(snapshot.database.devDatabase, false)
+    assert.equal(snapshot.database.connector, 'application')
+    assert.equal(Object.keys(snapshot.models).length, 7)
+    assert.equal(snapshot.assets.cleanup.minimumAge, 86400)
+    if (!apiOnly)
+        for (const path of ['/', '/arts', '/works', '/posts', '/admin/works']) await request(path)
     entry = await request('/api/site-admin/entries/posts', {
         method: 'POST',
         status: 201,
@@ -88,24 +96,8 @@ try {
         }))
     const revisionA = entry.currentRevisionId
     await request(`/api/content/posts/${id}`, { authenticated: false, status: 404 })
-    if (process.argv.includes('--worker')) {
-        await mutate('/schedule', { at: new Date(Date.now() + 1500).toISOString() })
-        await new Promise((resolve) => setTimeout(resolve, 1600))
-        await request('/cdn-cgi/local/scheduled', { authenticated: false })
-        for (let attempt = 0; attempt < 30; attempt++) {
-            entry = await request(base)
-            if (entry.publishedRevisionId === entry.currentRevisionId) break
-            await new Promise((resolve) => setTimeout(resolve, 100))
-        }
-        assert.equal(
-            entry.publishedRevisionId,
-            entry.currentRevisionId,
-            'Cloudflare scheduled hook did not publish due revision',
-        )
-        await mutate('/unpublish')
-    }
     await mutate('/publish')
-    await request(`/posts/${id}`)
+    if (!apiOnly) await request(`/posts/${id}`)
     const oldVersion = entry.version
     await mutate('', { data: { title: 'B', content: '# Draft B', tags: [] } }, 'PATCH')
     await request(base, {
@@ -125,8 +117,30 @@ try {
     await mutate('/cancel-schedule')
     await mutate('/unpublish')
     await request(`/api/content/posts/${id}`, { authenticated: false, status: 404 })
+    const image = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=',
+        'base64',
+    )
+    const asset = await request('/api/site-admin/assets', {
+        method: 'POST',
+        status: 201,
+        headers: {
+            'content-type': 'image/png',
+            'x-filename': encodeURIComponent('local-sqlite-probe.png'),
+            'x-upload-size': String(image.length),
+        },
+        rawBody: image,
+    })
+    httpAsset = asset.id
+    assert(httpAsset)
+    assert.equal((await request(`/api/site-admin/assets/${httpAsset}`)).state, 'ready')
+    const downloaded = await fetch(new URL(`/api/site-admin/assets/${httpAsset}/content`, origin), {
+        headers: { cookie },
+    })
+    assert.equal(downloaded.status, 200)
+    assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), image)
     console.log(
-        'PASS: public pages, anonymous admin 404/API 401, Better Auth admin, CRUD, conflict, published/scheduled/current revisions, restore, unpublish',
+        `PASS: ${apiOnly ? '' : 'public pages, anonymous admin 404, '}API 401, Better Auth admin, CRUD, conflict, published/scheduled/current revisions, restore, unpublish, fs upload/download`,
     )
     if (process.argv.includes('--browser')) {
         const { chromium } = await import('playwright-core')
@@ -159,20 +173,18 @@ try {
                 },
             ])
             const page = await context.newPage()
-            if (!process.argv.includes('--worker')) {
-                await page.goto(new URL('/__site-admin-devtools/', origin).href)
-                await page.waitForFunction(() =>
-                    document.querySelector('#snapshot')?.textContent?.includes('schemaReady'),
-                )
-                assert.equal(await page.getByRole('button').count(), 2)
-                await page.getByRole('button', { name: 'Refresh', exact: true }).click()
-                await page.waitForFunction(() =>
-                    document.querySelector('#status')?.textContent?.startsWith('Snapshot loaded'),
-                )
-                console.log(
-                    'PASS: authenticated read-only DevTools iframe, snapshot and manual refresh',
-                )
-            }
+            await page.goto(new URL('/__site-admin-devtools/', origin).href)
+            await page.waitForFunction(() =>
+                document.querySelector('#snapshot')?.textContent?.includes('schemaReady'),
+            )
+            assert.equal(await page.getByRole('button').count(), 2)
+            await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+            await page.waitForFunction(() =>
+                document.querySelector('#status')?.textContent?.startsWith('Snapshot loaded'),
+            )
+            console.log(
+                'PASS: authenticated read-only DevTools iframe, snapshot and manual refresh',
+            )
             const errors = []
             page.on('pageerror', (error) => errors.push(error.message))
             page.on('console', (message) => {
@@ -264,12 +276,17 @@ try {
                 headers: { 'if-match': `"${latest.version}"` },
             })
         }
-        if (uploadedAsset)
-            await request(`/api/site-admin/assets/${uploadedAsset}`, {
+        for (const asset of [uploadedAsset, httpAsset].filter(Boolean))
+            await request(`/api/site-admin/assets/${asset}`, {
                 method: 'DELETE',
                 status: 204,
             })
     } finally {
-        sql(`DELETE FROM sessions WHERE id='${id}'; DELETE FROM users WHERE id='${id}';`)
+        try {
+            database.prepare('DELETE FROM sessions WHERE id = ?').run(id)
+            database.prepare('DELETE FROM users WHERE id = ?').run(id)
+        } finally {
+            database.close()
+        }
     }
 }
