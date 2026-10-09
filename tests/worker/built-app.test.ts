@@ -133,8 +133,19 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 }),
             )
             const models = await server.fetch('/api/site-admin/models', { headers: authenticated })
-            expect(models.status).toBe(200)
-            expect(Object.keys((await models.json<{ models: object }>()).models)).toHaveLength(7)
+            if (isPreview) {
+                // This synthetic session has no GitHub account. Preview authorization
+                // must fail closed without attempting a real repository lookup.
+                expect(models.status).toBe(403)
+                expect(await models.json()).toMatchObject({
+                    error: { code: 'SITE_ADMIN_FORBIDDEN' },
+                })
+            } else {
+                expect(models.status).toBe(200)
+                expect(Object.keys((await models.json<{ models: object }>()).models)).toHaveLength(
+                    7,
+                )
+            }
             expect((await server.fetch('/api/site-admin/models')).status).toBe(401)
             const deniedAction = await server.fetch('/api/site-admin/ai/actions/proofread', {
                 method: 'POST',
