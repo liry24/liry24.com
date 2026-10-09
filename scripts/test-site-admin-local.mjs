@@ -312,6 +312,88 @@ try {
                         })
                         throw error
                     })
+                const tagInput = editor.locator('input[data-post-tags]')
+                if (title === 'Browser draft one') {
+                    let tagSaves = 0
+                    const onTagRequest = (request) => {
+                        if (request.method() === 'PATCH' && request.url().endsWith(base)) tagSaves++
+                    }
+                    page.on('request', onTagRequest)
+                    try {
+                        for (const tag of ['Vue', 'Vue', 'replace-me', '  spaced  ', 'comma,tag']) {
+                            await tagInput.fill(tag)
+                            await tagInput.press('Enter')
+                        }
+                        assert.deepEqual(
+                            await editor.locator('[data-slot="itemText"]').allTextContents(),
+                            ['Vue', 'Vue', 'replace-me', '  spaced  ', 'comma,tag'],
+                        )
+                        await editor
+                            .getByRole('button', { name: 'replace-me', exact: true })
+                            .click()
+                        await tagInput.fill('replacement')
+                        await tagInput.press('Enter')
+                        await tagInput.evaluate((input) => {
+                            const clipboardData = new DataTransfer()
+                            clipboardData.setData('text/plain', 'paste-one\npaste-two')
+                            input.dispatchEvent(
+                                new ClipboardEvent('paste', {
+                                    clipboardData,
+                                    bubbles: true,
+                                    cancelable: true,
+                                }),
+                            )
+                        })
+                        await tagInput.press('Enter')
+                        await tagInput.fill('IME input')
+                        await tagInput.evaluate((input) => {
+                            input.dispatchEvent(
+                                new CompositionEvent('compositionstart', { bubbles: true }),
+                            )
+                            input.dispatchEvent(
+                                new KeyboardEvent('keydown', {
+                                    key: 'Enter',
+                                    isComposing: true,
+                                    bubbles: true,
+                                    cancelable: true,
+                                }),
+                            )
+                            input.dispatchEvent(
+                                new CompositionEvent('compositionend', { bubbles: true }),
+                            )
+                        })
+                        assert.equal(await tagInput.inputValue(), 'IME input')
+                        await tagInput.fill('')
+                        assert.equal(tagSaves, 0, 'Tag Enter and IME must not save the post')
+                        assert.deepEqual(
+                            await editor.locator('[data-slot="itemText"]').allTextContents(),
+                            [
+                                'Vue',
+                                'Vue',
+                                '  spaced  ',
+                                'comma,tag',
+                                'replacement',
+                                'paste-one',
+                                'paste-two',
+                            ],
+                        )
+                    } finally {
+                        page.off('request', onTagRequest)
+                    }
+                } else {
+                    assert.deepEqual(
+                        await editor.locator('[data-slot="itemText"]').allTextContents(),
+                        [
+                            'Vue',
+                            'Vue',
+                            '  spaced  ',
+                            'comma,tag',
+                            'replacement',
+                            'paste-one',
+                            'paste-two',
+                        ],
+                    )
+                }
                 if (!uploadedAsset) {
                     const uploaded = page.waitForResponse(
                         (response) =>
@@ -349,6 +431,15 @@ try {
                 await page.waitForURL('**/admin/posts')
                 entry = await request(base)
                 assert.equal(entry.data.title, title)
+                assert.deepEqual(entry.data.tags, [
+                    'Vue',
+                    'Vue',
+                    '  spaced  ',
+                    'comma,tag',
+                    'replacement',
+                    'paste-one',
+                    'paste-two',
+                ])
                 assert.equal(entry.publishedRevisionId, null)
                 assert.equal(
                     entry.data.image ?? null,
@@ -373,6 +464,9 @@ try {
             assert.equal(await page.getByLabel('Slug', { exact: true }).count(), 0)
             assert.equal(await page.getByLabel('Excerpt', { exact: true }).count(), 0)
             await titleInput.fill('Browser create draft')
+            const newTagInput = page.locator('input[data-post-tags]')
+            await newTagInput.fill('draft-tag')
+            await newTagInput.press('Enter')
             const original =
                 '# Safe preview\n\n**Markdown works**\n\n<script>window.__previewUnsafe = true</script>\n<img src=x onerror="window.__previewUnsafe = true">\n\n[Unsafe link](javascript:alert(1))\n\n::admin-form-entry-modal\n::'
             await contentInput.fill(original)
@@ -392,6 +486,10 @@ try {
             await page.getByText('Unsaved input restored', { exact: true }).waitFor()
             assert.equal(await titleInput.inputValue(), 'Browser create draft')
             assert.equal(await contentInput.inputValue(), original)
+            assert.deepEqual(
+                await page.locator('#admin-post-form [data-slot="itemText"]').allTextContents(),
+                ['draft-tag'],
+            )
             await page.goForward()
             await page.waitForURL('**/admin/posts')
             await page.goBack()
@@ -516,6 +614,7 @@ try {
                 const stored = await request(`/api/site-admin/entries/${newEntry.id}`)
                 assert.equal(stored.slug, `${id}-browser-new`)
                 assert.equal(stored.data.title, 'Browser create draft')
+                assert.deepEqual(stored.data.tags, ['draft-tag'])
                 assert.equal(stored.data.content, '# Corrected content\n\nA suggestion.')
                 assert.equal(stored.data.excerpt, 'Generated excerpt')
                 assert.equal(stored.publishedRevisionId, null)
