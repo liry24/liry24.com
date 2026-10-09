@@ -18,14 +18,9 @@ test('draft form persists automatic choices without AI or a public route and kee
     })
     const paths: string[] = []
     const admin = createSiteAdmin({
-        config,
+        config: { ...config, ai: { ...config.ai, model: ai } },
         database: drizzleAdapter(local.database, { schema }),
         authorize: () => ({ id: 'synthetic-post-admin', roles: ['admin'] }),
-        aiEnabled: true,
-        aiRuntime: async () => {
-            ai()
-            throw new Error('AI has no balance')
-        },
     })
     const client = createSiteAdminManagementClient({
         origin: 'http://synthetic.invalid',
@@ -101,14 +96,9 @@ test('legacy drafts and published revisions retain metadata when no selection wa
         throw new Error('AI has no balance')
     })
     const admin = createSiteAdmin({
-        config,
+        config: { ...config, ai: { ...config.ai, model: ai } },
         database: drizzleAdapter(local.database, { schema }),
         authorize: () => ({ id: 'synthetic-legacy-admin', roles: ['admin'] }),
-        aiEnabled: true,
-        aiRuntime: async () => {
-            ai()
-            throw new Error('AI has no balance')
-        },
     })
     const client = createSiteAdminManagementClient({
         origin: 'http://synthetic.invalid',
@@ -171,7 +161,6 @@ test('an implicit slug on a directly published model retains the non-AI title fa
         },
         database: drizzleAdapter(local.database, { schema }),
         authorize: () => ({ id: 'synthetic-work-admin', roles: ['admin'] }),
-        aiEnabled: true,
     })
     const client = createSiteAdminManagementClient({
         origin: 'http://synthetic.invalid',

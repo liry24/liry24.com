@@ -63,7 +63,6 @@ async function fixture(run: ReturnType<typeof vi.fn>) {
         config: { ...config, ai: { ...config.ai, model } },
         database: drizzleAdapter(local.database, { schema }),
         authorize: () => (authorized ? { id: 'synthetic', roles: ['admin'] } : null),
-        aiEnabled: true,
         now: () => now,
     })
     const client = createSiteAdminManagementClient({
