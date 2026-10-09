@@ -153,6 +153,8 @@ export async function generatePostMetadata(ai: PostAIExecution | undefined, inpu
 async function protectedMarkdown(content: string) {
     const protectedValues: unknown[] = []
     const inspect: MarkdownExitPlugin = (parser) => {
+        // Classify raw HTML with the parser's native rules; this does not render it.
+        parser.set({ html: true })
         // Keep the exact source of code spans, including multiline whitespace.
         // Native inline rules decide where each span starts and ends.
         const getRules = parser.inline.ruler.getRules.bind(parser.inline.ruler)
@@ -187,6 +189,10 @@ async function protectedMarkdown(content: string) {
                             token.attrGet('href') ?? token.attrGet('src'),
                             token.attrGet('title'),
                         ])
+                    // Preserve complete raw tags and blocks, including attributes
+                    // and prose inside HTML blocks, rather than parsing HTML here.
+                    if (token.type === 'html_inline' || token.type === 'html_block')
+                        protectedValues.push([token.type, token.content])
                     if (token.children) visit(token.children)
                 }
             }
@@ -219,7 +225,7 @@ export async function proofreadPost(
     const output = await generate(
         ai,
         { content: { minLength: 1 } },
-        'Proofread only content. Correct spelling, grammar, and unclear wording conservatively while retaining the author’s intent, voice, and language. Preserve Markdown structure, code blocks, inline code, links, URLs, and every asset reference exactly. Do not add facts or rewrite the article into a summary.',
+        'Proofread only content. Correct spelling, grammar, and unclear wording conservatively while retaining the author’s intent, voice, and language. Preserve Markdown structure, code blocks, inline code, links, URLs, every asset reference, raw HTML tags and entire HTML blocks exactly. Do not add facts or rewrite the article into a summary.',
         { content: data.content },
         signal,
     )

@@ -228,6 +228,61 @@ test('proofreading can edit prose around protected Markdown without changing its
     expect(run).toHaveBeenCalledTimes(1)
 })
 
+test.each([
+    [
+        'inline HTML link',
+        'Read <a href="/posts/original">link</a>.',
+        'Read <a href="/posts/changed">link</a>.',
+    ],
+    ['HTML image', '<img src="/assets/original.png">', '<img src="/assets/changed.png">'],
+    [
+        'inline HTML image',
+        'See <img src="/assets/original.png"> here.',
+        'See <img src="/assets/changed.png"> here.',
+    ],
+    [
+        'multiline HTML link',
+        'Read <a\n href="/posts/original">link</a>.',
+        'Read <a\n href="/posts/changed">link</a>.',
+    ],
+    [
+        'HTML block destination',
+        '<div>\n<a href="/posts/original">link</a>\n</div>',
+        '<div>\n<a href="/posts/changed">link</a>\n</div>',
+    ],
+    [
+        'other HTML attributes',
+        'Read <a href="/posts/original" title="Original">link</a>.',
+        'Read <a href="/posts/original" title="Changed">link</a>.',
+    ],
+    [
+        'HTML block prose',
+        '<div>\nThis are an example.\n</div>',
+        '<div>\nThis is an example.\n</div>',
+    ],
+])('proofreading conservatively preserves %s', async (_name, content, changed) => {
+    const input = { ...draft, content }
+    const original = structuredClone(input)
+    const run = vi.fn(async () => proposal({ content: changed }))
+    await expect(proofreadPost(runtime(run), input)).rejects.toMatchObject({
+        code: 'SITE_ADMIN_AI_OUTPUT_INVALID',
+    })
+    expect(input).toEqual(original)
+    expect(run).toHaveBeenCalledTimes(1)
+})
+
+test('proofreading can edit surrounding prose while preserving raw HTML tokens', async () => {
+    const content =
+        'This are <a href="/posts/original">a link</a> and <img src="/assets/original.png">.\n\n<div>\nThis block stays exact.\n</div>'
+    const corrected = content.replace('This are', 'These are')
+    const input = { ...draft, content }
+    const run = vi.fn(async () => proposal({ content: corrected }))
+    const result = await proofreadPost(runtime(run), input)
+    expect(result.data.content).toBe(corrected)
+    expect(input.content).toBe(content)
+    expect(run).toHaveBeenCalledTimes(1)
+})
+
 test('manual publication does not call AI, and automatic updates preserve a published slug', async () => {
     const ai = vi.fn(() => {
         throw new Error('AI has no balance')
