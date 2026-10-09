@@ -19,6 +19,7 @@
         "content:generate": "site-admin generate --auth server/auth.config.ts --auth-use-plural --out server/database/schema.ts && oxfmt server/database/schema.ts --write && drizzle-kit generate --config drizzle.config.ts"
     },
     "dependencies": {
+        "@ai-sdk/openai": "^4.0.0",
         "@better-auth/drizzle-adapter": "1.7.7",
         "@better-auth/passkey": "1.7.7",
         "@comark/nuxt": "0.7.0",
@@ -39,7 +40,7 @@
         "nuxt": "^4.6.0",
         "ufo": "^1.6.4",
         "vue": "3.6.0-rc.10",
-        "workers-ai-provider": "3.0.0"
+        "workers-ai-provider": "4.0.0"
     },
     "devDependencies": {
         "@cloudflare/workers-types": "^5.20261008.1",

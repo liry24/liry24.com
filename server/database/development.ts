@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/node-sqlite'
 import { migrate } from 'drizzle-orm/node-sqlite/migrator'
 
-import * as schema from './schema'
+import * as schema from './schema.ts'
 
 const defaultDatabasePath = '.data/development/sqlite.db'
 

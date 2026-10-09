@@ -111,6 +111,12 @@ async function save() {
         saving.value = false
     }
 }
+function submit() {
+    // Enter in the tag input adds a tag, including while confirming IME input.
+    // Empty input must not trigger the form's implicit Save Draft action.
+    if (document.activeElement?.matches('[data-post-tags]')) return
+    void save()
+}
 async function proofread() {
     if (busy.value || !content.value.trim()) return
     localError.value = ''
@@ -187,7 +193,7 @@ async function upload(files: File | File[] | null | undefined) {
             :title="localError || serverError?.message"
             color="error"
         />
-        <form id="admin-post-form" class="grid gap-6" @submit.prevent="save">
+        <form id="admin-post-form" class="grid gap-6" @submit.prevent="submit">
             <fieldset :disabled="busy" class="grid min-w-0 gap-6">
                 <form.Field name="title">
                     <template #default="{ field }">
@@ -344,16 +350,22 @@ async function upload(files: File | File[] | null | undefined) {
                         </p>
                     </div>
                 </div>
-                <UFormField label="Tags" description="One tag per line."
-                    ><UTextarea
-                        :model-value="Array.isArray(values.tags) ? values.tags.join('\n') : ''"
+                <UFormField
+                    label="Tags"
+                    description="Press Enter to add a tag. Remove a tag and enter it again to edit it."
+                >
+                    <UInputTags
+                        :model-value="Array.isArray(values.tags) ? values.tags : []"
+                        data-post-tags
+                        duplicate
+                        add-on-paste
+                        :delimiter="/\r?\n/"
                         variant="soft"
                         class="w-full"
-                        :rows="3"
-                        @update:model-value="
-                            (value) => change('tags', value.split('\n').filter(Boolean))
-                        "
-                /></UFormField>
+                        placeholder="Add a tag"
+                        @update:model-value="(value) => change('tags', value.filter(Boolean))"
+                    />
+                </UFormField>
                 <UFormField label="Image">
                     <UFileUpload
                         :model-value="null"
