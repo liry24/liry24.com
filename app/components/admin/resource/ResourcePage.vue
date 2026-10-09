@@ -1,5 +1,6 @@
 <script setup lang="ts">
-defineProps<{ title: string; icon?: string; count?: number }>()
+const props = defineProps<{ title: string; icon?: string; count?: number }>()
+useHead(() => ({ title: props.title }))
 </script>
 
 <template>

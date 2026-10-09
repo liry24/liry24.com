@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const { signOut, user } = useUserSession()
 const sidebarCollapsed = ref(false)
+useHead({ titleTemplate: '%s | Liry24 Admin' })
 const links = Object.entries(adminModels).map(([name, model]) => ({
     label: model.label,
     icon: model.icon,
