@@ -1,0 +1,16 @@
+diff --git a/dist/runtime/core/rpc.js b/dist/runtime/core/rpc.js
+index 6771f5c06076b0b7ef5011272ed06f94794cebae..4b00ceef2fd6962080b03cef74a8f86b92234c6d 100644
+--- a/dist/runtime/core/rpc.js
++++ b/dist/runtime/core/rpc.js
+@@ -5,7 +5,10 @@ function wrapBroadcast(rpc) {
+       if (typeof value !== "function") return value;
+       return (...args) => {
+         try {
+-          const result = value.apply(target, args);
++          // Reports are notifications; unopened DevTools panels have no client handler to acknowledge.
++          // The panel fetches stored reports when it connects, so use the supported event transport.
++          const notify = typeof value.asEvent === "function" ? value.asEvent : value;
++          const result = notify.apply(target, args);
+           if (result && typeof result.catch === "function") {
+             ;
+             result.catch((e) => {

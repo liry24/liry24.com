@@ -18,7 +18,7 @@ defineEmits<{ up: []; down: [] }>()
             <UIcon name="mingcute:dot-grid-fill" class="size-5" />
         </button>
         <slot name="leading" />
-        <div class="order-last w-full min-w-0 sm:order-none sm:w-auto sm:flex-1"><slot /></div>
+        <div class="order-last w-full min-w-0 sm:order-0 sm:w-auto sm:flex-1"><slot /></div>
         <div class="ml-auto flex items-center"><slot name="actions" /></div>
     </div>
 </template>

@@ -1,0 +1,17 @@
+diff --git a/nuxt.config.ts b/nuxt.config.ts
+index e651c897481574f724e995f16154e374aa860ab1..a4e7f80f1b0e5bb2b6a77c632560431ca77707fe 100644
+--- a/nuxt.config.ts
++++ b/nuxt.config.ts
+@@ -5,6 +5,12 @@ const { resolve } = createResolver(import.meta.url)
+ export default defineNuxtConfig({
+   ssr: false,
+ 
++  nitro: {
++    // Nuxt 4.6's renderer must be bundled to replace its virtual build-file stubs on Windows.
++    // This DevTools client is built separately and does not inherit the host app's Nitro config.
++    externals: { inline: ['nuxt/internal'] },
++  },
++
+   modules: [
+     '@nuxt/ui',
+     '@vueuse/nuxt',

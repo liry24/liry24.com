@@ -1,11 +1,12 @@
 import { DatabaseSync } from 'node:sqlite'
 
 import { drizzleAdapter } from '@better-auth/drizzle-adapter/relations-v2'
-import { betterAuth } from 'better-auth'
-import { createAuthEndpoint } from 'better-auth/api'
 import { readMigrationFiles } from 'drizzle-orm/migrator'
 import { drizzle } from 'drizzle-orm/node-sqlite'
 import { expect, test } from 'vitest'
+
+import { betterAuth } from '#better-auth'
+import { createAuthEndpoint } from '#better-auth/api'
 
 import * as schema from '../../server/database/schema'
 

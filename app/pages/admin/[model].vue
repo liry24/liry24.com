@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SiteAdminDescriptor } from '@liria24/site-admin'
-import type { EntryPage, EntryRecord, RevisionRecord } from '@liria24/site-admin/server'
+import { managementAssetUrl, type SiteAdminManagementModels } from '@liria24/site-admin/client'
+import type { EntryRecord, RevisionRecord } from '@liria24/site-admin/server'
 
 import { LazyAdminFormEntryModal } from '#components'
 definePageMeta({
@@ -13,20 +14,37 @@ const presentation = adminModels[modelName as keyof typeof adminModels]
 const { data: descriptors } = await useFetch<SiteAdminDescriptor>('/api/site-admin/models')
 const descriptor = descriptors.value?.models[modelName]
 if (!descriptor || !presentation) throw createError({ statusCode: 404 })
-const request = useRequestFetch()
-const {
-    data: entries,
-    refresh,
-    error,
-} = await useAsyncData(
-    `admin:${modelName}`,
-    () =>
-        loadAdminEntries((offset) =>
-            request<EntryPage>('/api/site-admin/entries', {
-                query: { model: modelName, limit: 100, offset },
-            }),
-        ),
-    { default: () => [] },
+const management = useSiteAdminManagementClient()
+const page = ref(1)
+const pageSize = 20
+const posts =
+    modelName === 'posts'
+        ? await useSiteAdminManagementList('posts', {
+              // Posts are not localized; the admin UI language must not filter their locale.
+              locale: '',
+              limit: pageSize,
+              offset: () => (page.value - 1) * pageSize,
+          })
+        : undefined
+const allEntries =
+    modelName === 'posts'
+        ? undefined
+        : await useAsyncData(
+              `admin:${modelName}`,
+              () => management.listAllEntries(modelName as keyof SiteAdminManagementModels),
+              { default: () => [] },
+          )
+const entries = computed(() => (posts ? (posts.data.value?.items ?? []) : allEntries!.data.value))
+const error = computed(() => (posts ? posts.error.value : allEntries!.error.value))
+const count = computed(() => (posts ? (posts.data.value?.total ?? 0) : items.value.length))
+const pending = computed(() => posts?.pending.value ?? false)
+const refresh = () => (posts ? posts.refresh() : allEntries!.refresh())
+watch(
+    () => posts?.data.value?.total,
+    (total) => {
+        if (total !== undefined)
+            page.value = Math.min(page.value, Math.max(1, Math.ceil(total / pageSize)))
+    },
 )
 const items = ref<EntryRecord[]>([])
 watch(
@@ -43,11 +61,13 @@ const schedule = ref<Record<string, string>>({})
 const revisions = ref<Record<string, RevisionRecord[]>>({})
 const selectedRevision = ref<Record<string, string>>({})
 async function history(entry: EntryRecord) {
-    revisions.value[entry.id] = await $fetch(
-        `/api/site-admin/entries/${encodeURIComponent(entry.id)}/revisions`,
-    )
+    revisions.value[entry.id] = await management.listRevisions(entry.id)
 }
 async function edit(data?: EntryRecord) {
+    if (modelName === 'posts') {
+        await navigateTo(data ? `/admin/posts/${encodeURIComponent(data.id)}` : '/admin/posts/new')
+        return
+    }
     await modal.open({
         modelName,
         descriptor: descriptor!,
@@ -118,10 +138,20 @@ function move(index: number, offset: number) {
     items.value = order
     void reorder(order)
 }
+function imageUrl(entry: EntryRecord) {
+    const image = entry.data[descriptor!.displayFields?.image || 'images']
+    if (modelName === 'posts') {
+        return image && typeof image === 'object' && 'url' in image && typeof image.url === 'string'
+            ? image.url
+            : undefined
+    }
+    const id = adminAssetId(image)
+    return id ? managementAssetUrl(id) : undefined
+}
 </script>
 
 <template>
-    <AdminResourcePage :title="presentation.label" :icon="presentation.icon" :count="items.length">
+    <AdminResourcePage :title="presentation.label" :icon="presentation.icon" :count>
         <template #trailing>
             <UButton
                 aria-label="Reload latest"
@@ -129,7 +159,7 @@ function move(index: number, offset: number) {
                 icon="mingcute:refresh-2-line"
                 variant="ghost"
                 size="sm"
-                :disabled="busy"
+                :disabled="busy || pending"
                 loading-auto
                 @click="refresh()"
             />
@@ -163,16 +193,8 @@ function move(index: number, offset: number) {
                 >
                     <template #leading>
                         <img
-                            v-if="
-                                adminAssetUrl(
-                                    item.data[descriptor.displayFields?.image || 'images'],
-                                )
-                            "
-                            :src="
-                                adminAssetUrl(
-                                    item.data[descriptor.displayFields?.image || 'images'],
-                                )
-                            "
+                            v-if="imageUrl(item)"
+                            :src="imageUrl(item)"
                             alt=""
                             class="size-12 shrink-0 rounded-lg object-cover"
                         />
@@ -224,7 +246,7 @@ function move(index: number, offset: number) {
                                     modelName !== 'works' &&
                                     (field === 'slug' ? item.slug : item.data[field])
                                 "
-                                class="text-muted text-sm break-words"
+                                class="text-muted text-sm wrap-break-word"
                                 >{{ field === 'slug' ? item.slug : item.data[field] }}</span
                             >
                         </template>
@@ -351,5 +373,13 @@ function move(index: number, offset: number) {
                 </AdminResourceSortableItem>
             </template>
         </AdminResourceSortableList>
+        <UPagination
+            v-if="posts && count > pageSize"
+            v-model:page="page"
+            :total="count"
+            :items-per-page="pageSize"
+            :disabled="busy || pending"
+            aria-label="Post pages"
+        />
     </AdminResourcePage>
 </template>

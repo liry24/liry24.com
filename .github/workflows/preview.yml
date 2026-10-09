@@ -2,7 +2,7 @@ name: Branch Preview
 
 on:
   push:
-    branches-ignore: [main]
+    branches-ignore: [main, 'renovate/**']
   delete:
 
 permissions:
@@ -14,7 +14,9 @@ concurrency:
 
 jobs:
   preview:
-    if: github.event_name == 'push' || (github.event.ref_type == 'branch' && github.event.ref != 'main')
+    if: >-
+      (github.event_name == 'push' || (github.event.ref_type == 'branch' && github.event.ref != 'main')) &&
+      !startsWith(github.event_name == 'delete' && github.event.ref || github.ref_name, 'renovate/')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: Preview

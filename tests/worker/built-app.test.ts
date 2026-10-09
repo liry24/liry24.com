@@ -23,6 +23,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             'enable_nodejs_process_v2',
             'nodejs_compat_populate_process_env',
         ])
+        expect(generated.ai).toEqual({ binding: 'AI' })
         const serverDirectory = resolve('.output/server')
         const chunks = await readdir(serverDirectory, { recursive: true })
         for (const file of chunks.filter((file) => file.endsWith('.mjs'))) {
@@ -50,6 +51,8 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             r2_buckets: [{ binding: 'R2', bucket_name: 'test-assets' }],
         }
         delete config.previews
+        // No inference or remote AI service is available in this synthetic Worker test.
+        delete config.ai
         const configPath = join(root, 'wrangler.json')
         await writeFile(configPath, JSON.stringify(config))
         const secrets = Object.fromEntries(

@@ -1,3 +1,6 @@
+import { relative } from 'node:path'
+
+import { createSiteAdminDependencyTypePaths } from '@liria24/site-admin/dependency-aliases'
 import { defineNuxtConfig } from 'nuxt/config'
 import { parseURL } from 'ufo'
 import type { Unstable_RawConfig } from 'wrangler'
@@ -50,6 +53,7 @@ const cloudflareConfig = {
         },
     ],
     r2_buckets: [{ binding: 'R2', bucket_name: 'liry24-com' }],
+    ai: { binding: 'AI' },
     dev: { ip: '127.0.0.1', port: 3100 },
     ...(isPreview
         ? {
@@ -74,6 +78,40 @@ export default defineNuxtConfig({
     imports: { presets: [{ from: 'cn', imports: ['cn'] }] },
 
     modules: [
+        (_options, nuxt) => {
+            nuxt.hook('modules:done', () => {
+                nuxt.hook('prepare:types', ({ nodeTsConfig }) => {
+                    // Nuxt strips declaration extensions from absolute paths. Keep
+                    // the exported declarations explicit in the Node auth config project.
+                    const paths = createSiteAdminDependencyTypePaths()
+                    for (const [name, declarations] of Object.entries(paths))
+                        paths[name] = declarations.map((path) => {
+                            const target = relative(nuxt.options.buildDir, path).replaceAll(
+                                '\\',
+                                '/',
+                            )
+                            return target.startsWith('.') ? target : `./${target}`
+                        })
+                    nodeTsConfig.compilerOptions ??= {}
+                    Object.assign((nodeTsConfig.compilerOptions.paths ??= {}), paths)
+                })
+            })
+            // The application supplies Better Auth's adapter for the current request.
+            nuxt.hook('better-auth:database:providers', (providers) => {
+                providers.liry24 = {
+                    priority: 1000,
+                    isEnabled: () => true,
+                    buildDatabaseCode:
+                        () => `import { useSiteAdminRuntime } from '@liria24/site-admin/nuxt/server'
+export const db = undefined
+export function createDatabase(event) {
+    const database = useSiteAdminRuntime().authDatabase?.(event?.context)
+    if (!database) throw new Error('Application auth database is not initialized')
+    return database
+}`,
+                }
+            })
+        },
         '@comark/nuxt',
         '@nuxt/ui',
         '@nuxt/image',
@@ -153,8 +191,12 @@ export default defineNuxtConfig({
                 // Nuxt 4.6 renderer subpaths contain stubs that Nitro replaces during bundling.
                 'nuxt/internal',
                 // A predicate takes precedence over Nitro-dev's external build directory.
-                // Keep Better Auth's generated provider in the same Site Admin runtime instance.
-                (id: string) => /\/better-auth\/database\.mjs$/.test(id.replaceAll('\\', '/')),
+                // Bundle generated auth modules so their public dependency aliases resolve,
+                // and the database provider shares the current Site Admin runtime.
+                (id: string) =>
+                    /\/(?:better-auth\/database|site-admin\/better-auth-server-plugin)\.mjs$/.test(
+                        id.replaceAll('\\', '/'),
+                    ),
             ],
         },
         // Passkey certificate verification needs this polyfill before tsyringe initializes.
@@ -176,14 +218,19 @@ export default defineNuxtConfig({
         tsConfig: {
             compilerOptions: {
                 noUncheckedIndexedAccess: true,
-                types: ['@cloudflare/workers-types', 'bun'],
+                types: ['@cloudflare/workers-types'],
             },
         },
     },
 
     app: {
         pageTransition: { name: 'page', mode: 'out-in' },
-        head: { title, htmlAttrs: { prefix: 'og: https://ogp.me/ns#' } },
+        layoutTransition: { name: 'page', mode: 'out-in' },
+        head: {
+            title,
+            htmlAttrs: { prefix: 'og: https://ogp.me/ns#' },
+            link: [{ rel: 'icon', href: '/favicon.ico' }],
+        },
     },
 
     fonts: {
@@ -203,6 +250,7 @@ export default defineNuxtConfig({
 
     site: {
         url: baseURL,
+        name: title,
     },
 
     llms: {
@@ -226,11 +274,8 @@ export default defineNuxtConfig({
     },
 
     siteAdmin: {
-        assets: {
-            storage: 'content',
-            separateDrafts: false,
-            cleanup: { minimumAge: 60 * 60 * 24 },
-        },
+        ai: true,
+        routing: { metadata: false },
     },
 
     auth: {
