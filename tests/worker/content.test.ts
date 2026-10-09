@@ -57,15 +57,22 @@ test('application-owned D1 uses explicit migration and preserves scheduled revis
     })
     entry = await admin.publishEntry(entry.id, { expectedVersion: entry.version })
     const revisionA = entry.publishedRevisionId
-    entry = await admin.updateEntry(entry.id, {
-        expectedVersion: entry.version,
-        data: { title: 'B', content: '# B', tags: [] },
-    })
     entry = await admin.schedulePublish(entry.id, {
         expectedVersion: entry.version,
         at: new Date(Date.now() + 3600000).toISOString(),
+        draft: {
+            slug: 'worker-test',
+            data: {
+                title: 'B',
+                content: '# B',
+                tags: [],
+                publication: { slug: 'auto', excerpt: 'manual', publishedSlug: 'worker-test' },
+            },
+        },
     })
     const revisionB = entry.scheduledRevisionId
+    expect(entry.currentRevisionId).toBe(revisionB)
+    expect(entry.data.publication).toMatchObject({ slug: 'auto', excerpt: 'manual' })
     const oldVersion = entry.version
     entry = await admin.updateEntry(entry.id, {
         expectedVersion: entry.version,

@@ -5,6 +5,7 @@ import {
     image,
     images,
     markdown,
+    object,
     select,
     text,
     textarea,
@@ -40,6 +41,39 @@ export default defineSiteAdminConfig({
         model: async (context) => {
             const { getWorkersAIModel } = await import('./server/utils/workersAI.ts')
             return getWorkersAIModel(context)
+        },
+        models: {
+            posts: {
+                publication: async (action) => {
+                    const { postPublicationAction } =
+                        await import('./server/utils/postEditorial.ts')
+                    const { postMetadataModes } = await import('./shared/utils/postEditorial.ts')
+                    let publishedSlug: string | undefined
+                    if (
+                        action.entry.publishedRevisionId &&
+                        postMetadataModes(action.entry.data).slug === 'auto'
+                    ) {
+                        const { useSiteAdmin } = await import('@liria24/site-admin/nuxt/server')
+                        const admin = await useSiteAdmin(undefined, action.context?.platformContext)
+                        const revisions = await admin.listRevisions(action.entry.id)
+                        publishedSlug = revisions.find(
+                            (revision) => revision.id === action.entry.publishedRevisionId,
+                        )?.slug
+                        if (!publishedSlug) {
+                            const { SiteAdminError } = await import('@liria24/site-admin')
+                            throw new SiteAdminError(
+                                'SITE_ADMIN_CONFLICT',
+                                'The published URL could not be confirmed. Reload the latest post.',
+                            )
+                        }
+                    }
+                    return postPublicationAction(action, publishedSlug)
+                },
+                proofread: async ({ entry, ai, context }) => {
+                    const { proofreadPost } = await import('./server/utils/postEditorial.ts')
+                    return proofreadPost(ai, entry.data, context?.request?.signal)
+                },
+            },
         },
     },
     seo: { titleTemplate: '%s | Liry24' },
@@ -170,6 +204,11 @@ export default defineSiteAdminConfig({
                 title: text({ required: true }),
                 excerpt: textarea(),
                 content: markdown({ required: true }),
+                publication: object({
+                    slug: select(['auto', 'manual']),
+                    excerpt: select(['auto', 'manual']),
+                    publishedSlug: text(),
+                }),
                 tags: array(text(), { required: true, default: [] }),
                 image: image(),
                 authorUserId: text(),

@@ -204,6 +204,7 @@ export const content_706f737473 = sqliteTable('site_admin_content_posts', {
     title: text('field_title').notNull(),
     excerpt: text('field_excerpt'),
     content: text('field_content').notNull(),
+    publication: text('field_publication', { mode: 'json' }),
     tags: text('field_tags', { mode: 'json' }).notNull(),
     image: text('field_image', { mode: 'json' }),
     authorUserId: text('field_authorUserId'),

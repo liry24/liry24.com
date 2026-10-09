@@ -1,9 +1,16 @@
-import { createSiteAdminAI } from '@liria24/site-admin/ai'
 import { afterEach, expect, test, vi } from 'vitest'
 import type { createWorkersAI } from 'workers-ai-provider'
 
+import { generateText } from '#ai'
+
+import {
+    generatePostMetadata,
+    preparePostPublication,
+    postPublicationAction,
+    proofreadPost,
+    type PostAIExecution,
+} from '../server/utils/postEditorial'
 import { getWorkersAIModel, postAIModel } from '../server/utils/workersAI'
-import config from '../site-admin.config'
 
 const draft = { title: '日本語投稿', content: 'これは原稿です。', tags: [] }
 type Binding = Parameters<typeof createWorkersAI>[0]['binding']
@@ -26,8 +33,10 @@ const gateway = vi.fn(() => {
 const context = (run: ReturnType<typeof vi.fn>) => ({
     platformContext: { cloudflare: { env: { AI: { run, gateway } as unknown as Binding } } },
 })
-const runtime = (run: ReturnType<typeof vi.fn>) =>
-    createSiteAdminAI(getWorkersAIModel, context(run))
+const runtime =
+    (run: ReturnType<typeof vi.fn>): PostAIExecution =>
+    (options) =>
+        generateText({ ...options, model: getWorkersAIModel(context(run)) })
 // Mock the binding's raw OpenAI Chat Completions response. The official adapter
 // parses it; application code does not translate JSON, finish reasons or usage.
 const proposal = (data: Record<string, string>) =>
@@ -66,7 +75,7 @@ test('SDK v4 structured proposals use per-operation AI.run and the default Gatew
         modelId: 'gpt-6-luna',
     })
     const input = structuredClone(draft)
-    const metadata = await runtime(first).generateMetadata('posts', config.models.posts, {
+    const metadata = await generatePostMetadata(runtime(first), {
         data: input,
         generate: { slug: true, excerpt: true },
     })
@@ -75,10 +84,7 @@ test('SDK v4 structured proposals use per-operation AI.run and the default Gatew
         slug: 'test-post',
         issues: [],
     })
-    const proofread = await runtime(second).proofreadDraft('posts', config.models.posts, {
-        data: input,
-        fields: ['content'],
-    })
+    const proofread = await proofreadPost(runtime(second), input)
     expect(proofread.data).toEqual({ ...draft, content: 'これは校正した原稿です。' })
     expect(proofread.issues).toEqual([])
     expect(input).toEqual(draft)
@@ -112,7 +118,7 @@ test('selected metadata keeps manual fields and does not mutate the submitted dr
     const run = vi.fn(async () => proposal({ slug: 'generated-slug' }))
     const input = { ...structuredClone(draft), excerpt: '手動の概要。' }
     const original = structuredClone(input)
-    const result = await runtime(run).generateMetadata('posts', config.models.posts, {
+    const result = await generatePostMetadata(runtime(run), {
         data: input,
         generate: { slug: true, excerpt: false },
     })
@@ -128,7 +134,7 @@ test('manual metadata bypasses AI, and unavailable AI leaves the draft intact', 
     const input = structuredClone(draft)
     const ai = runtime(run)
     expect(
-        await ai.generateMetadata('posts', config.models.posts, {
+        await generatePostMetadata(ai, {
             data: input,
             slug: 'manual-slug',
             generate: { slug: false, excerpt: false },
@@ -136,14 +142,146 @@ test('manual metadata bypasses AI, and unavailable AI leaves the draft intact', 
     ).toEqual({ data: draft, slug: 'manual-slug', issues: [] })
     expect(run).not.toHaveBeenCalled()
     await expect(
-        ai.generateMetadata('posts', config.models.posts, {
+        generatePostMetadata(ai, {
             data: input,
             generate: { slug: true, excerpt: true },
         }),
-    ).rejects.toMatchObject({ code: 'SITE_ADMIN_AI_FAILED' })
+    ).rejects.toThrow('Unavailable model')
     expect(run).toHaveBeenCalledTimes(1)
     expect(input).toEqual(draft)
     expect(() => getWorkersAIModel({ platformContext: { env: {} } })).toThrow(
         'binding is not configured',
     )
+})
+
+test('proofreading rejects changes to code, links, and assets without changing the draft', async () => {
+    const input = {
+        ...draft,
+        content: 'Example `one()`\n\n[link](/posts/a)\n\n![image](site-admin:asset-one)',
+    }
+    const original = structuredClone(input)
+    for (const content of [
+        input.content.replace('one()', 'two()'),
+        input.content.replace('/posts/a', '/posts/b'),
+        input.content.replace('asset-one', 'asset-two'),
+    ]) {
+        const run = vi.fn(async () => proposal({ content }))
+        await expect(proofreadPost(runtime(run), input)).rejects.toMatchObject({
+            code: 'SITE_ADMIN_AI_OUTPUT_INVALID',
+        })
+        expect(input).toEqual(original)
+        expect(run).toHaveBeenCalledTimes(1)
+    }
+})
+
+test('editorial output contains exactly the requested fields and a valid slug', async () => {
+    for (const output of [
+        { slug: 'bad/slug' },
+        { slug: 'valid-slug', content: 'Unexpected rewrite' },
+        { slug: '' },
+    ]) {
+        const run = vi.fn(async () => proposal(output))
+        await expect(
+            generatePostMetadata(runtime(run), {
+                data: draft,
+                generate: { slug: true, excerpt: false },
+            }),
+        ).rejects.toThrow()
+        expect(run).toHaveBeenCalledTimes(1)
+    }
+})
+
+test('manual publication does not call AI, and automatic updates preserve a published slug', async () => {
+    const ai = vi.fn(() => {
+        throw new Error('AI has no balance')
+    })
+    const manual = {
+        data: {
+            ...draft,
+            publication: { slug: 'manual', excerpt: 'manual' },
+            excerpt: 'My own introduction.',
+        },
+        slug: 'my-post',
+    }
+    expect(
+        await preparePostPublication(ai as PostAIExecution, manual, { published: false }),
+    ).toEqual({
+        ...manual,
+        issues: [],
+    })
+    expect(ai).not.toHaveBeenCalled()
+    const run = vi.fn(async () => proposal({ excerpt: 'New introduction in my voice.' }))
+    const automatic = {
+        data: { ...draft, publication: { slug: 'auto', excerpt: 'auto' } },
+        slug: 'confirmed-public-url',
+    }
+    const result = await preparePostPublication(runtime(run), automatic, { published: true })
+    expect(result.slug).toBe('confirmed-public-url')
+    expect(result.data.excerpt).toBe('New introduction in my voice.')
+    expect(
+        Object.keys(
+            (run.mock.calls[0] as unknown as [string, ChatBody])[1].response_format.json_schema
+                .schema.properties,
+        ),
+    ).toEqual(['excerpt'])
+})
+
+test('unpublished posts preserve their confirmed URL when automatic metadata is selected', async () => {
+    const run = vi.fn(async () => proposal({ excerpt: 'A short introduction.' }))
+    const data = {
+        ...draft,
+        publication: { slug: 'auto', excerpt: 'auto', publishedSlug: 'confirmed-url' },
+    }
+    const result = await preparePostPublication(
+        runtime(run),
+        { data, slug: '' },
+        { published: false },
+    )
+    expect(result.slug).toBe('confirmed-url')
+    expect(result.data.publication).toEqual(data.publication)
+    expect(
+        Object.keys(
+            (run.mock.calls[0] as unknown as [string, ChatBody])[1].response_format.json_schema
+                .schema.properties,
+        ),
+    ).toEqual(['excerpt'])
+})
+
+test('app action uses the unsaved snapshot and selected fields while preserving manual values', async () => {
+    const run = vi.fn(async () => proposal({ slug: 'unsaved-title' }))
+    const entry = {
+        id: 'synthetic',
+        model: 'posts',
+        locale: '',
+        translationGroup: 'synthetic',
+        currentRevisionId: 'stored-base',
+        revisionId: 'stored-base',
+        publishedRevisionId: null,
+        publishedAt: null,
+        scheduledRevisionId: null,
+        scheduledAt: null,
+        createdAt: '2026-10-09T00:00:00Z',
+        updatedAt: '2026-10-09T00:00:00Z',
+        version: 1,
+        sortOrder: null,
+        slug: '',
+        data: {
+            ...draft,
+            title: 'Unsaved title',
+            publication: { slug: 'auto', excerpt: 'manual' },
+            excerpt: 'My own introduction.',
+        },
+    }
+    const snapshot = structuredClone(entry)
+    const result = await postPublicationAction({
+        entry,
+        input: { generateSlug: true, generateExcerpt: true },
+        ai: runtime(run),
+    })
+    expect(result.slug).toBe('unsaved-title')
+    expect(result.data.excerpt).toBe('My own introduction.')
+    const body = (run.mock.calls[0] as unknown as [string, ChatBody])[1]
+    expect(JSON.stringify(body.messages)).toContain('Unsaved title')
+    expect(Object.keys(body.response_format.json_schema.schema.properties)).toEqual(['slug'])
+    expect(entry).toEqual(snapshot)
 })
