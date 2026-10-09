@@ -13,3 +13,10 @@
 - Preview login requires the GitHub identity to match the current user's `admin` permission on `Liry24/liry24.com`; recheck permission at management APIs and fail closed on lookup errors. Only push trusted branch code because the Preview environment has deployment secrets.
 - GitHub Environment `Preview` holds the Cloudflare token, Preview auth secret, OAuth credentials and repository permission lookup token. The current Cloudflare and permission lookup tokens expire on 2026-12-30; replace those Environment secrets before expiry. Keep secret values out of Git.
 - Do not add `docs/` or a README for migration records. Keep temporary migration tools, exports and operational evidence outside tracked source; retain necessary development constraints here in English.
+- Renovate branches use `renovate/`, including onboarding and lock maintenance. Exclude them
+  from Preview deployment and deletion; PR quality is secretless and uses the pinned frozen
+  Bun install. Merge the Preview exclusions on both `dev` and default `main` before the owner
+  enables the selected-repository Renovate App; delete events read the default-branch workflow.
+  Default `main` must contain `renovate.json`, targeting `dev` with `useBaseBranchConfig: merge`.
+  Updating patched packages requires patch rebase/retirement and regression checks. Preserve
+  the Site Admin pkg.pr.new source until a separately reviewed migration.
