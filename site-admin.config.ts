@@ -16,8 +16,8 @@ import { z } from 'zod'
 
 import {
     postEditorialOptions,
-    postMetadataOutput,
-    postMetadataPrompt,
+    postSlugOutput,
+    postSlugPrompt,
     postProofreadingOutput,
     postProofreadingPrompt,
 } from './server/utils/postEditorial.ts'
@@ -55,11 +55,9 @@ export default defineSiteAdminConfig({
                 props: {
                     title: z.string().refine((value) => Boolean(value.trim()), 'Write a title.'),
                     content: z.string().refine((value) => Boolean(value.trim()), 'Write content.'),
-                    generateSlug: z.boolean(),
-                    generateExcerpt: z.boolean(),
                 },
-                prompt: postMetadataPrompt,
-                output: postMetadataOutput,
+                prompt: postSlugPrompt,
+                output: postSlugOutput(),
                 options: postEditorialOptions,
             },
             proofread: {
@@ -196,14 +194,12 @@ export default defineSiteAdminConfig({
         posts: {
             route: '/posts/:slug',
             seo: { type: 'article' },
-            displayFields: { title: 'title', description: 'excerpt', image: 'image' },
+            displayFields: { title: 'title', description: 'content', image: 'image' },
             fields: {
                 title: text({ required: true }),
-                excerpt: textarea(),
                 content: markdown({ required: true }),
                 publication: object({
                     slug: select(['auto', 'manual']),
-                    excerpt: select(['auto', 'manual']),
                     publishedSlug: text(),
                 }),
                 tags: array(text(), { required: true, default: [] }),
