@@ -1,72 +1,47 @@
 <script setup lang="ts">
-import type { ModelDescriptor } from '@liria24/site-admin'
-import { managementAssetUrl } from '@liria24/site-admin/client'
-import { useSiteAdminForm } from '@liria24/site-admin/form'
-import type { EntryRecord } from '@liria24/site-admin/server'
+import { useSelector } from '@tanstack/vue-form'
 
-import type { PostEditorAI, PostEditorDraft } from '~/utils/postEditor'
-
-const props = defineProps<{ descriptor: ModelDescriptor; entry?: EntryRecord; ai?: PostEditorAI }>()
-const { user } = useUserSession()
-const drafts = useState<Record<string, PostEditorDraft>>(
-    `post-editor:${user.value?.id}`,
-    () => ({}),
-)
-const draftKey = props.entry?.id || 'new'
-const draft = drafts.value[draftKey]
-const restored = ref(Boolean(draft))
-const slug = ref(draft?.slug ?? props.entry?.slug ?? '')
-const manualSlug = ref(draft?.manualSlug ?? Boolean(props.entry))
-const manualExcerpt = ref(draft?.manualExcerpt ?? Boolean(props.entry))
-const saving = ref(false)
+const props = defineProps<{ id?: string }>()
 const saved = ref(false)
 const uploading = ref(false)
-const proofreading = ref(false)
-const localError = ref('')
-const proposal = ref<{ original: string; content: string } | null>(null)
+const originalContent = ref('')
 const uploadedName = ref('')
-const busy = computed(() => saving.value || uploading.value || proofreading.value)
-const { form, conflict, serverError, asset } = useSiteAdminForm({
-    modelName: 'posts',
-    descriptor: props.descriptor,
-    entry: props.entry ? { ...props.entry, data: draft?.data ?? props.entry.data } : undefined,
-    defaultValues: draft?.data,
-    get slug() {
-        return manualSlug.value ? slug.value : slug.value || undefined
-    },
+const editor = await useSiteAdminForm('posts', {
+    ...(props.id ? { id: () => props.id } : {}),
     onSuccess: async () => {
         saved.value = true
-        dirty.value = false
-        delete drafts.value[draftKey]
-        await refreshNuxtData('admin:posts')
         await navigateTo('/admin/posts')
     },
 })
-const values = ref<Record<string, unknown>>({ ...form.state.values })
-const staleDraft = computed(() =>
-    Boolean(draft && draft.version !== (props.entry?.version ?? null)),
+const { form, conflict, serverError, asset, ai, dirty, loading, loadError } = editor
+const values = useSelector(form.atom, (state) => state.values)
+const saving = useSelector(form.atom, (state) => state.isSubmitting)
+const restored = ref(dirty.value)
+const { slug } = editor.metadata
+const manualSlug = computed({
+    get: () => editor.metadata.modes.value.slug === 'manual',
+    set: (value) => editor.metadata.setMode('slug', value ? 'manual' : 'auto'),
+})
+const manualExcerpt = computed({
+    get: () => editor.metadata.modes.value.excerpt === 'manual',
+    set: (value) => editor.metadata.setMode('excerpt', value ? 'manual' : 'auto'),
+})
+const content = computed(() => values.value.content)
+const { proposal, stale: proposalStale } = ai
+const proofreading = computed(() => ai.busy.value === 'proofread')
+const busy = computed(
+    () => saving.value || uploading.value || loading.value || ai.busy.value !== null,
 )
-const content = computed(() => String(values.value.content ?? ''))
-const proposalStale = computed(() => proposal.value?.original !== content.value)
-const dirty = ref(Boolean(draft))
-
-function remember() {
-    if (saved.value) return
-    dirty.value = true
-    drafts.value[draftKey] = {
-        data: postEditorSnapshot(values.value),
-        slug: slug.value,
-        manualSlug: manualSlug.value,
-        manualExcerpt: manualExcerpt.value,
-        version: draft?.version ?? props.entry?.version ?? null,
-    }
-}
-function change(name: string, value: unknown) {
-    form.setFieldValue(name, value)
-    values.value = { ...form.state.values }
-    remember()
-}
-watch([slug, manualSlug, manualExcerpt], remember)
+const errorMessage = computed(() => {
+    const cause =
+        serverError.value || ai.error.value || loadError.value || editor.callbackError.value
+    return cause instanceof Error ? cause.message : serverError.value?.message
+})
+const invalidProposal = computed(() =>
+    Boolean(
+        proposal.value && (proposal.value.issues.length || !proposal.value.data.content?.trim()),
+    ),
+)
 onBeforeRouteLeave(() => {
     if (busy.value && !saved.value) return false
 })
@@ -77,39 +52,8 @@ useEventListener('beforeunload', (event) => {
 })
 
 async function save() {
-    if (busy.value || conflict.value || staleDraft.value) return
-    localError.value = ''
-    if (!String(values.value.title ?? '').trim() || !content.value.trim()) {
-        localError.value = 'Title and content are required.'
-        return
-    }
-    saving.value = true
-    try {
-        const fields = postEditorAIFields(manualSlug.value, manualExcerpt.value)
-        if (fields.length) {
-            if (!props.ai)
-                throw new Error(
-                    'AI is unavailable. Your input is kept. You can enter slug and excerpt manually to save.',
-                )
-            const generated = await props.ai.generate({
-                data: postEditorSnapshot(values.value),
-                fields,
-                ...(manualSlug.value ? { slug: slug.value } : {}),
-            })
-            if (fields.includes('slug') && !generated.slug?.trim())
-                throw new Error('AI did not return a slug. Please try again.')
-            if (fields.includes('excerpt') && !generated.excerpt?.trim())
-                throw new Error('AI did not return an excerpt. Please try again.')
-            if (fields.includes('slug')) slug.value = generated.slug!
-            if (fields.includes('excerpt')) change('excerpt', generated.excerpt!)
-        }
-        await form.handleSubmit()
-    } catch (error) {
-        localError.value =
-            error instanceof Error ? error.message : 'Save failed. Your input is kept.'
-    } finally {
-        saving.value = false
-    }
+    if (busy.value || conflict.value || loadError.value) return
+    await form.handleSubmit()
 }
 function submit() {
     // Enter in the tag input adds a tag, including while confirming IME input.
@@ -119,25 +63,12 @@ function submit() {
 }
 async function proofread() {
     if (busy.value || !content.value.trim()) return
-    localError.value = ''
-    proofreading.value = true
-    const original = content.value
-    try {
-        if (!props.ai) throw new Error('AI proofreading is unavailable. Your content is kept.')
-        const result = await props.ai.proofread({ data: postEditorSnapshot(values.value) })
-        if (!result.content.trim()) throw new Error('AI returned empty content. Please try again.')
-        proposal.value = { original, content: result.content }
-    } catch (error) {
-        localError.value =
-            error instanceof Error ? error.message : 'Proofreading failed. Your content is kept.'
-    } finally {
-        proofreading.value = false
-    }
+    originalContent.value = content.value
+    await ai.proofread(['content'])
 }
 function applyProofreading() {
-    if (!proposal.value || proposalStale.value || busy.value) return
-    change('content', proposal.value.content)
-    proposal.value = null
+    if (busy.value || invalidProposal.value) return
+    ai.apply()
 }
 async function upload(files: File | File[] | null | undefined) {
     if (!files || busy.value) return
@@ -146,7 +77,7 @@ async function upload(files: File | File[] | null | undefined) {
     uploading.value = true
     try {
         const uploaded = await asset.upload(file)
-        change('image', uploaded.id)
+        asset.set('image', uploaded)
         uploadedName.value = file.name
     } catch {
         // The published Site Admin upload controller exposes the failure.
@@ -157,7 +88,7 @@ async function upload(files: File | File[] | null | undefined) {
 </script>
 
 <template>
-    <AdminResourcePage :title="entry ? 'Edit Post' : 'New Post'" icon="mingcute:book-3-fill">
+    <AdminResourcePage :title="id ? 'Edit Post' : 'New Post'" icon="mingcute:book-3-fill">
         <template #actions>
             <UButton
                 to="/admin/posts"
@@ -173,7 +104,7 @@ async function upload(files: File | File[] | null | undefined) {
                 icon="mingcute:save-line"
                 color="neutral"
                 :loading="saving"
-                :disabled="busy || conflict || staleDraft"
+                :disabled="busy || conflict || Boolean(loadError)"
             />
         </template>
         <UAlert
@@ -183,16 +114,12 @@ async function upload(files: File | File[] | null | undefined) {
             color="neutral"
         />
         <UAlert
-            v-if="conflict || staleDraft"
+            v-if="conflict"
             title="Conflict detected"
             description="Your input is kept. Open the latest entry in another tab and compare your changes before saving."
             color="warning"
         />
-        <UAlert
-            v-if="serverError || localError"
-            :title="localError || serverError?.message"
-            color="error"
-        />
+        <UAlert v-if="errorMessage" :title="errorMessage" color="error" />
         <form id="admin-post-form" class="grid gap-6" @submit.prevent="submit">
             <fieldset :disabled="busy" class="grid min-w-0 gap-6">
                 <form.Field name="title">
@@ -214,7 +141,7 @@ async function upload(files: File | File[] | null | undefined) {
                                 variant="soft"
                                 class="w-full"
                                 placeholder="Post title"
-                                @update:model-value="(value) => change('title', value)"
+                                @update:model-value="(value) => form.setFieldValue('title', value)"
                                 @blur="field.handleBlur"
                             />
                         </UFormField>
@@ -243,7 +170,9 @@ async function upload(files: File | File[] | null | undefined) {
                                     class="w-full"
                                     :ui="{ base: 'font-mono text-sm' }"
                                     placeholder="Write your post…"
-                                    @update:model-value="(value) => change('content', value)"
+                                    @update:model-value="
+                                        (value) => form.setFieldValue('content', value)
+                                    "
                                     @blur="field.handleBlur"
                                 />
                             </UFormField>
@@ -287,32 +216,38 @@ async function upload(files: File | File[] | null | undefined) {
                         description="Run proofreading again before applying a suggestion to this content."
                         color="warning"
                     />
+                    <UAlert
+                        v-if="invalidProposal"
+                        title="Invalid proofreading suggestion"
+                        description="Your content is kept. Run proofreading again to get a complete suggestion."
+                        color="error"
+                    />
                     <div class="grid min-w-0 gap-4 lg:grid-cols-2">
                         <div>
                             <h3 class="text-muted mb-2 text-sm">Original</h3>
                             <pre
                                 class="bg-muted max-h-80 overflow-auto rounded-lg p-3 text-sm break-words whitespace-pre-wrap"
-                                >{{ proposal.original }}</pre>
+                                >{{ originalContent }}</pre>
                         </div>
                         <div>
                             <h3 class="text-muted mb-2 text-sm">Suggested</h3>
                             <pre
                                 class="bg-muted max-h-80 overflow-auto rounded-lg p-3 text-sm break-words whitespace-pre-wrap"
-                                >{{ proposal.content }}</pre>
+                                >{{ proposal.data.content }}</pre>
                         </div>
                     </div>
                     <div class="flex gap-2">
                         <UButton
                             label="Apply Suggestion"
                             color="neutral"
-                            :disabled="busy || proposalStale"
+                            :disabled="busy || proposalStale || invalidProposal"
                             @click="applyProofreading"
                         />
                         <UButton
                             label="Discard Suggestion"
                             variant="ghost"
                             color="neutral"
-                            @click="proposal = null"
+                            @click="ai.discard"
                         />
                     </div>
                 </section>
@@ -343,7 +278,9 @@ async function upload(files: File | File[] | null | undefined) {
                                 class="w-full"
                                 :rows="3"
                                 autoresize
-                                @update:model-value="(value) => change('excerpt', value)"
+                                @update:model-value="
+                                    (value) => form.setFieldValue('excerpt', value)
+                                "
                         /></UFormField>
                         <p v-else class="text-muted text-sm">
                             AI generates the excerpt when you save the draft.
@@ -355,7 +292,9 @@ async function upload(files: File | File[] | null | undefined) {
                     description="Press Enter to add a tag. Remove a tag and enter it again to edit it."
                 >
                     <UInputTags
-                        :model-value="Array.isArray(values.tags) ? values.tags : []"
+                        :model-value="
+                            values.tags.filter((tag): tag is string => typeof tag === 'string')
+                        "
                         data-post-tags
                         duplicate
                         add-on-paste
@@ -363,7 +302,16 @@ async function upload(files: File | File[] | null | undefined) {
                         variant="soft"
                         class="w-full"
                         placeholder="Add a tag"
-                        @update:model-value="(value) => change('tags', value.filter(Boolean))"
+                        @update:model-value="
+                            (value) =>
+                                form.setFieldValue(
+                                    'tags',
+                                    value.filter(
+                                        (tag): tag is string =>
+                                            typeof tag === 'string' && Boolean(tag),
+                                    ),
+                                )
+                        "
                     />
                 </UFormField>
                 <UFormField label="Image">
@@ -385,9 +333,9 @@ async function upload(files: File | File[] | null | undefined) {
                     <p v-if="asset.error.value" class="text-error mt-2 text-sm" role="alert">
                         {{ asset.error.value }}
                     </p>
-                    <div v-if="adminAssetId(values.image)" class="mt-3 flex items-center gap-2">
+                    <div v-if="values.image" class="mt-3 flex items-center gap-2">
                         <img
-                            :src="managementAssetUrl(adminAssetId(values.image)!)"
+                            :src="values.image.url"
                             alt="Post image"
                             class="size-16 rounded-lg object-cover"
                         />
@@ -400,7 +348,7 @@ async function upload(files: File | File[] | null | undefined) {
                             icon="mingcute:close-line"
                             variant="ghost"
                             color="neutral"
-                            @click="change('image', null)"
+                            @click="asset.clear('image')"
                         />
                     </div>
                 </UFormField>

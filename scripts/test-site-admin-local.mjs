@@ -392,6 +392,61 @@ try {
             await page.waitForFunction(
                 () => document.querySelector('#__nuxt')?.__vue_app__?.$nuxt?.isHydrating === false,
             )
+            const paginated = Array.from({ length: 21 }, (_, index) => ({
+                ...entry,
+                id: `${id}-page-${index + 1}`,
+                slug: `${id}-page-${index + 1}`,
+                data: { ...entry.data, title: `Pagination post ${index + 1}` },
+            }))
+            const listRoute = '**/api/site-admin/entries?**'
+            await page.route(listRoute, async (route) => {
+                const query = new URL(route.request().url()).searchParams
+                assert.equal(query.get('model'), 'posts')
+                const limit = Number(query.get('limit'))
+                const offset = Number(query.get('offset'))
+                assert.equal(limit, 20)
+                await route.fulfill({
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        items: paginated.slice(offset, offset + limit),
+                        total: paginated.length,
+                        limit,
+                        offset,
+                    }),
+                })
+            })
+            await page.getByRole('button', { name: 'Reload latest', exact: true }).click()
+            await page.getByText('Pagination post 1', { exact: true }).waitFor()
+            await page.getByRole('button', { name: 'Page 2', exact: true }).click()
+            await page.getByText('Pagination post 21', { exact: true }).waitFor()
+            assert.equal(await page.getByText('Pagination post 1', { exact: true }).count(), 0)
+            await page.getByRole('button', { name: 'Page 1', exact: true }).click()
+            await page.getByText('Pagination post 1', { exact: true }).waitFor()
+            await page.unroute(listRoute)
+            const reloadList = page.waitForResponse(
+                (response) => new URL(response.url()).pathname === '/api/site-admin/entries',
+            )
+            await page.getByRole('button', { name: 'Reload latest', exact: true }).click()
+            const reloadedList = await (await reloadList).json()
+            assert(
+                reloadedList.items.some((item) => item.id === entry.id),
+                JSON.stringify({ expectedId: entry.id, reloadedList }),
+            )
+            await page
+                .getByText(entry.slug, { exact: true })
+                .waitFor()
+                .catch(async (error) => {
+                    console.error({
+                        reloadedList,
+                        body: await page.locator('body').innerText(),
+                        errors,
+                    })
+                    throw error
+                })
+            assert.equal(await page.getByRole('navigation', { name: 'Post pages' }).count(), 0)
+            console.log(
+                'PASS: native management list pagination reaches posts beyond the first page',
+            )
             for (const title of ['Browser draft one', 'Browser draft two']) {
                 const row = page
                     .locator('li')
@@ -515,7 +570,7 @@ try {
                     uploadedAsset = (await response.json()).id
                     assert(uploadedAsset)
                     await editor
-                        .locator(`img[src="/api/site-admin/assets/${uploadedAsset}/content"]`)
+                        .locator(`img[src$="/api/site-admin/assets/${uploadedAsset}/content"]`)
                         .waitFor()
                     await editor.getByText('local-probe.png', { exact: true }).waitFor()
                 } else {
@@ -528,6 +583,7 @@ try {
                 await page.getByRole('button', { name: 'Save Draft', exact: true }).click()
                 assert.equal((await saved).status(), 200)
                 await page.waitForURL('**/admin/posts')
+                await page.getByText(title, { exact: true }).waitFor()
                 entry = await request(base)
                 assert.equal(entry.data.title, title)
                 assert.deepEqual(entry.data.tags, [
@@ -540,10 +596,14 @@ try {
                     'paste-two',
                 ])
                 assert.equal(entry.publishedRevisionId, null)
-                assert.equal(
+                assert.deepEqual(
                     entry.data.image ?? null,
-                    title === 'Browser draft one' ? uploadedAsset : null,
+                    title === 'Browser draft one' ? { id: uploadedAsset } : null,
                 )
+                if (title === 'Browser draft one')
+                    await row
+                        .locator(`img[src$="/api/site-admin/assets/${uploadedAsset}/content"]`)
+                        .waitFor()
             }
             assert.equal((await request(`/api/site-admin/assets/${uploadedAsset}`)).state, 'ready')
             await request(`/api/site-admin/assets/${uploadedAsset}/content`)
@@ -633,6 +693,7 @@ try {
             assert.equal(await contentInput.inputValue(), original)
 
             let proofreadingCalls = 0
+            let invalidProofreading = false
             await page.route('**/api/site-admin/models/posts/ai/proofread', async (route) => {
                 proofreadingCalls++
                 const body = route.request().postDataJSON()
@@ -640,7 +701,12 @@ try {
                 await route.fulfill({
                     contentType: 'application/json',
                     body: JSON.stringify({
-                        data: { ...body.data, content: '# Corrected content\n\nA suggestion.' },
+                        data: {
+                            ...body.data,
+                            content: invalidProofreading
+                                ? ''
+                                : '# Corrected content\n\nA suggestion.',
+                        },
                         issues: [],
                     }),
                 })
@@ -657,6 +723,19 @@ try {
             await page.getByRole('button', { name: 'Apply Suggestion' }).click()
             assert.equal(await contentInput.inputValue(), '# Corrected content\n\nA suggestion.')
             assert.equal(proofreadingCalls, 2)
+            invalidProofreading = true
+            await page.getByRole('button', { name: 'Proofread Content', exact: true }).click()
+            await page.getByText('Invalid proofreading suggestion', { exact: true }).waitFor()
+            assert.equal(
+                await page.getByRole('button', { name: 'Apply Suggestion' }).isDisabled(),
+                true,
+            )
+            assert.equal(await contentInput.inputValue(), '# Corrected content\n\nA suggestion.')
+            await page.getByRole('button', { name: 'Discard Suggestion' }).click()
+            assert.equal(
+                await page.getByRole('region', { name: 'Proofreading suggestion' }).count(),
+                0,
+            )
 
             await manualSlug.check()
             await page.getByLabel('Slug', { exact: true }).fill(`${id}-browser-new`)
@@ -664,6 +743,21 @@ try {
             await page.getByLabel('Excerpt', { exact: true }).fill('Manual excerpt')
             await manualExcerpt.uncheck()
             await manualExcerpt.check()
+            assert.equal(
+                await page.getByLabel('Excerpt', { exact: true }).inputValue(),
+                'Manual excerpt',
+            )
+            await page.getByRole('link', { name: 'Back to Posts', exact: true }).click()
+            await page.waitForURL('**/admin/posts')
+            await page.goBack()
+            await page.waitForURL('**/admin/posts/new')
+            await titleInput.waitFor()
+            assert.equal(await manualSlug.isChecked(), true)
+            assert.equal(await manualExcerpt.isChecked(), true)
+            assert.equal(
+                await page.getByLabel('Slug', { exact: true }).inputValue(),
+                `${id}-browser-new`,
+            )
             assert.equal(
                 await page.getByLabel('Excerpt', { exact: true }).inputValue(),
                 'Manual excerpt',
@@ -717,6 +811,37 @@ try {
                 assert.equal(stored.data.content, '# Corrected content\n\nA suggestion.')
                 assert.equal(stored.data.excerpt, 'Generated excerpt')
                 assert.equal(stored.publishedRevisionId, null)
+                const row = page
+                    .locator('li')
+                    .filter({ has: page.getByText(stored.slug, { exact: true }) })
+                    .last()
+                await row.getByText(stored.data.title, { exact: true }).waitFor()
+                await row.getByRole('button', { name: 'Edit', exact: true }).click()
+                await page.waitForURL(`**/admin/posts/${stored.id}`)
+                await titleInput.fill('Unsaved local title')
+                await request(`/api/site-admin/entries/${stored.id}`, {
+                    method: 'PATCH',
+                    body: {
+                        expectedVersion: stored.version,
+                        data: { ...stored.data, title: 'Remote title' },
+                    },
+                })
+                await page.evaluate(() =>
+                    document
+                        .querySelector('#__nuxt')
+                        .__vue_app__.$nuxt.callHook('app:data:refresh'),
+                )
+                await page.getByText('Conflict detected', { exact: true }).waitFor()
+                assert.equal(await titleInput.inputValue(), 'Unsaved local title')
+                assert.equal(await contentInput.inputValue(), stored.data.content)
+                assert.equal(
+                    await page
+                        .getByRole('button', { name: 'Save Draft', exact: true })
+                        .isDisabled(),
+                    true,
+                )
+                await page.getByRole('link', { name: 'Back to Posts', exact: true }).click()
+                await page.waitForURL('**/admin/posts')
             } finally {
                 page.off('request', onRequest)
                 const latest = await request(`/api/site-admin/entries/${newEntry.id}`)
@@ -728,7 +853,7 @@ try {
             }
             assert.deepEqual(errors, [])
             console.log(
-                'PASS: creation page, safe Comark preview, back/forward draft recovery, metadata failure preserves input, manual switches and empty slug validation without AI, proofreading review/apply and stale suggestion guard, one create under double submission',
+                'PASS: creation page, safe Comark preview, native back/forward draft and metadata recovery, metadata failure preserves input, manual switches and empty slug validation without AI, proofreading review/apply/discard and invalid/stale suggestion guards, one create under double submission, native list invalidation and dirty refresh conflict',
             )
         } finally {
             await browser.close()

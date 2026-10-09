@@ -26,7 +26,7 @@
         "@formkit/drag-and-drop": "^0.6.1",
         "@iconify-json/mingcute": "^1.2.8",
         "@iconify-json/simple-icons": "^1.2.99",
-        "@liria24/site-admin": "https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@c738eb5",
+        "@liria24/site-admin": "https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@1f96886",
         "@nuxt/image": "^2.1.0",
         "@nuxt/ui": "^4.11.3",
         "@takumi-rs/core": "2.14.0",
