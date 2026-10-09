@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto'
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -75,8 +76,8 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             await env.R2.put('runtime-binding-probe', 'local-only')
             expect(await (await env.R2.get('runtime-binding-probe'))?.text()).toBe('local-only')
             for (const [path, status] of [
-                ['/', 200],
                 ['/api/auth/get-session', 200],
+                ['/', 200],
                 ['/api/site-admin/models', 401],
                 ['/admin/works', 404],
                 ['/favicon.ico', 200],
@@ -88,6 +89,53 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 if (path === '/api/auth/get-session') expect(body).toBe('null')
                 if (path === '/login' && isPreview) expect(body).not.toContain('Vercel')
             }
+            const userId = 'synthetic-built-worker-admin'
+            const token = 'synthetic-built-worker-session'
+            const now = Date.now()
+            await env.DB.prepare(
+                'INSERT INTO users (id,name,email,email_verified,role,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
+            )
+                .bind(
+                    userId,
+                    'Synthetic admin',
+                    'built-admin@example.invalid',
+                    1,
+                    'admin',
+                    now,
+                    now,
+                )
+                .run()
+            await env.DB.prepare(
+                'INSERT INTO sessions (id,token,user_id,expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?)',
+            )
+                .bind('synthetic-built-worker-session', token, userId, now + 3600000, now, now)
+                .run()
+            const signed = encodeURIComponent(
+                `${token}.${createHmac('sha256', secrets.BETTER_AUTH_SECRET!)
+                    .update(token)
+                    .digest('base64')}`,
+            )
+            const authenticated = {
+                cookie: `better-auth.session_token=${signed}; __Secure-better-auth.session_token=${signed}`,
+            }
+            // Auth must initialize independently of CMS access and remain request-local
+            // when authenticated and anonymous requests share the same Worker/database.
+            await Promise.all(
+                Array.from({ length: 8 }, async (_, index) => {
+                    const hasSession = index % 2 === 0
+                    const response = await server.fetch('/api/auth/get-session', {
+                        headers: hasSession ? authenticated : {},
+                    })
+                    expect(response.status).toBe(200)
+                    const session = await response.json()
+                    if (hasSession) expect(session).toMatchObject({ user: { id: userId } })
+                    else expect(session).toBeNull()
+                }),
+            )
+            const models = await server.fetch('/api/site-admin/models', { headers: authenticated })
+            expect(models.status).toBe(200)
+            expect(Object.keys((await models.json<{ models: object }>()).models)).toHaveLength(7)
+            expect((await server.fetch('/api/site-admin/models')).status).toBe(401)
             const deniedAction = await server.fetch('/api/site-admin/ai/actions/proofread', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },

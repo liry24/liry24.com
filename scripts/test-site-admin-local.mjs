@@ -793,8 +793,12 @@ try {
             await page.waitForURL('**/admin/posts/new')
             await page.waitForFunction(() => {
                 const app = document.querySelector('#__nuxt')?.__vue_app__?.$nuxt
+                const path = location.pathname + location.search + location.hash
                 return (
                     app &&
+                    !app._processingMiddleware &&
+                    app.$router.currentRoute.value.fullPath === path &&
+                    app._route.fullPath === path &&
                     !app['~transitionPromise'] &&
                     document.querySelectorAll('#admin-post-form').length === 1
                 )
