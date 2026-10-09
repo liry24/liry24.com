@@ -1,8 +1,8 @@
 import type { D1Database } from '@cloudflare/workers-types'
 import { drizzle } from 'drizzle-orm/d1'
 
-import type { DevelopmentDatabase } from './development'
-import * as schema from './schema'
+import type { DevelopmentDatabase } from './development.ts'
+import * as schema from './schema.ts'
 const relations = schema.authRelations
 const connections = new WeakMap<D1Database, ReturnType<typeof drizzle<typeof relations>>>()
 

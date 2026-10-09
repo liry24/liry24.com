@@ -2,7 +2,7 @@ import type { SiteAdminAIModelContext } from '@liria24/site-admin/ai'
 import { createWorkersAI } from 'workers-ai-provider'
 import { openai } from 'workers-ai-provider/openai'
 
-import { getCloudflareEnvironment } from './cloudflareContext'
+import { getCloudflareEnvironment } from './cloudflareContext.ts'
 
 export const postAIModel = 'openai/gpt-6-luna'
 

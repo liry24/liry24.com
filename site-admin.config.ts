@@ -12,18 +12,33 @@ import {
 } from '@liria24/site-admin'
 
 export default defineSiteAdminConfig({
+    storage: {
+        content: {
+            adapter: 'r2',
+            // Nitro parses the SDK's generated config as JavaScript.
+            config: () => ({ binding: Reflect.get(Object(process.env), 'R2') }),
+        },
+    },
+    $development: {
+        storage: {
+            content: {
+                adapter: 'fs',
+                config: { root: '.data/files/content' },
+            },
+        },
+    },
     assets: {
         storage: 'content',
         separateDrafts: false,
         cleanup: { minimumAge: 60 * 60 * 24 },
     },
     database: async (context) => {
-        const { getSiteAdminDatabase } = await import('./server/utils/database')
+        const { getSiteAdminDatabase } = await import('./server/utils/database.ts')
         return getSiteAdminDatabase(context)
     },
     ai: {
         model: async (context) => {
-            const { getWorkersAIModel } = await import('./server/utils/workersAI')
+            const { getWorkersAIModel } = await import('./server/utils/workersAI.ts')
             return getWorkersAIModel(context)
         },
     },

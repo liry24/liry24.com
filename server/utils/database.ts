@@ -3,9 +3,9 @@ import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
 import type { SiteAdminDatabaseContext } from '@liria24/site-admin/runtime/database'
 import { createError, type RequestEvent } from 'nuxt/server'
 
-import { createDB, getDevelopmentDB, type Database } from '../database'
-import * as schema from '../database/schema'
-import { getCloudflareEnvironment } from './cloudflareContext'
+import { createDB, getDevelopmentDB, type Database } from '../database/index.ts'
+import * as schema from '../database/schema.ts'
+import { getCloudflareEnvironment } from './cloudflareContext.ts'
 
 const adapters = new WeakMap<Database, ReturnType<typeof drizzleAdapter>>()
 
