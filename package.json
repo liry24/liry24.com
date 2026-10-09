@@ -26,7 +26,7 @@
         "@formkit/drag-and-drop": "^0.6.1",
         "@iconify-json/mingcute": "^1.2.8",
         "@iconify-json/simple-icons": "^1.2.99",
-        "@liria24/site-admin": "https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@1f96886",
+        "@liria24/site-admin": "https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@e34d0a8",
         "@nuxt/image": "^2.1.0",
         "@nuxt/ui": "^4.11.3",
         "@takumi-rs/core": "2.14.0",
@@ -40,7 +40,7 @@
         "nuxt": "^4.6.0",
         "ufo": "^1.6.4",
         "vue": "3.6.0-rc.10",
-        "workers-ai-provider": "4.0.0"
+        "zod": "4.6.5"
     },
     "devDependencies": {
         "@cloudflare/workers-types": "^5.20261008.1",

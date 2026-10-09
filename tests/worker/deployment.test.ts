@@ -40,7 +40,7 @@ test('Nitro owns production settings and preserves infrastructure and required s
         },
     ])
     expect(rawConfig.r2_buckets).toEqual([{ binding: 'R2', bucket_name: 'liry24-com' }])
-    expect(rawConfig.ai).toEqual({ binding: 'AI' })
+    expect(rawConfig.ai).toBeUndefined()
     expect(rawConfig.secrets?.required).toEqual([
         'BETTER_AUTH_SECRET',
         'GITHUB_CLIENT_ID',

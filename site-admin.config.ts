@@ -1,3 +1,4 @@
+import { openai } from '@ai-sdk/openai'
 import {
     array,
     datetime,
@@ -5,11 +6,21 @@ import {
     image,
     images,
     markdown,
+    object,
     select,
     text,
     textarea,
     url,
 } from '@liria24/site-admin'
+import { z } from 'zod'
+
+import {
+    postEditorialOptions,
+    postMetadataOutput,
+    postMetadataPrompt,
+    postProofreadingOutput,
+    postProofreadingPrompt,
+} from './server/utils/postEditorial.ts'
 
 export default defineSiteAdminConfig({
     storage: {
@@ -37,9 +48,29 @@ export default defineSiteAdminConfig({
         return getSiteAdminDatabase(context)
     },
     ai: {
-        model: async (context) => {
-            const { getWorkersAIModel } = await import('./server/utils/workersAI.ts')
-            return getWorkersAIModel(context)
+        model: openai('gpt-6-luna'),
+        actions: {
+            publication: {
+                type: 'text-generation',
+                props: {
+                    title: z.string().refine((value) => Boolean(value.trim()), 'Write a title.'),
+                    content: z.string().refine((value) => Boolean(value.trim()), 'Write content.'),
+                    generateSlug: z.boolean(),
+                    generateExcerpt: z.boolean(),
+                },
+                prompt: postMetadataPrompt,
+                output: postMetadataOutput,
+                options: postEditorialOptions,
+            },
+            proofread: {
+                type: 'text-generation',
+                props: {
+                    content: z.string().refine((value) => Boolean(value.trim()), 'Write content.'),
+                },
+                prompt: postProofreadingPrompt,
+                output: postProofreadingOutput,
+                options: postEditorialOptions,
+            },
         },
     },
     seo: { titleTemplate: '%s | Liry24' },
@@ -170,6 +201,11 @@ export default defineSiteAdminConfig({
                 title: text({ required: true }),
                 excerpt: textarea(),
                 content: markdown({ required: true }),
+                publication: object({
+                    slug: select(['auto', 'manual']),
+                    excerpt: select(['auto', 'manual']),
+                    publishedSlug: text(),
+                }),
                 tags: array(text(), { required: true, default: [] }),
                 image: image(),
                 authorUserId: text(),
