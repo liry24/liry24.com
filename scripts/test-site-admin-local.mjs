@@ -209,6 +209,105 @@ try {
                 },
             ])
             const page = await context.newPage()
+            for (const [path, title] of [
+                ['/admin/posts/new', 'New Post'],
+                ['/admin/posts', 'Posts'],
+                ['/admin/works', 'Works'],
+            ]) {
+                const html = await request(path)
+                assert(html.includes(`<title>${title} | Liry24 Admin</title>`))
+                assert.match(html, /<html\b[^>]*\blang="ja"(?:\s|>)/u)
+            }
+            const expectTitle = async (title) => {
+                try {
+                    await page.waitForFunction((value) => document.title === value, title, {
+                        timeout: 15000,
+                    })
+                } catch (error) {
+                    console.error(
+                        'Head mismatch',
+                        JSON.stringify(
+                            await page.evaluate(() => {
+                                const app = document.querySelector('#__nuxt').__vue_app__
+                                const head = app.$nuxt.$head ?? app._context.provides.usehead
+                                const value = (item) =>
+                                    typeof item === 'function' ? item() : (item?.value ?? item)
+                                return {
+                                    path: location.pathname,
+                                    title: document.title,
+                                    entries: Array.from(head.entries.values())
+                                        .map((entry) => ({
+                                            priority:
+                                                entry.options?.tagPriority ?? entry._o?.tagPriority,
+                                            title: value(entry.input?.title),
+                                            titleTemplate: value(entry.input?.titleTemplate),
+                                        }))
+                                        .filter(
+                                            (entry) =>
+                                                entry.title !== undefined ||
+                                                entry.titleTemplate !== undefined,
+                                        ),
+                                }
+                            }),
+                        ),
+                    )
+                    throw error
+                }
+            }
+            await page.goto(new URL('/admin/posts/new', origin).href)
+            await page.waitForFunction(
+                () => document.querySelector('#__nuxt')?.__vue_app__?.$nuxt?.isHydrating === false,
+            )
+            await expectTitle('New Post | Liry24 Admin')
+            assert.equal(await page.locator('html').getAttribute('lang'), 'ja')
+            await page.goto(new URL('/admin/posts', origin).href)
+            await page.waitForFunction(
+                () => document.querySelector('#__nuxt')?.__vue_app__?.$nuxt?.isHydrating === false,
+            )
+            await expectTitle('Posts | Liry24 Admin')
+            await page.getByRole('button', { name: /^New Post/ }).click()
+            await expectTitle('New Post | Liry24 Admin')
+            await page.goBack()
+            await expectTitle('Posts | Liry24 Admin')
+            await page.goForward()
+            await expectTitle('New Post | Liry24 Admin')
+            for (const [path, title] of [
+                ['/admin/works', 'Works | Liry24 Admin'],
+                ['/admin/posts/new', 'New Post | Liry24 Admin'],
+                ['/works', 'Works | Liry24'],
+                ['/admin/posts/new', 'New Post | Liry24 Admin'],
+                ['/works', 'Works | Liry24'],
+                ['/admin/posts/new', 'New Post | Liry24 Admin'],
+            ]) {
+                await page.evaluate(
+                    (path) =>
+                        document.querySelector('#__nuxt').__vue_app__.$nuxt.$router.push(path),
+                    path,
+                )
+                await expectTitle(title)
+            }
+            await page.waitForFunction(() => {
+                const app = document.querySelector('#__nuxt').__vue_app__
+                const head = app.$nuxt.$head ?? app._context.provides.usehead
+                const value = (item) =>
+                    typeof item === 'function' ? item() : (item?.value ?? item)
+                const entries = Array.from(head.entries.values()).map((entry) => {
+                    const input = value(entry.input)
+                    return {
+                        title: value(input?.title),
+                        template: value(input?.titleTemplate),
+                    }
+                })
+                return (
+                    !app.$nuxt['~transitionPromise'] &&
+                    !entries.some((entry) => entry.title === 'Works') &&
+                    entries.filter((entry) => entry.title === 'New Post').length === 1 &&
+                    entries.filter((entry) => entry.template === '%s | Liry24 Admin').length === 1
+                )
+            })
+            console.log(
+                'PASS: admin SSR/client titles, listing navigation, back/forward, repeated transitions from admin/public pages, completed transition promise and disposal of previous head entries',
+            )
             await page.goto(new URL('/__site-admin-devtools/', origin).href)
             await page.waitForFunction(() =>
                 document.querySelector('#snapshot')?.textContent?.includes('schemaReady'),
@@ -450,7 +549,7 @@ try {
             await request(`/api/site-admin/assets/${uploadedAsset}/content`)
             assert.deepEqual(errors, [])
             console.log(
-                'PASS: Chrome dedicated editor, two saves, uploaded image preview, reference clear preserves Blob, Save Draft does not publish',
+                'PASS: Chrome dedicated editor, tag chips add/remove/replace, duplicate/whitespace/comma/paste preservation, Enter/IME do not save, tags save/reload, two saves, uploaded image preview, reference clear preserves Blob, Save Draft does not publish',
             )
             await page.getByRole('button', { name: /^New Post/ }).click()
             await page.waitForURL('**/admin/posts/new')

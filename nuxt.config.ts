@@ -225,6 +225,7 @@ export function createDatabase(event) {
 
     app: {
         pageTransition: { name: 'page', mode: 'out-in' },
+        layoutTransition: { name: 'page', mode: 'out-in' },
         head: {
             title,
             htmlAttrs: { prefix: 'og: https://ogp.me/ns#' },
@@ -249,6 +250,7 @@ export function createDatabase(event) {
 
     site: {
         url: baseURL,
+        name: title,
     },
 
     llms: {
