@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { serializeSiteAdminData } from '@liria24/site-admin/client'
 import { useSelector } from '@tanstack/vue-form'
-import { postMetadataModes, postPublicationSettings } from '~~/shared/utils/postEditorial'
+import { postPublicationSettings } from '~~/shared/utils/postEditorial'
 
-import type { PostEditorialProposal, PostMetadataInput } from '~/utils/postEditorialFlow'
+import type { PostEditorialProposal, PostSlugInput } from '~/utils/postEditorialFlow'
 import {
     postProposalStale,
     preparePostProofreading,
@@ -20,7 +20,7 @@ const uploading = ref(false)
 const uploadedName = ref('')
 const editor = await useSiteAdminForm('posts', {
     ...(props.id ? { id: () => props.id } : {}),
-    ...(!props.id ? { defaultValues: { publication: { slug: 'auto', excerpt: 'auto' } } } : {}),
+    ...(!props.id ? { defaultValues: { publication: { slug: 'auto' } } } : {}),
     onSuccess: async () => {
         if (intent.value) return
         saved.value = true
@@ -44,18 +44,13 @@ const values = useSelector(form.atom, (state) => state.values)
 const saving = useSelector(form.atom, (state) => state.isSubmitting)
 const restored = ref(dirty.value)
 const { slug } = editor.metadata
-function setMetadataMode(field: 'slug' | 'excerpt', manual: boolean) {
-    const settings = postPublicationSettings(values.value)
-    form.setFieldValue('publication', { ...settings, [field]: manual ? 'manual' : 'auto' })
-    if (field === 'slug' && !manual && settings.publishedSlug) slug.value = settings.publishedSlug
-}
 const manualSlug = computed({
-    get: () => postMetadataModes(values.value).slug === 'manual',
-    set: (value) => setMetadataMode('slug', value),
-})
-const manualExcerpt = computed({
-    get: () => postMetadataModes(values.value).excerpt === 'manual',
-    set: (value) => setMetadataMode('excerpt', value),
+    get: () => postPublicationSettings(values.value).slug === 'manual',
+    set: (manual) => {
+        const settings = postPublicationSettings(values.value)
+        form.setFieldValue('publication', { ...settings, slug: manual ? 'manual' : 'auto' })
+        if (!manual && settings.publishedSlug) slug.value = settings.publishedSlug
+    },
 })
 const content = computed(() => values.value.content)
 const management = useSiteAdminManagementClient()
@@ -63,11 +58,9 @@ const proposal = shallowRef<PostEditorialProposal | null>(null)
 const originalContent = computed(() => String(proposal.value?.snapshot.draft.data.content ?? ''))
 const aiError = shallowRef<Error | null>(null)
 const proofreadInput = shallowRef({ content: '' })
-const publicationInput = shallowRef<PostMetadataInput>({
+const publicationInput = shallowRef<PostSlugInput>({
     title: '',
     content: '',
-    generateSlug: false,
-    generateExcerpt: false,
 })
 const proofreadAction = await useAiAction('proofread', {
     props: () => proofreadInput.value,
@@ -225,8 +218,6 @@ async function publish(schedule = false) {
                 return publicationAction.data.value
             },
         )
-        if (!manualExcerpt.value)
-            form.setFieldValue('excerpt', String(candidate.data.excerpt ?? ''))
         if (!manualSlug.value) slug.value = candidate.slug
         beforePublication = postPublicationSettings(values.value)
         if (slug.value)
@@ -335,7 +326,7 @@ async function upload(files: File | File[] | null | undefined) {
                             <UFormField
                                 label="Content"
                                 required
-                                description="Write in Markdown."
+                                description="Write in Markdown. Post cards use a short introduction from your content."
                                 :error="
                                     field.errors
                                         .map((error) =>
@@ -433,42 +424,22 @@ async function upload(files: File | File[] | null | undefined) {
                         />
                     </div>
                 </section>
-                <div class="grid gap-6 lg:grid-cols-2">
-                    <div class="grid content-start gap-3">
-                        <UCheckbox v-model="manualSlug" label="Enter slug manually" />
-                        <UFormField
-                            v-if="manualSlug"
-                            label="Slug"
-                            required
-                            description="Used in the post URL."
-                            ><UInput
-                                v-model="slug"
-                                variant="soft"
-                                class="w-full"
-                                placeholder="post-slug"
-                        /></UFormField>
-                        <p v-else class="text-muted text-sm">
-                            AI generates the slug when you publish or schedule. Published URLs are
-                            kept.
-                        </p>
-                    </div>
-                    <div class="grid content-start gap-3">
-                        <UCheckbox v-model="manualExcerpt" label="Enter excerpt manually" />
-                        <UFormField v-if="manualExcerpt" label="Excerpt"
-                            ><UTextarea
-                                :model-value="String(values.excerpt ?? '')"
-                                variant="soft"
-                                class="w-full"
-                                :rows="3"
-                                autoresize
-                                @update:model-value="
-                                    (value) => form.setFieldValue('excerpt', value)
-                                "
-                        /></UFormField>
-                        <p v-else class="text-muted text-sm">
-                            AI writes a short introduction when you publish.
-                        </p>
-                    </div>
+                <div class="grid content-start gap-3">
+                    <UCheckbox v-model="manualSlug" label="Enter slug manually" />
+                    <UFormField
+                        v-if="manualSlug"
+                        label="Slug"
+                        required
+                        description="Used in the post URL."
+                        ><UInput
+                            v-model="slug"
+                            variant="soft"
+                            class="w-full"
+                            placeholder="post-slug"
+                    /></UFormField>
+                    <p v-else class="text-muted text-sm">
+                        AI generates the slug when you publish or schedule. Published URLs are kept.
+                    </p>
                 </div>
                 <UFormField
                     label="Tags"

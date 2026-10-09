@@ -1,6 +1,6 @@
 import { SiteAdminError } from '@liria24/site-admin'
 import type { SiteAdminManagementClient } from '@liria24/site-admin/client'
-import { postMetadataSelection, postPublicationSettings } from '~~/shared/utils/postEditorial'
+import { postGeneratesSlug, postPublicationSettings } from '~~/shared/utils/postEditorial'
 
 export type PostDraftState = {
     entryId: string | null
@@ -8,13 +8,10 @@ export type PostDraftState = {
     draft: { data: Record<string, unknown>; slug: string }
 }
 export type PostDraftSnapshot = PostDraftState & { entryId: string; version: number }
-export type PostMetadataInput = {
+export type PostSlugInput = {
     title: string
     content: string
-    generateSlug: boolean
-    generateExcerpt: boolean
 }
-export type PostMetadataSuggestion = { slug?: string; excerpt?: string }
 export type PostEditorialProposal = {
     kind: 'proofread' | 'publication'
     snapshot: PostDraftSnapshot
@@ -89,7 +86,7 @@ export async function preparePostProofreading(
 
 export async function preparePostPublication(
     context: Context,
-    execute: (props: PostMetadataInput) => Promise<PostMetadataSuggestion>,
+    execute: (props: PostSlugInput) => Promise<{ slug: string }>,
 ): Promise<PostEditorialProposal> {
     const snapshot = capture(context.current())
     const entry = await storedDraft(context, snapshot)
@@ -109,29 +106,23 @@ export async function preparePostPublication(
         ...snapshot.draft.data,
         publication: { ...settings, publishedSlug },
     }
-    const selection = postMetadataSelection(policyData, Boolean(entry.publishedRevisionId))
+    const generateSlug = postGeneratesSlug(policyData, Boolean(entry.publishedRevisionId))
     assertCurrent(snapshot, context.current())
-    const generated =
-        selection.slug || selection.excerpt
-            ? await execute({
-                  title: String(snapshot.draft.data.title ?? ''),
-                  content: String(snapshot.draft.data.content ?? ''),
-                  generateSlug: selection.slug,
-                  generateExcerpt: selection.excerpt,
-              })
-            : {}
+    const generated = generateSlug
+        ? await execute({
+              title: String(snapshot.draft.data.title ?? ''),
+              content: String(snapshot.draft.data.content ?? ''),
+          })
+        : undefined
     await storedDraft(context, snapshot)
     assertCurrent(snapshot, context.current())
     return {
         kind: 'publication',
         snapshot,
-        data: {
-            ...snapshot.draft.data,
-            ...(selection.excerpt ? { excerpt: generated.excerpt } : {}),
-        },
+        data: snapshot.draft.data,
         slug:
             settings.slug === 'manual'
                 ? snapshot.draft.slug
-                : (publishedSlug ?? generated.slug ?? snapshot.draft.slug),
+                : (publishedSlug ?? generated?.slug ?? snapshot.draft.slug),
     }
 }

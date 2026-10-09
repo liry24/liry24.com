@@ -14,7 +14,7 @@ import {
 import { unpublishPost } from '../../app/utils/postUnpublish'
 import { openDevelopmentDB } from '../../server/database/development'
 import * as schema from '../../server/database/schema'
-import { postMetadataModes, postPublicationSettings } from '../../shared/utils/postEditorial'
+import { postPublicationSettings } from '../../shared/utils/postEditorial'
 import config from '../../site-admin.config'
 import { mockPostActions, postActionRequest, postActionResponse } from '../helpers/postAi'
 
@@ -23,7 +23,7 @@ const initial = {
     title: 'Saved title',
     content: '# Saved body',
     tags: [],
-    publication: { slug: 'auto', excerpt: 'auto' },
+    publication: { slug: 'auto' },
 }
 type Editor = ReturnType<typeof useSiteAdminForm>
 type Client = ReturnType<typeof createSiteAdminManagementClient>
@@ -42,8 +42,7 @@ function actionContext(editor: Editor, client: Client) {
 }
 function applyPublication(editor: Editor, candidate: PostEditorialProposal) {
     expect(postProposalStale(candidate, currentDraft(editor))).toBe(false)
-    const modes = postMetadataModes(editor.form.state.values)
-    if (modes.excerpt === 'auto') editor.form.setFieldValue('excerpt', candidate.data.excerpt)
+    const modes = postPublicationSettings(editor.form.state.values)
     if (modes.slug === 'auto') editor.metadata.slug.value = candidate.slug
     editor.form.setFieldValue('publication', {
         ...postPublicationSettings(editor.form.state.values),
@@ -118,9 +117,7 @@ async function fixture(run: ReturnType<typeof vi.fn>) {
 }
 
 test('an independent AI action publishes the unsaved candidate atomically and deduplicates publication', async () => {
-    const run = vi.fn(async () =>
-        completion({ slug: 'unsaved-title', excerpt: 'A short introduction in my voice.' }),
-    )
+    const run = vi.fn(async () => completion({ slug: 'unsaved-title' }))
     const f = await fixture(run)
     try {
         await f.editor.form.handleSubmit()
@@ -135,6 +132,7 @@ test('an independent AI action publishes the unsaved candidate atomically and de
         expect(f.editor.form.state.values.content).toBe('# Unsaved body')
         expect((await f.admin.getEntry(id)).data.content).toBe('# Saved body')
         expect(JSON.stringify(f.requests[0]!.body.input)).toContain('Unsaved title')
+        expect(Object.keys(f.requests[0]!.body.text.format.schema.properties)).toEqual(['slug'])
         applyPublication(f.editor, candidate)
         const before = f.calls.length
         const [first, second] = await Promise.all([f.editor.publish(), f.editor.publish()])
@@ -161,7 +159,6 @@ test('an independent AI action publishes the unsaved candidate atomically and de
         expect((await f.admin.getPublicEntry('posts', 'unsaved-title'))?.data).toMatchObject({
             title: 'Unsaved title',
             content: '# Unsaved body',
-            excerpt: 'A short introduction in my voice.',
         })
         expect(run).toHaveBeenCalledTimes(1)
         expect(f.model).not.toHaveBeenCalled()
@@ -186,13 +183,12 @@ test('AI failure keeps input and draft saving works, while manual publication by
         await f.editor.form.handleSubmit()
         expect(f.editor.serverError.value).toBeNull()
         expect((await f.admin.getEntry(id)).data.content).toBe('# Input that must survive')
-        f.editor.form.setFieldValue('publication', { slug: 'manual', excerpt: 'manual' })
-        f.editor.form.setFieldValue('excerpt', 'My own introduction.')
+        f.editor.form.setFieldValue('publication', { slug: 'manual' })
         f.editor.metadata.slug.value = 'manual-url'
         applyPublication(f.editor, await f.publication())
         expect(await f.editor.publish()).toBeDefined()
-        expect((await f.admin.getPublicEntry('posts', 'manual-url'))?.data.excerpt).toBe(
-            'My own introduction.',
+        expect((await f.admin.getPublicEntry('posts', 'manual-url'))?.data.content).toBe(
+            '# Input that must survive',
         )
         expect(run).toHaveBeenCalledTimes(1)
         expect(f.model).not.toHaveBeenCalled()
@@ -201,35 +197,33 @@ test('AI failure keeps input and draft saving works, while manual publication by
     }
 })
 
-test('manual slug stays intact when only the excerpt is generated from unsaved content', async () => {
-    const run = vi.fn(async () => completion({ excerpt: 'A short introduction in my voice.' }))
+test('manual slug publishes the unsaved content without AI', async () => {
+    const run = vi.fn(() => {
+        throw new Error('Manual slug must bypass inference')
+    })
     const f = await fixture(run)
     try {
         await f.editor.form.handleSubmit()
-        f.editor.form.setFieldValue('publication', { slug: 'manual', excerpt: 'auto' })
+        f.editor.form.setFieldValue('publication', { slug: 'manual' })
         f.editor.metadata.slug.value = 'author-chosen-url'
         f.editor.form.setFieldValue('content', '# My unsaved text')
         const candidate = await f.publication()
         expect(candidate.slug).toBe('author-chosen-url')
-        expect(f.editor.form.state.values.excerpt).toBeUndefined()
-        expect(Object.keys(f.requests[0]!.body.text.format.schema.properties)).toEqual(['excerpt'])
-        expect(JSON.stringify(f.requests[0]!.body.input)).toContain('# My unsaved text')
+        expect(f.editor.form.state.values.content).toBe('# My unsaved text')
+        expect(f.requests).toEqual([])
         applyPublication(f.editor, candidate)
         expect(await f.editor.publish()).toBeDefined()
         expect((await f.admin.getPublicEntry('posts', 'author-chosen-url'))?.data).toMatchObject({
             content: '# My unsaved text',
-            excerpt: 'A short introduction in my voice.',
         })
-        expect(run).toHaveBeenCalledTimes(1)
+        expect(run).not.toHaveBeenCalled()
     } finally {
         f.close()
     }
 })
 
 test('an edit after AI validation still fails the atomic publication version guard', async () => {
-    const run = vi.fn(async () =>
-        completion({ slug: 'candidate-url', excerpt: 'My introduction.' }),
-    )
+    const run = vi.fn(async () => completion({ slug: 'candidate-url' }))
     const f = await fixture(run)
     try {
         await f.editor.form.handleSubmit()
@@ -272,7 +266,7 @@ test('changed snapshots and concurrent edits reject AI publication without losin
         })
         await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1))
         f.editor.form.setFieldValue('content', '# Local edit during AI')
-        release(completion({ slug: 'stale-output', excerpt: 'Stale introduction.' }))
+        release(completion({ slug: 'stale-output' }))
         await pending
         const second = expect(f.publication()).rejects.toMatchObject({
             code: 'SITE_ADMIN_CONFLICT',
@@ -283,7 +277,7 @@ test('changed snapshots and concurrent edits reject AI publication without losin
             expectedVersion: current.version,
             data: { ...current.data, content: '# Other author' },
         })
-        release(completion({ slug: 'concurrent-output', excerpt: 'Concurrent introduction.' }))
+        release(completion({ slug: 'concurrent-output' }))
         await second
         expect(f.editor.form.state.values.content).toBe('# Local edit during AI')
         expect((await f.admin.getEntry(id)).publishedRevisionId).toBeNull()
@@ -302,7 +296,7 @@ test('proofreading is review-only, preserves metadata, and denied management blo
         await f.editor.form.handleSubmit()
         const id = f.editor.entryId.value!
         f.editor.metadata.slug.value = 'manual-url'
-        f.editor.form.setFieldValue('excerpt', 'My own introduction.')
+        f.editor.form.setFieldValue('tags', ['manual-tag'])
         const suggestion = await f.proofreading()
         expect(f.editor.form.state.values.content).toBe('# Saved body')
         expect((await f.admin.getEntry(id)).data.content).toBe('# Saved body')
@@ -312,7 +306,7 @@ test('proofreading is review-only, preserves metadata, and denied management blo
         f.editor.form.setFieldValue('content', suggestion.data.content)
         expect(f.editor.form.state.values.content).toBe('# Proofread body')
         expect(f.editor.metadata.slug.value).toBe('manual-url')
-        expect(f.editor.form.state.values.excerpt).toBe('My own introduction.')
+        expect(f.editor.form.state.values.tags).toEqual(['manual-tag'])
         expect(postProposalStale(suggestion, actionContext(f.editor, f.client).current())).toBe(
             true,
         )
@@ -331,7 +325,9 @@ test('proofreading is review-only, preserves metadata, and denied management blo
 })
 
 test('automatic updates keep the published URL and schedules pin candidates across draft edits', async () => {
-    const run = vi.fn(async () => completion({ excerpt: 'A new short introduction.' }))
+    const run = vi.fn(() => {
+        throw new Error('Confirmed URL must bypass inference')
+    })
     const f = await fixture(run)
     const scope = effectScope()
     try {
@@ -344,7 +340,7 @@ test('automatic updates keep the published URL and schedules pin candidates acro
         const editor = scope.run(() =>
             useSiteAdminForm({ descriptor, modelName: 'posts', client: f.client, entry: legacy }),
         )!
-        editor.form.setFieldValue('publication', { slug: 'auto', excerpt: 'auto' })
+        editor.form.setFieldValue('publication', { slug: 'auto' })
         editor.metadata.slug.value = 'unconfirmed-draft-url'
         editor.form.setFieldValue('content', '# Scheduled body')
         const candidate = await f.publication(editor)
@@ -367,7 +363,7 @@ test('automatic updates keep the published URL and schedules pin candidates acro
         expect((await f.admin.getPublicEntry('posts', 'confirmed-url'))?.data.content).toBe(
             '# Scheduled body',
         )
-        expect(Object.keys(f.requests[0]!.body.text.format.schema.properties)).toEqual(['excerpt'])
+        expect(f.requests).toEqual([])
         let current = await f.admin.getEntry(legacy.id)
         current = await f.admin.unpublishEntry(legacy.id, { expectedVersion: current.version })
         const republishing = scope.run(() =>
@@ -380,7 +376,7 @@ test('automatic updates keep the published URL and schedules pin candidates acro
         expect((await f.admin.getPublicEntry('posts', 'confirmed-url'))?.data.content).toBe(
             '# Later draft body',
         )
-        expect(run).toHaveBeenCalledTimes(2)
+        expect(run).not.toHaveBeenCalled()
     } finally {
         scope.stop()
         f.close()
@@ -388,7 +384,9 @@ test('automatic updates keep the published URL and schedules pin candidates acro
 })
 
 test('list unpublish preserves a legacy public URL and its current draft before republishing', async () => {
-    const run = vi.fn(async () => completion({ excerpt: 'An introduction after republishing.' }))
+    const run = vi.fn(() => {
+        throw new Error('Former public URL must bypass inference')
+    })
     const f = await fixture(run)
     const scope = effectScope()
     try {
@@ -412,7 +410,7 @@ test('list unpublish preserves a legacy public URL and its current draft before 
             title: 'Changed title',
             content: '# Later draft',
             tags: ['draft'],
-            publication: { slug: 'manual', excerpt: 'manual', publishedSlug: 'former-public-url' },
+            publication: { slug: 'manual', publishedSlug: 'former-public-url' },
         })
         expect(await f.admin.getPublicEntry('posts', 'former-public-url')).toBeNull()
         const editor = scope.run(() =>
@@ -421,7 +419,6 @@ test('list unpublish preserves a legacy public URL and its current draft before 
         editor.form.setFieldValue('publication', {
             ...(current.data.publication as Record<string, unknown>),
             slug: 'auto',
-            excerpt: 'auto',
         })
         const candidate = await f.publication(editor)
         expect(candidate.slug).toBe('former-public-url')
@@ -430,9 +427,9 @@ test('list unpublish preserves a legacy public URL and its current draft before 
         expect((await f.admin.getPublicEntry('posts', 'former-public-url'))?.data.content).toBe(
             '# Later draft',
         )
-        expect(run).toHaveBeenCalledTimes(1)
+        expect(run).not.toHaveBeenCalled()
         expect(f.model).not.toHaveBeenCalled()
-        expect(Object.keys(f.requests[0]!.body.text.format.schema.properties)).toEqual(['excerpt'])
+        expect(f.requests).toEqual([])
     } finally {
         scope.stop()
         f.close()

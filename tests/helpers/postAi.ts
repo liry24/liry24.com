@@ -2,7 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { executeSiteAdminAiAction } from '@liria24/site-admin/ai'
 import type { SiteAdminActor } from '@liria24/site-admin/server'
 
-import type { PostMetadataProps, PostMetadataResult } from '../../server/utils/postEditorial'
+import type { PostSlugProps, PostSlugResult } from '../../server/utils/postEditorial'
 import config from '../../site-admin.config'
 
 // Always use an explicit synthetic key and a supplied fetch. These tests never
@@ -28,8 +28,8 @@ export function mockPostActions(fetch: typeof globalThis.fetch) {
         )
     return {
         execute,
-        async publication(props: PostMetadataProps) {
-            return (await execute('publication', props)) as PostMetadataResult
+        async publication(props: PostSlugProps) {
+            return (await execute('publication', props)) as PostSlugResult
         },
         async proofread(props: { content: string }) {
             return (await execute('proofread', props)) as { content: string }

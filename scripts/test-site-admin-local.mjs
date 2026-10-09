@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHmac, randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
@@ -57,6 +57,7 @@ let entry
 let uploadedAsset
 let httpAsset
 const publicEntries = []
+const fullBodySentinel = `FULL_POST_BODY_${id.replaceAll('-', '_')}`
 try {
     const now = Date.now()
     database
@@ -82,8 +83,6 @@ try {
                         : {
                               title: 'Unauthorized',
                               content: 'Draft',
-                              generateSlug: true,
-                              generateExcerpt: true,
                           },
             },
         })
@@ -101,8 +100,13 @@ try {
     assert.equal(snapshot.database.connector, 'application')
     assert.equal(Object.keys(snapshot.models).length, 7)
     assert.equal(snapshot.assets.cleanup.minimumAge, 86400)
-    if (!apiOnly)
-        for (const path of ['/', '/arts', '/works', '/posts', '/admin/works']) await request(path)
+    if (!apiOnly) {
+        // Browser fixtures must exist before the first cacheable posts/home SSR request.
+        const publicPaths = process.argv.includes('--browser')
+            ? ['/arts', '/works', '/admin/works']
+            : ['/', '/arts', '/works', '/posts', '/admin/works']
+        for (const path of publicPaths) await request(path)
+    }
     entry = await request('/api/site-admin/entries/posts', {
         method: 'POST',
         status: 201,
@@ -166,13 +170,23 @@ try {
         for (const [suffix, title] of [
             ['one', 'Public probe one'],
             ['two', 'Public probe two'],
+            ['auto', 'Automatic probe'],
         ]) {
+            const explicitSummary = suffix !== 'auto'
+            const introduction = `${title} introduction.`
+            const description = explicitSummary
+                ? introduction
+                : `${introduction} Another short introduction.`
             let post = await request('/api/site-admin/entries/posts', {
                 method: 'POST',
                 status: 201,
                 body: {
                     slug: `${id}-${suffix}`,
-                    data: { title, excerpt: `${title} excerpt`, content: `# ${title}`, tags: [] },
+                    data: {
+                        title,
+                        content: `${introduction}${explicitSummary ? '\n\n<!-- more -->' : '\n\nAnother short introduction.'}\n\n# ${title}\n\n${fullBodySentinel}\n\n${'The full article remains available. '.repeat(100)}`,
+                        tags: [],
+                    },
                 },
             })
             publicEntries.push(post)
@@ -181,9 +195,83 @@ try {
                 body: { expectedVersion: post.version },
             })
             const html = await request(`/posts/${post.slug}`, { authenticated: false })
+            if (process.env.LIRY24_TEST_ARTIFACT_DIRECTORY)
+                writeFileSync(
+                    resolve(
+                        process.env.LIRY24_TEST_ARTIFACT_DIRECTORY,
+                        `detail-${suffix}-ssr.html`,
+                    ),
+                    html,
+                )
             assert(html.includes(`<title>${title} | Liry24</title>`))
             assert(html.includes('property="og:type" content="article"'))
-            assert(html.includes(`name="description" content="${title} excerpt"`))
+            assert(html.includes(`name="description" content="${description}"`))
+            assert(html.includes(fullBodySentinel), 'Detail SSR must retain the full article')
+            const detailResponse = await fetch(new URL(`/api/content/posts/${post.slug}`, origin))
+            assert.equal(detailResponse.status, 200)
+            const detailPayload = await detailResponse.text()
+            assert(
+                detailPayload.includes(fullBodySentinel),
+                'Detail HTTP must retain the full article',
+            )
+            if (process.env.LIRY24_TEST_ARTIFACT_DIRECTORY)
+                writeFileSync(
+                    resolve(
+                        process.env.LIRY24_TEST_ARTIFACT_DIRECTORY,
+                        `detail-${suffix}-http.json`,
+                    ),
+                    detailPayload,
+                )
+        }
+        for (const locale of ['', '&locale=ja']) {
+            const projected = await fetch(
+                new URL(`/api/content/posts?markdown=summary${locale}`, origin),
+                {
+                    signal: AbortSignal.timeout(30000),
+                },
+            )
+            assert.equal(projected.status, 200)
+            const serialized = await projected.text()
+            if (process.env.LIRY24_TEST_ARTIFACT_DIRECTORY)
+                writeFileSync(
+                    resolve(
+                        process.env.LIRY24_TEST_ARTIFACT_DIRECTORY,
+                        `summary-${locale ? 'ja' : 'default'}-http.json`,
+                    ),
+                    serialized,
+                )
+            assert(
+                serialized.includes('Public probe one introduction.'),
+                `${locale}: HTTP summary is rendered`,
+            )
+            assert(
+                serialized.includes('Automatic probe introduction.'),
+                `${locale}: automatic HTTP summary is rendered`,
+            )
+            assert(!serialized.includes(fullBodySentinel), `${locale}: HTTP excludes the full body`)
+        }
+        for (const path of ['/', '/posts']) {
+            // SWR may have a startup/preflight snapshot; exercise a fresh cache key.
+            const html = await request(`${path}?synthetic-probe=${encodeURIComponent(id)}`, {
+                authenticated: false,
+            })
+            if (process.env.LIRY24_TEST_ARTIFACT_DIRECTORY)
+                writeFileSync(
+                    resolve(
+                        process.env.LIRY24_TEST_ARTIFACT_DIRECTORY,
+                        `summary-${path === '/' ? 'home' : 'posts'}-ssr.html`,
+                    ),
+                    html,
+                )
+            assert(html.includes('Public probe one introduction.'), `${path}: summary is rendered`)
+            assert(
+                html.includes('Automatic probe introduction.'),
+                `${path}: automatic summary is rendered`,
+            )
+            assert(
+                !html.includes(fullBodySentinel),
+                `${path}: full body must not enter SSR or payload`,
+            )
         }
         const { chromium } = await import('playwright-core')
         const browser = await chromium.launch({ channel: 'chrome', headless: true })
@@ -336,6 +424,35 @@ try {
                     errors.push(message.text())
             })
             await page.goto(new URL(`/posts/${publicEntries[0].slug}`, origin).href)
+            await page.waitForFunction(
+                () => document.querySelector('#__nuxt')?.__vue_app__?.$nuxt?.isHydrating === false,
+            )
+            const projectedResponse = page
+                .waitForResponse((response) => {
+                    const url = new URL(response.url())
+                    return url.origin === origin.origin && url.pathname === '/api/content/posts'
+                })
+                .catch((error) => error)
+            await page.evaluate(() =>
+                document.querySelector('#__nuxt').__vue_app__.$nuxt.$router.push('/posts'),
+            )
+            const projected = await projectedResponse
+            if (projected instanceof Error) throw projected
+            const projectedPayload = await projected.text()
+            assert.equal(projected.status(), 200)
+            assert(projectedPayload.includes('Public probe one introduction.'))
+            assert(
+                !projectedPayload.includes(fullBodySentinel),
+                'List HTTP payload must exclude full bodies',
+            )
+            await page
+                .locator('article')
+                .filter({ has: page.locator(`a[href="/posts/${publicEntries[0].slug}"]`) })
+                .last()
+                .locator('.line-clamp-3')
+                .waitFor()
+            await page.locator(`a[href="/posts/${publicEntries[0].slug}"]`).first().click()
+            await page.waitForURL(`**/posts/${publicEntries[0].slug}`)
             await page
                 .getByRole('heading', { name: 'Public probe one', exact: true, level: 1 })
                 .first()
@@ -357,7 +474,7 @@ try {
             await page.waitForFunction(() => document.title === 'Public probe two | Liry24')
             assert.equal(
                 await page.locator('meta[name="description"]').getAttribute('content'),
-                'Public probe two excerpt',
+                'Public probe two introduction.',
             )
             await page.goBack()
             await page
@@ -375,7 +492,20 @@ try {
                     }),
                 })
             })
+            const homePostsResponse = page
+                .waitForResponse((response) => {
+                    const url = new URL(response.url())
+                    return url.origin === origin.origin && url.pathname === '/api/content/posts'
+                })
+                .catch((error) => error)
             await navigate('/')
+            const homePosts = await homePostsResponse
+            if (homePosts instanceof Error) throw homePosts
+            const homePostsPayload = await homePosts.text()
+            assert(
+                !homePostsPayload.includes(fullBodySentinel),
+                'Home batch HTTP payload must exclude full bodies',
+            )
             await page.locator(`a[href="/posts/${publicEntries[0].slug}"]`).last().waitFor()
             assert(partialFailure, 'Home should request the failed batch member')
             const batch = await page.evaluate(() =>
@@ -623,9 +753,11 @@ try {
             const titleInput = page.getByLabel('Title', { exact: true })
             const contentInput = page.getByLabel('Content', { exact: true })
             const manualSlug = page.getByRole('checkbox', { name: 'Enter slug manually' })
-            const manualExcerpt = page.getByRole('checkbox', { name: 'Enter excerpt manually' })
             assert.equal(await manualSlug.isChecked(), false)
-            assert.equal(await manualExcerpt.isChecked(), false)
+            assert.equal(
+                await page.getByRole('checkbox', { name: 'Enter excerpt manually' }).count(),
+                0,
+            )
             assert.equal(await page.getByLabel('Slug', { exact: true }).count(), 0)
             assert.equal(await page.getByLabel('Excerpt', { exact: true }).count(), 0)
             await titleInput.fill('Browser create draft')
@@ -659,138 +791,50 @@ try {
             await page.waitForURL('**/admin/posts')
             await page.goBack()
             await page.waitForURL('**/admin/posts/new')
-            assert.equal(await contentInput.inputValue(), original)
-
-            let metadataCalls = 0
-            let metadataBody
-            let failMetadata = true
-            await page.route('**/api/site-admin/models/posts/ai/metadata', async (route) => {
-                metadataCalls++
-                metadataBody = route.request().postDataJSON()
-                await new Promise((resolve) => setTimeout(resolve, 200))
-                await route.fulfill({
-                    status: failMetadata ? 503 : 200,
-                    contentType: 'application/json',
-                    body: JSON.stringify(
-                        failMetadata
-                            ? {
-                                  error: {
-                                      code: 'SITE_ADMIN_AI_UNAVAILABLE',
-                                      message: 'Synthetic AI failure',
-                                  },
-                              }
-                            : {
-                                  data: {
-                                      ...metadataBody.data,
-                                      title: 'Must not replace title',
-                                      content: 'Must not replace content',
-                                      excerpt: 'Generated excerpt',
-                                  },
-                                  slug: 'must-not-replace-manual-slug',
-                                  issues: [],
-                              },
-                    ),
-                })
+            await page.waitForFunction(() => {
+                const app = document.querySelector('#__nuxt')?.__vue_app__?.$nuxt
+                return (
+                    app &&
+                    !app['~transitionPromise'] &&
+                    document.querySelectorAll('#admin-post-form').length === 1
+                )
             })
-            await page.getByRole('button', { name: 'Save Draft', exact: true }).click()
-            await page.getByText('Synthetic AI failure', { exact: true }).waitFor()
-            assert.deepEqual(metadataBody.generate, { slug: true, excerpt: true })
-            assert.equal(await titleInput.inputValue(), 'Browser create draft')
             assert.equal(await contentInput.inputValue(), original)
 
+            let slugCalls = 0
             let proofreadingCalls = 0
+            let draftCreates = 0
+            let publications = 0
+            page.on('request', (request) => {
+                if (request.method() !== 'POST') return
+                if (request.url().endsWith('/api/site-admin/entries/posts')) draftCreates++
+                if (/\/api\/site-admin\/entries\/[^/]+\/publish$/.test(request.url()))
+                    publications++
+            })
+            let slugInput
+            let corrected = original.replace('Markdown works', 'Markdown corrected')
             let invalidProofreading = false
-            await page.route('**/api/site-admin/models/posts/ai/proofread', async (route) => {
-                proofreadingCalls++
-                const body = route.request().postDataJSON()
-                assert.deepEqual(body.fields, ['content'])
+            await page.route('**/api/site-admin/ai/actions/publication', async (route) => {
+                slugCalls++
+                slugInput = route.request().postDataJSON()
                 await route.fulfill({
+                    status: 503,
                     contentType: 'application/json',
                     body: JSON.stringify({
-                        data: {
-                            ...body.data,
-                            content: invalidProofreading
-                                ? ''
-                                : '# Corrected content\n\nA suggestion.',
-                        },
-                        issues: [],
+                        error: { code: 'SITE_ADMIN_AI_FAILED', message: 'Synthetic AI failure' },
                     }),
                 })
             })
-            await page.getByRole('button', { name: 'Proofread Content', exact: true }).click()
-            await page.getByRole('region', { name: 'Proofreading suggestion' }).waitFor()
-            assert.equal(await contentInput.inputValue(), original)
-            await contentInput.fill(original + '\n\nNew sentence.')
-            assert.equal(
-                await page.getByRole('button', { name: 'Apply Suggestion' }).isDisabled(),
-                true,
-            )
-            await page.getByRole('button', { name: 'Proofread Content', exact: true }).click()
-            await page.getByRole('button', { name: 'Apply Suggestion' }).click()
-            assert.equal(await contentInput.inputValue(), '# Corrected content\n\nA suggestion.')
-            assert.equal(proofreadingCalls, 2)
-            invalidProofreading = true
-            await page.getByRole('button', { name: 'Proofread Content', exact: true }).click()
-            await page.getByText('Invalid proofreading suggestion', { exact: true }).waitFor()
-            assert.equal(
-                await page.getByRole('button', { name: 'Apply Suggestion' }).isDisabled(),
-                true,
-            )
-            assert.equal(await contentInput.inputValue(), '# Corrected content\n\nA suggestion.')
-            await page.getByRole('button', { name: 'Discard Suggestion' }).click()
-            assert.equal(
-                await page.getByRole('region', { name: 'Proofreading suggestion' }).count(),
-                0,
-            )
-
-            await manualSlug.check()
-            await page.getByLabel('Slug', { exact: true }).fill(`${id}-browser-new`)
-            await manualExcerpt.check()
-            await page.getByLabel('Excerpt', { exact: true }).fill('Manual excerpt')
-            await manualExcerpt.uncheck()
-            await manualExcerpt.check()
-            assert.equal(
-                await page.getByLabel('Excerpt', { exact: true }).inputValue(),
-                'Manual excerpt',
-            )
-            await page.getByRole('link', { name: 'Back to Posts', exact: true }).click()
-            await page.waitForURL('**/admin/posts')
-            await page.goBack()
-            await page.waitForURL('**/admin/posts/new')
-            await titleInput.waitFor()
-            assert.equal(await manualSlug.isChecked(), true)
-            assert.equal(await manualExcerpt.isChecked(), true)
-            assert.equal(
-                await page.getByLabel('Slug', { exact: true }).inputValue(),
-                `${id}-browser-new`,
-            )
-            assert.equal(
-                await page.getByLabel('Excerpt', { exact: true }).inputValue(),
-                'Manual excerpt',
-            )
-            await page.getByLabel('Slug', { exact: true }).fill('')
-            const invalidSlug = page.waitForResponse(
-                (response) =>
-                    response.url().endsWith('/api/site-admin/entries/posts') &&
-                    response.request().method() === 'POST',
-            )
-            await page.getByRole('button', { name: 'Save Draft', exact: true }).click()
-            assert.equal((await invalidSlug).status(), 400)
-            assert.equal(metadataCalls, 1)
-            assert.equal(await page.getByLabel('Slug', { exact: true }).inputValue(), '')
-            assert.equal(await contentInput.inputValue(), '# Corrected content\n\nA suggestion.')
-            await page.getByLabel('Slug', { exact: true }).fill(`${id}-browser-new`)
-            await manualExcerpt.uncheck()
-            failMetadata = false
-            let createCalls = 0
-            const onRequest = (request) => {
-                if (
-                    request.method() === 'POST' &&
-                    request.url().endsWith('/api/site-admin/entries/posts')
-                )
-                    createCalls++
-            }
-            page.on('request', onRequest)
+            await page.route('**/api/site-admin/ai/actions/proofread', async (route) => {
+                proofreadingCalls++
+                const body = route.request().postDataJSON()
+                assert.deepEqual(Object.keys(body), ['props'])
+                assert.deepEqual(Object.keys(body.props), ['content'])
+                await route.fulfill({
+                    contentType: 'application/json',
+                    body: JSON.stringify({ content: invalidProofreading ? '' : corrected }),
+                })
+            })
             const created = page.waitForResponse(
                 (response) =>
                     response.request().method() === 'POST' &&
@@ -805,24 +849,121 @@ try {
             assert.equal(response.status(), 201)
             const newEntry = await response.json()
             try {
+                try {
+                    await page.waitForURL('**/admin/posts')
+                } catch (error) {
+                    console.error({
+                        newDraftNavigation: page.url(),
+                        formText: await page.locator('main').innerText(),
+                        editorState: await page.evaluate(() => {
+                            let component =
+                                document.querySelector('#admin-post-form')?.__vueParentComponent
+                            while (component && !component.setupState.editor)
+                                component = component.parent
+                            const state = component?.setupState
+                            if (!state) return null
+                            return {
+                                saved: state.saved,
+                                saving: state.saving,
+                                savePending: state.savePending,
+                                busy: state.busy,
+                                intent: state.intent,
+                                entryId: state.editor.entryId.value,
+                                serverError: state.editor.serverError.value,
+                                callbackError: String(state.editor.callbackError.value ?? ''),
+                            }
+                        }),
+                        errors,
+                    })
+                    throw error
+                }
+                assert.equal(slugCalls, 0)
+                assert.equal(proofreadingCalls, 0)
+                assert.equal(draftCreates, 1)
+                assert.equal(newEntry.data.excerpt, undefined)
+                assert.deepEqual(newEntry.data.publication, { slug: 'auto' })
+                assert.equal(newEntry.publishedRevisionId, null)
+                await page
+                    .locator('li')
+                    .filter({ has: page.getByText(newEntry.data.title, { exact: true }) })
+                    .last()
+                    .getByRole('button', { name: 'Edit', exact: true })
+                    .click()
+                await page.waitForURL(`**/admin/posts/${newEntry.id}`)
+                await contentInput.waitFor()
+                await page.getByRole('button', { name: 'Proofread Content', exact: true }).click()
+                await page.getByRole('region', { name: 'Proofreading suggestion' }).waitFor()
+                assert.equal(await contentInput.inputValue(), original)
+                await contentInput.fill(original + '\n\nNew sentence.')
+                assert.equal(
+                    await page.getByRole('button', { name: 'Apply Suggestion' }).isDisabled(),
+                    true,
+                )
+                await page.getByRole('button', { name: 'Proofread Content', exact: true }).click()
+                await page.getByRole('button', { name: 'Apply Suggestion' }).click()
+                assert.equal(await contentInput.inputValue(), corrected)
+                invalidProofreading = true
+                await page.getByRole('button', { name: 'Proofread Content', exact: true }).click()
+                await page.getByText('Invalid proofreading suggestion', { exact: true }).waitFor()
+                assert.equal(
+                    await page.getByRole('button', { name: 'Apply Suggestion' }).isDisabled(),
+                    true,
+                )
+                assert.equal(await contentInput.inputValue(), corrected)
+                await page.getByRole('button', { name: 'Discard Suggestion' }).click()
+                await page.getByRole('button', { name: 'Publish', exact: true }).click()
+                await page.getByText('Synthetic AI failure', { exact: true }).waitFor()
+                assert.deepEqual(slugInput, {
+                    props: { title: 'Browser create draft', content: corrected },
+                })
+                assert.equal(await contentInput.inputValue(), corrected)
+                assert.equal(
+                    (await request(`/api/site-admin/entries/${newEntry.id}`)).publishedRevisionId,
+                    null,
+                )
+                await manualSlug.check()
+                await page.getByLabel('Slug', { exact: true }).fill('')
+                await page.getByRole('button', { name: 'Publish', exact: true }).click()
+                await page
+                    .getByText('Enter a slug or use automatic generation.', { exact: true })
+                    .waitFor()
+                assert.equal(slugCalls, 1)
+                await page.getByLabel('Slug', { exact: true }).fill(`${id}-browser-new`)
+                await page.getByRole('link', { name: 'Back to Posts', exact: true }).click()
                 await page.waitForURL('**/admin/posts')
-                assert.equal(metadataCalls, 2)
-                assert.equal(createCalls, 1)
-                assert.deepEqual(metadataBody.generate, { slug: false, excerpt: true })
-                assert.equal(metadataBody.slug, `${id}-browser-new`)
+                await page.goBack()
+                await page.waitForURL(`**/admin/posts/${newEntry.id}`)
+                await titleInput.waitFor()
+                assert.equal(await manualSlug.isChecked(), true)
+                assert.equal(
+                    await page.getByLabel('Slug', { exact: true }).inputValue(),
+                    `${id}-browser-new`,
+                )
+                assert.equal(await contentInput.inputValue(), corrected)
+                await page.evaluate(() => {
+                    const button = [...document.querySelectorAll('button')].find(
+                        (button) => button.textContent.trim() === 'Publish',
+                    )
+                    button.click()
+                    button.click()
+                })
+                await page.waitForURL('**/admin/posts')
                 const stored = await request(`/api/site-admin/entries/${newEntry.id}`)
                 assert.equal(stored.slug, `${id}-browser-new`)
                 assert.equal(stored.data.title, 'Browser create draft')
                 assert.deepEqual(stored.data.tags, ['draft-tag'])
-                assert.equal(stored.data.content, '# Corrected content\n\nA suggestion.')
-                assert.equal(stored.data.excerpt, 'Generated excerpt')
-                assert.equal(stored.publishedRevisionId, null)
-                const row = page
+                assert.equal(stored.data.content, corrected)
+                assert.equal(stored.data.excerpt, undefined)
+                assert.equal(stored.currentRevisionId, stored.publishedRevisionId)
+                assert.equal(slugCalls, 1)
+                assert.equal(proofreadingCalls, 3)
+                assert.equal(publications, 1)
+                await page
                     .locator('li')
-                    .filter({ has: page.getByText(stored.slug, { exact: true }) })
+                    .filter({ has: page.getByText(stored.data.title, { exact: true }) })
                     .last()
-                await row.getByText(stored.data.title, { exact: true }).waitFor()
-                await row.getByRole('button', { name: 'Edit', exact: true }).click()
+                    .getByRole('button', { name: 'Edit', exact: true })
+                    .click()
                 await page.waitForURL(`**/admin/posts/${stored.id}`)
                 await titleInput.fill('Unsaved local title')
                 await request(`/api/site-admin/entries/${stored.id}`, {
@@ -839,7 +980,7 @@ try {
                 )
                 await page.getByText('Conflict detected', { exact: true }).waitFor()
                 assert.equal(await titleInput.inputValue(), 'Unsaved local title')
-                assert.equal(await contentInput.inputValue(), stored.data.content)
+                assert.equal(await contentInput.inputValue(), corrected)
                 assert.equal(
                     await page
                         .getByRole('button', { name: 'Save Draft', exact: true })
@@ -849,7 +990,6 @@ try {
                 await page.getByRole('link', { name: 'Back to Posts', exact: true }).click()
                 await page.waitForURL('**/admin/posts')
             } finally {
-                page.off('request', onRequest)
                 const latest = await request(`/api/site-admin/entries/${newEntry.id}`)
                 await request(`/api/site-admin/entries/${newEntry.id}`, {
                     method: 'DELETE',
@@ -857,9 +997,10 @@ try {
                     headers: { 'if-match': `"${latest.version}"` },
                 })
             }
+
             assert.deepEqual(errors, [])
             console.log(
-                'PASS: creation page, safe Comark preview, native back/forward draft and metadata recovery, metadata failure preserves input, manual switches and empty slug validation without AI, proofreading review/apply/discard and invalid/stale suggestion guards, one create under double submission, native list invalidation and dirty refresh conflict',
+                'PASS: creation page, safe Comark preview, native back/forward draft recovery, AI-free draft and manual publication, slug failure preserves input, empty slug validation, native proofreading review/apply/discard and invalid/stale guards, double submission, native list invalidation and dirty refresh conflict',
             )
         } finally {
             await browser.close()
