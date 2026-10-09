@@ -246,7 +246,7 @@ function imageUrl(entry: EntryRecord) {
                                     modelName !== 'works' &&
                                     (field === 'slug' ? item.slug : item.data[field])
                                 "
-                                class="text-muted text-sm break-words"
+                                class="text-muted text-sm wrap-break-word"
                                 >{{ field === 'slug' ? item.slug : item.data[field] }}</span
                             >
                         </template>

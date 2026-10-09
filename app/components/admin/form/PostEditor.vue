@@ -187,7 +187,7 @@ async function upload(files: File | File[] | null | undefined) {
                             <Markdown
                                 :value="content"
                                 :options="{ registerDefaultPlugins: false }"
-                                class="sentence break-words *:first:mt-0 *:last:mb-0"
+                                class="sentence wrap-break-word *:first:mt-0 *:last:mb-0"
                             />
                         </Suspense>
                     </section>
@@ -226,13 +226,13 @@ async function upload(files: File | File[] | null | undefined) {
                         <div>
                             <h3 class="text-muted mb-2 text-sm">Original</h3>
                             <pre
-                                class="bg-muted max-h-80 overflow-auto rounded-lg p-3 text-sm break-words whitespace-pre-wrap"
+                                class="bg-muted max-h-80 overflow-auto rounded-lg p-3 text-sm wrap-break-word whitespace-pre-wrap"
                                 >{{ originalContent }}</pre>
                         </div>
                         <div>
                             <h3 class="text-muted mb-2 text-sm">Suggested</h3>
                             <pre
-                                class="bg-muted max-h-80 overflow-auto rounded-lg p-3 text-sm break-words whitespace-pre-wrap"
+                                class="bg-muted max-h-80 overflow-auto rounded-lg p-3 text-sm wrap-break-word whitespace-pre-wrap"
                                 >{{ proposal.data.content }}</pre>
                         </div>
                     </div>
