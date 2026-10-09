@@ -23,7 +23,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             'enable_nodejs_process_v2',
             'nodejs_compat_populate_process_env',
         ])
-        expect(generated.ai).toEqual({ binding: 'AI' })
+        expect(generated.ai).toBeUndefined()
         const serverDirectory = resolve('.output/server')
         const chunks = await readdir(serverDirectory, { recursive: true })
         for (const file of chunks.filter((file) => file.endsWith('.mjs'))) {
@@ -88,6 +88,22 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 if (path === '/api/auth/get-session') expect(body).toBe('null')
                 if (path === '/login' && isPreview) expect(body).not.toContain('Vercel')
             }
+            const deniedAction = await server.fetch('/api/site-admin/ai/actions/proofread', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ props: { content: 'Synthetic anonymous draft' } }),
+            })
+            expect(deniedAction.status).toBe(401)
+            expect(await deniedAction.json()).toMatchObject({
+                error: { code: 'SITE_ADMIN_AUTH_REQUIRED' },
+            })
+            expect(deniedAction.headers.get('cache-control')).toBe('private, no-store')
+            const crossedAction = await server.fetch('/api/site-admin/ai/actions/proofread', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json', origin: 'https://evil.invalid' },
+                body: JSON.stringify({ props: { content: 'Synthetic cross-origin draft' } }),
+            })
+            expect(crossedAction.status).toBe(403)
             let entry = await admin.createEntry('posts', {
                 slug: 'emitted-scheduled-handler',
                 data: { title: 'A', content: '# A', tags: [] },

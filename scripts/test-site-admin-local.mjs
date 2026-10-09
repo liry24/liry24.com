@@ -70,15 +70,21 @@ try {
         )
         .run(id, token, id, now + 3600000, now, now)
     await request('/api/site-admin/models', { authenticated: false, status: 401 })
-    for (const action of ['metadata', 'proofread'])
-        await request(`/api/site-admin/models/posts/ai/${action}`, {
+    for (const action of ['publication', 'proofread'])
+        await request(`/api/site-admin/ai/actions/${action}`, {
             authenticated: false,
             method: 'POST',
             status: 401,
             body: {
-                data: { title: 'Unauthorized', content: 'Draft', tags: [] },
-                generate: { slug: true, excerpt: true },
-                fields: ['content'],
+                props:
+                    action === 'proofread'
+                        ? { content: 'Draft' }
+                        : {
+                              title: 'Unauthorized',
+                              content: 'Draft',
+                              generateSlug: true,
+                              generateExcerpt: true,
+                          },
             },
         })
     if (!apiOnly)

@@ -53,7 +53,6 @@ const cloudflareConfig = {
         },
     ],
     r2_buckets: [{ binding: 'R2', bucket_name: 'liry24-com' }],
-    ai: { binding: 'AI' },
     dev: { ip: '127.0.0.1', port: 3100 },
     ...(isPreview
         ? {

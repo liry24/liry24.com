@@ -1,20 +1,22 @@
 <script setup lang="ts">
+import { serializeSiteAdminData } from '@liria24/site-admin/client'
 import { useSelector } from '@tanstack/vue-form'
+import { postMetadataModes, postPublicationSettings } from '~~/shared/utils/postEditorial'
+
+import type { PostEditorialProposal, PostMetadataInput } from '~/utils/postEditorialFlow'
 import {
-    postMetadataModes,
-    postMetadataSelection,
-    postPublicationSettings,
-} from '~~/shared/utils/postEditorial'
+    postProposalStale,
+    preparePostProofreading,
+    preparePostPublication,
+} from '~/utils/postEditorialFlow'
 
 const props = defineProps<{ id?: string }>()
 const saved = ref(false)
 const savePending = ref(false)
 const intent = ref<'proofread' | 'publish' | 'schedule' | null>(null)
-const proposalKind = ref<'proofread' | 'publication' | null>(null)
 const localError = ref('')
 const publishAt = ref('')
 const uploading = ref(false)
-const originalContent = ref('')
 const uploadedName = ref('')
 const editor = await useSiteAdminForm('posts', {
     ...(props.id ? { id: () => props.id } : {}),
@@ -26,7 +28,7 @@ const editor = await useSiteAdminForm('posts', {
         if (!props.id) delete editor.drafts[newDraftIdentity]
     },
 })
-const { form, conflict, serverError, asset, ai, dirty, loading, loadError } = editor
+const { form, conflict, serverError, asset, dirty, loading, loadError } = editor
 const newDraftIdentity = editor.identity.value
 // AI actions first create a draft while the browser is still on /new. Keep
 // that route's session input pointing at the created entry until navigation.
@@ -56,7 +58,44 @@ const manualExcerpt = computed({
     set: (value) => setMetadataMode('excerpt', value),
 })
 const content = computed(() => values.value.content)
-const { proposal, stale: proposalStale } = ai
+const management = useSiteAdminManagementClient()
+const proposal = shallowRef<PostEditorialProposal | null>(null)
+const originalContent = computed(() => String(proposal.value?.snapshot.draft.data.content ?? ''))
+const aiError = shallowRef<Error | null>(null)
+const proofreadInput = shallowRef({ content: '' })
+const publicationInput = shallowRef<PostMetadataInput>({
+    title: '',
+    content: '',
+    generateSlug: false,
+    generateExcerpt: false,
+})
+const proofreadAction = await useAiAction('proofread', {
+    props: () => proofreadInput.value,
+    immediate: false,
+})
+const publicationAction = await useAiAction('publication', {
+    props: () => publicationInput.value,
+    immediate: false,
+})
+function currentDraft() {
+    return {
+        entryId: editor.entryId.value,
+        version: editor.version.value,
+        draft: {
+            data: serializeSiteAdminData(editor.descriptor.value, values.value),
+            slug: slug.value,
+        },
+    }
+}
+const proposalStale = computed(() =>
+    proposal.value ? postProposalStale(proposal.value, currentDraft()) : false,
+)
+function discardSuggestion() {
+    proposal.value = null
+    aiError.value = null
+    proofreadAction.clear()
+    publicationAction.clear()
+}
 const proofreading = computed(() => intent.value === 'proofread')
 const busy = computed(
     () =>
@@ -65,21 +104,21 @@ const busy = computed(
         uploading.value ||
         loading.value ||
         intent.value !== null ||
-        ai.busy.value !== null ||
+        proofreadAction.status.value === 'pending' ||
+        publicationAction.status.value === 'pending' ||
         editor.publishBusy.value,
 )
-const awaitingProofreading = computed(
-    () => proposalKind.value === 'proofread' && Boolean(proposal.value),
-)
+const awaitingProofreading = computed(() => proposal.value?.kind === 'proofread')
 const errorMessage = computed(() => {
     if (localError.value) return localError.value
     const cause =
-        serverError.value || ai.error.value || loadError.value || editor.callbackError.value
+        serverError.value || aiError.value || loadError.value || editor.callbackError.value
     return cause instanceof Error ? cause.message : serverError.value?.message
 })
 const invalidProposal = computed(() =>
     Boolean(
-        proposal.value && (proposal.value.issues.length || !proposal.value.data.content?.trim()),
+        proposal.value &&
+        (typeof proposal.value.data.content !== 'string' || !proposal.value.data.content.trim()),
     ),
 )
 onBeforeRouteLeave(() => {
@@ -113,22 +152,45 @@ async function ensureDraft() {
     await form.handleSubmit()
     return !serverError.value && Boolean(editor.entryId.value)
 }
+function actionFailure(error: unknown, fallback: string) {
+    if (error && typeof error === 'object') {
+        const data = Reflect.get(error, 'data')
+        const failure = data && typeof data === 'object' ? Reflect.get(data, 'error') : undefined
+        const message =
+            failure && typeof failure === 'object' ? Reflect.get(failure, 'message') : undefined
+        if (typeof message === 'string' && message) return new Error(message, { cause: error })
+    }
+    return error instanceof Error ? error : new Error(fallback)
+}
 async function proofread() {
     if (busy.value || conflict.value || loadError.value || !content.value.trim()) return
     intent.value = 'proofread'
     localError.value = ''
+    discardSuggestion()
     try {
         if (!(await ensureDraft())) return
-        originalContent.value = content.value
-        proposalKind.value = 'proofread'
-        await ai.run('proofread')
+        const result = await preparePostProofreading(
+            { management, current: currentDraft },
+            async (props) => {
+                proofreadInput.value = props
+                await proofreadAction.execute()
+                if (proofreadAction.error.value) throw proofreadAction.error.value
+                if (!proofreadAction.data.value)
+                    throw new Error('No proofreading suggestion was returned.')
+                return proofreadAction.data.value
+            },
+        )
+        proposal.value = result
+    } catch (error) {
+        aiError.value = actionFailure(error, 'Proofreading failed. Your content is kept.')
     } finally {
         intent.value = null
     }
 }
 function applyProofreading() {
-    if (busy.value || invalidProposal.value) return
-    if (ai.apply({ fields: ['content'], slug: false })) proposalKind.value = null
+    if (busy.value || invalidProposal.value || proposalStale.value || !proposal.value) return
+    form.setFieldValue('content', String(proposal.value.data.content))
+    discardSuggestion()
 }
 async function publish(schedule = false) {
     if (busy.value || conflict.value || loadError.value || awaitingProofreading.value) return
@@ -147,29 +209,25 @@ async function publish(schedule = false) {
     }
     intent.value = schedule ? 'schedule' : 'publish'
     localError.value = ''
+    discardSuggestion()
     let beforePublication: ReturnType<typeof postPublicationSettings> | undefined
     let committed = false
     try {
         if (!(await ensureDraft())) return
-        if (!manualSlug.value || !manualExcerpt.value) {
-            const selection = postMetadataSelection(values.value, false)
-            proposalKind.value = 'publication'
-            await ai.run('publication', {
-                generateSlug: selection.slug,
-                generateExcerpt: selection.excerpt,
-            })
-            if (ai.error.value || ai.stale.value) return
-            if (
-                !ai.apply({
-                    fields: manualExcerpt.value ? [] : ['excerpt'],
-                    slug: !manualSlug.value,
-                })
-            )
-                return
-        } else {
-            // Choosing both manual fields explicitly publishes the current input.
-            ai.discard()
-        }
+        const candidate = await preparePostPublication(
+            { management, current: currentDraft },
+            async (props) => {
+                publicationInput.value = props
+                await publicationAction.execute()
+                if (publicationAction.error.value) throw publicationAction.error.value
+                if (!publicationAction.data.value)
+                    throw new Error('No publication suggestion was returned.')
+                return publicationAction.data.value
+            },
+        )
+        if (!manualExcerpt.value)
+            form.setFieldValue('excerpt', String(candidate.data.excerpt ?? ''))
+        if (!manualSlug.value) slug.value = candidate.slug
         beforePublication = postPublicationSettings(values.value)
         if (slug.value)
             form.setFieldValue('publication', { ...beforePublication, publishedSlug: slug.value })
@@ -179,6 +237,8 @@ async function publish(schedule = false) {
         saved.value = true
         await navigateTo('/admin/posts')
         if (!props.id) delete editor.drafts[newDraftIdentity]
+    } catch (error) {
+        aiError.value = actionFailure(error, 'Publication failed. Your draft is kept.')
     } finally {
         if (!committed && beforePublication) form.setFieldValue('publication', beforePublication)
         intent.value = null
@@ -369,7 +429,7 @@ async function upload(files: File | File[] | null | undefined) {
                             label="Discard Suggestion"
                             variant="ghost"
                             color="neutral"
-                            @click="ai.discard"
+                            @click="discardSuggestion"
                         />
                     </div>
                 </section>
