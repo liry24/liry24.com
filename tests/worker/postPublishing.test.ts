@@ -8,6 +8,7 @@ import { expect, test, vi } from 'vitest'
 import { effectScope } from 'vue'
 import type { createWorkersAI } from 'workers-ai-provider'
 
+import { unpublishPost } from '../../app/utils/postUnpublish'
 import { openDevelopmentDB } from '../../server/database/development'
 import * as schema from '../../server/database/schema'
 import { getWorkersAIModel } from '../../server/utils/workersAI'
@@ -357,6 +358,144 @@ test('automatic updates keep the published URL and schedules pin their candidate
         } finally {
             scope.stop()
         }
+    } finally {
+        f.close()
+    }
+})
+
+test('list unpublish preserves a migrated post public URL before its first new-editor publication', async () => {
+    const run = vi.fn(async () => completion({ excerpt: 'An introduction after republishing.' }))
+    const f = await fixture(run)
+    const scope = effectScope()
+    try {
+        let legacy = await f.admin.createEntry('posts', {
+            slug: 'former-public-url',
+            data: { title: 'Former title', content: '# Published content', tags: [] },
+        })
+        legacy = await f.admin.publishEntry(legacy.id, { expectedVersion: legacy.version })
+        legacy = await f.admin.updateEntry(legacy.id, {
+            expectedVersion: legacy.version,
+            slug: 'unpublished-draft-url',
+            data: { title: 'Changed title', content: '# Later draft', tags: ['draft'] },
+        })
+        expect(legacy.data.publication).toBeUndefined()
+        const descriptor = (await f.client.models()).models.posts!
+        const unpublished = await unpublishPost(f.client, descriptor, legacy)
+        expect(unpublished.version).toBe(legacy.version + 2)
+        const current = await f.admin.getEntry(legacy.id)
+        expect(current.publishedRevisionId).toBeNull()
+        expect(current.slug).toBe('unpublished-draft-url')
+        expect(current.data).toMatchObject({
+            title: 'Changed title',
+            content: '# Later draft',
+            tags: ['draft'],
+            publication: { slug: 'manual', excerpt: 'manual', publishedSlug: 'former-public-url' },
+        })
+        expect(await f.admin.getPublicEntry('posts', 'former-public-url')).toBeNull()
+        expect(f.model).not.toHaveBeenCalled()
+        const editor = scope.run(() =>
+            useSiteAdminForm({ descriptor, modelName: 'posts', client: f.client, entry: current }),
+        )!
+        editor.form.setFieldValue('publication', {
+            ...(current.data.publication as Record<string, unknown>),
+            slug: 'auto',
+            excerpt: 'auto',
+        })
+        await editor.ai.run('publication', { generateSlug: true, generateExcerpt: true })
+        expect(editor.ai.error.value).toBeNull()
+        expect(editor.ai.proposal.value?.slug).toBe('former-public-url')
+        expect(editor.ai.apply({ fields: ['excerpt'], slug: true })).toBe(true)
+        expect(await editor.publish()).toBeDefined()
+        expect((await f.admin.getPublicEntry('posts', 'former-public-url'))?.data.content).toBe(
+            '# Later draft',
+        )
+        expect(run).toHaveBeenCalledTimes(1)
+        const body = run.mock.calls[0]![1] as {
+            response_format: { json_schema: { schema: { properties: Record<string, unknown> } } }
+        }
+        expect(Object.keys(body.response_format.json_schema.schema.properties)).toEqual(['excerpt'])
+    } finally {
+        scope.stop()
+        f.close()
+    }
+})
+
+test.each(['missing revision', 'stale version', 'unauthorized'])(
+    'list unpublish fails closed on %s without losing the published pointer or current input',
+    async (failure) => {
+        const run = vi.fn(() => {
+            throw new Error('Unexpected inference')
+        })
+        const f = await fixture(run)
+        try {
+            let legacy = await f.admin.createEntry('posts', {
+                slug: 'former-public-url',
+                data: { title: 'Former title', content: '# Published content', tags: [] },
+            })
+            legacy = await f.admin.publishEntry(legacy.id, { expectedVersion: legacy.version })
+            const descriptor = (await f.client.models()).models.posts!
+            let input = legacy
+            if (failure === 'missing revision')
+                input = { ...legacy, publishedRevisionId: 'missing' }
+            if (failure === 'stale version') {
+                await f.admin.updateEntry(legacy.id, {
+                    expectedVersion: legacy.version,
+                    data: { ...legacy.data, content: '# Concurrent draft' },
+                })
+            }
+            if (failure === 'unauthorized') f.setAuthorized(false)
+            const before = await f.admin.getEntry(legacy.id)
+            await expect(unpublishPost(f.client, descriptor, input)).rejects.toMatchObject({
+                code:
+                    failure === 'unauthorized' ? 'SITE_ADMIN_AUTH_REQUIRED' : 'SITE_ADMIN_CONFLICT',
+            })
+            expect(await f.admin.getEntry(legacy.id)).toEqual(before)
+            expect(f.calls.some((call) => call.path.endsWith('/unpublish'))).toBe(false)
+            expect(run).not.toHaveBeenCalled()
+            expect(f.model).not.toHaveBeenCalled()
+        } finally {
+            f.close()
+        }
+    },
+)
+
+test('a concurrent edit between URL preservation and unpublish stays published', async () => {
+    const run = vi.fn(() => {
+        throw new Error('Unexpected inference')
+    })
+    const f = await fixture(run)
+    try {
+        let legacy = await f.admin.createEntry('posts', {
+            slug: 'former-public-url',
+            data: { title: 'Former title', content: '# Published content', tags: [] },
+        })
+        legacy = await f.admin.publishEntry(legacy.id, { expectedVersion: legacy.version })
+        const descriptor = (await f.client.models()).models.posts!
+        await expect(
+            unpublishPost(
+                {
+                    ...f.client,
+                    unpublishEntry: async (id, input) => {
+                        const saved = await f.admin.getEntry(id)
+                        await f.admin.updateEntry(id, {
+                            expectedVersion: saved.version,
+                            data: { ...saved.data, content: '# Concurrent draft' },
+                        })
+                        return f.client.unpublishEntry(id, input)
+                    },
+                },
+                descriptor,
+                legacy,
+            ),
+        ).rejects.toMatchObject({ code: 'SITE_ADMIN_CONFLICT' })
+        const current = await f.admin.getEntry(legacy.id)
+        expect(current.publishedRevisionId).toBe(legacy.publishedRevisionId)
+        expect(current.data.content).toBe('# Concurrent draft')
+        expect(current.data.publication).toMatchObject({ publishedSlug: 'former-public-url' })
+        expect((await f.admin.getPublicEntry('posts', 'former-public-url'))?.data.content).toBe(
+            '# Published content',
+        )
+        expect(run).not.toHaveBeenCalled()
     } finally {
         f.close()
     }

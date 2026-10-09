@@ -191,6 +191,43 @@ test('editorial output contains exactly the requested fields and a valid slug', 
     }
 })
 
+test.each([
+    ['nested link target', '[link](/posts/a(foo).png)', '[link](/posts/a(foo).jpg)'],
+    ['nested image target', '![image](/assets/a(foo).png)', '![image](/assets/a(foo).jpg)'],
+    ['indented code', 'Example:\n\n    one()\n    next()', 'Example:\n\n    two()\n    next()'],
+    ['multiline code span', 'Example `one()\nnext()`.', 'Example `two()\nnext()`.'],
+    ['code span whitespace', 'Example `one()\nnext()`.', 'Example `one() next()`.'],
+    ['multiple backticks', 'Example ``one(`x`)\nnext()``.', 'Example ``two(`x`)\nnext()``.'],
+    ['long fence', '````js\none()\n```\nnext()\n````', '````js\ntwo()\n```\nnext()\n````'],
+    [
+        'reference target',
+        '[link][a]\n\n[a]: /posts/a(foo).png',
+        '[link][a]\n\n[a]: /posts/a(foo).jpg',
+    ],
+    ['unused reference', '[unused]: /posts/a(foo).png', '[unused]: /posts/a(foo).jpg'],
+])('proofreading protects %s using native Markdown parsing', async (_name, content, changed) => {
+    const input = { ...draft, content }
+    const original = structuredClone(input)
+    const run = vi.fn(async () => proposal({ content: changed }))
+    await expect(proofreadPost(runtime(run), input)).rejects.toMatchObject({
+        code: 'SITE_ADMIN_AI_OUTPUT_INVALID',
+    })
+    expect(input).toEqual(original)
+    expect(run).toHaveBeenCalledTimes(1)
+})
+
+test('proofreading can edit prose around protected Markdown without changing its source', async () => {
+    const content =
+        'This are an example `one()\nnext()` with [a link](/posts/a(foo).png).\n\n    one()\n\n![image](site-admin:asset-one)\n\n[unused]: /posts/a(foo).png'
+    const corrected = content.replace('This are', 'This is')
+    const input = { ...draft, content }
+    const run = vi.fn(async () => proposal({ content: corrected }))
+    const result = await proofreadPost(runtime(run), input)
+    expect(result.data.content).toBe(corrected)
+    expect(input.content).toBe(content)
+    expect(run).toHaveBeenCalledTimes(1)
+})
+
 test('manual publication does not call AI, and automatic updates preserve a published slug', async () => {
     const ai = vi.fn(() => {
         throw new Error('AI has no balance')

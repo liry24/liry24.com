@@ -2,6 +2,8 @@ import { SiteAdminError } from '@liria24/site-admin'
 import type { SiteAdminAIActionInput, SiteAdminAIExecution } from '@liria24/site-admin/ai'
 
 import { Output, jsonSchema } from '#ai'
+import type { MarkdownExitPlugin } from '#comark'
+import { parseMarkdown } from '#comark/parse'
 
 import { postMetadataSelection, postPublicationSettings } from '../../shared/utils/postEditorial.ts'
 
@@ -148,12 +150,60 @@ export async function generatePostMetadata(ai: PostAIExecution | undefined, inpu
 
 // Proofreading must keep executable examples and link/asset targets intact.
 // A proposal that changes these tokens is rejected before the author sees it.
-function protectedMarkdown(content: string) {
-    return (
-        content.match(
-            /(^ {0,3}(?:`{3,}|~{3,})[^\n]*\n[\s\S]*?^ {0,3}(?:`{3,}|~{3,})[^\n]*$)|(`+[^`\n]*`+)|(\]\([^\n)]*\))|(^ {0,3}\[[^\]\n]+\]:[^\n]+$)|((?:https?:\/\/|site-admin:)[^\s<>\])]+)/gmu,
-        ) ?? []
-    )
+async function protectedMarkdown(content: string) {
+    const protectedValues: unknown[] = []
+    const inspect: MarkdownExitPlugin = (parser) => {
+        // Keep the exact source of code spans, including multiline whitespace.
+        // Native inline rules decide where each span starts and ends.
+        const getRules = parser.inline.ruler.getRules.bind(parser.inline.ruler)
+        parser.inline.ruler.getRules = (chain) =>
+            getRules(chain).map((rule) => (state, silent) => {
+                const start = state.pos
+                const tokenCount = state.tokens.length
+                const matched = rule(state, silent)
+                if (
+                    matched &&
+                    !silent &&
+                    state.tokens.length > tokenCount &&
+                    state.tokens.at(-1)?.type === 'code_inline'
+                )
+                    protectedValues.push(['code_inline', state.src.slice(start, state.pos)])
+                return matched
+            })
+        parser.core.ruler.after('inline', 'protect-editorial-markdown', (state) => {
+            const lines = state.src.split('\n')
+            const visit = (tokens: typeof state.tokens) => {
+                for (const token of tokens) {
+                    if (token.type === 'fence' || token.type === 'code_block')
+                        protectedValues.push([
+                            token.type,
+                            token.content,
+                            token.info,
+                            token.map ? lines.slice(...token.map).join('\n') : token.markup,
+                        ])
+                    if (token.type === 'link_open' || token.type === 'image')
+                        protectedValues.push([
+                            token.type,
+                            token.attrGet('href') ?? token.attrGet('src'),
+                            token.attrGet('title'),
+                        ])
+                    if (token.children) visit(token.children)
+                }
+            }
+            visit(state.tokens)
+            // Reference definitions remain protected even when currently unused.
+            protectedValues.push(['references', Object.entries(state.env.references ?? {}).sort()])
+        })
+    }
+    await parseMarkdown(content, {
+        registerDefaultPlugins: false,
+        autoClose: false,
+        autoUnwrap: false,
+        plugins: [{ name: 'protect-editorial-markdown', markdownItPlugins: [inspect] }],
+    })
+    // Literal asset references need protection even outside Markdown links.
+    protectedValues.push(content.match(/(?:https?:\/\/|site-admin:)[^\s<>]+/gu) ?? [])
+    return protectedValues
 }
 
 export async function proofreadPost(
@@ -173,10 +223,11 @@ export async function proofreadPost(
         { content: data.content },
         signal,
     )
-    if (
-        JSON.stringify(protectedMarkdown(data.content)) !==
-        JSON.stringify(protectedMarkdown(output.content!))
-    )
+    const [before, after] = await Promise.all([
+        protectedMarkdown(data.content),
+        protectedMarkdown(output.content!),
+    ])
+    if (JSON.stringify(before) !== JSON.stringify(after))
         throw new SiteAdminError(
             'SITE_ADMIN_AI_OUTPUT_INVALID',
             'The suggestion changed code or link targets. Your content is kept.',

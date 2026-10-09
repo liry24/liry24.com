@@ -84,9 +84,15 @@ async function edit(data?: EntryRecord) {
 }
 defineShortcuts({ n: () => edit() })
 async function operation(entry: EntryRecord, action: string, extra: Record<string, unknown> = {}) {
+    if (busy.value) return
     busy.value = true
     failure.value = ''
     try {
+        if (modelName === 'posts' && action === 'unpublish') {
+            await unpublishPost(management, descriptor!, entry)
+            await refresh()
+            return
+        }
         await $fetch(
             `/api/site-admin/entries/${encodeURIComponent(entry.id)}${action === 'delete' ? '' : `/${action}`}`,
             {
