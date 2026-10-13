@@ -221,6 +221,17 @@ export function createDatabase(event) {
                 types: ['@cloudflare/workers-types'],
             },
         },
+        nodeTsConfig: {
+            compilerOptions: {
+                paths: {
+                    // Nuxt 4.6 typechecks this file with moduleResolution nodenext and maps
+                    // nitropack/types onto a concrete declaration. nitropack's presets entry
+                    // re-exports without a file extension, so nodenext drops preset keys such
+                    // as cloudflare. Load the declaration that defines those keys.
+                    'nitropack/presets': ['../node_modules/nitropack/dist/presets/_types.gen.d.ts'],
+                },
+            },
+        },
     },
 
     app: {
