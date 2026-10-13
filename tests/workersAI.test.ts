@@ -1,4 +1,4 @@
-import { createSiteAdminAI } from '@liria24/site-admin/ai'
+import { executeSiteAdminAiAction } from '@liria24/site-admin/ai'
 import { afterEach, expect, test, vi } from 'vitest'
 import type { createWorkersAI } from 'workers-ai-provider'
 
@@ -24,10 +24,11 @@ const gateway = vi.fn(() => {
     throw new Error('Unexpected gateway transport or experimental resume')
 })
 const context = (run: ReturnType<typeof vi.fn>) => ({
+    actor: { id: 'workers-ai-test', roles: ['admin'] },
     platformContext: { cloudflare: { env: { AI: { run, gateway } as unknown as Binding } } },
 })
-const runtime = (run: ReturnType<typeof vi.fn>) =>
-    createSiteAdminAI(getWorkersAIModel, context(run))
+const execute = (name: 'metadata' | 'proofread', run: ReturnType<typeof vi.fn>, props: unknown) =>
+    executeSiteAdminAiAction(config, name, { props }, context(run))
 // Mock the binding's raw OpenAI Chat Completions response. The official adapter
 // parses it; application code does not translate JSON, finish reasons or usage.
 const proposal = (data: Record<string, string>) =>
@@ -66,21 +67,17 @@ test('SDK v4 structured proposals use per-operation AI.run and the default Gatew
         modelId: 'gpt-6-luna',
     })
     const input = structuredClone(draft)
-    const metadata = await runtime(first).generateMetadata('posts', config.models.posts, {
+    const metadata = await execute('metadata', first, {
         data: input,
         generate: { slug: true, excerpt: true },
     })
     expect(metadata).toEqual({
-        data: { ...draft, excerpt: '記事の概要。' },
+        data: { excerpt: '記事の概要。' },
         slug: 'test-post',
         issues: [],
     })
-    const proofread = await runtime(second).proofreadDraft('posts', config.models.posts, {
-        data: input,
-        fields: ['content'],
-    })
-    expect(proofread.data).toEqual({ ...draft, content: 'これは校正した原稿です。' })
-    expect(proofread.issues).toEqual([])
+    const proofread = await execute('proofread', second, { data: input, fields: ['content'] })
+    expect(proofread).toEqual({ data: { content: 'これは校正した原稿です。' }, issues: [] })
     expect(input).toEqual(draft)
     for (const [run, fields] of [
         [first, ['slug', 'excerpt']],
@@ -108,15 +105,15 @@ test('SDK v4 structured proposals use per-operation AI.run and the default Gatew
     expect(fetch).not.toHaveBeenCalled()
 })
 
-test('selected metadata keeps manual fields and does not mutate the submitted draft', async () => {
+test('selected metadata returns only generated fields and does not mutate the submitted draft', async () => {
     const run = vi.fn(async () => proposal({ slug: 'generated-slug' }))
     const input = { ...structuredClone(draft), excerpt: '手動の概要。' }
     const original = structuredClone(input)
-    const result = await runtime(run).generateMetadata('posts', config.models.posts, {
+    const result = await execute('metadata', run, {
         data: input,
         generate: { slug: true, excerpt: false },
     })
-    expect(result).toEqual({ data: original, slug: 'generated-slug', issues: [] })
+    expect(result).toEqual({ data: {}, slug: 'generated-slug', issues: [] })
     expect(input).toEqual(original)
     expect(run).toHaveBeenCalledTimes(1)
 })
@@ -126,20 +123,16 @@ test('manual metadata bypasses AI, and unavailable AI leaves the draft intact', 
         throw new Error('Unavailable model')
     })
     const input = structuredClone(draft)
-    const ai = runtime(run)
-    expect(
-        await ai.generateMetadata('posts', config.models.posts, {
+    await expect(
+        execute('metadata', run, {
             data: input,
             slug: 'manual-slug',
             generate: { slug: false, excerpt: false },
         }),
-    ).toEqual({ data: draft, slug: 'manual-slug', issues: [] })
+    ).rejects.toMatchObject({ code: 'SITE_ADMIN_INVALID_INPUT' })
     expect(run).not.toHaveBeenCalled()
     await expect(
-        ai.generateMetadata('posts', config.models.posts, {
-            data: input,
-            generate: { slug: true, excerpt: true },
-        }),
+        execute('metadata', run, { data: input, generate: { slug: true, excerpt: true } }),
     ).rejects.toMatchObject({ code: 'SITE_ADMIN_AI_FAILED' })
     expect(run).toHaveBeenCalledTimes(1)
     expect(input).toEqual(draft)

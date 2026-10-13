@@ -11,6 +11,8 @@ import {
     url,
 } from '@liria24/site-admin'
 
+import { editorialActions } from './server/utils/editorialAi.ts'
+
 export default defineSiteAdminConfig({
     storage: {
         content: {
@@ -41,6 +43,7 @@ export default defineSiteAdminConfig({
             const { getWorkersAIModel } = await import('./server/utils/workersAI.ts')
             return getWorkersAIModel(context)
         },
+        actions: editorialActions,
     },
     seo: { titleTemplate: '%s | Liry24' },
     routeRules: {

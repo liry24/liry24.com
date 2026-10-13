@@ -71,14 +71,16 @@ try {
         .run(id, token, id, now + 3600000, now, now)
     await request('/api/site-admin/models', { authenticated: false, status: 401 })
     for (const action of ['metadata', 'proofread'])
-        await request(`/api/site-admin/models/posts/ai/${action}`, {
+        await request(`/api/site-admin/ai/actions/${action}`, {
             authenticated: false,
             method: 'POST',
             status: 401,
             body: {
-                data: { title: 'Unauthorized', content: 'Draft', tags: [] },
-                generate: { slug: true, excerpt: true },
-                fields: ['content'],
+                props: {
+                    data: { title: 'Unauthorized', content: 'Draft', tags: [] },
+                    generate: { slug: true, excerpt: true },
+                    fields: ['content'],
+                },
             },
         })
     if (!apiOnly)
@@ -658,7 +660,7 @@ try {
             let metadataCalls = 0
             let metadataBody
             let failMetadata = true
-            await page.route('**/api/site-admin/models/posts/ai/metadata', async (route) => {
+            await page.route('**/api/site-admin/ai/actions/metadata', async (route) => {
                 metadataCalls++
                 metadataBody = route.request().postDataJSON()
                 await new Promise((resolve) => setTimeout(resolve, 200))
@@ -675,7 +677,7 @@ try {
                               }
                             : {
                                   data: {
-                                      ...metadataBody.data,
+                                      ...metadataBody.props.data,
                                       title: 'Must not replace title',
                                       content: 'Must not replace content',
                                       excerpt: 'Generated excerpt',
@@ -688,21 +690,21 @@ try {
             })
             await page.getByRole('button', { name: 'Save Draft', exact: true }).click()
             await page.getByText('Synthetic AI failure', { exact: true }).waitFor()
-            assert.deepEqual(metadataBody.generate, { slug: true, excerpt: true })
+            assert.deepEqual(metadataBody.props.generate, { slug: true, excerpt: true })
             assert.equal(await titleInput.inputValue(), 'Browser create draft')
             assert.equal(await contentInput.inputValue(), original)
 
             let proofreadingCalls = 0
             let invalidProofreading = false
-            await page.route('**/api/site-admin/models/posts/ai/proofread', async (route) => {
+            await page.route('**/api/site-admin/ai/actions/proofread', async (route) => {
                 proofreadingCalls++
                 const body = route.request().postDataJSON()
-                assert.deepEqual(body.fields, ['content'])
+                assert.deepEqual(body.props.fields, ['content'])
                 await route.fulfill({
                     contentType: 'application/json',
                     body: JSON.stringify({
                         data: {
-                            ...body.data,
+                            ...body.props.data,
                             content: invalidProofreading
                                 ? ''
                                 : '# Corrected content\n\nA suggestion.',
@@ -763,14 +765,12 @@ try {
                 'Manual excerpt',
             )
             await page.getByLabel('Slug', { exact: true }).fill('')
-            const invalidSlug = page.waitForResponse(
-                (response) =>
-                    response.url().endsWith('/api/site-admin/entries/posts') &&
-                    response.request().method() === 'POST',
-            )
             await page.getByRole('button', { name: 'Save Draft', exact: true }).click()
-            assert.equal((await invalidSlug).status(), 400)
+            await page
+                .getByText('Enter a slug before saving this draft.', { exact: true })
+                .waitFor()
             assert.equal(metadataCalls, 1)
+            assert.match(page.url(), /\/admin\/posts\/new$/)
             assert.equal(await page.getByLabel('Slug', { exact: true }).inputValue(), '')
             assert.equal(await contentInput.inputValue(), '# Corrected content\n\nA suggestion.')
             await page.getByLabel('Slug', { exact: true }).fill(`${id}-browser-new`)
@@ -802,8 +802,8 @@ try {
                 await page.waitForURL('**/admin/posts')
                 assert.equal(metadataCalls, 2)
                 assert.equal(createCalls, 1)
-                assert.deepEqual(metadataBody.generate, { slug: false, excerpt: true })
-                assert.equal(metadataBody.slug, `${id}-browser-new`)
+                assert.deepEqual(metadataBody.props.generate, { slug: false, excerpt: true })
+                assert.equal(metadataBody.props.slug, `${id}-browser-new`)
                 const stored = await request(`/api/site-admin/entries/${newEntry.id}`)
                 assert.equal(stored.slug, `${id}-browser-new`)
                 assert.equal(stored.data.title, 'Browser create draft')
