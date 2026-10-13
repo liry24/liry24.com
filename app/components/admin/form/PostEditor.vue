@@ -18,21 +18,37 @@ const values = useSelector(form.atom, (state) => state.values)
 const saving = useSelector(form.atom, (state) => state.isSubmitting)
 const restored = ref(dirty.value)
 const { slug } = editor.metadata
-const manualSlug = computed({
-    get: () => editor.metadata.modes.value.slug === 'manual',
-    set: (value) => editor.metadata.setMode('slug', value ? 'manual' : 'auto'),
+// Session drafts no longer store generation choices. Keep them for this tab's client navigations.
+const manualModes = useState<Record<string, { excerpt: boolean; slug: boolean }>>(
+    'admin-post-metadata-modes',
+    () => ({}),
+)
+const modesFor = (identity: string) =>
+    manualModes.value[identity] ??
+    (props.id ? { excerpt: true, slug: true } : { excerpt: false, slug: false })
+const manualSlug = ref(modesFor(editor.identity.value).slug)
+const manualExcerpt = ref(modesFor(editor.identity.value).excerpt)
+watch(editor.identity, (identity) => {
+    const modes = modesFor(identity)
+    manualSlug.value = modes.slug
+    manualExcerpt.value = modes.excerpt
 })
-const manualExcerpt = computed({
-    get: () => editor.metadata.modes.value.excerpt === 'manual',
-    set: (value) => editor.metadata.setMode('excerpt', value ? 'manual' : 'auto'),
+watch([manualSlug, manualExcerpt], () => {
+    manualModes.value = {
+        ...manualModes.value,
+        [editor.identity.value]: { excerpt: manualExcerpt.value, slug: manualSlug.value },
+    }
 })
 const content = computed(() => values.value.content)
 const { proposal, stale: proposalStale } = ai
 const proofreading = computed(() => ai.busy.value === 'proofread')
+const generatingMetadata = computed(() => ai.busy.value === 'metadata')
+const localError = ref('')
 const busy = computed(
     () => saving.value || uploading.value || loading.value || ai.busy.value !== null,
 )
 const errorMessage = computed(() => {
+    if (localError.value) return localError.value
     const cause =
         serverError.value || ai.error.value || loadError.value || editor.callbackError.value
     return cause instanceof Error ? cause.message : serverError.value?.message
@@ -51,8 +67,38 @@ useEventListener('beforeunload', (event) => {
     event.returnValue = ''
 })
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+function draftData(): Record<string, unknown> {
+    const data: unknown = JSON.parse(JSON.stringify(values.value))
+    if (!isRecord(data)) throw new Error('Post draft must be an object.')
+    return data
+}
 async function save() {
     if (busy.value || conflict.value || loadError.value) return
+    if (manualSlug.value && slug.value === '') {
+        localError.value = 'Enter a slug before saving this draft.'
+        return
+    }
+    localError.value = ''
+    const generate = { excerpt: !manualExcerpt.value, slug: !manualSlug.value }
+    if (generate.slug || generate.excerpt) {
+        await ai.run('metadata', {
+            data: draftData(),
+            generate,
+            ...(manualSlug.value ? { slug: slug.value } : {}),
+        })
+        if (ai.error.value || !proposal.value) return
+        const applied = ai.apply({
+            fields: generate.excerpt ? ['excerpt'] : [],
+            slug: generate.slug,
+        })
+        if (!applied) {
+            ai.discard()
+            localError.value = 'AI returned an invalid metadata proposal.'
+            return
+        }
+    }
     await form.handleSubmit()
 }
 function submit() {
@@ -64,11 +110,11 @@ function submit() {
 async function proofread() {
     if (busy.value || !content.value.trim()) return
     originalContent.value = content.value
-    await ai.proofread(['content'])
+    await ai.run('proofread', { data: draftData(), fields: ['content'] })
 }
 function applyProofreading() {
     if (busy.value || invalidProposal.value) return
-    ai.apply()
+    ai.apply({ fields: ['content'], slug: false })
 }
 async function upload(files: File | File[] | null | undefined) {
     if (!files || busy.value) return
@@ -103,7 +149,7 @@ async function upload(files: File | File[] | null | undefined) {
                 label="Save Draft"
                 icon="mingcute:save-line"
                 color="neutral"
-                :loading="saving"
+                :loading="saving || generatingMetadata"
                 :disabled="busy || conflict || Boolean(loadError)"
             />
         </template>

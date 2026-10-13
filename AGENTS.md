@@ -18,5 +18,6 @@
   Bun install. Merge the Preview exclusions on both `dev` and default `main` before the owner
   enables the selected-repository Renovate App; delete events read the default-branch workflow.
   Default `main` must contain `renovate.json`, targeting `dev` with `useBaseBranchConfig: merge`.
-  Updating patched packages requires patch rebase/retirement and regression checks. Preserve
-  the Site Admin pkg.pr.new source until a separately reviewed migration.
+  Updating patched packages requires patch rebase/retirement and regression checks. Keep
+  `@liria24/site-admin` on its published pkg.pr.new build. Metadata and proofreading are
+  application-owned `ai.actions`; keep that field policy aligned with the posts model.

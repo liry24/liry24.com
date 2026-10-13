@@ -1,4 +1,4 @@
-import { relative } from 'node:path'
+import { relative, resolve } from 'node:path'
 
 import { createSiteAdminDependencyTypePaths } from '@liria24/site-admin/dependency-aliases'
 import { defineNuxtConfig } from 'nuxt/config'
@@ -96,18 +96,18 @@ export default defineNuxtConfig({
                     Object.assign((nodeTsConfig.compilerOptions.paths ??= {}), paths)
                 })
             })
-            // The application supplies Better Auth's adapter for the current request.
+            // A configured Site Admin database adapter is not prepared before Better Auth.
+            // Resolve the same application connection directly for each auth request.
             nuxt.hook('better-auth:database:providers', (providers) => {
+                const authDatabase = resolve(nuxt.options.rootDir, 'server/utils/authDatabase.ts')
                 providers.liry24 = {
                     priority: 1000,
                     isEnabled: () => true,
                     buildDatabaseCode:
-                        () => `import { useSiteAdminRuntime } from '@liria24/site-admin/nuxt/server'
+                        () => `import { createAuthDatabase } from ${JSON.stringify(authDatabase)}
 export const db = undefined
 export function createDatabase(event) {
-    const database = useSiteAdminRuntime().authDatabase?.(event?.context)
-    if (!database) throw new Error('Application auth database is not initialized')
-    return database
+    return createAuthDatabase(event)
 }`,
                 }
             })
