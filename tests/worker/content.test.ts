@@ -66,13 +66,13 @@ test('application-owned D1 uses explicit migration and preserves scheduled revis
                 title: 'B',
                 content: '# B',
                 tags: [],
-                publication: { slug: 'auto', excerpt: 'manual', publishedSlug: 'worker-test' },
+                publication: { slug: 'auto', publishedSlug: 'worker-test' },
             },
         },
     })
     const revisionB = entry.scheduledRevisionId
     expect(entry.currentRevisionId).toBe(revisionB)
-    expect(entry.data.publication).toMatchObject({ slug: 'auto', excerpt: 'manual' })
+    expect(entry.data.publication).toMatchObject({ slug: 'auto' })
     const oldVersion = entry.version
     entry = await admin.updateEntry(entry.id, {
         expectedVersion: entry.version,

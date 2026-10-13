@@ -7,7 +7,7 @@ import { effectScope } from 'vue'
 
 import { openDevelopmentDB } from '../../server/database/development'
 import * as schema from '../../server/database/schema'
-import { postMetadataModes, postMetadataSelection } from '../../shared/utils/postEditorial'
+import { postGeneratesSlug, postPublicationSettings } from '../../shared/utils/postEditorial'
 import config from '../../site-admin.config'
 
 test('draft form persists automatic choices without AI or a public route and keeps conflicts', async () => {
@@ -18,14 +18,9 @@ test('draft form persists automatic choices without AI or a public route and kee
     })
     const paths: string[] = []
     const admin = createSiteAdmin({
-        config,
+        config: { ...config, ai: { ...config.ai, model: ai } },
         database: drizzleAdapter(local.database, { schema }),
         authorize: () => ({ id: 'synthetic-post-admin', roles: ['admin'] }),
-        aiEnabled: true,
-        aiRuntime: async () => {
-            ai()
-            throw new Error('AI has no balance')
-        },
     })
     const client = createSiteAdminManagementClient({
         origin: 'http://synthetic.invalid',
@@ -46,7 +41,7 @@ test('draft form persists automatic choices without AI or a public route and kee
                     title: 'Synthetic post',
                     content: '# Unsaved body',
                     tags: [],
-                    publication: { slug: 'auto', excerpt: 'auto' },
+                    publication: { slug: 'auto' },
                 },
             }),
         )!
@@ -56,7 +51,7 @@ test('draft form persists automatic choices without AI or a public route and kee
         const first = await admin.getEntry(id)
         expect(first.data).toMatchObject({
             content: '# Unsaved body',
-            publication: { slug: 'auto', excerpt: 'auto' },
+            publication: { slug: 'auto' },
         })
         expect(first.publishedRevisionId).toBeNull()
         expect(await admin.getPublicEntry('posts', first.slug)).toBeNull()
@@ -72,14 +67,12 @@ test('draft form persists automatic choices without AI or a public route and kee
             }),
         )!
         controller.form.setFieldValue('content', '# Changed body')
-        controller.form.setFieldValue('publication', { slug: 'auto', excerpt: 'manual' })
-        controller.form.setFieldValue('excerpt', 'An introduction in my voice.')
+        controller.form.setFieldValue('publication', { slug: 'manual' })
         await controller.form.handleSubmit()
         const saved = await admin.getEntry(id)
         expect(saved.data).toMatchObject({
             content: '# Changed body',
-            publication: { slug: 'auto', excerpt: 'manual' },
-            excerpt: 'An introduction in my voice.',
+            publication: { slug: 'manual' },
         })
         controller.form.setFieldValue('content', '# Local text that must survive')
         await admin.updateEntry(id, {
@@ -103,14 +96,9 @@ test('legacy drafts and published revisions retain metadata when no selection wa
         throw new Error('AI has no balance')
     })
     const admin = createSiteAdmin({
-        config,
+        config: { ...config, ai: { ...config.ai, model: ai } },
         database: drizzleAdapter(local.database, { schema }),
         authorize: () => ({ id: 'synthetic-legacy-admin', roles: ['admin'] }),
-        aiEnabled: true,
-        aiRuntime: async () => {
-            ai()
-            throw new Error('AI has no balance')
-        },
     })
     const client = createSiteAdminManagementClient({
         origin: 'http://synthetic.invalid',
@@ -125,18 +113,14 @@ test('legacy drafts and published revisions retain metadata when no selection wa
                     title: 'Existing post',
                     content: '# Existing content',
                     tags: [],
-                    excerpt: 'The author’s existing introduction.',
                 },
             })
             if (published)
                 entry = await admin.publishEntry(entry.id, { expectedVersion: entry.version })
             const publicRevision = entry.publishedRevisionId
             const loaded = await client.getEntry(entry.id)
-            expect(postMetadataModes(loaded.data)).toEqual({ slug: 'manual', excerpt: 'manual' })
-            expect(postMetadataSelection(loaded.data, published)).toEqual({
-                slug: false,
-                excerpt: false,
-            })
+            expect(postPublicationSettings(loaded.data)).toEqual({ slug: 'manual' })
+            expect(postGeneratesSlug(loaded.data, published)).toBe(false)
             const controller = scope.run(() =>
                 useSiteAdminForm({
                     descriptor,
@@ -146,12 +130,10 @@ test('legacy drafts and published revisions retain metadata when no selection wa
                 }),
             )!
             expect(controller.metadata.slug.value).toBe(entry.slug)
-            expect(controller.form.state.values.excerpt).toBe('The author’s existing introduction.')
             controller.form.setFieldValue('title', 'Edited title')
             await controller.form.handleSubmit()
             const saved = await admin.getEntry(entry.id)
             expect(saved.slug).toBe(entry.slug)
-            expect(saved.data.excerpt).toBe(entry.data.excerpt)
             expect(saved.publishedRevisionId).toBe(publicRevision)
             if (published)
                 expect((await admin.getPublicEntry('posts', entry.slug))?.data.title).toBe(
@@ -179,7 +161,6 @@ test('an implicit slug on a directly published model retains the non-AI title fa
         },
         database: drizzleAdapter(local.database, { schema }),
         authorize: () => ({ id: 'synthetic-work-admin', roles: ['admin'] }),
-        aiEnabled: true,
     })
     const client = createSiteAdminManagementClient({
         origin: 'http://synthetic.invalid',

@@ -1,19 +1,16 @@
 import { afterEach, expect, test, vi } from 'vitest'
 
-import { postMetadataOutput } from '../server/utils/postEditorial'
 import { mockPostActions, postActionRequest, postActionResponse } from './helpers/postAi'
 
 const draft = { title: '日本語投稿', content: 'これは原稿です。', tags: [] }
 const metadataProps = {
     title: draft.title,
     content: draft.content,
-    generateSlug: true,
-    generateExcerpt: true,
 }
 
 afterEach(() => vi.unstubAllGlobals())
 
-test('native Output uses direct OpenAI Responses with the requested fields and preserves input', async () => {
+test('native Output generates only a slug through the unchanged provider and preserves input', async () => {
     const external = vi.fn(() => {
         throw new Error('Unexpected external request')
     })
@@ -23,19 +20,19 @@ test('native Output uses direct OpenAI Responses with the requested fields and p
         requests.push(await postActionRequest(input, init))
         return postActionResponse(
             requests.length === 1
-                ? { slug: 'test-post', excerpt: '記事の紹介。' }
+                ? { slug: 'test-post' }
                 : { content: 'これは校正された原稿です。' },
         )
     })
     const actions = mockPostActions(fetch)
     const input = structuredClone(metadataProps)
-    expect(await actions.publication(input)).toEqual({ slug: 'test-post', excerpt: '記事の紹介。' })
+    expect(await actions.publication(input)).toEqual({ slug: 'test-post' })
     expect(await actions.proofread({ content: input.content })).toEqual({
         content: 'これは校正された原稿です。',
     })
     expect(input).toEqual(metadataProps)
     expect(fetch).toHaveBeenCalledTimes(2)
-    for (const [index, fields] of [['slug', 'excerpt'], ['content']].entries()) {
+    for (const [index, fields] of [['slug'], ['content']].entries()) {
         const request = requests[index]!
         expect(request.url).toBe('https://api.openai.com/v1/responses')
         expect(request.body.model).toBe('gpt-6-luna')
@@ -48,33 +45,27 @@ test('native Output uses direct OpenAI Responses with the requested fields and p
     expect(external).not.toHaveBeenCalled()
 })
 
-test('selected metadata has no rewrite or manual field in its native output', async () => {
+test('slug output does not contain rewritten content or a generated introduction', async () => {
     const fetch = vi.fn(async () => postActionResponse({ slug: 'generated-slug' }))
-    const input = { ...metadataProps, generateExcerpt: false }
+    const input = { ...metadataProps }
     const original = structuredClone(input)
     expect(await mockPostActions(fetch).publication(input)).toEqual({ slug: 'generated-slug' })
     expect(input).toEqual(original)
     expect(fetch).toHaveBeenCalledTimes(1)
-    expect(() => postMetadataOutput({ ...input, generateSlug: false })).toThrow('Select metadata')
 })
 
-test('metadata validates exact fields, slug shape, excerpt size, and incomplete responses', async () => {
+test('slug generation validates exact fields and shape and rejects incomplete responses', async () => {
     for (const output of [
         { slug: 'bad/slug' },
         { slug: 'valid-slug', content: 'Unexpected rewrite' },
+        { slug: 'valid-slug', excerpt: 'Unexpected introduction' },
         { slug: '' },
         { slug: 'a'.repeat(81) },
     ]) {
         const fetch = vi.fn(async () => postActionResponse(output))
-        await expect(
-            mockPostActions(fetch).publication({ ...metadataProps, generateExcerpt: false }),
-        ).rejects.toThrow()
+        await expect(mockPostActions(fetch).publication(metadataProps)).rejects.toThrow()
         expect(fetch).toHaveBeenCalledTimes(1)
     }
-    const excerpt = vi.fn(async () => postActionResponse({ excerpt: 'x'.repeat(281) }))
-    await expect(
-        mockPostActions(excerpt).publication({ ...metadataProps, generateSlug: false }),
-    ).rejects.toThrow()
     const incomplete = vi.fn(async () =>
         postActionResponse({ content: 'A complete-looking answer.' }, true),
     )
@@ -268,4 +259,24 @@ test('proofreading can edit surrounding prose while preserving raw HTML tokens',
     expect(result.content).toBe(corrected)
     expect(input.content).toBe(content)
     expect(run).toHaveBeenCalledTimes(1)
+})
+
+test('proofreading retains an explicit summary boundary and its blank lines', async () => {
+    const content =
+        'This are an introduction with [a link](/posts/example).\n\n<!-- more -->\n\nThe rest has `one()`.\n\nA final paragraph.'
+    const corrected = content.replace('This are', 'This is')
+    const run = vi.fn(async () => postActionResponse({ content: corrected }))
+    expect(await mockPostActions(run).proofread({ content })).toEqual({ content: corrected })
+    for (const changed of [
+        corrected.replace('<!-- more -->', ''),
+        corrected.replace('<!-- more -->', '<!-- other -->'),
+        corrected.replace('\n\n<!-- more -->\n\n', '\n<!-- more -->\n'),
+        corrected
+            .replace('\n\n<!-- more -->', '')
+            .replace('\n\nA final', '\n\n<!-- more -->\n\nA final'),
+    ]) {
+        const invalid = vi.fn(async () => postActionResponse({ content: changed }))
+        await expect(mockPostActions(invalid).proofread({ content })).rejects.toThrow()
+        expect(invalid).toHaveBeenCalledTimes(1)
+    }
 })

@@ -101,12 +101,10 @@ export default defineNuxtConfig({
                     priority: 1000,
                     isEnabled: () => true,
                     buildDatabaseCode:
-                        () => `import { useSiteAdminRuntime } from '@liria24/site-admin/nuxt/server'
+                        () => `import { getAuthDatabase } from '~~/server/utils/database'
 export const db = undefined
 export function createDatabase(event) {
-    const database = useSiteAdminRuntime().authDatabase?.(event?.context)
-    if (!database) throw new Error('Application auth database is not initialized')
-    return database
+    return getAuthDatabase(event)
 }`,
                 }
             })
@@ -190,8 +188,8 @@ export function createDatabase(event) {
                 // Nuxt 4.6 renderer subpaths contain stubs that Nitro replaces during bundling.
                 'nuxt/internal',
                 // A predicate takes precedence over Nitro-dev's external build directory.
-                // Bundle generated auth modules so their public dependency aliases resolve,
-                // and the database provider shares the current Site Admin runtime.
+                // Bundle generated auth modules so their public dependency aliases
+                // and application-owned database factory resolve.
                 (id: string) =>
                     /\/(?:better-auth\/database|site-admin\/better-auth-server-plugin)\.mjs$/.test(
                         id.replaceAll('\\', '/'),

@@ -1,3 +1,4 @@
+import { drizzleAdapter as authAdapter } from '@better-auth/drizzle-adapter/relations-v2'
 import type { D1Database } from '@cloudflare/workers-types'
 import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
 import type { SiteAdminDatabaseContext } from '@liria24/site-admin/runtime/database'
@@ -8,6 +9,7 @@ import * as schema from '../database/schema.ts'
 import { getCloudflareEnvironment } from './cloudflareContext.ts'
 
 const adapters = new WeakMap<Database, ReturnType<typeof drizzleAdapter>>()
+const authAdapters = new WeakMap<Database, ReturnType<typeof authAdapter>>()
 
 export const useDB = (event?: Pick<RequestEvent, 'context'>, platformContext?: object) => {
     if (import.meta.dev && !import.meta.prerender) {
@@ -33,6 +35,21 @@ export const getSiteAdminDatabase = ({ event, platformContext }: SiteAdminDataba
     if (!adapter) {
         adapter = drizzleAdapter(database, { schema })
         adapters.set(database, adapter)
+    }
+    return adapter
+}
+
+export const getAuthDatabase = (event?: Pick<RequestEvent, 'context'>) => {
+    const database = useDB(event)
+    let adapter = authAdapters.get(database)
+    if (!adapter) {
+        adapter = authAdapter(database, {
+            provider: 'sqlite',
+            schema,
+            transaction: false,
+            usePlural: true,
+        })
+        authAdapters.set(database, adapter)
     }
     return adapter
 }
