@@ -57,10 +57,13 @@ const select = (index: number) => {
         </UCarousel>
 
         <div class="mx-auto flex gap-2">
-            <div
+            <button
                 v-for="(item, index) in data"
                 :key="index"
-                class="opacity-25 transition-opacity hover:opacity-100"
+                type="button"
+                :aria-label="`View image ${index + 1}${item.alt ? `: ${item.alt}` : ''}`"
+                :aria-pressed="activeIndex === index"
+                class="rounded-lg opacity-25 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-4"
                 :class="{ 'opacity-100': activeIndex === index }"
                 @click="select(index)"
             >
@@ -71,7 +74,7 @@ const select = (index: number) => {
                     :height="48"
                     class="size-12 cursor-pointer rounded-lg object-cover"
                 />
-            </div>
+            </button>
         </div>
     </div>
 </template>

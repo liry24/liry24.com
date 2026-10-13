@@ -30,11 +30,7 @@ useSeo(() => entry.value?.seo)
 <template>
     <UPage v-if="data" :ui="{ center: 'flex flex-col gap-6 items-center' }">
         <UContainer class="flex max-w-4xl flex-col items-center gap-6">
-            <h1
-                :initial="{ opacity: 0 }"
-                :animate="{ opacity: 1 }"
-                class="text-center text-4xl font-bold"
-            >
+            <h1 class="text-center text-4xl font-bold">
                 {{ data.title }}
             </h1>
 

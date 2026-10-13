@@ -2,6 +2,7 @@
 import { serializeSiteAdminData } from '@liria24/site-admin/client'
 import { useSelector } from '@tanstack/vue-form'
 import { postPublicationSettings } from '~~/shared/utils/postEditorial'
+import { postMarkdownSecurity } from '~~/shared/utils/postMarkdown'
 
 import type { PostEditorialProposal, PostSlugInput } from '~/utils/postEditorialFlow'
 import {
@@ -359,7 +360,7 @@ async function upload(files: File | File[] | null | undefined) {
                         <Suspense>
                             <Markdown
                                 :value="content"
-                                :options="{ registerDefaultPlugins: false }"
+                                :plugins="[postMarkdownSecurity]"
                                 class="sentence wrap-break-word *:first:mt-0 *:last:mb-0"
                             />
                         </Suspense>

@@ -21,8 +21,10 @@ import {
     postProofreadingOutput,
     postProofreadingPrompt,
 } from './server/utils/postEditorial.ts'
+import { postMarkdownSecurity } from './shared/utils/postMarkdown.ts'
 
 export default defineSiteAdminConfig({
+    markdown: { plugins: [postMarkdownSecurity] },
     storage: {
         content: {
             adapter: 'r2',
