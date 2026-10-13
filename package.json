@@ -26,7 +26,7 @@
         "@formkit/drag-and-drop": "^0.6.1",
         "@iconify-json/mingcute": "^1.2.8",
         "@iconify-json/simple-icons": "^1.2.100",
-        "@liria24/site-admin": "https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@863671d",
+        "@liria24/site-admin": "https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@e1d9d00",
         "@nuxt/image": "^2.1.0",
         "@nuxt/ui": "^4.11.3",
         "@takumi-rs/core": "2.15.2",
@@ -68,7 +68,6 @@
     },
     "packageManager": "bun@1.4.2",
     "patchedDependencies": {
-        "nuxt@4.6.1": "patches/nuxt@4.6.1.patch",
         "better-auth@1.7.7": "patches/better-auth@1.7.7.patch",
         "better-call@1.4.0": "patches/better-call@1.4.0.patch",
         "nuxtseo-layer-devtools@5.3.16": "patches/nuxtseo-layer-devtools@5.3.16.patch",
