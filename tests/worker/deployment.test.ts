@@ -43,6 +43,7 @@ test('Nitro owns production settings and preserves infrastructure and required s
     expect(rawConfig.ai).toBeUndefined()
     expect(rawConfig.secrets?.required).toEqual([
         'BETTER_AUTH_SECRET',
+        'NUXT_APP_SECRET',
         'GITHUB_CLIENT_ID',
         'GITHUB_CLIENT_SECRET',
         'VERCEL_CLIENT_ID',

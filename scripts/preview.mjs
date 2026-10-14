@@ -4,7 +4,7 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 
-import { previewTarget, repository, workerName } from './preview-target.mjs'
+import { previewTarget, repository, retiredPreviewTarget, workerName } from './preview-target.mjs'
 
 const [action, branch] = process.argv.slice(2)
 assert(
@@ -54,17 +54,58 @@ function run(executable, args, { input, json = false, env = environment } = {}) 
 const cf = (...args) => run(process.execPath, ['node_modules/cf/bin/cf', ...args], { json: true })
 const wranglerPreview = (args, input) =>
     run(process.execPath, ['node_modules/wrangler/bin/wrangler.js', ...args], { input })
-const listDatabase = async () => {
-    const databases = await cf('d1', 'list', '--name', target.resourceName)
+const listDatabase = async (resourceName = target.resourceName) => {
+    const databases = await cf('d1', 'list', '--name', resourceName)
     assert(Array.isArray(databases), 'Unexpected D1 list response')
-    const exact = databases.filter((database) => database.name === target.resourceName)
+    const exact = databases.filter((database) => database.name === resourceName)
     assert(exact.length <= 1, 'Ambiguous Preview database')
     return exact[0]
 }
-const listBucket = async () => {
-    const result = await cf('r2', 'buckets', 'list', '--name-contains', target.resourceName)
+const listBucket = async (resourceName = target.resourceName) => {
+    const result = await cf('r2', 'buckets', 'list', '--name-contains', resourceName)
     assert(Array.isArray(result.buckets), 'Unexpected R2 list response')
-    return result.buckets.find((bucket) => bucket.name === target.resourceName)
+    return result.buckets.find((bucket) => bucket.name === resourceName)
+}
+const deleteNamedPreview = async (previewName, resourceName) => {
+    assert(resourceName.startsWith(`${workerName}-p-`), 'Not a Preview resource')
+    try {
+        await wranglerPreview([
+            'preview',
+            'delete',
+            '--worker-name',
+            workerName,
+            '--name',
+            previewName,
+            '--skip-confirmation',
+        ])
+    } catch (error) {
+        if (!/\[code: 10025\]/.test(String(error))) throw error
+    }
+    if (await listBucket(resourceName)) {
+        let job = await cf(
+            'r2',
+            'objects',
+            'bulk-delete',
+            '--bucket-name',
+            resourceName,
+            '--prefix=',
+            '--body',
+            '[]',
+            '--force',
+        )
+        const deadline = Date.now() + 10 * 60 * 1000
+        while (job.status !== 'COMPLETED') {
+            assert(
+                job.id && !['FAILED', 'CANCELLED'].includes(job.status) && Date.now() < deadline,
+                'R2 empty job failed or timed out',
+            )
+            await setTimeout(3000)
+            job = await cf('r2', 'buckets', 'jobs', 'get', job.id, '--bucket-name', resourceName)
+        }
+        await cf('r2', 'buckets', 'delete', resourceName, '--force')
+    }
+    const database = await listDatabase(resourceName)
+    if (database) await cf('d1', 'delete', database.uuid, '--force')
 }
 
 await run('git', ['check-ref-format', '--branch', branch])
@@ -83,12 +124,22 @@ if (action === 'deploy') {
     }
     const secrets = {
         BETTER_AUTH_SECRET: process.env.PREVIEW_BETTER_AUTH_SECRET,
+        NUXT_APP_SECRET: process.env.PREVIEW_NUXT_APP_SECRET,
         GITHUB_CLIENT_ID: process.env.PREVIEW_GITHUB_CLIENT_ID,
         GITHUB_CLIENT_SECRET: process.env.PREVIEW_GITHUB_CLIENT_SECRET,
         PREVIEW_GITHUB_TOKEN: process.env.PREVIEW_GITHUB_TOKEN,
     }
     for (const [name, value] of Object.entries(secrets))
         assert(value, `Missing Preview secret: ${name}`)
+    assert(
+        secrets.NUXT_APP_SECRET.length >= 32,
+        'Preview NUXT_APP_SECRET needs at least 32 characters',
+    )
+    const retired = retiredPreviewTarget(branch)
+    if (retired) {
+        console.log(`Removing Preview resources that used consecutive hyphens: ${retired.name}`)
+        await deleteNamedPreview(retired.name, retired.resourceName)
+    }
     let database = await listDatabase()
     if (!database) database = await cf('d1', 'create', '--name', target.resourceName)
     assert(
@@ -158,11 +209,12 @@ if (action === 'deploy') {
         .split('\n')
         .map((line) => JSON.parse(line))
     const deployed = records.find((record) => record.type === 'preview')
-    assert(
-        deployed?.worker_name === workerName &&
-            deployed.preview_name === target.name &&
-            deployed.preview_urls?.includes(target.url),
-        'Unexpected Preview deployment target',
+    const previewURLs = Array.isArray(deployed?.preview_urls) ? deployed.preview_urls : []
+    assert.equal(deployed?.worker_name, workerName)
+    assert.equal(deployed?.preview_name, target.name)
+    assert.ok(
+        previewURLs.includes(target.url),
+        `Preview URL ${target.url} was not reported: ${JSON.stringify(previewURLs)}`,
     )
     // Base secrets only initialize new Previews. Refresh existing ones on every deployment too.
     await wranglerPreview(
