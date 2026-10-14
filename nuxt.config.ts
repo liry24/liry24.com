@@ -248,9 +248,10 @@ export function createDatabase(event) {
 
     fonts: {
         defaults: { weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
+        // Resolve fonts before cold SSR; discovering a new family restarts Nitro for OG images.
         families: [
-            { name: 'Geist', provider: 'google', preload: true },
-            { name: 'Geist Mono', provider: 'google', preload: true },
+            { name: 'Geist', provider: 'google', preload: true, global: true },
+            { name: 'Geist Mono', provider: 'google', preload: true, global: true },
             {
                 name: 'Special Gothic Expanded One',
                 weights: [400],
