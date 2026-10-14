@@ -26,6 +26,20 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
         expect(generated.ai).toEqual({ binding: 'AI' })
         const serverDirectory = resolve('.output/server')
         const chunks = await readdir(serverDirectory, { recursive: true })
+        const ogImageBundle = await readFile(
+            join(serverDirectory, 'chunks/routes/_og/d/image.mjs'),
+            'utf8',
+        )
+        for (const family of ['Special Gothic Expanded One', 'Geist Mono'])
+            expect(ogImageBundle, `OG images retain ${family}`).toMatch(
+                new RegExp(`(?:\\bfamily|"family"):\\s*"${family}"`),
+            )
+        const homeComponentPath = chunks.find((file) =>
+            /[/\\]build[/\\]Home\.takumi-[^/\\]+\.mjs$/.test(file),
+        )
+        expect(homeComponentPath, 'OG home component is emitted').toBeDefined()
+        const homeComponent = await readFile(join(serverDirectory, homeComponentPath!), 'utf8')
+        expect(homeComponent).toMatch(/"font-family":\s*"'Special Gothic Expanded One'"/)
         for (const file of chunks.filter((file) => file.endsWith('.mjs'))) {
             const bundle = await readFile(join(serverDirectory, file), 'utf8')
             for (const marker of [
@@ -76,6 +90,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             expect(await (await env.R2.get('runtime-binding-probe'))?.text()).toBe('local-only')
             for (const [path, status] of [
                 ['/', 200],
+                ['/works', 200],
                 ['/api/auth/get-session', 200],
                 ['/api/site-admin/models', 401],
                 ['/admin/works', 404],
@@ -85,6 +100,17 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 const response = await server.fetch(path)
                 const body = await response.text()
                 expect(response.status, `${path}: ${body.slice(0, 300)}`).toBe(status)
+                if (path === '/' || path === '/works') {
+                    const image = body.match(
+                        /<meta\b[^>]*property="og:image"[^>]*content="([^"]+)"/,
+                    )
+                    expect(image, 'SSR includes an OG image').not.toBeNull()
+                    const url = new URL(image![1]!.replaceAll('&amp;', '&'))
+                    const rendered = await server.fetch(`${url.pathname}${url.search}`)
+                    expect(rendered.status, await rendered.clone().text()).toBe(200)
+                    expect(rendered.headers.get('content-type')).toMatch(/^image\//)
+                    expect((await rendered.arrayBuffer()).byteLength).toBeGreaterThan(1000)
+                }
                 if (path === '/api/auth/get-session') expect(body).toBe('null')
                 if (path === '/login' && isPreview) expect(body).not.toContain('Vercel')
             }
