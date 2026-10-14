@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest'
 
-import { previewBindings, previewTarget } from '../scripts/preview-target.mjs'
+import { previewBindings, previewTarget, retiredPreviewTarget } from '../scripts/preview-target.mjs'
 import {
     isPreviewGitHubAccountAdmin,
     validatePreviewIdentity,
@@ -17,6 +17,16 @@ test('Preview names isolate branches and never select production', () => {
         expect(new URL(target.url).hostname).toBe(`${target.name}-liry24-com.liry.workers.dev`)
     }
     expect(previewTarget('dev')).toEqual(targets[0])
+    const dependencyUpdates = previewTarget('cursor/dependency-updates-56e1')
+    expect(dependencyUpdates.name).toBe('p-cursor-dependency-0150633bdf7a')
+    expect(dependencyUpdates.url).toBe(
+        'https://p-cursor-dependency-0150633bdf7a-liry24-com.liry.workers.dev',
+    )
+    expect(dependencyUpdates.name.includes('--')).toBe(false)
+    expect(retiredPreviewTarget('cursor/dependency-updates-56e1')?.name).toBe(
+        'p-cursor-dependency--0150633bdf7a',
+    )
+    expect(retiredPreviewTarget('dev')).toBeNull()
 })
 
 test('Wrangler Preview bindings use only the branch resources and public origin', () => {
