@@ -34,6 +34,12 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             expect(ogImageBundle, `OG images retain ${family}`).toMatch(
                 new RegExp(`(?:\\bfamily|"family"):\\s*"${family}"`),
             )
+        const homeComponentPath = chunks.find((file) =>
+            /[/\\]build[/\\]Home\.takumi-[^/\\]+\.mjs$/.test(file),
+        )
+        expect(homeComponentPath, 'OG home component is emitted').toBeDefined()
+        const homeComponent = await readFile(join(serverDirectory, homeComponentPath!), 'utf8')
+        expect(homeComponent).toMatch(/"font-family":\s*"'Special Gothic Expanded One'"/)
         for (const file of chunks.filter((file) => file.endsWith('.mjs'))) {
             const bundle = await readFile(join(serverDirectory, file), 'utf8')
             for (const marker of [

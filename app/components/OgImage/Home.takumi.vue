@@ -8,7 +8,8 @@ const { title = 'title', subpath } = defineProps<Props>()
 
 <template>
     <div
-        class="flex size-full flex-col items-center justify-center gap-16 bg-black font-[Special_Gothic_Expanded_One]"
+        class="flex size-full flex-col items-center justify-center gap-16 bg-black"
+        style="font-family: 'Special Gothic Expanded One'"
     >
         <div v-if="subpath" class="flex items-center pt-8 text-[112px] tracking-tight text-white">
             <h1>
