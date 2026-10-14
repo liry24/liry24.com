@@ -85,6 +85,17 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 const response = await server.fetch(path)
                 const body = await response.text()
                 expect(response.status, `${path}: ${body.slice(0, 300)}`).toBe(status)
+                if (path === '/') {
+                    const image = body.match(
+                        /<meta\b[^>]*property="og:image"[^>]*content="([^"]+)"/,
+                    )
+                    expect(image, 'SSR includes an OG image').not.toBeNull()
+                    const url = new URL(image![1]!.replaceAll('&amp;', '&'))
+                    const rendered = await server.fetch(`${url.pathname}${url.search}`)
+                    expect(rendered.status, await rendered.clone().text()).toBe(200)
+                    expect(rendered.headers.get('content-type')).toMatch(/^image\//)
+                    expect((await rendered.arrayBuffer()).byteLength).toBeGreaterThan(1000)
+                }
                 if (path === '/api/auth/get-session') expect(body).toBe('null')
                 if (path === '/login' && isPreview) expect(body).not.toContain('Vercel')
             }
