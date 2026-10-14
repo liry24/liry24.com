@@ -312,6 +312,8 @@ export function createDatabase(event) {
     },
 
     $development: {
+        // Background SSR warmup discovers OG font weights and restarts Nitro during requests.
+        vite: { warmupEntry: false },
         nitro: { preset: 'nitro-dev' },
         runtimeConfig: { public: { siteUrl: '' } },
     },
