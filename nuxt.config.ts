@@ -1,4 +1,4 @@
-import { relative } from 'node:path'
+import { relative, resolve } from 'node:path'
 
 import { createSiteAdminDependencyTypePaths } from '@liria24/site-admin/dependency-aliases'
 import { defineNuxtConfig } from 'nuxt/config'
@@ -39,6 +39,7 @@ const cloudflareConfig = {
     secrets: {
         required: [
             'BETTER_AUTH_SECRET',
+            'NUXT_APP_SECRET',
             'GITHUB_CLIENT_ID',
             'GITHUB_CLIENT_SECRET',
             'VERCEL_CLIENT_ID',
@@ -96,22 +97,23 @@ export default defineNuxtConfig({
                     Object.assign((nodeTsConfig.compilerOptions.paths ??= {}), paths)
                 })
             })
-            // The application supplies Better Auth's adapter for the current request.
+            // A configured Site Admin database adapter is not prepared before Better Auth.
+            // Resolve the same application connection directly for each auth request.
             nuxt.hook('better-auth:database:providers', (providers) => {
+                const authDatabase = resolve(nuxt.options.rootDir, 'server/utils/authDatabase.ts')
                 providers.liry24 = {
                     priority: 1000,
                     isEnabled: () => true,
                     buildDatabaseCode:
-                        () => `import { useSiteAdminRuntime } from '@liria24/site-admin/nuxt/server'
+                        () => `import { createAuthDatabase } from ${JSON.stringify(authDatabase)}
 export const db = undefined
 export function createDatabase(event) {
-    const database = useSiteAdminRuntime().authDatabase?.(event?.context)
-    if (!database) throw new Error('Application auth database is not initialized')
-    return database
+    return createAuthDatabase(event)
 }`,
                 }
             })
         },
+        '@nuxt/fonts',
         '@comark/nuxt',
         '@nuxt/ui',
         '@nuxt/image',
@@ -221,6 +223,17 @@ export function createDatabase(event) {
                 types: ['@cloudflare/workers-types'],
             },
         },
+        nodeTsConfig: {
+            compilerOptions: {
+                paths: {
+                    // Nuxt 4.6 typechecks this file with moduleResolution nodenext and maps
+                    // nitropack/types onto a concrete declaration. nitropack's presets entry
+                    // re-exports without a file extension, so nodenext drops preset keys such
+                    // as cloudflare. Load the declaration that defines those keys.
+                    'nitropack/presets': ['../node_modules/nitropack/dist/presets/_types.gen.d.ts'],
+                },
+            },
+        },
     },
 
     app: {
@@ -235,9 +248,10 @@ export function createDatabase(event) {
 
     fonts: {
         defaults: { weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
+        // Resolve fonts before cold SSR; discovering a new family restarts Nitro for OG images.
         families: [
-            { name: 'Geist', provider: 'google', preload: true },
-            { name: 'Geist Mono', provider: 'google', preload: true },
+            { name: 'Geist', provider: 'google', preload: true, global: true },
+            { name: 'Geist Mono', provider: 'google', preload: true, global: true },
             {
                 name: 'Special Gothic Expanded One',
                 weights: [400],
@@ -298,6 +312,8 @@ export function createDatabase(event) {
     },
 
     $development: {
+        // Background SSR warmup discovers OG font weights and restarts Nitro during requests.
+        vite: { warmupEntry: false },
         nitro: { preset: 'nitro-dev' },
         runtimeConfig: { public: { siteUrl: '' } },
     },
