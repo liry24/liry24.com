@@ -14,7 +14,7 @@ const { title = 'title', subpath } = defineProps<Props>()
             <h1>
                 {{ title }}
             </h1>
-            <h2 class="font-[Geist_Mono] font-light tracking-[-0.07em] text-zinc-300">
+            <h2 class="font-mono font-light tracking-[-0.07em] text-zinc-300">
                 <span class="mr-8 tracking-[-0.3em]">//</span>{{ subpath }}
             </h2>
         </div>

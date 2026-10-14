@@ -45,6 +45,7 @@
     "devDependencies": {
         "@cloudflare/workers-types": "^5.20261013.1",
         "@nuxt/a11y": "^1.0.0-alpha.1",
+        "@nuxt/fonts": "1.0.1",
         "@nuxt/hints": "^1.1.5",
         "@types/node": "^26.6.5",
         "cf": "1.0.0-beta.16",
