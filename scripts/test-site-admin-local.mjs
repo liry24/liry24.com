@@ -765,7 +765,7 @@ try {
             await newTagInput.fill('draft-tag')
             await newTagInput.press('Enter')
             const original =
-                '# Safe preview\n\n**Markdown works**\n\n<script>window.__previewUnsafe = true</script>\n<img src=x onerror="window.__previewUnsafe = true">\n\n[Unsafe link](javascript:alert(1))\n\n::admin-form-entry-modal\n::'
+                '# Safe preview\n\n**Markdown works**\n\n<script>window.__previewUnsafe = true</script>\n<img src=x alt="Security test image" onerror="window.__previewUnsafe = true">\n\n[Unsafe link](javascript:alert(1))\n\n::admin-form-entry-modal\n::'
             await contentInput.fill(original)
             const preview = page.getByRole('region', { name: 'Markdown preview' })
             await preview.getByRole('heading', { name: 'Safe preview' }).waitFor()
@@ -1002,9 +1002,15 @@ try {
                 })
             }
 
+            await page.getByRole('button', { name: /^New Post/ }).click()
+            await page.waitForURL('**/admin/posts/new')
+            assert.equal(await manualSlug.isChecked(), false)
+            assert.equal(await titleInput.inputValue(), '')
+            assert.equal(await contentInput.inputValue(), '')
+            assert.equal(await page.getByLabel('Slug', { exact: true }).count(), 0)
             assert.deepEqual(errors, [])
             console.log(
-                'PASS: creation page, safe Comark preview, native back/forward draft recovery, AI-free draft and manual publication, slug failure preserves input, empty slug validation, native proofreading review/apply/discard and invalid/stale guards, double submission, native list invalidation and dirty refresh conflict',
+                'PASS: creation page, safe Comark preview, native back/forward draft recovery, AI-free draft and manual publication, slug failure preserves input, empty slug validation, native proofreading review/apply/discard and invalid/stale guards, double submission, native list invalidation and dirty refresh conflict, consecutive new posts reset manual slug mode and input',
             )
         } finally {
             await browser.close()
