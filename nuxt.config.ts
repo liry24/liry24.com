@@ -39,6 +39,7 @@ const cloudflareConfig = {
     secrets: {
         required: [
             'BETTER_AUTH_SECRET',
+            'NUXT_APP_SECRET',
             'GITHUB_CLIENT_ID',
             'GITHUB_CLIENT_SECRET',
             'VERCEL_CLIENT_ID',

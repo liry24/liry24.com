@@ -40,6 +40,7 @@ jobs:
       - name: Check local SQLite development
         env:
           BETTER_AUTH_SECRET: test-only-local-ci-secret-0123456789abcdef
+          NUXT_APP_SECRET: test-only-local-ci-app-secret-0123456789abcdef
           LIRY24_DEV_DB_PATH: ${{ runner.temp }}/liry24-local-test/database.sqlite
         run: |
           node node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port 3101 > "$RUNNER_TEMP/nuxt-local.log" 2>&1 &

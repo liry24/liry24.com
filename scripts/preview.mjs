@@ -124,12 +124,17 @@ if (action === 'deploy') {
     }
     const secrets = {
         BETTER_AUTH_SECRET: process.env.PREVIEW_BETTER_AUTH_SECRET,
+        NUXT_APP_SECRET: process.env.PREVIEW_NUXT_APP_SECRET,
         GITHUB_CLIENT_ID: process.env.PREVIEW_GITHUB_CLIENT_ID,
         GITHUB_CLIENT_SECRET: process.env.PREVIEW_GITHUB_CLIENT_SECRET,
         PREVIEW_GITHUB_TOKEN: process.env.PREVIEW_GITHUB_TOKEN,
     }
     for (const [name, value] of Object.entries(secrets))
         assert(value, `Missing Preview secret: ${name}`)
+    assert(
+        secrets.NUXT_APP_SECRET.length >= 32,
+        'Preview NUXT_APP_SECRET needs at least 32 characters',
+    )
     const retired = retiredPreviewTarget(branch)
     if (retired) {
         console.log(`Removing Preview resources that used consecutive hyphens: ${retired.name}`)
