@@ -113,6 +113,7 @@ export function createDatabase(event) {
                 }
             })
         },
+        '@nuxt/fonts',
         '@comark/nuxt',
         '@nuxt/ui',
         '@nuxt/image',
