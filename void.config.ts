@@ -4,6 +4,7 @@ const production = process.env.APP_ENV === 'production'
 const name = production ? 'liry24-com' : 'liry24-com-dev'
 
 export default defineConfig({
+    inference: { bindings: { db: true, storage: true } },
     cloudflare: {
         name,
         account_id: '422bd946004c77eb0d569ec489b40196',
