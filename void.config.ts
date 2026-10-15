@@ -23,7 +23,7 @@ export default defineConfig({
             {
                 binding: 'DB',
                 database_name: name,
-                migrations_dir: 'db/migrations',
+                migrations_dir: './db/migrations',
                 ...(production ? { database_id: '227d818f-cd40-4fca-9710-b57273be94ca' } : {}),
             },
         ],

@@ -23,7 +23,7 @@ test('Void isolates dev and production resources and owns deployment configurati
             expect(worker.triggers?.crons).toEqual(production ? ['* * * * *'] : [])
             expect(worker.d1_databases?.[0]).toMatchObject({
                 binding: 'DB',
-                migrations_dir: 'db/migrations',
+                migrations_dir: './db/migrations',
                 database_name: worker.name,
             })
             expect(worker.d1_databases?.[0]?.database_id).toBe(
