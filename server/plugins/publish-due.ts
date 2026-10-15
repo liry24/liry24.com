@@ -1,10 +1,8 @@
-import { useSiteAdmin } from '@liria24/site-admin/nuxt/server'
+import { useAdmin } from '@liria24/site-admin/server'
 export default defineNitroPlugin((nitroApp) => {
     nitroApp.hooks.hook('cloudflare:scheduled', ({ controller, context, env }) => {
         context.waitUntil(
-            useSiteAdmin(undefined, { env }).then((admin) =>
-                admin.publishDue(new Date(controller.scheduledTime)),
-            ),
+            useAdmin(undefined, { env }).tasks.publishDue(new Date(controller.scheduledTime)),
         )
     })
 })

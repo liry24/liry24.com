@@ -6,16 +6,17 @@ import { ArtViewer } from '#components'
 const route = useRoute()
 const overlay = useOverlay()
 
-const { data } = await useSiteAdminList('arts', { default: () => [] })
+const { data } = await useContent('arts', { default: () => [] })
 
 const modalArtViewer = overlay.create(ArtViewer)
 
 onMounted(() => {
-    if (route.query.open && data.value?.map((i) => i.slug).includes(route.query.open as string))
-        modalArtViewer.open({ item: data.value.find((i) => i.slug === route.query.open)! })
+    if (
+        route.query.open &&
+        data.value?.map((i) => i.data.slug).includes(route.query.open as string)
+    )
+        modalArtViewer.open({ item: data.value.find((i) => i.data.slug === route.query.open)! })
 })
-
-useSeo()
 </script>
 
 <template>

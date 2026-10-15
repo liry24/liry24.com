@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PublicAsset } from '@liria24/site-admin/client'
+import type { PublicAsset } from '@liria24/site-admin'
 
 import { ImageViewer } from '#components'
 

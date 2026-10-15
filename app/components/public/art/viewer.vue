@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { SiteAdminPublicModels } from '@liria24/site-admin/client'
+import type { Content } from '@liria24/site-admin/client'
 
 const open = defineModel<boolean>('open', { default: false })
 
 const { item } = defineProps<{
-    item: SiteAdminPublicModels['arts']
+    item: Content<'arts'>
 }>()
 
 const historyStateAdded = ref(false)

@@ -1,5 +1,8 @@
-import { createSiteAdminManagementClient, managementAssetUrl } from '@liria24/site-admin/client'
-import type { EntryRecord } from '@liria24/site-admin/server'
+import {
+    createSiteAdminManagementClient,
+    managementAssetUrl,
+} from '@liria24/site-admin/internal/client'
+import type { EntryRecord } from '@liria24/site-admin/internal/server'
 import { expect, test } from 'vitest'
 
 import { adminAssetId } from '../app/utils/adminPresentation'

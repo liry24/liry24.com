@@ -1,22 +1,20 @@
 <script setup lang="ts">
-const { data } = await useSiteAdminList('posts', {
+const { data } = await useContent('posts', {
     markdown: 'summary',
     transform: (entries) =>
         entries.map((entry) => ({
             ...entry.data,
-            slug: entry.slug,
+            slug: entry.data.slug,
             createdAt: entry.data.createdAt || entry.publishedAt,
         })),
 })
-
-useSeo()
 </script>
 
 <template>
     <UPage v-if="data?.length" :ui="{ center: 'sm:mx-4 grid grid-cols-1 gap-6 lg:grid-cols-2' }">
         <article
             v-for="(post, index) in data"
-            :key="post.slug"
+            :key="String(post.slug)"
             :style="{ 'animation-delay': `${100 + index * 100}ms` }"
             class="fade-in hover:bg-muted flex flex-col justify-between gap-2 rounded-xl p-5 transition-colors"
         >

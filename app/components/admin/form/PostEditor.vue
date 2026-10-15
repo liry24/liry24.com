@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { serializeSiteAdminData } from '@liria24/site-admin/client'
 import { useSelector } from '@tanstack/vue-form'
 
 const props = defineProps<{ id?: string }>()
@@ -10,32 +9,32 @@ const localError = ref('')
 const publishAt = ref('')
 const uploading = ref(false)
 const uploadedName = ref('')
-const editor = await useSiteAdminForm('posts', {
-    ...(props.id ? { id: () => props.id } : {}),
+const resource = await useAdminEntry('posts', () => props.id ?? null)
+if (resource.error.value) throw resource.error.value
+const {
+    form,
+    draft,
+    publish: publishEntry,
+    schedule: scheduleEntry,
+    upload: uploadAsset,
+} = useEntryForm(resource, {
     ...(!props.id ? { defaultValues: { publication: { slug: 'auto' } } } : {}),
     onSuccess: async () => {
         if (intent.value) return
         saved.value = true
         await navigateTo('/admin/posts')
-        if (!props.id) delete editor.drafts[newDraftIdentity]
     },
 })
-const { form, conflict, serverError, asset, dirty, loading, loadError } = editor
-const newDraftIdentity = editor.identity.value
-// AI actions first create a draft while the browser is still on /new. Keep
-// that route's session input pointing at the created entry until navigation.
-watchEffect(
-    () => {
-        if (props.id || !editor.entryId.value || saved.value) return
-        const current = editor.drafts[editor.identity.value]
-        if (current) editor.drafts[newDraftIdentity] = current
-    },
-    { flush: 'sync' },
-)
+const { error, status } = resource
 const values = useSelector(form.atom, (state) => state.values)
 const saving = useSelector(form.atom, (state) => state.isSubmitting)
+const dirty = draft.isDirty
+const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
 const restored = ref(dirty.value)
-const { slug } = editor.metadata
+const slug = computed({
+    get: () => String(values.value.slug ?? ''),
+    set: (value) => form.setFieldValue('slug', value),
+})
 const manualSlug = computed({
     get: () => postPublicationSettings(values.value).slug === 'manual',
     set: (manual) => {
@@ -45,41 +44,23 @@ const manualSlug = computed({
     },
 })
 const content = computed(() => values.value.content)
-const management = useSiteAdminManagementClient()
+const management = useAdminClient()
 const proposal = shallowRef<PostEditorialProposal | null>(null)
-const originalContent = computed(() => String(proposal.value?.snapshot.draft.data.content ?? ''))
+const originalContent = computed(() => String(proposal.value?.snapshot.draft.content ?? ''))
 const aiError = shallowRef<Error | null>(null)
 const proofreadInput = shallowRef({ content: '' })
-const publicationInput = shallowRef<PostSlugInput>({
-    title: '',
-    content: '',
-})
-const proofreadAction = await useAiAction('proofread', {
-    props: () => proofreadInput.value,
+const proofreadAction = await useAi('proofread', {
+    input: () => proofreadInput.value,
     immediate: false,
 })
-const publicationAction = await useAiAction('publication', {
-    props: () => publicationInput.value,
-    immediate: false,
-})
-function currentDraft() {
-    return {
-        entryId: editor.entryId.value,
-        version: editor.version.value,
-        draft: {
-            data: serializeSiteAdminData(editor.descriptor.value, values.value),
-            slug: slug.value,
-        },
-    }
-}
+const currentDraft = () => draft.snapshot()
 const proposalStale = computed(() =>
-    proposal.value ? postProposalStale(proposal.value, currentDraft()) : false,
+    proposal.value ? draft.isStale(proposal.value.snapshot) : false,
 )
 function discardSuggestion() {
     proposal.value = null
     aiError.value = null
     proofreadAction.clear()
-    publicationAction.clear()
 }
 const proofreading = computed(() => intent.value === 'proofread')
 const busy = computed(
@@ -87,18 +68,15 @@ const busy = computed(
         savePending.value ||
         saving.value ||
         uploading.value ||
-        loading.value ||
+        status.value === 'pending' ||
         intent.value !== null ||
-        proofreadAction.status.value === 'pending' ||
-        publicationAction.status.value === 'pending' ||
-        editor.publishBusy.value,
+        proofreadAction.status.value === 'pending',
 )
 const awaitingProofreading = computed(() => proposal.value?.kind === 'proofread')
 const errorMessage = computed(() => {
     if (localError.value) return localError.value
-    const cause =
-        serverError.value || aiError.value || loadError.value || editor.callbackError.value
-    return cause instanceof Error ? cause.message : serverError.value?.message
+    const cause = error.value || aiError.value
+    return cause instanceof Error ? cause.message : error.value?.message
 })
 const invalidProposal = computed(() =>
     Boolean(
@@ -115,7 +93,7 @@ useEventListener('beforeunload', (event) => {
     event.returnValue = ''
 })
 async function save() {
-    if (busy.value || conflict.value || loadError.value) return
+    if (busy.value || conflict.value) return
     savePending.value = true
     localError.value = ''
     try {
@@ -133,9 +111,9 @@ async function ensureDraft() {
         localError.value = 'Write a title and content before using AI or publishing.'
         return false
     }
-    if (editor.entryId.value) return true
+    if (draft.snapshot().entryId) return true
     await form.handleSubmit()
-    return !serverError.value && Boolean(editor.entryId.value)
+    return !error.value && Boolean(draft.snapshot().entryId)
 }
 function actionFailure(error: unknown, fallback: string) {
     if (error && typeof error === 'object') {
@@ -148,7 +126,7 @@ function actionFailure(error: unknown, fallback: string) {
     return error instanceof Error ? error : new Error(fallback)
 }
 async function proofread() {
-    if (busy.value || conflict.value || loadError.value || !content.value.trim()) return
+    if (busy.value || conflict.value || !content.value.trim()) return
     intent.value = 'proofread'
     localError.value = ''
     discardSuggestion()
@@ -178,7 +156,7 @@ function applyProofreading() {
     discardSuggestion()
 }
 async function publish(schedule = false) {
-    if (busy.value || conflict.value || loadError.value || awaitingProofreading.value) return
+    if (busy.value || conflict.value || awaitingProofreading.value) return
     if (manualSlug.value && !slug.value.trim()) {
         localError.value = 'Enter a slug or use automatic generation.'
         return
@@ -195,49 +173,28 @@ async function publish(schedule = false) {
     intent.value = schedule ? 'schedule' : 'publish'
     localError.value = ''
     discardSuggestion()
-    let beforePublication: ReturnType<typeof postPublicationSettings> | undefined
-    let committed = false
     try {
-        if (!(await ensureDraft())) return
-        const candidate = await preparePostPublication(
-            { management, current: currentDraft },
-            async (props) => {
-                publicationInput.value = props
-                await publicationAction.execute()
-                if (publicationAction.error.value) throw publicationAction.error.value
-                if (!publicationAction.data.value)
-                    throw new Error('No publication suggestion was returned.')
-                return publicationAction.data.value
-            },
-        )
-        if (!manualSlug.value) slug.value = candidate.slug
-        beforePublication = postPublicationSettings(values.value)
-        if (slug.value)
-            form.setFieldValue('publication', { ...beforePublication, publishedSlug: slug.value })
-        const result = at ? await editor.schedule(at) : await editor.publish()
+        const result = at ? await scheduleEntry(at) : await publishEntry()
         if (!result) return
-        committed = true
         saved.value = true
         await navigateTo('/admin/posts')
-        if (!props.id) delete editor.drafts[newDraftIdentity]
     } catch (error) {
         aiError.value = actionFailure(error, 'Publication failed. Your draft is kept.')
     } finally {
-        if (!committed && beforePublication) form.setFieldValue('publication', beforePublication)
         intent.value = null
     }
 }
+
 async function upload(files: File | File[] | null | undefined) {
     if (!files || busy.value) return
     const file = Array.isArray(files) ? files[0] : files
     if (!file) return
     uploading.value = true
     try {
-        const uploaded = await asset.upload(file)
-        asset.set('image', uploaded)
+        await uploadAsset('image', file)
         uploadedName.value = file.name
     } catch {
-        // The published Site Admin upload controller exposes the failure.
+        // resource.error displays the upload failure.
     } finally {
         uploading.value = false
     }
@@ -261,14 +218,14 @@ async function upload(files: File | File[] | null | undefined) {
                 icon="mingcute:save-line"
                 color="neutral"
                 :loading="saving"
-                :disabled="busy || conflict || Boolean(loadError)"
+                :disabled="busy || conflict"
             />
             <UButton
                 label="Publish"
                 icon="mingcute:upload-3-fill"
                 color="neutral"
                 :loading="intent === 'publish'"
-                :disabled="busy || conflict || Boolean(loadError) || awaitingProofreading"
+                :disabled="busy || conflict || awaitingProofreading"
                 @click="publish()"
             />
         </template>
@@ -472,13 +429,7 @@ async function upload(files: File | File[] | null | undefined) {
                         variant="outline"
                         color="neutral"
                         :loading="intent === 'schedule'"
-                        :disabled="
-                            busy ||
-                            conflict ||
-                            Boolean(loadError) ||
-                            !publishAt ||
-                            awaitingProofreading
-                        "
+                        :disabled="busy || conflict || !publishAt || awaitingProofreading"
                         @click="publish(true)"
                     />
                 </div>
@@ -494,13 +445,10 @@ async function upload(files: File | File[] | null | undefined) {
                         @update:model-value="upload"
                     />
                     <UProgress
-                        v-if="uploading && asset.progress.value !== null"
-                        :model-value="asset.progress.value * 100"
+                        v-if="uploading"
+                        :model-value="undefined"
                         aria-label="Upload progress"
                     />
-                    <p v-if="asset.error.value" class="text-error mt-2 text-sm" role="alert">
-                        {{ asset.error.value }}
-                    </p>
                     <div v-if="values.image" class="mt-3 flex items-center gap-2">
                         <img
                             :src="values.image.url"
@@ -516,7 +464,7 @@ async function upload(files: File | File[] | null | undefined) {
                             icon="mingcute:close-line"
                             variant="ghost"
                             color="neutral"
-                            @click="asset.clear('image')"
+                            @click="form.setFieldValue('image', null)"
                         />
                     </div>
                 </UFormField>

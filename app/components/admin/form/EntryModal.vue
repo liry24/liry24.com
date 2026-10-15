@@ -1,89 +1,46 @@
 <script setup lang="ts">
-import type { ModelDescriptor } from '@liria24/site-admin'
-import { managementAssetUrl } from '@liria24/site-admin/client'
-import { useSiteAdminForm } from '@liria24/site-admin/form'
-import type { EntryRecord } from '@liria24/site-admin/server'
-
-const props = defineProps<{
-    modelName: string
-    descriptor: ModelDescriptor
-    data?: EntryRecord
-    categories?: string[]
-}>()
+import { useSelector } from '@tanstack/vue-form'
+const props = defineProps<{ modelName: string; id?: string; categories?: string[] }>()
 const emit = defineEmits<{ close: [saved: boolean] }>()
-
 const singular =
     adminModels[props.modelName as keyof typeof adminModels]?.singular || props.modelName
-const slug = ref(props.data?.slug || '')
-const { form, conflict, serverError, asset } = useSiteAdminForm({
-    modelName: props.modelName,
-    descriptor: props.descriptor,
-    entry: props.data,
-    get slug() {
-        return slug.value || undefined
+// This renderer accepts every model; individual editors retain model-specific field types.
+const resource = await useAdminEntry(props.modelName, props.id ?? null)
+const {
+    form,
+    fields,
+    upload: uploadFiles,
+} = useEntryForm(resource, {
+    onSuccess: () => {
+        emit('close', true)
     },
-    onSuccess: () => emit('close', true),
 })
-const localError = ref('')
-const saving = ref(false)
-const uploading = ref(false)
-const uploadedNames = ref<Record<string, string>>({})
-const fields = computed(() =>
-    Object.entries(props.descriptor.fields).sort(([left, a], [right, b]) => {
-        const priority = (name: string, kind: string) =>
-            name === props.descriptor.displayFields?.title
-                ? 0
-                : ['image', 'images'].includes(kind)
-                  ? 1
-                  : 2
-        return priority(left, a.kind) - priority(right, b.kind)
-    }),
-)
-const fieldLabel = (name: string) =>
-    name === 'href'
-        ? 'URL'
-        : name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (letter) => letter.toUpperCase())
+const values = useSelector(form.atom, (state) => state.values)
+const saving = useSelector(form.atom, (state) => state.isSubmitting)
+const slug = computed({
+    get: () => String(values.value.slug ?? ''),
+    set: (value) => form.setFieldValue('slug', value),
+})
+const conflict = computed(() => resource.error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
+const uploading = computed(() => resource.status.value === 'pending' && !saving.value)
+const editableFields = computed(() => fields.value.filter((field) => field.key !== 'slug'))
+const suggestedSlug = computed(() => entrySlugSuggestion(resource.display(values.value).title))
 const references = (value: unknown) => (Array.isArray(value) ? value : value ? [value] : [])
-async function save() {
-    saving.value = true
-    localError.value = ''
+async function upload(files: File | File[] | null | undefined, name: string) {
     try {
-        await form.handleSubmit()
-    } catch (error) {
-        localError.value = error instanceof Error ? error.message : 'Save failed'
-    } finally {
-        saving.value = false
-    }
-}
-async function upload(
-    files: File | File[] | null | undefined,
-    name: string,
-    multiple: boolean,
-    current: unknown,
-) {
-    if (!files) return
-    uploading.value = true
-    try {
-        const uploaded = []
-        for (const file of Array.isArray(files) ? files : [files]) {
-            const record = await asset.upload(file)
-            uploaded.push(record.id)
-            uploadedNames.value[record.id] = file.name
-        }
-        if (multiple) form.setFieldValue(name, [...references(current), ...uploaded])
-        else if (uploaded[0]) asset.set(name, uploaded[0])
+        await uploadFiles(name, files)
     } catch {
-        /* The Site Admin upload controller exposes the failure. */
-    } finally {
-        uploading.value = false
+        /* resource.error displays the failure. */
     }
 }
+const assetUrl = (value: unknown) =>
+    value && typeof value === 'object' && 'url' in value ? String(value.url) : undefined
 </script>
 
 <template>
     <UModal
-        :title="`${data ? 'Edit' : 'New'} ${singular}`"
-        :description="data ? `Editing #${data.slug}` : `Add a new ${singular.toLowerCase()}`"
+        :title="`${id ? 'Edit' : 'New'} ${singular}`"
+        :description="id ? `Editing #${id}` : `Add a new ${singular.toLowerCase()}`"
         :dismissible="false"
         :ui="{ content: modelName === 'posts' ? 'sm:max-w-4xl' : 'sm:max-w-lg' }"
         @update:open="
@@ -105,16 +62,20 @@ async function upload(
                 /></template>
             </UAlert>
             <UAlert
-                v-if="serverError || localError"
-                :title="serverError?.message || localError"
+                v-if="resource.error.value"
+                :title="resource.error.value?.message"
                 color="error"
                 class="mb-4"
             />
-            <form id="admin-entry-form" class="grid gap-4" @submit.prevent="save">
-                <form.Field v-for="[name, descriptor] in fields" :key="name" :name="name">
+            <form id="admin-entry-form" class="grid gap-4" @submit.prevent="form.handleSubmit">
+                <form.Field
+                    v-for="descriptor in editableFields"
+                    :key="descriptor.key"
+                    :name="descriptor.name"
+                >
                     <template #default="{ field }">
                         <UFormField
-                            :label="descriptor.label || fieldLabel(name)"
+                            :label="descriptor.label"
                             :required="descriptor.required"
                             :error="
                                 field.errors
@@ -150,24 +111,13 @@ async function upload(
                                     icon="mingcute:upload-3-fill"
                                     :disabled="uploading || saving"
                                     class="min-h-32 w-full"
-                                    @update:model-value="
-                                        (files) =>
-                                            upload(
-                                                files,
-                                                name,
-                                                descriptor.kind === 'images',
-                                                field.value,
-                                            )
-                                    "
+                                    @update:model-value="(files) => upload(files, descriptor.key)"
                                 />
                                 <UProgress
-                                    v-if="uploading && asset.progress.value !== null"
-                                    :model-value="asset.progress.value * 100"
+                                    v-if="uploading"
+                                    :model-value="undefined"
                                     aria-label="Upload progress"
                                 />
-                                <p v-if="asset.error.value" class="text-error text-sm" role="alert">
-                                    {{ asset.error.value }}
-                                </p>
                                 <div
                                     v-for="(reference, index) in references(field.value)"
                                     :key="adminAssetId(reference)"
@@ -177,7 +127,7 @@ async function upload(
                                         v-if="descriptor.kind !== 'file'"
                                         :src="
                                             adminAssetId(reference)
-                                                ? managementAssetUrl(adminAssetId(reference)!)
+                                                ? assetUrl(reference)
                                                 : undefined
                                         "
                                         alt=""
@@ -185,7 +135,6 @@ async function upload(
                                     />
                                     <UIcon v-else name="mingcute:file-fill" class="size-5" />
                                     <span class="text-toned min-w-0 flex-1 truncate text-sm">{{
-                                        uploadedNames[adminAssetId(reference)!] ||
                                         `${descriptor.kind === 'file' ? 'File' : 'Image'} ${index + 1}`
                                     }}</span>
                                     <UButton
@@ -203,7 +152,7 @@ async function upload(
                                                           (_, i) => i !== index,
                                                       ),
                                                   )
-                                                : asset.clear(name)
+                                                : field.handleChange(null)
                                         "
                                     />
                                 </div>
@@ -225,7 +174,7 @@ async function upload(
                                 v-else-if="['textarea', 'markdown'].includes(descriptor.kind)"
                                 :model-value="String(field.value ?? '')"
                                 :rows="descriptor.kind === 'markdown' ? 16 : 3"
-                                :placeholder="singular + ' ' + fieldLabel(name)"
+                                :placeholder="singular + ' ' + descriptor.label"
                                 variant="soft"
                                 autoresize
                                 class="w-full"
@@ -241,22 +190,22 @@ async function upload(
                                 v-else
                                 :model-value="String(field.value ?? '')"
                                 :placeholder="
-                                    name === 'href'
+                                    descriptor.key === 'href'
                                         ? 'https://example.com'
-                                        : singular + ' ' + fieldLabel(name)
+                                        : singular + ' ' + descriptor.label
                                 "
                                 variant="soft"
-                                :size="name === props.descriptor.displayFields?.title ? 'xl' : 'md'"
+                                :size="descriptor.key === 'title' ? 'xl' : 'md'"
                                 class="w-full"
                                 @update:model-value="field.handleChange"
                                 @blur="field.handleBlur"
                             >
-                                <template v-if="name === 'icon' && field.value" #trailing
+                                <template v-if="descriptor.key === 'icon' && field.value" #trailing
                                     ><UIcon :name="String(field.value)" class="size-5"
                                 /></template>
                             </UInput>
                             <div
-                                v-if="name === 'category' && categories?.length"
+                                v-if="descriptor.key === 'category' && categories?.length"
                                 class="mt-2 flex flex-wrap gap-2"
                             >
                                 <UButton
@@ -271,10 +220,10 @@ async function upload(
                         </UFormField>
                     </template>
                 </form.Field>
-                <UFormField label="Slug" description="Leave empty to generate an identifier."
+                <UFormField label="Slug" description="Leave empty to use the label when publishing."
                     ><UInput
                         v-model="slug"
-                        :placeholder="singular.toLowerCase() + '-slug'"
+                        :placeholder="suggestedSlug"
                         variant="soft"
                         class="w-full"
                 /></UFormField>
@@ -284,7 +233,7 @@ async function upload(
             <UButton
                 type="submit"
                 form="admin-entry-form"
-                label="Save Draft"
+                :label="resource.features.value.publishing ? 'Save Draft' : 'Save'"
                 color="neutral"
                 size="lg"
                 block

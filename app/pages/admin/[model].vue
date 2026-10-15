@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import type { SiteAdminDescriptor } from '@liria24/site-admin'
-import { managementAssetUrl, type SiteAdminManagementModels } from '@liria24/site-admin/client'
-import type { EntryRecord, RevisionRecord } from '@liria24/site-admin/server'
+import type { Revision } from '@liria24/site-admin'
 
 import { LazyAdminFormEntryModal } from '#components'
 
@@ -10,162 +8,78 @@ definePageMeta({
     layout: 'admin',
     key: (route) => ('model' in route.params ? String(route.params.model) : route.path),
 })
-
 const modelName = String(useRoute('admin-model').params.model)
 const presentation = adminModels[modelName as keyof typeof adminModels]
-const { data: descriptors } = await useFetch<SiteAdminDescriptor>('/api/site-admin/models')
-const descriptor = descriptors.value?.models[modelName]
-if (!descriptor || !presentation) throw createError({ statusCode: 404 })
-
-const management = useSiteAdminManagementClient()
-const page = ref(1)
+if (!presentation) throw createError({ statusCode: 404 })
+const resource = await useAdminEntries(modelName, {
+    all: modelName !== 'posts',
+})
+const { data, error, status, page, features } = resource
+const items = computed(() => data.value?.items ?? [])
+type Entry = (typeof items.value)[number]
+const count = computed(() => resource.data.value?.total ?? 0)
+const busy = computed(() => status.value === 'pending')
 const pageSize = 20
-const posts =
-    modelName === 'posts'
-        ? await useSiteAdminManagementList('posts', {
-              limit: pageSize,
-              offset: () => (page.value - 1) * pageSize,
-          })
-        : undefined
-const allEntries =
-    modelName === 'posts'
-        ? undefined
-        : await useAsyncData(
-              `admin:${modelName}`,
-              () => management.listAllEntries(modelName as keyof SiteAdminManagementModels),
-              { default: () => [] },
-          )
-const entries = computed(() => (posts ? (posts.data.value?.items ?? []) : allEntries!.data.value))
-const error = computed(() => (posts ? posts.error.value : allEntries!.error.value))
-const count = computed(() => (posts ? (posts.data.value?.total ?? 0) : items.value.length))
-const pending = computed(() => posts?.pending.value ?? false)
-
-const refresh = () => (posts ? posts.refresh() : allEntries!.refresh())
-
-watch(
-    () => posts?.data.value?.total,
-    (total) => {
-        if (total !== undefined)
-            page.value = Math.min(page.value, Math.max(1, Math.ceil(total / pageSize)))
-    },
-)
-
-const items = ref<EntryRecord[]>([])
-
-watch(
-    entries,
-    (value) => {
-        items.value = [...value]
-    },
-    { immediate: true },
-)
-
 const modal = useOverlay().create(LazyAdminFormEntryModal)
-const failure = ref('')
-const busy = ref(false)
 const schedule = ref<Record<string, string>>({})
-const revisions = ref<Record<string, RevisionRecord[]>>({})
+const revisions = ref<Record<string, Revision[]>>({})
 const selectedRevision = ref<Record<string, string>>({})
-
-async function history(entry: EntryRecord) {
-    revisions.value[entry.id] = await management.listRevisions(entry.id)
+async function history(entry: Entry) {
+    try {
+        revisions.value[entry.id] = await resource.revisions(entry)
+    } catch {
+        /* resource.error displays the failure. */
+    }
 }
-async function edit(data?: EntryRecord) {
+async function edit(data?: Entry) {
     if (modelName === 'posts') {
         await navigateTo(data ? `/admin/posts/${encodeURIComponent(data.id)}` : '/admin/posts/new')
         return
     }
     await modal.open({
         modelName,
-        descriptor: descriptor!,
-        data,
+        id: data?.id,
         categories: [
             ...new Set(
                 items.value
-                    .map((entry) => entry.data.category)
+                    .map((entry) => Reflect.get(entry.data, 'category'))
                     .filter(
                         (value): value is string => typeof value === 'string' && Boolean(value),
                     ),
             ),
         ],
     }).result
-    await refresh()
 }
-
 defineShortcuts({ n: () => edit() })
-
-async function operation(entry: EntryRecord, action: string, extra: Record<string, unknown> = {}) {
+async function operation(entry: Entry, action: string, extra: Record<string, unknown> = {}) {
     if (busy.value) return
-    busy.value = true
-    failure.value = ''
     try {
-        if (modelName === 'posts' && action === 'unpublish') {
-            await unpublishPost(management, descriptor!, entry)
-            await refresh()
-            return
-        }
-        await $fetch(
-            `/api/site-admin/entries/${encodeURIComponent(entry.id)}${action === 'delete' ? '' : `/${action}`}`,
-            {
-                method: action === 'delete' ? 'DELETE' : 'POST',
-                ...(action === 'delete'
-                    ? { headers: { 'if-match': `"${entry.version}"` } }
-                    : { body: { expectedVersion: entry.version, ...extra } }),
-            },
-        )
-        await refresh()
-    } catch (error: any) {
-        failure.value =
-            error.data?.error?.code === 'SITE_ADMIN_CONFLICT'
-                ? 'Conflict detected. Reload latest.'
-                : error.data?.error?.message || error.message
-    } finally {
-        busy.value = false
+        if (action === 'delete') await resource.remove(entry)
+        else if (action === 'publish') await resource.publish(entry)
+        else if (action === 'unpublish') await resource.unpublish(entry)
+        else if (action === 'schedule') await resource.schedule(entry, String(extra.at))
+        else if (action === 'cancel-schedule') await resource.cancelSchedule(entry)
+        else await resource.restore(entry, selectedRevision.value[entry.id]!)
+    } catch {
+        /* resource.error displays the failure. */
     }
 }
-
-async function reorder(order: EntryRecord[]) {
-    if (busy.value) return
-    busy.value = true
-    failure.value = ''
+async function reorder(order: Entry[]) {
     try {
-        await $fetch(`/api/site-admin/entries/${encodeURIComponent(modelName)}/reorder`, {
-            method: 'POST',
-            body: {
-                items: order.map((entry, sortOrder) => ({
-                    id: entry.id,
-                    sortOrder,
-                    expectedVersion: entry.version,
-                })),
-            },
-        })
-    } catch (error: any) {
-        failure.value = error.data?.error?.message || error.message
-    } finally {
-        await refresh()
-        busy.value = false
+        await resource.reorder(order)
+    } catch {
+        /* The resource restores the previous order. */
     }
 }
-
 function move(index: number, offset: number) {
     const target = index + offset
     if (busy.value || target < 0 || target >= items.value.length) return
     const order = [...items.value]
     ;[order[index], order[target]] = [order[target]!, order[index]!]
-    items.value = order
     void reorder(order)
 }
-
-function imageUrl(entry: EntryRecord) {
-    const image = entry.data[descriptor!.displayFields?.image || 'images']
-    if (modelName === 'posts') {
-        return image && typeof image === 'object' && 'url' in image && typeof image.url === 'string'
-            ? image.url
-            : undefined
-    }
-    const id = adminAssetId(image)
-    return id ? managementAssetUrl(id) : undefined
-}
+const imageUrl = (entry: Entry) => resource.display(entry.data).image
+const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, field)
 </script>
 
 <template>
@@ -177,9 +91,9 @@ function imageUrl(entry: EntryRecord) {
                 icon="mingcute:refresh-2-line"
                 variant="ghost"
                 size="sm"
-                :disabled="busy || pending"
+                :disabled="busy"
                 loading-auto
-                @click="refresh()"
+                @click="resource.refresh()"
             />
         </template>
         <template #actions>
@@ -195,16 +109,16 @@ function imageUrl(entry: EntryRecord) {
             </UButton>
         </template>
 
-        <UAlert v-if="failure || error" :title="failure || error?.message" color="error" />
+        <UAlert v-if="error" :title="error.message" color="error" />
 
         <AdminResourceSortableList
-            v-model="items"
-            :disabled="!descriptor?.sortable || busy"
+            :items="items"
+            :disabled="!features.sortable || busy"
             @reorder="reorder"
         >
             <template #default="{ item }">
                 <AdminResourceSortableItem
-                    :sortable="descriptor?.sortable"
+                    :sortable="features.sortable"
                     :class="modelName === 'works' && 'bg-muted/70 ring-muted/50 rounded-xl px-3'"
                     @up="move(items.indexOf(item), -1)"
                     @down="move(items.indexOf(item), 1)"
@@ -217,16 +131,17 @@ function imageUrl(entry: EntryRecord) {
                             class="size-12 shrink-0 rounded-lg object-cover"
                         />
                         <UIcon
-                            v-else-if="typeof item.data.icon === 'string' && item.data.icon"
-                            :name="item.data.icon"
+                            v-else-if="
+                                typeof fieldValue(item, 'icon') === 'string' &&
+                                fieldValue(item, 'icon')
+                            "
+                            :name="String(fieldValue(item, 'icon'))"
                             class="size-5 shrink-0"
                         />
                     </template>
                     <div class="flex flex-wrap items-center gap-2">
                         <p class="text-sm leading-snug">
-                            {{
-                                item.data[descriptor?.displayFields?.title || 'title'] || item.slug
-                            }}
+                            {{ resource.display(item.data).title }}
                         </p>
                         <UBadge
                             :label="
@@ -252,24 +167,18 @@ function imageUrl(entry: EntryRecord) {
                     <div class="mt-3 flex flex-wrap items-center gap-2">
                         <template v-for="field in presentation.fields" :key="field">
                             <AdminResourceMeta
-                                v-if="
-                                    modelName === 'works' &&
-                                    (field === 'slug' ? item.slug : item.data[field])
-                                "
+                                v-if="modelName === 'works' && fieldValue(item, field)"
                                 :label="field"
-                                :value="field === 'slug' ? item.slug : item.data[field]"
+                                :value="fieldValue(item, field)"
                             />
                             <span
-                                v-else-if="
-                                    modelName !== 'works' &&
-                                    (field === 'slug' ? item.slug : item.data[field])
-                                "
+                                v-else-if="modelName !== 'works' && fieldValue(item, field)"
                                 class="text-muted text-sm wrap-break-word"
-                                >{{ field === 'slug' ? item.slug : item.data[field] }}</span
+                                >{{ fieldValue(item, field) }}</span
                             >
                         </template>
                     </div>
-                    <details class="group mt-3">
+                    <details v-if="features.publishing || features.revisions" class="group mt-3">
                         <summary
                             class="text-muted hover:text-default flex w-fit cursor-pointer list-none items-center gap-1 text-xs"
                         >
@@ -283,6 +192,7 @@ function imageUrl(entry: EntryRecord) {
                             class="border-default mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
                         >
                             <UButton
+                                v-if="features.publishing"
                                 :label="modelName === 'posts' ? 'Edit & Publish' : 'Publish'"
                                 icon="mingcute:upload-3-fill"
                                 variant="soft"
@@ -294,7 +204,7 @@ function imageUrl(entry: EntryRecord) {
                                 "
                             />
                             <UButton
-                                v-if="item.publishedRevisionId"
+                                v-if="features.publishing && item.publishedRevisionId"
                                 label="Unpublish"
                                 variant="ghost"
                                 color="neutral"
@@ -303,7 +213,7 @@ function imageUrl(entry: EntryRecord) {
                                 @click="operation(item, 'unpublish')"
                             />
                             <UInput
-                                v-if="modelName !== 'posts'"
+                                v-if="features.scheduling && modelName !== 'posts'"
                                 v-model="schedule[item.id]"
                                 type="datetime-local"
                                 aria-label="Schedule publish time"
@@ -311,7 +221,7 @@ function imageUrl(entry: EntryRecord) {
                                 size="sm"
                             />
                             <UButton
-                                v-if="modelName !== 'posts'"
+                                v-if="features.scheduling && modelName !== 'posts'"
                                 label="Schedule Publish"
                                 variant="soft"
                                 color="neutral"
@@ -333,6 +243,7 @@ function imageUrl(entry: EntryRecord) {
                                 @click="operation(item, 'cancel-schedule')"
                             />
                             <UButton
+                                v-if="features.revisions"
                                 label="Revision history"
                                 icon="mingcute:history-line"
                                 variant="ghost"
@@ -348,7 +259,7 @@ function imageUrl(entry: EntryRecord) {
                                     aria-label="Revision to restore"
                                     :items="
                                         revisions[item.id]?.map((revision) => ({
-                                            label: `${new Date(revision.createdAt).toLocaleString()} — ${revision.slug}`,
+                                            label: `${new Date(revision.createdAt).toLocaleString()} — ${revision.data.slug ?? revision.id}`,
                                             value: revision.id,
                                         }))
                                     "
@@ -396,11 +307,11 @@ function imageUrl(entry: EntryRecord) {
             </template>
         </AdminResourceSortableList>
         <UPagination
-            v-if="posts && count > pageSize"
+            v-if="modelName === 'posts' && count > pageSize"
             v-model:page="page"
             :total="count"
             :items-per-page="pageSize"
-            :disabled="busy || pending"
+            :disabled="busy"
             aria-label="Post pages"
         />
     </AdminResourcePage>

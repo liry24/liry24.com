@@ -1,6 +1,5 @@
 import { passkeyClient } from '@better-auth/passkey/client'
-
-import { lastLoginMethodClient } from '#better-auth/client/plugins'
-import { defineClientAuth } from '#nuxtjs/better-auth/config'
+import { defineClientAuth } from '@nuxtjs/better-auth/config'
+import { lastLoginMethodClient } from 'better-auth/client/plugins'
 
 export default defineClientAuth({ plugins: [passkeyClient(), lastLoginMethodClient()] })

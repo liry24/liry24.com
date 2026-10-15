@@ -1,7 +1,7 @@
 import { drizzleAdapter as authAdapter } from '@better-auth/drizzle-adapter/relations-v2'
 import type { D1Database } from '@cloudflare/workers-types'
+import type { SiteAdminDatabaseContext } from '@liria24/site-admin'
 import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
-import type { SiteAdminDatabaseContext } from '@liria24/site-admin/runtime/database'
 import { createError, type RequestEvent } from 'nuxt/server'
 
 import { createDB, getDevelopmentDB, type Database } from '../database/index.ts'

@@ -10,7 +10,7 @@ const overlay = useOverlay()
 const modalStacks = overlay.create(LazyStacksModal)
 const MotionUSeparator = motion.create('hr')
 
-const { data: batch } = await useSiteAdminBatch({
+const { data: batch } = await useContent({
     arts: { list: 'arts' },
     socials: { list: 'socials' },
     careers: { list: 'careers' },
@@ -29,7 +29,7 @@ const data = computed(() => ({
     posts:
         batch.value?.posts.data?.map((entry) => ({
             ...entry.data,
-            slug: entry.slug,
+            slug: entry.data.slug,
             createdAt: entry.data.createdAt || entry.publishedAt,
         })) || [],
 }))
@@ -44,8 +44,6 @@ const rotateArray = <T>(arr: T[], n: number): T[] => {
 }
 
 useKeyCommand(modalStacks.open)
-
-useSeo()
 </script>
 
 <template>
@@ -62,7 +60,7 @@ useSeo()
                 :animate="{ scale: 1, opacity: 1, filter: 'blur(0px)' }"
                 :transition="{ delay: 0.2 + index * 0.1 }"
             >
-                <NuxtLink :to="`/arts?open=${art.slug}`">
+                <NuxtLink :to="`/arts?open=${art.data.slug}`">
                     <NuxtImg
                         :src="art.data.images[0]?.url"
                         :alt="art.data.title"
@@ -260,7 +258,7 @@ useSeo()
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <article
                         v-for="post in data.posts.slice(0, 10)"
-                        :key="post.slug"
+                        :key="String(post.slug)"
                         class="hover:bg-muted flex h-fit flex-col gap-3 rounded-xl p-6 transition-colors"
                     >
                         <h2 class="line-clamp-2 text-2xl font-bold">

@@ -48,7 +48,6 @@ export const revisions = sqliteTable(
         entry_id: text()
             .notNull()
             .references(() => entries.id, { onDelete: 'cascade' }),
-        slug: text().notNull(),
         actor_id: text(),
         created_at: text().notNull(),
     },
@@ -143,6 +142,7 @@ export const content_776f726b73 = sqliteTable('site_admin_content_works', {
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
+    slug: text('field_slug'),
     title: text('field_title').notNull(),
     description: text('field_description'),
     category: text('field_category'),
@@ -157,6 +157,7 @@ export const content_61727473 = sqliteTable('site_admin_content_arts', {
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
+    slug: text('field_slug'),
     title: text('field_title').notNull(),
     description: text('field_description'),
     href: text('field_href'),
@@ -167,6 +168,7 @@ export const content_63617265657273 = sqliteTable('site_admin_content_careers', 
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
+    slug: text('field_slug'),
     period: text('field_period').notNull(),
     position: text('field_position').notNull(),
     company: text('field_company').notNull(),
@@ -175,6 +177,7 @@ export const content_72616e6b73 = sqliteTable('site_admin_content_ranks', {
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
+    slug: text('field_slug'),
     game: text('field_game').notNull(),
     season: text('field_season'),
     rank: text('field_rank').notNull(),
@@ -185,6 +188,7 @@ export const content_736b696c6c73 = sqliteTable('site_admin_content_skills', {
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
+    slug: text('field_slug'),
     name: text('field_name').notNull(),
     icon: text('field_icon').notNull(),
     category: text('field_category'),
@@ -193,6 +197,7 @@ export const content_736f6369616c73 = sqliteTable('site_admin_content_socials', 
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
+    slug: text('field_slug'),
     href: text('field_href').notNull(),
     icon: text('field_icon').notNull(),
     label: text('field_label').notNull(),
@@ -201,9 +206,8 @@ export const content_706f737473 = sqliteTable('site_admin_content_posts', {
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
+    slug: text('field_slug'),
     title: text('field_title').notNull(),
-    // Retain retired excerpt storage and historical values; the model no longer uses it.
-    excerpt: text('field_excerpt'),
     content: text('field_content').notNull(),
     publication: text('field_publication', { mode: 'json' }),
     tags: text('field_tags', { mode: 'json' }).notNull(),

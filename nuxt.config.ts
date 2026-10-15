@@ -1,6 +1,5 @@
-import { relative, resolve } from 'node:path'
+import { resolve } from 'node:path'
 
-import { createSiteAdminDependencyTypePaths } from '@liria24/site-admin/dependency-aliases'
 import { defineNuxtConfig } from 'nuxt/config'
 import { parseURL } from 'ufo'
 import type { Unstable_RawConfig } from 'wrangler'
@@ -79,23 +78,6 @@ export default defineNuxtConfig({
 
     modules: [
         (_options, nuxt) => {
-            nuxt.hook('modules:done', () => {
-                nuxt.hook('prepare:types', ({ nodeTsConfig }) => {
-                    // Nuxt strips declaration extensions from absolute paths. Keep
-                    // the exported declarations explicit in the Node auth config project.
-                    const paths = createSiteAdminDependencyTypePaths()
-                    for (const [name, declarations] of Object.entries(paths))
-                        paths[name] = declarations.map((path) => {
-                            const target = relative(nuxt.options.buildDir, path).replaceAll(
-                                '\\',
-                                '/',
-                            )
-                            return target.startsWith('.') ? target : `./${target}`
-                        })
-                    nodeTsConfig.compilerOptions ??= {}
-                    Object.assign((nodeTsConfig.compilerOptions.paths ??= {}), paths)
-                })
-            })
             // A configured Site Admin database adapter is not prepared before Better Auth.
             // Resolve the same application connection directly for each auth request.
             nuxt.hook('better-auth:database:providers', (providers) => {
@@ -187,19 +169,6 @@ export function createDatabase(event) {
 
     nitro: {
         preset: 'cloudflare_module',
-        externals: {
-            inline: [
-                // Nuxt 4.6 renderer subpaths contain stubs that Nitro replaces during bundling.
-                'nuxt/internal',
-                // A predicate takes precedence over Nitro-dev's external build directory.
-                // Bundle generated auth modules so their public dependency aliases
-                // and application-owned database factory resolve.
-                (id: string) =>
-                    /\/(?:better-auth\/database|site-admin\/better-auth-server-plugin)\.mjs$/.test(
-                        id.replaceAll('\\', '/'),
-                    ),
-            ],
-        },
         // Passkey certificate verification needs this polyfill before tsyringe initializes.
         moduleSideEffects: ['reflect-metadata'],
         compressPublicAssets: true,
@@ -287,7 +256,6 @@ export function createDatabase(event) {
 
     siteAdmin: {
         ai: true,
-        routing: { metadata: false },
     },
 
     auth: {

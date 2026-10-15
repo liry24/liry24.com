@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import type { D1Database } from '@cloudflare/workers-types'
 import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
-import { createSiteAdmin } from '@liria24/site-admin/server'
+import { createSiteAdmin } from '@liria24/site-admin/internal/server'
 import { drizzle } from 'drizzle-orm/d1'
 import { migrate } from 'drizzle-orm/d1/migrator'
 import { afterEach, expect, test } from 'vitest'
@@ -52,8 +52,7 @@ test('application-owned D1 uses explicit migration and preserves scheduled revis
     const database = drizzleAdapter(orm, { schema })
     const admin = createSiteAdmin({ config, database })
     let entry = await admin.createEntry('posts', {
-        slug: 'worker-test',
-        data: { title: 'A', content: '# A', tags: [] },
+        data: { title: 'A', content: '# A', tags: [], slug: 'worker-test' },
     })
     entry = await admin.publishEntry(entry.id, { expectedVersion: entry.version })
     const revisionA = entry.publishedRevisionId
@@ -61,12 +60,12 @@ test('application-owned D1 uses explicit migration and preserves scheduled revis
         expectedVersion: entry.version,
         at: new Date(Date.now() + 3600000).toISOString(),
         draft: {
-            slug: 'worker-test',
             data: {
                 title: 'B',
                 content: '# B',
                 tags: [],
                 publication: { slug: 'auto', publishedSlug: 'worker-test' },
+                slug: 'worker-test',
             },
         },
     })
@@ -76,7 +75,7 @@ test('application-owned D1 uses explicit migration and preserves scheduled revis
     const oldVersion = entry.version
     entry = await admin.updateEntry(entry.id, {
         expectedVersion: entry.version,
-        data: { title: 'C', content: '# C', tags: [] },
+        data: { slug: entry.data.slug, title: 'C', content: '# C', tags: [] },
     })
     expect(entry.publishedRevisionId).toBe(revisionA)
     expect(entry.scheduledRevisionId).toBe(revisionB)
@@ -84,5 +83,5 @@ test('application-owned D1 uses explicit migration and preserves scheduled revis
     await expect(
         admin.updateEntry(entry.id, { expectedVersion: oldVersion, data: entry.data }),
     ).rejects.toMatchObject({ code: 'SITE_ADMIN_CONFLICT' })
-    expect((await admin.getPublicEntry('posts', 'worker-test'))?.data.title).toBe('A')
+    expect((await admin.getPublicEntry('posts', entry.id))?.data.title).toBe('A')
 }, 60_000)

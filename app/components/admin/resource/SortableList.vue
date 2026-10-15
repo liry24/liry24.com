@@ -2,17 +2,23 @@
 import { updateConfig } from '@formkit/drag-and-drop'
 import { dragAndDrop } from '@formkit/drag-and-drop/vue'
 
-const items = defineModel<T[]>({ required: true })
-const props = defineProps<{ disabled?: boolean }>()
+const props = defineProps<{ items: T[]; disabled?: boolean }>()
+const values = shallowRef<T[]>([...props.items])
+watch(
+    () => props.items,
+    (items) => {
+        values.value = [...items]
+    },
+)
 const emit = defineEmits<{ reorder: [items: T[]] }>()
 const parent = ref<HTMLElement>()
 
 dragAndDrop({
     parent,
-    values: items,
+    values,
     dragHandle: '.resource-drag-handle',
     disabled: props.disabled,
-    onDragend: () => emit('reorder', items.value),
+    onDragend: () => emit('reorder', values.value),
 })
 watch(
     () => props.disabled,
@@ -24,6 +30,6 @@ watch(
 
 <template>
     <ul ref="parent" class="grid min-w-0 grid-cols-1 gap-2">
-        <li v-for="item in items" :key="item.id" class="min-w-0"><slot :item /></li>
+        <li v-for="item in values" :key="item.id" class="min-w-0"><slot :item /></li>
     </ul>
 </template>

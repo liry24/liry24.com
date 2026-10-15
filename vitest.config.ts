@@ -1,11 +1,12 @@
 import { fileURLToPath } from 'node:url'
 
-import { createSiteAdminDependencyPlugin } from '@liria24/site-admin/dependency-aliases'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
     envDir: false,
-    plugins: [createSiteAdminDependencyPlugin()],
-    resolve: { alias: { '~~': fileURLToPath(new URL('.', import.meta.url)) } },
-    test: { include: ['tests/**/*.test.ts'] },
+    resolve: {
+        dedupe: ['vue', '@tanstack/vue-form'],
+        alias: { '~~': fileURLToPath(new URL('.', import.meta.url)) },
+    },
+    test: { server: { deps: { inline: [/site-admin/] } }, include: ['tests/**/*.test.ts'] },
 })

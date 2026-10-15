@@ -14,9 +14,3 @@ export function postPublicationSettings(data: Record<string, unknown>): PostPubl
             : {}),
     }
 }
-
-// Older revisions keep their URL until the author explicitly chooses auto.
-export function postGeneratesSlug(data: Record<string, unknown>, published: boolean) {
-    const settings = postPublicationSettings(data)
-    return !published && !settings.publishedSlug && settings.slug === 'auto'
-}

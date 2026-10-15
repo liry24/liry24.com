@@ -1,13 +1,15 @@
 <script setup lang="ts">
 const route = useRoute()
 
-const { data: entry, error } = await useSiteAdminEntry('posts', () => String(route.params.slug))
+const { data: entry, error } = await useContent('posts', {
+    path: () => route.path,
+})
 if (error.value) throw error.value
 const data = computed(() =>
     entry.value
         ? {
               ...entry.value.data,
-              slug: entry.value.slug,
+              slug: entry.value.data.slug,
               createdAt: entry.value.data.createdAt || entry.value.publishedAt,
           }
         : null,
@@ -23,8 +25,6 @@ const { isSupported: isShareSupported, share } = useShare(() => ({
 }))
 
 const { isSupported: isCopySupported, copy, copied } = useClipboard()
-
-useSeo(() => entry.value?.seo)
 </script>
 
 <template>

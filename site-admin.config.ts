@@ -14,6 +14,7 @@ import {
 } from '@liria24/site-admin'
 import { z } from 'zod'
 
+import { getSiteAdminDatabase } from './server/utils/database.ts'
 import {
     postEditorialOptions,
     postSlugOutput,
@@ -45,28 +46,25 @@ export default defineSiteAdminConfig({
         separateDrafts: false,
         cleanup: { minimumAge: 60 * 60 * 24 },
     },
-    database: async (context) => {
-        const { getSiteAdminDatabase } = await import('./server/utils/database.ts')
-        return getSiteAdminDatabase(context)
-    },
+    database: getSiteAdminDatabase,
     ai: {
         model: openai('gpt-6-luna'),
         actions: {
             publication: {
                 type: 'text-generation',
-                props: {
+                input: z.strictObject({
                     title: z.string().refine((value) => Boolean(value.trim()), 'Write a title.'),
                     content: z.string().refine((value) => Boolean(value.trim()), 'Write content.'),
-                },
+                }),
                 prompt: postSlugPrompt,
                 output: postSlugOutput(),
                 options: postEditorialOptions,
             },
             proofread: {
                 type: 'text-generation',
-                props: {
+                input: z.strictObject({
                     content: z.string().refine((value) => Boolean(value.trim()), 'Write content.'),
-                },
+                }),
                 prompt: postProofreadingPrompt,
                 output: postProofreadingOutput,
                 options: postEditorialOptions,
@@ -127,12 +125,13 @@ export default defineSiteAdminConfig({
 
             displayFields: { title: 'title', description: 'description', image: 'image' },
             fields: {
+                slug: text({ default: '' }),
                 title: text({ required: true }),
                 description: textarea(),
                 category: text(),
                 image: image(),
                 icon: text(),
-                href: url(),
+                href: url({ label: 'URL' }),
                 price: text(),
                 style: select(['large', 'small'], { required: true, default: 'small' }),
                 createdAt: datetime(),
@@ -143,9 +142,10 @@ export default defineSiteAdminConfig({
 
             displayFields: { title: 'title', description: 'description' },
             fields: {
+                slug: text({ default: '' }),
                 title: text({ required: true }),
                 description: textarea(),
-                href: url(),
+                href: url({ label: 'URL' }),
                 images: images({ required: true }),
                 createdAt: datetime(),
             },
@@ -155,21 +155,26 @@ export default defineSiteAdminConfig({
 
             displayFields: { title: 'company' },
             fields: {
+                slug: text({ default: '' }),
                 period: text({ required: true }),
                 position: text({ required: true }),
                 company: text({ required: true }),
             },
         },
         ranks: {
+            publishing: false,
+            scheduling: false,
+            revisions: false,
             sortable: true,
 
             displayFields: { title: 'game', image: 'image' },
             fields: {
+                slug: text({ default: '' }),
                 game: text({ required: true }),
                 season: text(),
                 rank: text({ required: true }),
                 image: image({ required: true }),
-                href: url(),
+                href: url({ label: 'URL' }),
             },
         },
         skills: {
@@ -177,18 +182,23 @@ export default defineSiteAdminConfig({
 
             displayFields: { title: 'name' },
             fields: {
+                slug: text({ default: '' }),
                 name: text({ required: true }),
                 icon: text({ required: true }),
                 category: text(),
             },
         },
         socials: {
+            publishing: false,
+            scheduling: false,
+            revisions: false,
             sortable: true,
 
             displayFields: { title: 'label' },
             route: { path: '/:slug', redirect: 'href', sitemap: false, llms: false },
             fields: {
-                href: url({ required: true }),
+                slug: text({ default: '' }),
+                href: url({ required: true, label: 'URL' }),
                 icon: text({ required: true }),
                 label: text({ required: true }),
             },
@@ -198,6 +208,7 @@ export default defineSiteAdminConfig({
             seo: { type: 'article' },
             displayFields: { title: 'title', description: 'content', image: 'image' },
             fields: {
+                slug: text({ default: '' }),
                 title: text({ required: true }),
                 content: markdown({ required: true }),
                 publication: object({

@@ -1,10 +1,9 @@
 import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
-import { createSiteAdminClient } from '@liria24/site-admin/client'
-import { createSiteAdmin, handlePublicRequest } from '@liria24/site-admin/server'
+import { createSiteAdminClient } from '@liria24/site-admin/internal/client'
+import { createSiteAdmin, handlePublicRequest } from '@liria24/site-admin/internal/server'
+import type { Node } from 'comark'
+import { parseMarkdown } from 'comark/parse'
 import { expect, test } from 'vitest'
-
-import type { Node } from '#comark'
-import { parseMarkdown } from '#comark/parse'
 
 import { openDevelopmentDB } from '../../server/database/development'
 import * as schema from '../../server/database/schema'
@@ -129,11 +128,10 @@ test('post preview and native public detail/summary apply the same Markdown poli
     })
     try {
         let entry = await admin.createEntry('posts', {
-            slug: 'safe-markdown',
-            data: { title: 'Safe Markdown', content, tags: [] },
+            data: { title: 'Safe Markdown', content, tags: [], slug: 'safe-markdown' },
         })
         entry = await admin.publishEntry(entry.id, { expectedVersion: entry.version })
-        const detail = await client.get('posts', entry.slug)
+        const detail = await client.get('posts', entry.id)
         const summary = (await client.list('posts', { markdown: 'summary' }))[0]!
         const preview = await parseMarkdown(content, { plugins: [postMarkdownSecurity] })
         for (const nodes of [preview.nodes, detail!.data.content.nodes, summary.data.content.nodes])

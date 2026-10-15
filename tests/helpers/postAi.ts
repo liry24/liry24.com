@@ -1,6 +1,6 @@
 import { createOpenAI } from '@ai-sdk/openai'
-import { executeSiteAdminAiAction } from '@liria24/site-admin/ai'
-import type { SiteAdminActor } from '@liria24/site-admin/server'
+import { executeSiteAdminAiAction } from '@liria24/site-admin/internal/ai'
+import type { SiteAdminActor } from '@liria24/site-admin/internal/server'
 
 import type { PostSlugProps, PostSlugResult } from '../../server/utils/postEditorial'
 import config from '../../site-admin.config'
@@ -23,7 +23,7 @@ export function mockPostActions(fetch: typeof globalThis.fetch) {
         executeSiteAdminAiAction(
             { ...config, ai: { ...config.ai, model } },
             name,
-            { props },
+            { input: props },
             { actor, request: new Request('http://synthetic.invalid/ai', { signal }) },
         )
     return {

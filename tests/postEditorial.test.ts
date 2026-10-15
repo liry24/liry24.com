@@ -1,30 +1,21 @@
 import { expect, test } from 'vitest'
 
-import { postGeneratesSlug, postPublicationSettings } from '../shared/utils/postEditorial'
+import { postPublicationSettings } from '../shared/utils/postEditorial'
 
-test('saved choices remain automatic and publishing preserves a confirmed URL', () => {
-    const data = {
-        publication: { slug: 'auto', excerpt: 'manual' },
-        excerpt: 'Keep this introduction.',
-    }
-    expect(postPublicationSettings(data)).toEqual({ slug: 'auto' })
-    expect(postGeneratesSlug(data, false)).toBe(true)
-    expect(postGeneratesSlug(data, true)).toBe(false)
-    expect(data.excerpt).toBe('Keep this introduction.')
+test('keeps automatic publication choices', () => {
+    expect(postPublicationSettings({ publication: { slug: 'auto' } })).toEqual({ slug: 'auto' })
 })
 
-test('legacy revisions keep unrecorded URLs and ignore retired excerpt choices', () => {
-    expect(postGeneratesSlug({ excerpt: 'Existing introduction.' }, false)).toBe(false)
-    expect(postGeneratesSlug({ publication: { slug: 'manual', excerpt: 'auto' } }, true)).toBe(
-        false,
-    )
+test('defaults missing or malformed publication settings to manual', () => {
+    for (const publication of [undefined, null, [], { slug: 'invalid' }])
+        expect(postPublicationSettings({ publication })).toEqual({ slug: 'manual' })
 })
 
-test('a confirmed URL remains reserved after unpublishing', () => {
+test('keeps the confirmed URL marker after unpublishing', () => {
     expect(
-        postGeneratesSlug(
-            { publication: { slug: 'auto', excerpt: 'auto', publishedSlug: 'confirmed-url' } },
-            false,
-        ),
-    ).toBe(false)
+        postPublicationSettings({ publication: { slug: 'auto', publishedSlug: 'confirmed-url' } }),
+    ).toEqual({
+        slug: 'auto',
+        publishedSlug: 'confirmed-url',
+    })
 })

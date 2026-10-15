@@ -1,5 +1,5 @@
-import type { ComarkPlugin, Node } from '#comark'
-import security from '#comark/plugins/security'
+import type { ComarkPlugin, Node } from 'comark'
+import security from 'comark/plugins/security'
 
 // Posts support prose HTML, never executable tags or application components.
 const proseSecurity = security({

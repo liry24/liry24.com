@@ -1,6 +1,6 @@
 # Development constraints
 
-- Keep public pages, `/admin`, content APIs and Better Auth in the root Nuxt app and the single `liry24-com` Worker. Use the published `@liria24/site-admin` package, not a workspace copy.
+- Keep public pages, `/admin`, content APIs and Better Auth in the root Nuxt app and the single `liry24-com` Worker. Install `@liria24/site-admin` as a package. For SDK integration, verify with bun link first, then pin a commit-specific pkg.pr.new URL. Stable SDK releases use its existing uppt workflow.
 - Build with Nuxt and deploy Nitro's standard generated configuration with Wrangler, including branch Previews. Adopt `cf` gradually for supported operations such as D1/R2 management; do not convert Wrangler output into cf Build Output. Recheck support when upgrading cf or Nitro.
 - Keep deployment settings in `nitro.cloudflare.wrangler`; Nitro generates the Wrangler config and deploy redirect. Use `nodejs_compat_v2` with `enable_nodejs_process_v2` and `nodejs_compat_populate_process_env` so Nitro 2 does not add its v2 opt-out and native process stdio/runtime secrets work at the pinned date. Verify actual Worker execution when changing compatibility settings.
 - Normal Nuxt development uses Node's SQLite driver at `.data/development/sqlite.db` and the existing fs files storage. Initialize and apply local migrations only during development startup, never an HTTP request or a production build/deployment. Keep the SQLite driver out of Worker bundles. Preserve old `.data/unified` data; switching databases does not copy it automatically.
@@ -20,5 +20,5 @@
   enables the selected-repository Renovate App; delete events read the default-branch workflow.
   Default `main` must contain `renovate.json`, targeting `dev` with `useBaseBranchConfig: merge`.
   Updating patched packages requires patch rebase/retirement and regression checks. Keep
-  `@liria24/site-admin` on its published npm release. Publication and proofreading are
+  `@liria24/site-admin` pinned to the verified release or commit-specific pkg.pr.new URL. Publication and proofreading are
   application-owned `ai.actions`; keep that field policy aligned with the posts model.

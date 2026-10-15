@@ -110,7 +110,7 @@ try {
     entry = await request('/api/site-admin/entries/posts', {
         method: 'POST',
         status: 201,
-        body: { slug: id, data: { title: 'A', content: '# Draft A', tags: [] } },
+        body: { data: { title: 'A', content: '# Draft A', tags: [], slug: id } },
     })
     const base = `/api/site-admin/entries/${entry.id}`
     const mutate = async (action, extra = {}, method = 'POST') =>
@@ -119,11 +119,11 @@ try {
             body: { expectedVersion: entry.version, ...extra },
         }))
     const revisionA = entry.currentRevisionId
-    await request(`/api/content/posts/${id}`, { authenticated: false, status: 404 })
+    await request(`/api/content/posts/${entry.id}`, { authenticated: false, status: 404 })
     await mutate('/publish')
     if (!apiOnly) await request(`/posts/${id}`)
     const oldVersion = entry.version
-    await mutate('', { data: { title: 'B', content: '# Draft B', tags: [] } }, 'PATCH')
+    await mutate('', { data: { slug: id, title: 'B', content: '# Draft B', tags: [] } }, 'PATCH')
     await request(base, {
         method: 'PATCH',
         status: 409,
@@ -140,7 +140,7 @@ try {
     assert.notEqual(entry.currentRevisionId, revisionA)
     await mutate('/cancel-schedule')
     await mutate('/unpublish')
-    await request(`/api/content/posts/${id}`, { authenticated: false, status: 404 })
+    await request(`/api/content/posts/${entry.id}`, { authenticated: false, status: 404 })
     const image = Buffer.from(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=',
         'base64',
@@ -181,11 +181,11 @@ try {
                 method: 'POST',
                 status: 201,
                 body: {
-                    slug: `${id}-${suffix}`,
                     data: {
                         title,
                         content: `${introduction}${explicitSummary ? '\n\n<!-- more -->' : '\n\nAnother short introduction.'}\n\n# ${title}\n\n${fullBodySentinel}\n\n${'The full article remains available. '.repeat(100)}`,
                         tags: [],
+                        slug: `${id}-${suffix}`,
                     },
                 },
             })
@@ -194,7 +194,7 @@ try {
                 method: 'POST',
                 body: { expectedVersion: post.version },
             })
-            const html = await request(`/posts/${post.slug}`, { authenticated: false })
+            const html = await request(`/posts/${post.data.slug}`, { authenticated: false })
             if (process.env.LIRY24_TEST_ARTIFACT_DIRECTORY)
                 writeFileSync(
                     resolve(
@@ -207,7 +207,7 @@ try {
             assert(html.includes('property="og:type" content="article"'))
             assert(html.includes(`name="description" content="${description}"`))
             assert(html.includes(fullBodySentinel), 'Detail SSR must retain the full article')
-            const detailResponse = await fetch(new URL(`/api/content/posts/${post.slug}`, origin))
+            const detailResponse = await fetch(new URL(`/api/content/posts/${post.id}`, origin))
             assert.equal(detailResponse.status, 200)
             const detailPayload = await detailResponse.text()
             assert(
@@ -423,7 +423,7 @@ try {
                 )
                     errors.push(message.text())
             })
-            await page.goto(new URL(`/posts/${publicEntries[0].slug}`, origin).href)
+            await page.goto(new URL(`/posts/${publicEntries[0].data.slug}`, origin).href)
             await page.waitForFunction(
                 () => document.querySelector('#__nuxt')?.__vue_app__?.$nuxt?.isHydrating === false,
             )
@@ -447,12 +447,12 @@ try {
             )
             await page
                 .locator('article')
-                .filter({ has: page.locator(`a[href="/posts/${publicEntries[0].slug}"]`) })
+                .filter({ has: page.locator(`a[href="/posts/${publicEntries[0].data.slug}"]`) })
                 .last()
                 .locator('.line-clamp-3')
                 .waitFor()
-            await page.locator(`a[href="/posts/${publicEntries[0].slug}"]`).first().click()
-            await page.waitForURL(`**/posts/${publicEntries[0].slug}`)
+            await page.locator(`a[href="/posts/${publicEntries[0].data.slug}"]`).first().click()
+            await page.waitForURL(`**/posts/${publicEntries[0].data.slug}`)
             await page
                 .getByRole('heading', { name: 'Public probe one', exact: true, level: 1 })
                 .first()
@@ -466,7 +466,7 @@ try {
                         document.querySelector('#__nuxt').__vue_app__.$nuxt.$router.push(path),
                     path,
                 )
-            await navigate(`/posts/${publicEntries[1].slug}`)
+            await navigate(`/posts/${publicEntries[1].data.slug}`)
             await page
                 .getByRole('heading', { name: 'Public probe two', exact: true, level: 1 })
                 .first()
@@ -506,7 +506,7 @@ try {
                 !homePostsPayload.includes(fullBodySentinel),
                 'Home batch HTTP payload must exclude full bodies',
             )
-            await page.locator(`a[href="/posts/${publicEntries[0].slug}"]`).last().waitFor()
+            await page.locator(`a[href="/posts/${publicEntries[0].data.slug}"]`).last().waitFor()
             assert(partialFailure, 'Home should request the failed batch member')
             const batch = await page.evaluate(() =>
                 Object.entries(
@@ -519,7 +519,11 @@ try {
             )
             assert.equal(batch.length, 1)
             assert.equal(batch[0][1].socials.error.status, 503)
-            assert(batch[0][1].posts.data.some((post) => post.slug === publicEntries[0].slug))
+            assert(
+                batch[0][1].posts.data.some(
+                    (post) => post.data.slug === publicEntries[0].data.slug,
+                ),
+            )
             await page.unroute('**/api/content/socials?**')
             console.log(
                 'PASS: published SSR SEO, reactive post slug/title/description and history, one native home batch retaining successful posts after a socials failure',
@@ -531,8 +535,11 @@ try {
             const paginated = Array.from({ length: 21 }, (_, index) => ({
                 ...entry,
                 id: `${id}-page-${index + 1}`,
-                slug: `${id}-page-${index + 1}`,
-                data: { ...entry.data, title: `Pagination post ${index + 1}` },
+                data: {
+                    ...entry.data,
+                    title: `Pagination post ${index + 1}`,
+                    slug: `${id}-page-${index + 1}`,
+                },
             }))
             const listRoute = '**/api/site-admin/entries?**'
             await page.route(listRoute, async (route) => {
@@ -569,7 +576,7 @@ try {
                 JSON.stringify({ expectedId: entry.id, reloadedList }),
             )
             await page
-                .getByText(entry.slug, { exact: true })
+                .getByText(entry.data.slug, { exact: true })
                 .waitFor()
                 .catch(async (error) => {
                     console.error({
@@ -586,7 +593,7 @@ try {
             for (const title of ['Browser draft one', 'Browser draft two']) {
                 const row = page
                     .locator('li')
-                    .filter({ has: page.getByText(entry.slug, { exact: true }) })
+                    .filter({ has: page.getByText(entry.data.slug, { exact: true }) })
                     .last()
                 await row.getByRole('button', { name: 'Edit', exact: true }).click()
                 await page.waitForURL(`**/admin/posts/${entry.id}`)
@@ -832,8 +839,8 @@ try {
             await page.route('**/api/site-admin/ai/actions/proofread', async (route) => {
                 proofreadingCalls++
                 const body = route.request().postDataJSON()
-                assert.deepEqual(Object.keys(body), ['props'])
-                assert.deepEqual(Object.keys(body.props), ['content'])
+                assert.deepEqual(Object.keys(body), ['input'])
+                assert.deepEqual(Object.keys(body.input), ['content'])
                 await route.fulfill({
                     contentType: 'application/json',
                     body: JSON.stringify({ content: invalidProofreading ? '' : corrected }),
@@ -918,7 +925,7 @@ try {
                 await page.getByRole('button', { name: 'Publish', exact: true }).click()
                 await page.getByText('Synthetic AI failure', { exact: true }).waitFor()
                 assert.deepEqual(slugInput, {
-                    props: { title: 'Browser create draft', content: corrected },
+                    input: { title: 'Browser create draft', content: corrected },
                 })
                 assert.equal(await contentInput.inputValue(), corrected)
                 assert.equal(
@@ -944,6 +951,15 @@ try {
                     `${id}-browser-new`,
                 )
                 assert.equal(await contentInput.inputValue(), corrected)
+                await page.waitForFunction(() => {
+                    const app = document.querySelector('#__nuxt')?.__vue_app__?.$nuxt
+                    return (
+                        app &&
+                        !app._processingMiddleware &&
+                        !app['~transitionPromise'] &&
+                        document.querySelectorAll('#admin-post-form').length === 1
+                    )
+                })
                 await page.evaluate(() => {
                     const button = [...document.querySelectorAll('button')].find(
                         (button) => button.textContent.trim() === 'Publish',
@@ -953,7 +969,7 @@ try {
                 })
                 await page.waitForURL('**/admin/posts')
                 const stored = await request(`/api/site-admin/entries/${newEntry.id}`)
-                assert.equal(stored.slug, `${id}-browser-new`)
+                assert.equal(stored.data.slug, `${id}-browser-new`)
                 assert.equal(stored.data.title, 'Browser create draft')
                 assert.deepEqual(stored.data.tags, ['draft-tag'])
                 assert.equal(stored.data.content, corrected)

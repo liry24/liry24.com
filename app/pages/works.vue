@@ -1,16 +1,14 @@
 <script setup lang="ts">
 import { MasonryWall } from '@yeger/vue-masonry-wall'
 
-const { data } = await useSiteAdminList('works', {
+const { data } = await useContent('works', {
     transform: (entries) =>
         entries.map((entry) => ({
             ...entry.data,
-            slug: entry.slug,
+            slug: entry.data.slug,
             image: entry.data.image?.url,
         })),
 })
-
-useSeo()
 </script>
 
 <template>

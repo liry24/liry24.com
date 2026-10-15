@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types'
 import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
-import { createSiteAdmin } from '@liria24/site-admin/server'
+import { createSiteAdmin } from '@liria24/site-admin/internal/server'
 import { drizzle } from 'drizzle-orm/d1'
 import { migrate } from 'drizzle-orm/d1/migrator'
 import { expect, test } from 'vitest'
@@ -190,13 +190,12 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             })
             expect(crossedAction.status).toBe(403)
             let entry = await admin.createEntry('posts', {
-                slug: 'emitted-scheduled-handler',
-                data: { title: 'A', content: '# A', tags: [] },
+                data: { title: 'A', content: '# A', tags: [], slug: 'emitted-scheduled-handler' },
             })
             entry = await admin.publishEntry(entry.id, { expectedVersion: entry.version })
             entry = await admin.updateEntry(entry.id, {
                 expectedVersion: entry.version,
-                data: { title: 'B', content: '# B', tags: [] },
+                data: { slug: entry.data.slug, title: 'B', content: '# B', tags: [] },
             })
             const at = new Date(Date.now() + 60_000)
             entry = await admin.schedulePublish(entry.id, {
@@ -206,7 +205,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             const scheduledRevision = entry.scheduledRevisionId
             entry = await admin.updateEntry(entry.id, {
                 expectedVersion: entry.version,
-                data: { title: 'C', content: '# C', tags: [] },
+                data: { slug: entry.data.slug, title: 'C', content: '# C', tags: [] },
             })
             const currentRevision = entry.currentRevisionId
             // Dispatch through the actual emitted Worker entry, not admin.publishDue().
@@ -219,7 +218,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             const published = await admin.getEntry(entry.id)
             expect(published.scheduledRevisionId).toBeNull()
             expect(published.currentRevisionId).toBe(currentRevision)
-            expect((await admin.getPublicEntry('posts', entry.slug))?.data.title).toBe('B')
+            expect((await admin.getPublicEntry('posts', entry.id))?.data.title).toBe('B')
         } finally {
             for (const log of server.getLogs().filter((log) => log.level === 'error'))
                 console.error(log.message)

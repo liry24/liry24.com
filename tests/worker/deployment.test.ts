@@ -8,15 +8,8 @@ import type { Unstable_RawConfig } from 'wrangler'
 
 import nuxtConfig from '../../nuxt.config'
 
-test('the generated auth provider stays inline on POSIX and Windows paths', () => {
-    const inline = nuxtConfig.nitro!.externals!.inline!.find(
-        (rule) => typeof rule === 'function',
-    ) as (id: string) => boolean
-    expect(inline('/app/.nuxt/better-auth/database.mjs')).toBe(true)
-    expect(inline('C:\\app\\.nuxt\\better-auth\\database.mjs')).toBe(true)
-    expect(inline('/app/.nuxt/site-admin/better-auth-server-plugin.mjs')).toBe(true)
-    expect(inline('C:\\app\\.nuxt\\site-admin\\better-auth-server-plugin.mjs')).toBe(true)
-    expect(inline('/app/node_modules/better-auth/dist/index.mjs')).toBe(false)
+test('Site Admin owns generated module bundling', () => {
+    expect(nuxtConfig.nitro!.externals).toBeUndefined()
 })
 
 test('Nitro owns production settings and preserves infrastructure and required secret bindings', () => {

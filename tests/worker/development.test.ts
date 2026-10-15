@@ -4,11 +4,10 @@ import { join } from 'node:path'
 
 import { drizzleAdapter as authAdapter } from '@better-auth/drizzle-adapter/relations-v2'
 import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
-import { createSiteAdmin } from '@liria24/site-admin/server'
+import { createSiteAdmin } from '@liria24/site-admin/internal/server'
+import { betterAuth } from 'better-auth'
 import { transform } from 'esbuild'
 import { expect, test } from 'vitest'
-
-import { betterAuth } from '#better-auth'
 
 import { openDevelopmentDB } from '../../server/database/development'
 import * as schema from '../../server/database/schema'
@@ -46,14 +45,13 @@ test('development SQLite migrates once and preserves shared auth/content data ac
             ).json(),
         ).toBeNull()
         let entry = await admin.createEntry('posts', {
-            slug: 'sqlite-persistence',
-            data: { title: 'A', content: '# A', tags: [] },
+            data: { title: 'A', content: '# A', tags: [], slug: 'sqlite-persistence' },
         })
         entry = await admin.publishEntry(entry.id, { expectedVersion: entry.version })
         const revisionA = entry.publishedRevisionId
         entry = await admin.updateEntry(entry.id, {
             expectedVersion: entry.version,
-            data: { title: 'B', content: '# B', tags: [] },
+            data: { slug: entry.data.slug, title: 'B', content: '# B', tags: [] },
         })
         entry = await admin.schedulePublish(entry.id, {
             expectedVersion: entry.version,
@@ -63,7 +61,7 @@ test('development SQLite migrates once and preserves shared auth/content data ac
         const staleVersion = entry.version
         entry = await admin.updateEntry(entry.id, {
             expectedVersion: entry.version,
-            data: { title: 'C', content: '# C', tags: [] },
+            data: { slug: entry.data.slug, title: 'C', content: '# C', tags: [] },
         })
         await expect(
             admin.updateEntry(entry.id, {
@@ -83,7 +81,7 @@ test('development SQLite migrates once and preserves shared auth/content data ac
         expect(persisted.scheduledRevisionId).toBe(revisionB)
         expect(persisted.currentRevisionId).not.toBe(revisionB)
         expect(persisted.data.title).toBe('C')
-        expect((await reopened.getPublicEntry('posts', 'sqlite-persistence'))?.data.title).toBe('A')
+        expect((await reopened.getPublicEntry('posts', entry.id))?.data.title).toBe('A')
         expect(await readFile(oldData, 'utf8')).toBe('old-local-D1-data')
     } finally {
         local.close()
