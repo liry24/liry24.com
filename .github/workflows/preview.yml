@@ -53,16 +53,18 @@ jobs:
           GITHUB_CLIENT_SECRET: ${{ secrets.PREVIEW_GITHUB_CLIENT_SECRET }}
           PREVIEW_GITHUB_TOKEN: ${{ secrets.PREVIEW_GITHUB_TOKEN }}
         run: |
-          bun x void connect --platform cloudflare
           node --input-type=module <<'NODE'
-          import { writeFileSync } from 'node:fs'
-          import { join } from 'node:path'
+          import { mkdirSync, writeFileSync } from 'node:fs'
+          import { execFileSync } from 'node:child_process'
           const keys = ['BETTER_AUTH_SECRET', 'NUXT_APP_SECRET', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'PREVIEW_GITHUB_TOKEN']
           for (const name of keys) if (!process.env[name]) throw new Error('Missing Preview secret: ' + name)
-          writeFileSync(join(process.env.RUNNER_TEMP, 'preview.env'), keys.map(name => name + '=' + JSON.stringify(process.env[name])).join('\n'), { mode: 0o600 })
+          // The account is pinned in void.config.ts; CI does not need interactive account discovery.
+          mkdirSync('.void', { recursive: true })
+          writeFileSync('.void/project.json', JSON.stringify({ platform: 'cloudflare' }))
+          for (const name of keys) execFileSync('bun', ['x', 'void', 'secret', 'put', name], {
+            input: process.env[name], stdio: ['pipe', 'inherit', 'inherit'],
+          })
           NODE
-          trap 'rm -f "$RUNNER_TEMP/preview.env"' EXIT
-          bun x void secret sync "$RUNNER_TEMP/preview.env"
       - name: Deploy dev through Void
         run: bun x void deploy --platform cloudflare
         env:
