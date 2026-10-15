@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto'
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types'
 import { createSiteAdmin } from '@liria24/site-admin/internal/server'
@@ -62,7 +63,13 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             assets: { binding: 'ASSETS', directory: resolve('.output/public') },
             routes: [],
             triggers: { crons: [] },
-            d1_databases: [{ binding: 'DB', database_name: 'test-db', database_id: 'test-db' }],
+            d1_databases: [
+                {
+                    binding: 'DB',
+                    database_name: 'test-db',
+                    database_id: '00000000-0000-4000-8000-000000000001',
+                },
+            ],
             r2_buckets: [{ binding: 'STORAGE', bucket_name: 'test-assets' }],
         }
         delete config.previews
@@ -81,6 +88,24 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 'PREVIEW_GITHUB_TOKEN',
             ].map((name) => [name, `test-only-${name}-0123456789abcdef0123456789abcdef`]),
         )
+        // Exercise Void's actual deploy rebundling, including the native OG renderer WASM.
+        const voidDist = resolve('node_modules/void/dist')
+        const buildOutput = (await readdir(voidDist)).find((name) =>
+            /^cf-build-output-.*\.mjs$/.test(name),
+        )
+        expect(buildOutput).toBeDefined()
+        const { n: prepare } = await import(pathToFileURL(join(voidDist, buildOutput!)).href)
+        const prepared = await prepare({
+            projectRoot: process.cwd(),
+            configPath,
+            accountId: generated.account_id,
+        })
+        expect(prepared).not.toBeNull()
+        const workerOutput = join(prepared.directory, '.cloudflare/output/v0/workers/default')
+        const built = JSON.parse(await readFile(join(workerOutput, 'worker.config.json'), 'utf8'))
+        expect(Object.values(built.manifest.modules)).toContainEqual({ type: 'wasm' })
+        config.main = join(workerOutput, 'bundle', built.manifest.mainModule)
+        await writeFile(configPath, JSON.stringify(config))
         const server = createTestHarness({ workers: [{ configPath, secrets }] })
         try {
             await server.listen()
@@ -235,6 +260,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             for (const log of server.getLogs().filter((log) => log.level === 'error'))
                 console.error(log.message)
             await server.close()
+            await prepared.dispose()
             await rm(root, { recursive: true, force: true })
         }
     },

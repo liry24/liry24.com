@@ -1,0 +1,22 @@
+diff --git a/dist/cf-build-output-Bc8i3dzE.mjs b/dist/cf-build-output-Bc8i3dzE.mjs
+index 61b7cc5c8fb97b1a3800be307c505b413bd3fc08..1edab8b7e02af75a11859921ba312fdcc631ce1b 100644
+--- a/dist/cf-build-output-Bc8i3dzE.mjs
++++ b/dist/cf-build-output-Bc8i3dzE.mjs
+@@ -474,6 +474,17 @@ async function prepareBundledBuildOutput(options) {
+ 			root: options.projectRoot,
+ 			publicDir: false,
+ 			logLevel: "error",
++			plugins: [{
++				name: "void:worker-wasm",
++				enforce: "pre",
++				async resolveId(source, importer) {
++					if (!/\.wasm(?:\?module)?$/.test(source)) return;
++					const resolved = await this.resolve(source.replace(/\?module$/, ""), importer, { skipSelf: true });
++					if (!resolved || resolved.external) return;
++					const reference = this.emitFile({ type: "asset", name: basename(resolved.id), source: readFileSync(resolved.id) });
++					return { id: "./" + this.getFileName(reference), external: true };
++				}
++			}],
+ 			build: {
+ 				outDir: scratch,
+ 				emptyOutDir: true,

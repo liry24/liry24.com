@@ -82,6 +82,7 @@
     "patchedDependencies": {
         "better-call@1.4.2": "patches/better-call@1.4.2.patch",
         "@nuxt/hints@1.1.5": "patches/@nuxt%2Fhints@1.1.5.patch",
-        "better-auth@1.7.10": "patches/better-auth@1.7.10.patch"
+        "better-auth@1.7.10": "patches/better-auth@1.7.10.patch",
+        "void@1.1.11": "patches/void@1.1.11.patch"
     }
 }

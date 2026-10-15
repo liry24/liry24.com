@@ -13,3 +13,5 @@
 - GitHub Environment `Preview` holds the Cloudflare token, dev auth/OG signing secrets, OAuth credentials and repository permission lookup token. Cloudflare and permission lookup tokens expire on 2026-12-30; replace them before expiry. Never log secret values.
 - Renovate uses `renovate/`, targets `dev`, and runs only secretless quality checks. The default `main` needs `renovate.json` with `useBaseBranchConfig: merge` before enabling its App. Do not change Cloudflare Workers Builds settings in this task.
 - Publication slug policy and proofreading review belong to the app. Keep `ai.actions`, preparation hooks and the posts field definitions aligned; generic upload/save/publish state belongs to Site Admin.
+
+- Keep the Void 1.1.11 native-WASM patch until upstream preserves Worker WASM modules when rebundling Nuxt output; the built Worker integration test exercises that exact deployment path.
