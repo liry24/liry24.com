@@ -1,10 +1,10 @@
 <script setup lang="ts">
 const colorMode = useColorMode()
-const isLight = computed(() => colorMode.preference === 'light')
+const isLight = computed(() => colorMode.value === 'light')
 
 const logoSource = (name: string) => 'https://svgl.app/library/' + name + '.svg'
 
-const logos = [
+const logos = computed(() => [
     {
         name: 'TypeScript',
         logo: 'typescript',
@@ -115,7 +115,7 @@ const logos = [
         logo: 'svgl',
         href: 'https://svgl.app',
     },
-]
+])
 </script>
 
 <template>

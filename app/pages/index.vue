@@ -15,7 +15,7 @@ const { data: batch } = await useSiteAdminBatch({
     socials: { list: 'socials' },
     careers: { list: 'careers' },
     ranks: { list: 'ranks' },
-    posts: { list: 'posts' },
+    posts: { list: 'posts', markdown: 'summary' },
 })
 const data = computed(() => ({
     arts: batch.value?.arts.data || [],
@@ -258,15 +258,20 @@ useSeo()
                 </h2>
 
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <NuxtLink
+                    <article
                         v-for="post in data.posts.slice(0, 10)"
                         :key="post.slug"
-                        :to="`/posts/${post.slug}`"
                         class="hover:bg-muted flex h-fit flex-col gap-3 rounded-xl p-6 transition-colors"
                     >
                         <h2 class="line-clamp-2 text-2xl font-bold">
-                            {{ post.title }}
+                            <NuxtLink :to="`/posts/${post.slug}`">{{ post.title }}</NuxtLink>
                         </h2>
+
+                        <MarkdownDocument
+                            v-if="post.content.nodes.length"
+                            :value="post.content"
+                            class="sentence line-clamp-3 text-sm wrap-break-word *:first:mt-0 *:last:mb-0"
+                        />
 
                         <div class="flex flex-wrap items-center gap-2">
                             <NuxtTime
@@ -283,7 +288,7 @@ useSeo()
                                 variant="soft"
                             />
                         </div>
-                    </NuxtLink>
+                    </article>
                 </div>
             </Motion>
         </div>

@@ -1,3 +1,4 @@
+import { openai } from '@ai-sdk/openai'
 import {
     array,
     datetime,
@@ -5,15 +6,25 @@ import {
     image,
     images,
     markdown,
+    object,
     select,
     text,
     textarea,
     url,
 } from '@liria24/site-admin'
+import { z } from 'zod'
 
-import { editorialActions } from './server/utils/editorialAi.ts'
+import {
+    postEditorialOptions,
+    postSlugOutput,
+    postSlugPrompt,
+    postProofreadingOutput,
+    postProofreadingPrompt,
+} from './server/utils/postEditorial.ts'
+import { postMarkdownSecurity } from './shared/utils/postMarkdown.ts'
 
 export default defineSiteAdminConfig({
+    markdown: { plugins: [postMarkdownSecurity] },
     storage: {
         content: {
             adapter: 'r2',
@@ -39,11 +50,28 @@ export default defineSiteAdminConfig({
         return getSiteAdminDatabase(context)
     },
     ai: {
-        model: async (context) => {
-            const { getWorkersAIModel } = await import('./server/utils/workersAI.ts')
-            return getWorkersAIModel(context)
+        model: openai('gpt-6-luna'),
+        actions: {
+            publication: {
+                type: 'text-generation',
+                props: {
+                    title: z.string().refine((value) => Boolean(value.trim()), 'Write a title.'),
+                    content: z.string().refine((value) => Boolean(value.trim()), 'Write content.'),
+                },
+                prompt: postSlugPrompt,
+                output: postSlugOutput(),
+                options: postEditorialOptions,
+            },
+            proofread: {
+                type: 'text-generation',
+                props: {
+                    content: z.string().refine((value) => Boolean(value.trim()), 'Write content.'),
+                },
+                prompt: postProofreadingPrompt,
+                output: postProofreadingOutput,
+                options: postEditorialOptions,
+            },
         },
-        actions: editorialActions,
     },
     seo: { titleTemplate: '%s | Liry24' },
     routeRules: {
@@ -168,11 +196,14 @@ export default defineSiteAdminConfig({
         posts: {
             route: '/posts/:slug',
             seo: { type: 'article' },
-            displayFields: { title: 'title', description: 'excerpt', image: 'image' },
+            displayFields: { title: 'title', description: 'content', image: 'image' },
             fields: {
                 title: text({ required: true }),
-                excerpt: textarea(),
                 content: markdown({ required: true }),
+                publication: object({
+                    slug: select(['auto', 'manual']),
+                    publishedSlug: text(),
+                }),
                 tags: array(text(), { required: true, default: [] }),
                 image: image(),
                 authorUserId: text(),

@@ -29,7 +29,7 @@ export const adminModels = {
         label: 'Posts',
         singular: 'Post',
         icon: 'mingcute:book-3-fill',
-        fields: ['slug', 'excerpt'],
+        fields: ['slug'],
     },
 } satisfies Record<string, { label: string; singular: string; icon: string; fields: string[] }>
 

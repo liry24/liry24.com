@@ -1,8 +1,4 @@
-import type {} from '@liria24/site-admin/nuxt'
-import { useServerHooks } from 'nuxt/server'
-
 import { getDevelopmentDB, setDevelopmentDB } from '../database'
-import { createAuthDatabase } from '../utils/authDatabase'
 
 export default defineNitroPlugin(async (nitroApp) => {
     // Nitro replaces these flags before bundling; our development SQLite driver
@@ -17,8 +13,4 @@ export default defineNitroPlugin(async (nitroApp) => {
         })
         console.info(`[database] Local development SQLite ready: ${local.path}`)
     }
-
-    useServerHooks().hook('site-admin:database', (context) => {
-        context.authDatabase = createAuthDatabase(context.event, context.platformContext)
-    })
 })

@@ -29,8 +29,10 @@ useSeo()
             :ssr-columns="2"
         >
             <template #default="{ item }">
-                <div
-                    class="group relative cursor-pointer overflow-clip rounded-xl"
+                <button
+                    type="button"
+                    :aria-label="`View ${item.data.title}`"
+                    class="group relative block w-full cursor-pointer overflow-clip rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-4"
                     @click="modalArtViewer.open({ item })"
                 >
                     <NuxtImg
@@ -42,7 +44,7 @@ useSeo()
                     />
 
                     <div
-                        class="absolute inset-0 flex flex-col gap-3 bg-black/50 p-4 text-zinc-100 opacity-0 transition-opacity group-hover:opacity-100"
+                        class="absolute inset-0 flex flex-col gap-3 bg-black/50 p-4 text-zinc-100 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
                     >
                         <span class="font-[Special_Gothic_Expanded_One] text-3xl font-bold">
                             {{ item.data.title }}
@@ -53,7 +55,7 @@ useSeo()
                             <span class="font-bold">{{ item.data.images.length }}</span>
                         </div>
                     </div>
-                </div>
+                </button>
             </template>
         </MasonryWall>
     </div>

@@ -20,5 +20,5 @@
   enables the selected-repository Renovate App; delete events read the default-branch workflow.
   Default `main` must contain `renovate.json`, targeting `dev` with `useBaseBranchConfig: merge`.
   Updating patched packages requires patch rebase/retirement and regression checks. Keep
-  `@liria24/site-admin` on its published npm release. Metadata and proofreading are
+  `@liria24/site-admin` on its published npm release. Publication and proofreading are
   application-owned `ai.actions`; keep that field policy aligned with the posts model.
