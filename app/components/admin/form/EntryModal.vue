@@ -3,6 +3,7 @@ import type { ModelDescriptor } from '@liria24/site-admin'
 import { managementAssetUrl } from '@liria24/site-admin/client'
 import { useSiteAdminForm } from '@liria24/site-admin/form'
 import type { EntryRecord } from '@liria24/site-admin/server'
+
 const props = defineProps<{
     modelName: string
     descriptor: ModelDescriptor
@@ -10,6 +11,7 @@ const props = defineProps<{
     categories?: string[]
 }>()
 const emit = defineEmits<{ close: [saved: boolean] }>()
+
 const singular =
     adminModels[props.modelName as keyof typeof adminModels]?.singular || props.modelName
 const slug = ref(props.data?.slug || '')

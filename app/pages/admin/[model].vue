@@ -4,16 +4,19 @@ import { managementAssetUrl, type SiteAdminManagementModels } from '@liria24/sit
 import type { EntryRecord, RevisionRecord } from '@liria24/site-admin/server'
 
 import { LazyAdminFormEntryModal } from '#components'
+
 definePageMeta({
     middleware: 'admin',
     layout: 'admin',
     key: (route) => ('model' in route.params ? String(route.params.model) : route.path),
 })
+
 const modelName = String(useRoute('admin-model').params.model)
 const presentation = adminModels[modelName as keyof typeof adminModels]
 const { data: descriptors } = await useFetch<SiteAdminDescriptor>('/api/site-admin/models')
 const descriptor = descriptors.value?.models[modelName]
 if (!descriptor || !presentation) throw createError({ statusCode: 404 })
+
 const management = useSiteAdminManagementClient()
 const page = ref(1)
 const pageSize = 20
@@ -36,7 +39,9 @@ const entries = computed(() => (posts ? (posts.data.value?.items ?? []) : allEnt
 const error = computed(() => (posts ? posts.error.value : allEntries!.error.value))
 const count = computed(() => (posts ? (posts.data.value?.total ?? 0) : items.value.length))
 const pending = computed(() => posts?.pending.value ?? false)
+
 const refresh = () => (posts ? posts.refresh() : allEntries!.refresh())
+
 watch(
     () => posts?.data.value?.total,
     (total) => {
@@ -44,7 +49,9 @@ watch(
             page.value = Math.min(page.value, Math.max(1, Math.ceil(total / pageSize)))
     },
 )
+
 const items = ref<EntryRecord[]>([])
+
 watch(
     entries,
     (value) => {
@@ -52,12 +59,14 @@ watch(
     },
     { immediate: true },
 )
+
 const modal = useOverlay().create(LazyAdminFormEntryModal)
 const failure = ref('')
 const busy = ref(false)
 const schedule = ref<Record<string, string>>({})
 const revisions = ref<Record<string, RevisionRecord[]>>({})
 const selectedRevision = ref<Record<string, string>>({})
+
 async function history(entry: EntryRecord) {
     revisions.value[entry.id] = await management.listRevisions(entry.id)
 }
@@ -82,7 +91,9 @@ async function edit(data?: EntryRecord) {
     }).result
     await refresh()
 }
+
 defineShortcuts({ n: () => edit() })
+
 async function operation(entry: EntryRecord, action: string, extra: Record<string, unknown> = {}) {
     if (busy.value) return
     busy.value = true
@@ -112,6 +123,7 @@ async function operation(entry: EntryRecord, action: string, extra: Record<strin
         busy.value = false
     }
 }
+
 async function reorder(order: EntryRecord[]) {
     if (busy.value) return
     busy.value = true
@@ -134,6 +146,7 @@ async function reorder(order: EntryRecord[]) {
         busy.value = false
     }
 }
+
 function move(index: number, offset: number) {
     const target = index + offset
     if (busy.value || target < 0 || target >= items.value.length) return
@@ -142,6 +155,7 @@ function move(index: number, offset: number) {
     items.value = order
     void reorder(order)
 }
+
 function imageUrl(entry: EntryRecord) {
     const image = entry.data[descriptor!.displayFields?.image || 'images']
     if (modelName === 'posts') {

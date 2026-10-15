@@ -1,15 +1,6 @@
 <script setup lang="ts">
 import { serializeSiteAdminData } from '@liria24/site-admin/client'
 import { useSelector } from '@tanstack/vue-form'
-import { postPublicationSettings } from '~~/shared/utils/postEditorial'
-import { postMarkdownSecurity } from '~~/shared/utils/postMarkdown'
-
-import type { PostEditorialProposal, PostSlugInput } from '~/utils/postEditorialFlow'
-import {
-    postProposalStale,
-    preparePostProofreading,
-    preparePostPublication,
-} from '~/utils/postEditorialFlow'
 
 const props = defineProps<{ id?: string }>()
 const saved = ref(false)

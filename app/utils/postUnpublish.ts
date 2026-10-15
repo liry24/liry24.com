@@ -1,7 +1,6 @@
 import { SiteAdminError, type ModelDescriptor } from '@liria24/site-admin'
 import { serializeSiteAdminData, type SiteAdminManagementClient } from '@liria24/site-admin/client'
 import type { EntryRecord } from '@liria24/site-admin/server'
-import { postPublicationSettings } from '~~/shared/utils/postEditorial'
 
 type PostManagement = Pick<
     SiteAdminManagementClient<Record<string, Record<string, unknown>>>,

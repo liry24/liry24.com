@@ -1,6 +1,5 @@
 import { SiteAdminError } from '@liria24/site-admin'
 import type { SiteAdminManagementClient } from '@liria24/site-admin/client'
-import { postGeneratesSlug, postPublicationSettings } from '~~/shared/utils/postEditorial'
 
 export type PostDraftState = {
     entryId: string | null

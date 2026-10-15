@@ -1,10 +1,12 @@
 <script setup lang="ts" generic="T extends { id: string }">
 import { updateConfig } from '@formkit/drag-and-drop'
 import { dragAndDrop } from '@formkit/drag-and-drop/vue'
+
 const items = defineModel<T[]>({ required: true })
 const props = defineProps<{ disabled?: boolean }>()
 const emit = defineEmits<{ reorder: [items: T[]] }>()
 const parent = ref<HTMLElement>()
+
 dragAndDrop({
     parent,
     values: items,

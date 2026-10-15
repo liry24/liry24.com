@@ -1,8 +1,10 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'admin', layout: 'admin' })
+
 const { user } = useUserSession()
 const isPreview = String(useRuntimeConfig().public.preview) === 'true'
 const failure = ref('')
+
 async function revokeOthers() {
     const client = useAuthClient()
     if (!client) return
