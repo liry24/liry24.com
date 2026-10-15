@@ -25,11 +25,7 @@ const schedule = ref<Record<string, string>>({})
 const revisions = ref<Record<string, Revision[]>>({})
 const selectedRevision = ref<Record<string, string>>({})
 async function history(entry: Entry) {
-    try {
-        revisions.value[entry.id] = await resource.revisions(entry)
-    } catch {
-        /* resource.error displays the failure. */
-    }
+    revisions.value[entry.id] = (await resource.revisions(entry)) ?? []
 }
 async function edit(data?: Entry) {
     if (modelName === 'posts') {
@@ -53,30 +49,19 @@ async function edit(data?: Entry) {
 defineShortcuts({ n: () => edit() })
 async function operation(entry: Entry, action: string, extra: Record<string, unknown> = {}) {
     if (busy.value) return
-    try {
-        if (action === 'delete') await resource.remove(entry)
-        else if (action === 'publish') await resource.publish(entry)
-        else if (action === 'unpublish') await resource.unpublish(entry)
-        else if (action === 'schedule') await resource.schedule(entry, String(extra.at))
-        else if (action === 'cancel-schedule') await resource.cancelSchedule(entry)
-        else await resource.restore(entry, selectedRevision.value[entry.id]!)
-    } catch {
-        /* resource.error displays the failure. */
-    }
-}
-async function reorder(order: Entry[]) {
-    try {
-        await resource.reorder(order)
-    } catch {
-        /* The resource restores the previous order. */
-    }
+    if (action === 'delete') await resource.remove(entry)
+    else if (action === 'publish') await resource.publish(entry)
+    else if (action === 'unpublish') await resource.unpublish(entry)
+    else if (action === 'schedule') await resource.schedule(entry, String(extra.at))
+    else if (action === 'cancel-schedule') await resource.cancelSchedule(entry)
+    else await resource.restore(entry, selectedRevision.value[entry.id]!)
 }
 function move(index: number, offset: number) {
     const target = index + offset
     if (busy.value || target < 0 || target >= items.value.length) return
     const order = [...items.value]
     ;[order[index], order[target]] = [order[target]!, order[index]!]
-    void reorder(order)
+    void resource.reorder(order)
 }
 const imageUrl = (entry: Entry) => resource.display(entry.data).image
 const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, field)
@@ -98,7 +83,7 @@ const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, fiel
         </template>
         <template #actions>
             <UButton
-                :label="`New ${presentation.singular}`"
+                :label="`New ${presentation.entryLabel}`"
                 icon="mingcute:add-line"
                 variant="outline"
                 color="neutral"
@@ -114,7 +99,7 @@ const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, fiel
         <AdminResourceSortableList
             :items="items"
             :disabled="!features.sortable || busy"
-            @reorder="reorder"
+            @reorder="resource.reorder"
         >
             <template #default="{ item }">
                 <AdminResourceSortableItem

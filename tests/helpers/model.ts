@@ -36,7 +36,8 @@ export function createModelResource(options: {
             descriptor: shallowRef(options.descriptor),
             id,
             identity: ref(options.modelName + ':' + (id.value ?? 'new')),
-            locale: ref(undefined),
+            defaultLocale: 'ja',
+            locale: ref('ja'),
             drafts: {},
             prepare:
                 options.prepare ??

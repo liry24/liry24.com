@@ -208,13 +208,16 @@ export default defineSiteAdminConfig({
             seo: { type: 'article' },
             displayFields: { title: 'title', description: 'content', image: 'image' },
             fields: {
-                slug: text({ default: '' }),
-                title: text({ required: true }),
-                content: markdown({ required: true }),
-                publication: object({
-                    slug: select(['auto', 'manual']),
-                    publishedSlug: text(),
-                }),
+                slug: text({ default: '', i18n: true }),
+                title: text({ required: true, i18n: true }),
+                content: markdown({ required: true, i18n: true }),
+                publication: object(
+                    {
+                        slug: select(['auto', 'manual']),
+                        publishedSlug: text(),
+                    },
+                    { i18n: true },
+                ),
                 tags: array(text(), { required: true, default: [] }),
                 image: image(),
                 authorUserId: text(),

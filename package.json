@@ -26,7 +26,7 @@
         "@formkit/drag-and-drop": "^0.6.1",
         "@iconify-json/mingcute": "^1.2.8",
         "@iconify-json/simple-icons": "^1.2.100",
-        "@liria24/site-admin": "https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@f5b4f06",
+        "@liria24/site-admin": "https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@4b417fa",
         "@nuxt/image": "^2.1.0",
         "@nuxt/ui": "^4.11.3",
         "@nuxtjs/better-auth": "0.3.9",
@@ -35,7 +35,6 @@
         "@nuxtjs/sitemap": "9.1.0",
         "@takumi-rs/core": "2.16.2",
         "@takumi-rs/wasm": "2.16.2",
-        "@tanstack/vue-form": "2.0.0-alpha.2",
         "@vueuse/nuxt": "^15.0.0",
         "@yeger/vue-masonry-wall": "^6.1.4",
         "ai": "7.0.141",
@@ -76,12 +75,11 @@
     },
     "overrides": {
         "@vue/compiler-sfc": "3.6.0-rc.11",
+        "auth": "1.7.9",
         "vue": "3.6.0-rc.11"
     },
     "packageManager": "bun@1.4.3",
     "patchedDependencies": {
-        "better-auth@1.7.7": "patches/better-auth@1.7.7.patch",
-        "better-call@1.4.0": "patches/better-call@1.4.0.patch",
         "better-call@1.4.2": "patches/better-call@1.4.2.patch",
         "@nuxt/hints@1.1.5": "patches/@nuxt%2Fhints@1.1.5.patch",
         "better-auth@1.7.9": "patches/better-auth@1.7.9.patch"

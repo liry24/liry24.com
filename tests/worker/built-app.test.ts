@@ -84,6 +84,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             const orm = drizzle(env.DB)
             await migrate(orm, { migrationsFolder: 'drizzle' })
             const admin = createSiteAdmin({
+                locales: { defaultLocale: 'ja', supported: ['ja'] },
                 config: siteAdminConfig,
                 database: drizzleAdapter(orm, { schema }),
             })

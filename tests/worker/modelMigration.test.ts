@@ -64,6 +64,35 @@ async function verify(store: Store) {
         '--> statement-breakpoint',
     ))
         if (sql.trim()) await store.exec(sql)
+    const before = await store.all(
+        'SELECT id,model,current_revision_id,published_revision_id,scheduled_revision_id FROM site_admin_entries ORDER BY id',
+    )
+    await store.exec(
+        "INSERT INTO site_admin_meta(key,value) VALUES ('public_generation','17'),('asset_sync_lease','retained'),('content_search:v1:obsolete','obsolete')",
+    )
+    for (const sql of readFileSync('drizzle/20261015113136_i18n/migration.sql', 'utf8').split(
+        '--> statement-breakpoint',
+    ))
+        if (sql.trim()) await store.exec(sql)
+    expect(
+        await store.all(
+            'SELECT id,model,current_revision_id,published_revision_id,scheduled_revision_id FROM site_admin_entries ORDER BY id',
+        ),
+    ).toEqual(before)
+    expect(await store.all('SELECT DISTINCT default_locale FROM site_admin_entries')).toEqual([
+        { default_locale: 'ja' },
+    ])
+    expect(await store.all('SELECT DISTINCT locale FROM site_admin_asset_refs')).toEqual([
+        { locale: 'ja' },
+    ])
+    expect(await store.all('SELECT * FROM site_admin_translations')).toEqual([])
+    expect(await store.all('SELECT * FROM site_admin_search')).toEqual([])
+    expect(
+        await store.all("SELECT value FROM site_admin_meta WHERE key='public_generation'"),
+    ).toEqual([{ value: '18' }])
+    expect(
+        await store.all("SELECT value FROM site_admin_meta WHERE key='asset_sync_lease'"),
+    ).toEqual([{ value: 'retained' }])
     expect(await store.all('PRAGMA foreign_key_check')).toEqual([])
     expect(
         ((await store.all('PRAGMA table_info(site_admin_revisions)')) as { name: string }[]).some(

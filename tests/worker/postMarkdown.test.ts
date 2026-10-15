@@ -121,7 +121,11 @@ function assertSafe(nodes: Node[]) {
 
 test('post preview and native public detail/summary apply the same Markdown policy without rewriting stored content', async () => {
     const local = openDevelopmentDB({ databasePath: ':memory:' })
-    const admin = createSiteAdmin({ config, database: drizzleAdapter(local.database, { schema }) })
+    const admin = createSiteAdmin({
+        locales: { defaultLocale: 'ja', supported: ['ja'] },
+        config,
+        database: drizzleAdapter(local.database, { schema }),
+    })
     const client = createSiteAdminClient({
         origin: 'http://synthetic.invalid',
         fetch: (input, init) => handlePublicRequest(admin, new Request(String(input), init)),

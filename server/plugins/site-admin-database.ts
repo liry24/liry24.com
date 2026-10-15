@@ -7,6 +7,7 @@ export default defineNitroPlugin(async (nitroApp) => {
         const { openDevelopmentDB } = await import('../database/development')
         const local = openDevelopmentDB({ databasePath: process.env.LIRY24_DEV_DB_PATH })
         setDevelopmentDB(local.database)
+        await useAdmin().tasks.rebuildSearch()
         nitroApp.hooks.hook('close', () => {
             if (getDevelopmentDB() === local.database) setDevelopmentDB()
             local.close()

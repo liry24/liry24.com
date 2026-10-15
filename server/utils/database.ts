@@ -8,7 +8,6 @@ import { createDB, getDevelopmentDB, type Database } from '../database/index.ts'
 import * as schema from '../database/schema.ts'
 import { getCloudflareEnvironment } from './cloudflareContext.ts'
 
-const adapters = new WeakMap<Database, ReturnType<typeof drizzleAdapter>>()
 const authAdapters = new WeakMap<Database, ReturnType<typeof authAdapter>>()
 
 export const useDB = (event?: Pick<RequestEvent, 'context'>, platformContext?: object) => {
@@ -31,12 +30,7 @@ export const useDB = (event?: Pick<RequestEvent, 'context'>, platformContext?: o
 
 export const getSiteAdminDatabase = ({ event, platformContext }: SiteAdminDatabaseContext) => {
     const database = useDB(event, platformContext)
-    let adapter = adapters.get(database)
-    if (!adapter) {
-        adapter = drizzleAdapter(database, { schema })
-        adapters.set(database, adapter)
-    }
-    return adapter
+    return drizzleAdapter(database, { schema })
 }
 
 export const getAuthDatabase = (event?: Pick<RequestEvent, 'context'>) => {

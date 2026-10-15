@@ -4,6 +4,7 @@ import type { Entry } from '@liria24/site-admin'
 export type PostDraftState = {
     entryId: string | null
     version: number | null
+    locale?: string
     draft: Record<string, unknown>
 }
 export type PostDraftSnapshot = PostDraftState & { entryId: string; version: number }
@@ -13,7 +14,7 @@ export type PostEditorialProposal = {
     data: Record<string, unknown>
 }
 type Context = {
-    management: { entries: { get: (id: string) => Promise<Entry> } }
+    management: { entries: { get: (model: 'posts', id: string) => Promise<Entry> } }
     current: () => PostDraftState
 }
 export async function preparePostProofreading(
@@ -25,7 +26,7 @@ export async function preparePostProofreading(
         throw new SiteAdminError('SITE_ADMIN_INVALID_INPUT', 'Save a draft before using AI.')
     const snapshot = structuredClone(current) as PostDraftSnapshot
     const assertCurrent = async () => {
-        const entry = await context.management.entries.get(snapshot.entryId)
+        const entry = await context.management.entries.get('posts', snapshot.entryId)
         if (
             entry.model !== 'posts' ||
             entry.version !== snapshot.version ||

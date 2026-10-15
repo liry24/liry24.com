@@ -18,6 +18,7 @@ test('draft form persists automatic choices without AI or a public route and kee
     })
     const paths: string[] = []
     const admin = createSiteAdmin({
+        locales: { defaultLocale: 'ja', supported: ['ja'] },
         config: { ...config, ai: { ...config.ai, model: ai } },
         database: drizzleAdapter(local.database, { schema }),
         authorize: () => ({ id: 'synthetic-post-admin', roles: ['admin'] }),
@@ -96,6 +97,7 @@ test('legacy drafts and published revisions retain metadata when no selection wa
         throw new Error('AI has no balance')
     })
     const admin = createSiteAdmin({
+        locales: { defaultLocale: 'ja', supported: ['ja'] },
         config: { ...config, ai: { ...config.ai, model: ai } },
         database: drizzleAdapter(local.database, { schema }),
         authorize: () => ({ id: 'synthetic-legacy-admin', roles: ['admin'] }),
@@ -153,6 +155,7 @@ test('an implicit slug on a directly published model retains the non-AI title fa
         throw new Error('AI must not resolve during a save')
     })
     const admin = createSiteAdmin({
+        locales: { defaultLocale: 'ja', supported: ['ja'] },
         config: {
             ...config,
             models: { ...config.models, works: { ...config.models.works, publishing: false } },

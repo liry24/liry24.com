@@ -16,8 +16,7 @@ export const entries = sqliteTable(
     {
         id: text().primaryKey(),
         model: text().notNull(),
-        locale: text().notNull().default(''),
-        translation_group: text().notNull(),
+        default_locale: text().notNull().default(''),
         current_revision_id: text(),
         published_revision_id: text(),
         scheduled_revision_id: text(),
@@ -29,11 +28,6 @@ export const entries = sqliteTable(
         published_at: text(),
     },
     (table) => [
-        uniqueIndex('site_admin_entries_translation').on(
-            table.model,
-            table.translation_group,
-            table.locale,
-        ),
         index('site_admin_entries_model').on(table.model),
         index('site_admin_entries_schedule')
             .on(table.scheduled_at)
@@ -82,6 +76,7 @@ export const relations = sqliteTable(
         revision_id: text()
             .notNull()
             .references(() => revisions.id, { onDelete: 'cascade' }),
+        locale: text().notNull().default(''),
         field_path: text().notNull(),
         target_entry_id: text()
             .notNull()
@@ -90,7 +85,9 @@ export const relations = sqliteTable(
         required: integer().notNull(),
     },
     (table) => [
-        primaryKey({ columns: [table.revision_id, table.field_path, table.position] }),
+        primaryKey({
+            columns: [table.revision_id, table.locale, table.field_path, table.position],
+        }),
         index('site_admin_relations_target').on(table.target_entry_id),
     ],
 )
@@ -101,6 +98,7 @@ export const assetRefs = sqliteTable(
         revision_id: text()
             .notNull()
             .references(() => revisions.id, { onDelete: 'cascade' }),
+        locale: text().notNull().default(''),
         field_path: text().notNull(),
         asset_id: text()
             .notNull()
@@ -108,7 +106,9 @@ export const assetRefs = sqliteTable(
         position: integer().notNull(),
     },
     (table) => [
-        primaryKey({ columns: [table.revision_id, table.field_path, table.position] }),
+        primaryKey({
+            columns: [table.revision_id, table.locale, table.field_path, table.position],
+        }),
         index('site_admin_asset_refs_asset').on(table.asset_id),
     ],
 )
@@ -137,6 +137,31 @@ export const meta = sqliteTable('site_admin_meta', {
     key: text().primaryKey(),
     value: text().notNull(),
 })
+
+export const translations = sqliteTable(
+    'site_admin_translations',
+    {
+        revision_id: text()
+            .notNull()
+            .references(() => revisions.id, { onDelete: 'cascade' }),
+        locale: text().notNull(),
+        data: text({ mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+    },
+    (table) => [primaryKey({ columns: [table.revision_id, table.locale] })],
+)
+
+export const search = sqliteTable(
+    'site_admin_search',
+    {
+        revision_id: text()
+            .notNull()
+            .references(() => revisions.id, { onDelete: 'cascade' }),
+        locale: text().notNull(),
+        part: integer().notNull(),
+        value: text().notNull(),
+    },
+    (table) => [primaryKey({ columns: [table.revision_id, table.locale, table.part] })],
+)
 
 export const content_776f726b73 = sqliteTable('site_admin_content_works', {
     revisionId: text('revision_id')

@@ -10,6 +10,7 @@ import { migrate } from 'drizzle-orm/d1/migrator'
 import { afterEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 
+import { rebuildPreviewSearch } from '../../scripts/preview-search.mjs'
 import * as schema from '../../server/database/schema'
 import config from '../../site-admin.config'
 let proxy: Awaited<ReturnType<typeof getPlatformProxy>> | undefined
@@ -50,7 +51,11 @@ test('application-owned D1 uses explicit migration and preserves scheduled revis
     const orm = drizzle(env.DB)
     await migrate(orm, { migrationsFolder: 'drizzle' })
     const database = drizzleAdapter(orm, { schema })
-    const admin = createSiteAdmin({ config, database })
+    const admin = createSiteAdmin({
+        locales: { defaultLocale: 'ja', supported: ['ja'] },
+        config,
+        database,
+    })
     let entry = await admin.createEntry('posts', {
         data: { title: 'A', content: '# A', tags: [], slug: 'worker-test' },
     })
@@ -84,4 +89,26 @@ test('application-owned D1 uses explicit migration and preserves scheduled revis
         admin.updateEntry(entry.id, { expectedVersion: oldVersion, data: entry.data }),
     ).rejects.toMatchObject({ code: 'SITE_ADMIN_CONFLICT' })
     expect((await admin.getPublicEntry('posts', entry.id))?.data.title).toBe('A')
+    await env.DB.prepare('DELETE FROM site_admin_search').run()
+    await expect(
+        admin.pageEntries({ models: ['posts'], q: 'C' }, { limit: 1, offset: 0 }),
+    ).rejects.toMatchObject({ code: 'SITE_ADMIN_MIGRATION_REQUIRED' })
+    const execute = (queries: Array<{ sql: string; params: unknown[] }>) =>
+        env.DB.batch(queries.map(({ sql, params }) => env.DB.prepare(sql).bind(...params)))
+    const target = {
+        name: 'liry24-com-p-search-test',
+        uuid: '00000000-0000-0000-0000-000000000001',
+    }
+    expect(await rebuildPreviewSearch(target, target.name, execute)).toEqual({ indexed: 3 })
+    expect(
+        (await admin.pageEntries({ models: ['posts'], q: 'C' }, { limit: 1, offset: 0 })).total,
+    ).toBe(1)
+    expect(await admin.getEntry(entry.id)).toEqual(entry)
+    await expect(
+        rebuildPreviewSearch(
+            { ...target, uuid: '227d818f-cd40-4fca-9710-b57273be94ca' },
+            target.name,
+            execute,
+        ),
+    ).rejects.toThrow('Expected a D1 database ID')
 }, 60_000)

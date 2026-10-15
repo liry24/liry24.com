@@ -182,6 +182,10 @@ if (action === 'deploy') {
         '--pattern',
         'drizzle/*/migration.sql',
     ])
+    const { rebuildPreviewSearch } = await import('./preview-search.mjs')
+    await rebuildPreviewSearch(database, target.resourceName, (queries) =>
+        cf('d1', 'query', database.uuid, '--batch', JSON.stringify(queries)),
+    )
     const secretInput = JSON.stringify(secrets)
     await wranglerPreview(
         ['preview', 'base-config', 'secret', 'bulk', '--worker-name', workerName],

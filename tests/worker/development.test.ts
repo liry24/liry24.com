@@ -26,6 +26,7 @@ test('development SQLite migrates once and preserves shared auth/content data ac
         const count = migrationCount()
         expect(Number(count)).toBeGreaterThan(0)
         const admin = createSiteAdmin({
+            locales: { defaultLocale: 'ja', supported: ['ja'] },
             config,
             database: drizzleAdapter(local.database, { schema }),
         })
@@ -73,6 +74,7 @@ test('development SQLite migrates once and preserves shared auth/content data ac
         local = openDevelopmentDB({ databasePath })
         expect(migrationCount()).toBe(count)
         const reopened = createSiteAdmin({
+            locales: { defaultLocale: 'ja', supported: ['ja'] },
             config,
             database: drizzleAdapter(local.database, { schema }),
         })

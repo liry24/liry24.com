@@ -10,7 +10,11 @@ import config from '../../site-admin.config'
 
 test('native automatic summary stays small without parsing or rewriting content in the app', async () => {
     const local = openDevelopmentDB({ databasePath: ':memory:' })
-    const admin = createSiteAdmin({ config, database: drizzleAdapter(local.database, { schema }) })
+    const admin = createSiteAdmin({
+        locales: { defaultLocale: 'ja', supported: ['ja'] },
+        config,
+        database: drizzleAdapter(local.database, { schema }),
+    })
     try {
         const content = [
             '# Full article title',
@@ -43,7 +47,11 @@ test('native automatic summary stays small without parsing or rewriting content 
 
 test('native HTTP summary projection excludes the full body and keeps default/detail responses full', async () => {
     const local = openDevelopmentDB({ databasePath: ':memory:' })
-    const admin = createSiteAdmin({ config, database: drizzleAdapter(local.database, { schema }) })
+    const admin = createSiteAdmin({
+        locales: { defaultLocale: 'ja', supported: ['ja'] },
+        config,
+        database: drizzleAdapter(local.database, { schema }),
+    })
     const responses: string[] = []
     const client = createSiteAdminClient({
         origin: 'http://synthetic.invalid',
@@ -79,7 +87,11 @@ test('native HTTP summary projection excludes the full body and keeps default/de
 
 test('native summary lists retain every article after detail route parsing', async () => {
     const local = openDevelopmentDB({ databasePath: ':memory:' })
-    const admin = createSiteAdmin({ config, database: drizzleAdapter(local.database, { schema }) })
+    const admin = createSiteAdmin({
+        locales: { defaultLocale: 'ja', supported: ['ja'] },
+        config,
+        database: drizzleAdapter(local.database, { schema }),
+    })
     const responses: string[] = []
     const client = createSiteAdminClient({
         origin: 'http://synthetic.invalid',

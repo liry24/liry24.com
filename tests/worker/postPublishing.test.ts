@@ -34,6 +34,7 @@ async function fixture(
     let authorized = true
     const writes: string[] = []
     const admin = createSiteAdmin({
+        locales: { defaultLocale: 'ja', supported: ['ja'] },
         config,
         database: drizzleAdapter(local.database, { schema }),
         authorize: () => (authorized ? { id: 'synthetic', roles: ['admin'] } : null),
@@ -169,7 +170,7 @@ test('proofreading rejects a remote edit and preserves local input', async () =>
     await expect(
         preparePostProofreading(
             {
-                management: { entries: { get: (id) => client.getEntry(id) } },
+                management: { entries: { get: (_model, id) => client.getEntry(id) } },
                 current: () => editor.draft.snapshot(),
             },
             async () => {
