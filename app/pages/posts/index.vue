@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { data } = await useSiteAdminList('posts', {
+    markdown: 'summary',
     transform: (entries) =>
         entries.map((entry) => ({
             ...entry.data,
@@ -13,19 +14,23 @@ useSeo()
 
 <template>
     <UPage v-if="data?.length" :ui="{ center: 'sm:mx-4 grid grid-cols-1 gap-6 lg:grid-cols-2' }">
-        <NuxtLink
+        <article
             v-for="(post, index) in data"
             :key="post.slug"
-            :to="`/posts/${post.slug}`"
-            variant="ghost"
             :style="{ 'animation-delay': `${100 + index * 100}ms` }"
             class="fade-in hover:bg-muted flex flex-col justify-between gap-2 rounded-xl p-5 transition-colors"
         >
             <h2
                 class="before:text-dimmed text-2xl font-bold before:font-mono before:-tracking-widest before:content-['//_']"
             >
-                {{ post.title }}
+                <NuxtLink :to="`/posts/${post.slug}`">{{ post.title }}</NuxtLink>
             </h2>
+
+            <MarkdownDocument
+                v-if="post.content.nodes.length"
+                :value="post.content"
+                class="sentence line-clamp-3 text-sm wrap-break-word *:first:mt-0 *:last:mb-0"
+            />
 
             <div class="flex flex-wrap items-center gap-2">
                 <NuxtTime
@@ -42,6 +47,6 @@ useSeo()
                     variant="soft"
                 />
             </div>
-        </NuxtLink>
+        </article>
     </UPage>
 </template>

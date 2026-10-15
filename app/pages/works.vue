@@ -24,13 +24,10 @@ useSeo()
             :ssr-columns="2"
         >
             <template #default="{ item }">
-                <UModal
-                    scrollable
-                    :title="item.title"
-                    :ui="{
-                        content:
-                            'max-w-full h-[calc(100dvh-4rem)] w-[calc(100dvw-4rem)] rounded-4xl',
-                    }"
+                <component
+                    :is="item.href ? 'a' : 'div'"
+                    :href="item.href || undefined"
+                    class="block rounded-3xl focus-visible:outline-2 focus-visible:outline-offset-4"
                 >
                     <div
                         v-if="item.style === 'small'"
@@ -78,9 +75,7 @@ useSeo()
 
                         <h2 class="text-toned mx-1 font-mono text-sm">{{ item.title }}</h2>
                     </div>
-
-                    <template #content> </template>
-                </UModal>
+                </component>
             </template>
         </MasonryWall>
     </UPage>

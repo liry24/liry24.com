@@ -54,7 +54,6 @@ const cloudflareConfig = {
         },
     ],
     r2_buckets: [{ binding: 'R2', bucket_name: 'liry24-com' }],
-    ai: { binding: 'AI' },
     dev: { ip: '127.0.0.1', port: 3100 },
     ...(isPreview
         ? {
@@ -100,15 +99,15 @@ export default defineNuxtConfig({
             // A configured Site Admin database adapter is not prepared before Better Auth.
             // Resolve the same application connection directly for each auth request.
             nuxt.hook('better-auth:database:providers', (providers) => {
-                const authDatabase = resolve(nuxt.options.rootDir, 'server/utils/authDatabase.ts')
+                const authDatabase = resolve(nuxt.options.rootDir, 'server/utils/database.ts')
                 providers.liry24 = {
                     priority: 1000,
                     isEnabled: () => true,
                     buildDatabaseCode:
-                        () => `import { createAuthDatabase } from ${JSON.stringify(authDatabase)}
+                        () => `import { getAuthDatabase } from ${JSON.stringify(authDatabase)}
 export const db = undefined
 export function createDatabase(event) {
-    return createAuthDatabase(event)
+    return getAuthDatabase(event)
 }`,
                 }
             })
@@ -193,8 +192,8 @@ export function createDatabase(event) {
                 // Nuxt 4.6 renderer subpaths contain stubs that Nitro replaces during bundling.
                 'nuxt/internal',
                 // A predicate takes precedence over Nitro-dev's external build directory.
-                // Bundle generated auth modules so their public dependency aliases resolve,
-                // and the database provider shares the current Site Admin runtime.
+                // Bundle generated auth modules so their public dependency aliases
+                // and application-owned database factory resolve.
                 (id: string) =>
                     /\/(?:better-auth\/database|site-admin\/better-auth-server-plugin)\.mjs$/.test(
                         id.replaceAll('\\', '/'),

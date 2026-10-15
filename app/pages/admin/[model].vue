@@ -20,8 +20,6 @@ const pageSize = 20
 const posts =
     modelName === 'posts'
         ? await useSiteAdminManagementList('posts', {
-              // Posts are not localized; the admin UI language must not filter their locale.
-              locale: '',
               limit: pageSize,
               offset: () => (page.value - 1) * pageSize,
           })
@@ -86,9 +84,15 @@ async function edit(data?: EntryRecord) {
 }
 defineShortcuts({ n: () => edit() })
 async function operation(entry: EntryRecord, action: string, extra: Record<string, unknown> = {}) {
+    if (busy.value) return
     busy.value = true
     failure.value = ''
     try {
+        if (modelName === 'posts' && action === 'unpublish') {
+            await unpublishPost(management, descriptor!, entry)
+            await refresh()
+            return
+        }
         await $fetch(
             `/api/site-admin/entries/${encodeURIComponent(entry.id)}${action === 'delete' ? '' : `/${action}`}`,
             {
@@ -265,13 +269,15 @@ function imageUrl(entry: EntryRecord) {
                             class="border-default mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
                         >
                             <UButton
-                                label="Publish"
+                                :label="modelName === 'posts' ? 'Edit & Publish' : 'Publish'"
                                 icon="mingcute:upload-3-fill"
                                 variant="soft"
                                 color="neutral"
                                 size="sm"
                                 :disabled="busy"
-                                @click="operation(item, 'publish')"
+                                @click="
+                                    modelName === 'posts' ? edit(item) : operation(item, 'publish')
+                                "
                             />
                             <UButton
                                 v-if="item.publishedRevisionId"
@@ -283,6 +289,7 @@ function imageUrl(entry: EntryRecord) {
                                 @click="operation(item, 'unpublish')"
                             />
                             <UInput
+                                v-if="modelName !== 'posts'"
                                 v-model="schedule[item.id]"
                                 type="datetime-local"
                                 aria-label="Schedule publish time"
@@ -290,6 +297,7 @@ function imageUrl(entry: EntryRecord) {
                                 size="sm"
                             />
                             <UButton
+                                v-if="modelName !== 'posts'"
                                 label="Schedule Publish"
                                 variant="soft"
                                 color="neutral"
