@@ -1,19 +1,17 @@
-import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
 import { createSiteAdminClient } from '@liria24/site-admin/internal/client'
 import { createSiteAdmin, handlePublicRequest } from '@liria24/site-admin/internal/server'
 import type { MarkdownDocument } from 'comark'
 import { expect, test } from 'vitest'
 
-import { openDevelopmentDB } from '../../server/database/development'
-import * as schema from '../../server/database/schema'
 import config from '../../site-admin.config'
+import { openTestDatabase } from '../helpers/database'
 
 test('native automatic summary stays small without parsing or rewriting content in the app', async () => {
-    const local = openDevelopmentDB({ databasePath: ':memory:' })
+    const local = openTestDatabase()
     const admin = createSiteAdmin({
         locales: { defaultLocale: 'ja', supported: ['ja'] },
         config,
-        database: drizzleAdapter(local.database, { schema }),
+        database: local.database,
     })
     try {
         const content = [
@@ -46,11 +44,11 @@ test('native automatic summary stays small without parsing or rewriting content 
 })
 
 test('native HTTP summary projection excludes the full body and keeps default/detail responses full', async () => {
-    const local = openDevelopmentDB({ databasePath: ':memory:' })
+    const local = openTestDatabase()
     const admin = createSiteAdmin({
         locales: { defaultLocale: 'ja', supported: ['ja'] },
         config,
-        database: drizzleAdapter(local.database, { schema }),
+        database: local.database,
     })
     const responses: string[] = []
     const client = createSiteAdminClient({
@@ -86,11 +84,11 @@ test('native HTTP summary projection excludes the full body and keeps default/de
 })
 
 test('native summary lists retain every article after detail route parsing', async () => {
-    const local = openDevelopmentDB({ databasePath: ':memory:' })
+    const local = openTestDatabase()
     const admin = createSiteAdmin({
         locales: { defaultLocale: 'ja', supported: ['ja'] },
         config,
-        database: drizzleAdapter(local.database, { schema }),
+        database: local.database,
     })
     const responses: string[] = []
     const client = createSiteAdminClient({

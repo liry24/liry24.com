@@ -1,4 +1,4 @@
-import { sql, defineRelationsPart } from 'drizzle-orm'
+import { sql, relations as authRelations } from 'drizzle-orm'
 import {
     index,
     integer,
@@ -371,40 +371,29 @@ export const rateLimits = sqliteTable('rate_limits', {
     lastRequest: integer('last_request').notNull(),
 })
 
-export const authRelations = defineRelationsPart(
-    { users, sessions, accounts, verifications, passkeys, jwks, rateLimits },
-    (r) => ({
-        users: {
-            sessions: r.many.sessions({
-                from: r.users.id,
-                to: r.sessions.userId,
-            }),
-            accounts: r.many.accounts({
-                from: r.users.id,
-                to: r.accounts.userId,
-            }),
-            passkeys: r.many.passkeys({
-                from: r.users.id,
-                to: r.passkeys.userId,
-            }),
-        },
-        sessions: {
-            user: r.one.users({
-                from: r.sessions.userId,
-                to: r.users.id,
-            }),
-        },
-        accounts: {
-            user: r.one.users({
-                from: r.accounts.userId,
-                to: r.users.id,
-            }),
-        },
-        passkeys: {
-            user: r.one.users({
-                from: r.passkeys.userId,
-                to: r.users.id,
-            }),
-        },
+export const usersRelations = authRelations(users, ({ many }) => ({
+    sessions: many(sessions),
+    accounts: many(accounts),
+    passkeys: many(passkeys),
+}))
+
+export const sessionsRelations = authRelations(sessions, ({ one }) => ({
+    user: one(users, {
+        fields: [sessions.userId],
+        references: [users.id],
     }),
-)
+}))
+
+export const accountsRelations = authRelations(accounts, ({ one }) => ({
+    user: one(users, {
+        fields: [accounts.userId],
+        references: [users.id],
+    }),
+}))
+
+export const passkeysRelations = authRelations(passkeys, ({ one }) => ({
+    user: one(users, {
+        fields: [passkeys.userId],
+        references: [users.id],
+    }),
+}))

@@ -58,7 +58,7 @@ export async function validatePreviewIdentity({
 }: {
     source: { method: string; oauth?: { providerId: string; profile?: Record<string, unknown> } }
 }) {
-    if (process.env.APP_ENV !== 'preview') return
+    if (import.meta.dev || process.env.APP_ENV !== 'dev') return
     if (
         source.method === 'oauth' &&
         source.oauth?.providerId === 'github' &&

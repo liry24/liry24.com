@@ -1,14 +1,12 @@
-import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
 import { createSiteAdminClient } from '@liria24/site-admin/internal/client'
 import { createSiteAdmin, handlePublicRequest } from '@liria24/site-admin/internal/server'
 import type { Node } from 'comark'
 import { parseMarkdown } from 'comark/parse'
 import { expect, test } from 'vitest'
 
-import { openDevelopmentDB } from '../../server/database/development'
-import * as schema from '../../server/database/schema'
 import { postMarkdownSecurity } from '../../shared/utils/postMarkdown'
 import config from '../../site-admin.config'
+import { openTestDatabase } from '../helpers/database'
 
 const content = [
     'An **introduction** with [a safe link](/works).',
@@ -120,11 +118,11 @@ function assertSafe(nodes: Node[]) {
 }
 
 test('post preview and native public detail/summary apply the same Markdown policy without rewriting stored content', async () => {
-    const local = openDevelopmentDB({ databasePath: ':memory:' })
+    const local = openTestDatabase()
     const admin = createSiteAdmin({
         locales: { defaultLocale: 'ja', supported: ['ja'] },
         config,
-        database: drizzleAdapter(local.database, { schema }),
+        database: local.database,
     })
     const client = createSiteAdminClient({
         origin: 'http://synthetic.invalid',

@@ -30,3 +30,7 @@ logs
 .cloudflare
 .dev.vars*
 .tmp
+
+.void
+.void-wrangler.jsonc
+server/middleware/__void-dev-trigger.ts

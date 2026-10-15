@@ -1,4 +1,3 @@
-import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
 import { createSiteAdminManagementClient } from '@liria24/site-admin/internal/client'
 import { createSiteAdmin, handleManagementRequest } from '@liria24/site-admin/internal/server'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -6,9 +5,8 @@ import { effectScope } from 'vue'
 
 import { preparePostProofreading } from '../../app/utils/postEditorialFlow'
 import { prepareEntry } from '../../app/utils/prepareEntry'
-import { openDevelopmentDB } from '../../server/database/development'
-import * as schema from '../../server/database/schema'
 import config from '../../site-admin.config'
+import { openTestDatabase } from '../helpers/database'
 import { createModelForm } from '../helpers/model'
 
 const cleanup: (() => void)[] = []
@@ -25,7 +23,7 @@ async function fixture(
     modelName = 'posts',
     generate = vi.fn(async () => ({ slug: 'generated-post' })),
 ) {
-    const local = openDevelopmentDB({ databasePath: ':memory:' })
+    const local = openTestDatabase()
     const scope = effectScope()
     cleanup.push(() => {
         scope.stop()
@@ -36,7 +34,7 @@ async function fixture(
     const admin = createSiteAdmin({
         locales: { defaultLocale: 'ja', supported: ['ja'] },
         config,
-        database: drizzleAdapter(local.database, { schema }),
+        database: local.database,
         authorize: () => (authorized ? { id: 'synthetic', roles: ['admin'] } : null),
     })
     const client = createSiteAdminManagementClient({

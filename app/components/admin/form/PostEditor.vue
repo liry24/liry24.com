@@ -1,32 +1,33 @@
 <script setup lang="ts">
-const props = defineProps<{ id?: string }>()
+const { id } = defineProps<{ id?: string }>()
 const publishAt = ref('')
 const uploadedName = ref('')
-const resource = await useAdminEntry('posts', () => props.id ?? null)
-if (resource.error.value) throw resource.error.value
-const { form, draft, publish, schedule, upload, operation } = useEntryForm(resource, {
-    ...(!props.id ? { defaultValues: { publication: { slug: 'auto' } } } : {}),
-    onBeforeSubmit: ({ operation }) => {
-        if (operation !== 'save' && editorial.proposal.value)
-            throw new Error('Apply or discard the proofreading suggestion before publishing.')
+
+const { form, draft, publish, schedule, upload, operation, status, error } = await useAdminForm(
+    'posts',
+    {
+        id: () => id,
+        beforeUnload: (): boolean => busy.value,
+        defaultValues: {
+            publication: { slug: !id ? 'auto' : undefined },
+        },
+        onBeforeSubmit: ({ operation }) => {
+            if (operation !== 'save' && proposal.value)
+                throw new Error('Apply or discard the proofreading suggestion before publishing.')
+        },
+        onUpload: ({ files }) => {
+            uploadedName.value = files[0]?.name ?? ''
+        },
+        onSuccess: async () => {
+            await navigateTo('/admin/posts')
+        },
     },
-    onUpload: ({ files }) => {
-        uploadedName.value = files[0]?.name ?? ''
-    },
-    onSuccess: async () => {
-        await navigateTo('/admin/posts')
-    },
-})
-const { error, status } = resource
-const dirty = draft.isDirty
-const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
-const restored = ref(dirty.value)
-const editorial = await usePostProofreading(
-    form,
-    draft,
-    () => operation.value !== null || status.value === 'pending' || conflict.value,
 )
+
+const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
+const restored = ref(draft.isDirty.value)
 const {
+    error: editorialError,
     proposal,
     originalContent,
     running: proofreading,
@@ -35,28 +36,30 @@ const {
     discard: discardSuggestion,
     run: proofread,
     apply: applyProofreading,
-} = editorial
+} = await usePostProofreading(
+    form,
+    draft,
+    () => operation.value !== null || status.value === 'pending' || conflict.value,
+)
 const busy = computed(
     () => operation.value !== null || proofreading.value || status.value === 'pending',
 )
 const awaitingProofreading = computed(() => Boolean(proposal.value))
-const errorMessage = computed(() => (error.value || editorial.error.value)?.message)
-function setManualSlug(manual: boolean) {
+const errorMessage = computed(() => (error.value || editorialError.value)?.message)
+
+const setManualSlug = (manual: boolean) => {
     const settings = postPublicationSettings(form.state.values)
     form.setFieldValue('publication', { ...settings, slug: manual ? 'manual' : 'auto' })
     if (!manual && settings.publishedSlug) form.setFieldValue('slug', settings.publishedSlug)
 }
-function submit() {
+
+const submit = () => {
     if (!busy.value && !conflict.value && !document.activeElement?.matches('[data-post-tags]'))
         void form.handleSubmit()
 }
+
 onBeforeRouteLeave(() => {
     if (busy.value) return false
-})
-useEventListener('beforeunload', (event) => {
-    if (!dirty.value && !busy.value) return
-    event.preventDefault()
-    event.returnValue = ''
 })
 </script>
 
@@ -305,6 +308,7 @@ useEventListener('beforeunload', (event) => {
                         />
                     </div>
                     <UFormField label="Image">
+                        <!-- @vue-generic {false, File} -->
                         <UFileUpload
                             :model-value="null"
                             reset

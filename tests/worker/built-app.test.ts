@@ -4,23 +4,23 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types'
-import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
 import { createSiteAdmin } from '@liria24/site-admin/internal/server'
 import { drizzle } from 'drizzle-orm/d1'
 import { migrate } from 'drizzle-orm/d1/migrator'
 import { expect, test } from 'vitest'
 import { createTestHarness, type Unstable_RawConfig } from 'wrangler'
 
-import * as schema from '../../server/database/schema'
 import siteAdminConfig from '../../site-admin.config'
+import { bindTestDatabase } from '../helpers/database'
 
 test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
     'the emitted v2 Worker uses D1/R2 and wires scheduled publishing without the local SQLite driver',
     async () => {
         const root = await mkdtemp(join(tmpdir(), 'liry24-built-worker-'))
-        const generated = JSON.parse(await readFile('.output/server/wrangler.json', 'utf8'))
+        const generated = JSON.parse(await readFile('.void-wrangler.jsonc', 'utf8'))
         expect(generated.compatibility_flags).toEqual([
             'nodejs_compat_v2',
+            'nodejs_als',
             'enable_nodejs_process_v2',
             'nodejs_compat_populate_process_env',
         ])
@@ -52,18 +52,18 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             ])
                 expect(bundle, `${file}: development code ${marker}`).not.toContain(marker)
         }
-        const isPreview = Boolean(generated.previews)
-        const runtime = isPreview ? generated.previews : generated
+        const isPreview = generated.vars?.APP_ENV === 'dev'
+        const runtime = generated
         const config: Unstable_RawConfig = {
             ...generated,
             ...runtime,
             name: 'liry24-built-worker-test',
             main: resolve('.output/server/index.mjs'),
-            assets: { ...generated.assets, directory: resolve('.output/public') },
+            assets: { binding: 'ASSETS', directory: resolve('.output/public') },
             routes: [],
             triggers: { crons: [] },
             d1_databases: [{ binding: 'DB', database_name: 'test-db', database_id: 'test-db' }],
-            r2_buckets: [{ binding: 'R2', bucket_name: 'test-assets' }],
+            r2_buckets: [{ binding: 'STORAGE', bucket_name: 'test-assets' }],
         }
         delete config.previews
         // No inference or remote AI service is available in this synthetic Worker test.
@@ -71,35 +71,44 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
         const configPath = join(root, 'wrangler.json')
         await writeFile(configPath, JSON.stringify(config))
         const secrets = Object.fromEntries(
-            [...generated.secrets.required, 'PREVIEW_GITHUB_TOKEN'].map((name) => [
-                name,
-                `test-only-${name}-0123456789abcdef0123456789abcdef`,
-            ]),
+            [
+                ...(generated.secrets?.required ?? [
+                    'BETTER_AUTH_SECRET',
+                    'NUXT_APP_SECRET',
+                    'GITHUB_CLIENT_ID',
+                    'GITHUB_CLIENT_SECRET',
+                ]),
+                'PREVIEW_GITHUB_TOKEN',
+            ].map((name) => [name, `test-only-${name}-0123456789abcdef0123456789abcdef`]),
         )
         const server = createTestHarness({ workers: [{ configPath, secrets }] })
         try {
             await server.listen()
-            const worker = server.getWorker<{ DB: D1Database; R2: R2Bucket }>()
+            const worker = server.getWorker<{ DB: D1Database; STORAGE: R2Bucket }>()
             const env = await worker.getEnv()
             const orm = drizzle(env.DB)
-            await migrate(orm, { migrationsFolder: 'drizzle' })
+            await migrate(orm, { migrationsFolder: 'db/migrations' })
+            const preparedAt = Date.now() - 120_000
             const admin = createSiteAdmin({
+                now: () => new Date(preparedAt),
                 locales: { defaultLocale: 'ja', supported: ['ja'] },
                 config: siteAdminConfig,
-                database: drizzleAdapter(orm, { schema }),
+                database: bindTestDatabase(env),
             })
-            await env.R2.put('runtime-binding-probe', 'local-only')
-            expect(await (await env.R2.get('runtime-binding-probe'))?.text()).toBe('local-only')
+            await env.STORAGE.put('runtime-binding-probe', 'local-only')
+            expect(await (await env.STORAGE.get('runtime-binding-probe'))?.text()).toBe(
+                'local-only',
+            )
             for (const [path, status] of [
                 ['/api/auth/get-session', 200],
                 ['/', 200],
                 ['/works', 200],
                 ['/api/site-admin/models', 401],
-                ['/admin/works', 404],
+                ['/admin/works', 302],
                 ['/favicon.ico', 200],
                 ['/login', 200],
             ] as const) {
-                const response = await server.fetch(path)
+                const response = await server.fetch(path, { redirect: 'manual' })
                 const body = await response.text()
                 expect(response.status, `${path}: ${body.slice(0, 300)}`).toBe(status)
                 if (path === '/' || path === '/works') {
@@ -198,7 +207,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 expectedVersion: entry.version,
                 data: { slug: entry.data.slug, title: 'B', content: '# B', tags: [] },
             })
-            const at = new Date(Date.now() + 60_000)
+            const at = new Date(preparedAt + 60_000)
             entry = await admin.schedulePublish(entry.id, {
                 expectedVersion: entry.version,
                 at: at.toISOString(),
@@ -215,11 +224,13 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             )
             await expect
                 .poll(async () => (await admin.getEntry(entry.id)).publishedRevisionId)
-                .toBe(scheduledRevision)
+                .toBe(isPreview ? entry.publishedRevisionId : scheduledRevision)
             const published = await admin.getEntry(entry.id)
-            expect(published.scheduledRevisionId).toBeNull()
+            expect(published.scheduledRevisionId).toBe(isPreview ? scheduledRevision : null)
             expect(published.currentRevisionId).toBe(currentRevision)
-            expect((await admin.getPublicEntry('posts', entry.id))?.data.title).toBe('B')
+            expect((await admin.getPublicEntry('posts', entry.id))?.data.title).toBe(
+                isPreview ? 'A' : 'B',
+            )
         } finally {
             for (const log of server.getLogs().filter((log) => log.level === 'error'))
                 console.error(log.message)

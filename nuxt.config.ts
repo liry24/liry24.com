@@ -1,72 +1,15 @@
-import { resolve } from 'node:path'
-
 import { defineNuxtConfig } from 'nuxt/config'
 import { parseURL } from 'ufo'
-import type { Unstable_RawConfig } from 'wrangler'
 
-import { previewBindings } from './scripts/preview-target.mjs'
-
-const isPreview = process.env.CLOUDFLARE_PREVIEW_BUILD === 'true'
+const isPreview = process.env.APP_ENV !== 'production'
 const baseURL =
-    (isPreview ? process.env.PREVIEW_URL : process.env.NUXT_PUBLIC_SITE_URL) || 'https://liry24.com'
+    process.env.NUXT_PUBLIC_SITE_URL ||
+    (isPreview ? 'https://liry24-com-dev.liry.workers.dev' : 'https://liry24.com')
 const imagesDomain = isPreview ? baseURL : 'https://images.liry24.com'
 const title = 'Liry24'
 
-const cloudflareConfig = {
-    name: 'liry24-com',
-    account_id: '422bd946004c77eb0d569ec489b40196',
-    compatibility_date: '2026-07-30',
-    // Explicit v2 prevents Nitro 2's opt-out. Enable the process features used by auth at this date.
-    compatibility_flags: [
-        'nodejs_compat_v2',
-        'enable_nodejs_process_v2',
-        'nodejs_compat_populate_process_env',
-    ],
-    workers_dev: false,
-    preview_urls: true,
-    routes: [{ pattern: 'liry24.com', custom_domain: true }],
-    triggers: { crons: ['* * * * *'] },
-    assets: { not_found_handling: '404-page' },
-    observability: { enabled: true, logs: { enabled: true, invocation_logs: true } },
-    vars: {
-        APP_ENV: 'production',
-        NUXT_PUBLIC_PREVIEW: 'false',
-        NUXT_PUBLIC_SITE_URL: 'https://liry24.com',
-        NUXT_PUBLIC_IMAGES_DOMAIN: 'https://images.liry24.com',
-        R2_DOMAIN: 'https://images.liry24.com',
-    },
-    secrets: {
-        required: [
-            'BETTER_AUTH_SECRET',
-            'NUXT_APP_SECRET',
-            'GITHUB_CLIENT_ID',
-            'GITHUB_CLIENT_SECRET',
-            'VERCEL_CLIENT_ID',
-            'VERCEL_CLIENT_SECRET',
-        ],
-    },
-    d1_databases: [
-        {
-            binding: 'DB',
-            database_name: 'liry24-com',
-            database_id: '227d818f-cd40-4fca-9710-b57273be94ca',
-        },
-    ],
-    r2_buckets: [{ binding: 'R2', bucket_name: 'liry24-com' }],
-    dev: { ip: '127.0.0.1', port: 3100 },
-    ...(isPreview
-        ? {
-              previews: previewBindings({
-                  siteURL: process.env.PREVIEW_URL,
-                  databaseId: process.env.PREVIEW_D1_ID,
-                  resourceName: process.env.PREVIEW_RESOURCE_NAME,
-              }),
-          }
-        : {}),
-} satisfies Unstable_RawConfig
-
 export default defineNuxtConfig({
-    compatibilityDate: '2026-07-30',
+    compatibilityDate: '2026-10-13',
 
     future: { compatibilityVersion: 5 },
 
@@ -77,23 +20,6 @@ export default defineNuxtConfig({
     imports: { presets: [{ from: 'cn', imports: ['cn'] }] },
 
     modules: [
-        (_options, nuxt) => {
-            // A configured Site Admin database adapter is not prepared before Better Auth.
-            // Resolve the same application connection directly for each auth request.
-            nuxt.hook('better-auth:database:providers', (providers) => {
-                const authDatabase = resolve(nuxt.options.rootDir, 'server/utils/database.ts')
-                providers.liry24 = {
-                    priority: 1000,
-                    isEnabled: () => true,
-                    buildDatabaseCode:
-                        () => `import { getAuthDatabase } from ${JSON.stringify(authDatabase)}
-export const db = undefined
-export function createDatabase(event) {
-    return getAuthDatabase(event)
-}`,
-                }
-            })
-        },
         '@nuxt/fonts',
         '@comark/nuxt',
         '@nuxt/ui',
@@ -132,7 +58,6 @@ export function createDatabase(event) {
                 '@comark/vue',
                 '@formkit/drag-and-drop',
                 '@formkit/drag-and-drop/vue',
-                '@tanstack/vue-form',
                 '@yeger/vue-masonry-wall',
                 'cn',
             ],
@@ -147,20 +72,13 @@ export function createDatabase(event) {
         },
     },
 
-    hooks: {
-        'nitro:config'(config) {
-            // The auth module copies local .env secrets into runtimeConfig during a build.
-            // Every deployment uses its own secret binding, never the build machine's secret.
-            if (config.runtimeConfig) config.runtimeConfig.betterAuthSecret = ''
-        },
-    },
-
     routeRules: {
         '/': { swr: 300 },
         '/arts/**': { swr: 300 },
         '/works/**': { swr: 300 },
         '/posts/**': { swr: 300 },
         '/admin/**': {
+            auth: { user: { role: 'admin' } },
             appMiddleware: 'admin',
             appLayout: 'admin',
             headers: { 'cache-control': 'private, no-store' },
@@ -173,11 +91,7 @@ export function createDatabase(event) {
         moduleSideEffects: ['reflect-metadata'],
         compressPublicAssets: true,
         experimental: { asyncContext: true },
-        cloudflare: {
-            deployConfig: true,
-            nodeCompat: true,
-            wrangler: cloudflareConfig,
-        },
+
         prerender: {
             crawlLinks: false,
             failOnError: true,
@@ -260,7 +174,7 @@ export function createDatabase(event) {
 
     auth: {
         redirects: { authenticated: '/admin', logout: '/' },
-        schema: { usePlural: true },
+        schema: { usePlural: true, casing: 'snake_case' },
     },
 
     i18n: {
@@ -280,7 +194,6 @@ export function createDatabase(event) {
     $development: {
         // Background SSR warmup discovers OG font weights and restarts Nitro during requests.
         vite: { warmupEntry: false },
-        nitro: { preset: 'nitro-dev' },
         runtimeConfig: { public: { siteUrl: '' } },
     },
 

@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 // Run against Nuxt dev started with a synthetic BETTER_AUTH_SECRET and an isolated
-// LIRY24_DEV_DB_PATH, passing those same variables to this local-only probe.
+// LIRY24_TEST_DB_PATH, passing those same variables to this local-only probe.
 const origin = new URL(process.argv[2] || 'http://localhost:3000')
 assert(
     ['localhost', '127.0.0.1'].includes(origin.hostname) && origin.protocol === 'http:',
@@ -17,10 +17,10 @@ assert(
     'Supply the same synthetic auth secret as the local Nuxt server',
 )
 assert(
-    process.env.LIRY24_DEV_DB_PATH,
-    'Supply the isolated SQLite path used by the local Nuxt server',
+    process.env.LIRY24_TEST_DB_PATH,
+    'Supply the isolated Void D1 SQLite file used by the local Nuxt server',
 )
-const databasePath = resolve(process.env.LIRY24_DEV_DB_PATH)
+const databasePath = resolve(process.env.LIRY24_TEST_DB_PATH)
 const apiOnly = process.argv.includes('--api-only')
 assert(existsSync(databasePath), 'Start Nuxt dev and let its startup migrations finish first')
 const database = new DatabaseSync(databasePath)
@@ -44,6 +44,7 @@ const request = async (
         },
         ...(body ? { body: JSON.stringify(body) } : rawBody ? { body: rawBody } : {}),
         signal: AbortSignal.timeout(30000),
+        redirect: 'manual',
     }).catch((cause) => {
         throw new Error(`${method} ${path} failed`, { cause })
     })
@@ -88,7 +89,7 @@ try {
         })
     if (!apiOnly)
         for (const path of ['/admin/works', '/admin/posts/new', '/admin/posts/unknown'])
-            await request(path, { authenticated: false, status: 404 })
+            await request(path, { authenticated: false, status: 302 })
     const session = await request('/api/auth/get-session')
     assert.equal(session.user.id, id)
     const models = await request('/api/site-admin/models')
@@ -96,8 +97,8 @@ try {
     await request('/__site-admin-devtools/snapshot', { authenticated: false, status: 401 })
     const snapshot = await request('/__site-admin-devtools/snapshot')
     assert.equal(snapshot.database.schemaReady, true)
-    assert.equal(snapshot.database.devDatabase, false)
-    assert.equal(snapshot.database.connector, 'application')
+    assert.equal(snapshot.database.devDatabase, true)
+    assert.equal(snapshot.database.connector, 'void')
     assert.equal(Object.keys(snapshot.models).length, 7)
     assert.equal(snapshot.assets.cleanup.minimumAge, 86400)
     if (!apiOnly) {
@@ -164,7 +165,7 @@ try {
     assert.equal(downloaded.status, 200)
     assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), image)
     console.log(
-        `PASS: ${apiOnly ? '' : 'public pages, anonymous admin 404, '}API 401, Better Auth admin, CRUD, conflict, published/scheduled/current revisions, restore, unpublish, fs upload/download`,
+        `PASS: ${apiOnly ? '' : 'public pages, anonymous admin redirect, '}API 401, Better Auth admin, CRUD, conflict, published/scheduled/current revisions, restore, unpublish, R2 upload/download`,
     )
     if (process.argv.includes('--browser')) {
         for (const [suffix, title] of [

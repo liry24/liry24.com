@@ -1,28 +1,19 @@
-import { DatabaseSync } from 'node:sqlite'
-
-import { drizzleAdapter } from '@better-auth/drizzle-adapter/relations-v2'
+import { createAuthDatabase } from '@liria24/site-admin/internal/runtime/database'
 import { betterAuth } from 'better-auth'
 import { createAuthEndpoint } from 'better-auth/api'
-import { readMigrationFiles } from 'drizzle-orm/migrator'
-import { drizzle } from 'drizzle-orm/node-sqlite'
 import { expect, test } from 'vitest'
 
-import * as schema from '../../server/database/schema'
+import * as schema from '../../db/schema'
+import { openTestDatabase } from '../helpers/database'
 
 test('auth counters bound unknown paths and dynamic routes while preserving ingress rules', async () => {
-    const db = new DatabaseSync(':memory:')
+    const local = openTestDatabase()
+    const db = local.sqlite
     try {
-        for (const migration of readMigrationFiles({ migrationsFolder: 'drizzle' }))
-            db.exec(migration.sql.join(';'))
         const auth = betterAuth({
             baseURL: 'https://auth.invalid',
             secret: 'test-only-auth-secret-not-for-deployment',
-            database: drizzleAdapter(drizzle({ client: db, relations: schema.authRelations }), {
-                provider: 'sqlite',
-                schema,
-                usePlural: true,
-                transaction: false,
-            }),
+            database: createAuthDatabase(schema, { usePlural: true }, { env: local.env }),
             rateLimit: {
                 enabled: true,
                 storage: 'database',

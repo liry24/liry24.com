@@ -1,17 +1,15 @@
-import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
 import { createSiteAdminManagementClient } from '@liria24/site-admin/internal/client'
 import { createSiteAdmin, handleManagementRequest } from '@liria24/site-admin/internal/server'
 import { expect, test, vi } from 'vitest'
 import { effectScope } from 'vue'
 
-import { openDevelopmentDB } from '../../server/database/development'
-import * as schema from '../../server/database/schema'
 import { postPublicationSettings } from '../../shared/utils/postEditorial'
 import config from '../../site-admin.config'
+import { openTestDatabase } from '../helpers/database'
 import { createModelForm } from '../helpers/model'
 
 test('draft form persists automatic choices without AI or a public route and keeps conflicts', async () => {
-    const local = openDevelopmentDB({ databasePath: ':memory:' })
+    const local = openTestDatabase()
     const scope = effectScope()
     const ai = vi.fn(() => {
         throw new Error('AI has no balance')
@@ -20,7 +18,7 @@ test('draft form persists automatic choices without AI or a public route and kee
     const admin = createSiteAdmin({
         locales: { defaultLocale: 'ja', supported: ['ja'] },
         config: { ...config, ai: { ...config.ai, model: ai } },
-        database: drizzleAdapter(local.database, { schema }),
+        database: local.database,
         authorize: () => ({ id: 'synthetic-post-admin', roles: ['admin'] }),
     })
     const client = createSiteAdminManagementClient({
@@ -91,7 +89,7 @@ test('draft form persists automatic choices without AI or a public route and kee
 })
 
 test('legacy drafts and published revisions retain metadata when no selection was recorded', async () => {
-    const local = openDevelopmentDB({ databasePath: ':memory:' })
+    const local = openTestDatabase()
     const scope = effectScope()
     const ai = vi.fn(() => {
         throw new Error('AI has no balance')
@@ -99,7 +97,7 @@ test('legacy drafts and published revisions retain metadata when no selection wa
     const admin = createSiteAdmin({
         locales: { defaultLocale: 'ja', supported: ['ja'] },
         config: { ...config, ai: { ...config.ai, model: ai } },
-        database: drizzleAdapter(local.database, { schema }),
+        database: local.database,
         authorize: () => ({ id: 'synthetic-legacy-admin', roles: ['admin'] }),
     })
     const client = createSiteAdminManagementClient({
@@ -149,7 +147,7 @@ test('legacy drafts and published revisions retain metadata when no selection wa
 })
 
 test('an implicit slug on a directly published model retains the non-AI title fallback', async () => {
-    const local = openDevelopmentDB({ databasePath: ':memory:' })
+    const local = openTestDatabase()
     const scope = effectScope()
     const model = vi.fn(() => {
         throw new Error('AI must not resolve during a save')
@@ -161,7 +159,7 @@ test('an implicit slug on a directly published model retains the non-AI title fa
             models: { ...config.models, works: { ...config.models.works, publishing: false } },
             ai: { ...config.ai, model },
         },
-        database: drizzleAdapter(local.database, { schema }),
+        database: local.database,
         authorize: () => ({ id: 'synthetic-work-admin', roles: ['admin'] }),
     })
     const client = createSiteAdminManagementClient({

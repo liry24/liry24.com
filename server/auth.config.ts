@@ -8,7 +8,7 @@ import {
 } from './utils/previewAuthorization.js'
 
 export default defineServerAuth(() => {
-    const isPreview = process.env.APP_ENV === 'preview'
+    const isPreview = !import.meta.dev && process.env.APP_ENV === 'dev'
     return {
         appName: 'liry24',
 

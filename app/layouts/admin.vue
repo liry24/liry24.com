@@ -2,11 +2,19 @@
 const { signOut, user } = useUserSession()
 const sidebarCollapsed = ref(false)
 useHead({ titleTemplate: '%s | Liry24 Admin' })
-const links = Object.entries(adminModels).map(([name, model]) => ({
-    label: model.label,
-    icon: model.icon,
-    to: `/admin/${name}`,
-}))
+const client = useAdminClient()
+const { locale } = useI18n()
+const { data: models } = await useAsyncData(
+    () => `admin-navigation:${user.value?.id}:${user.value?.role}:${locale.value}`,
+    () => client.models(),
+)
+const links = computed(() =>
+    (models.value ?? []).map(({ name, meta }) => ({
+        label: meta.plural,
+        icon: meta.icon,
+        to: '/admin/' + name,
+    })),
+)
 const extraLinks = [
     {
         to: 'https://github.com/Liry24/liry24.com',

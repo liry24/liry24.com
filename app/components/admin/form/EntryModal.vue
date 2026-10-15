@@ -1,16 +1,20 @@
 <script setup lang="ts">
-const props = defineProps<{ modelName: string; id?: string; categories?: string[] }>()
+const { modelName, id, categories } = defineProps<{
+    modelName: string
+    id?: string
+    categories?: string[]
+}>()
 const emit = defineEmits<{ close: [saved: boolean] }>()
-const entryLabel =
-    adminModels[props.modelName as keyof typeof adminModels]?.entryLabel || props.modelName
-// This renderer accepts every model; individual editors retain model-specific field types.
-const resource = await useAdminEntry(props.modelName, props.id ?? null)
-const { form, fields, upload, operation } = useEntryForm(resource, {
-    onSuccess: () => {
-        emit('close', true)
-    },
-})
-const conflict = computed(() => resource.error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
+
+const { form, fields, upload, operation, meta, error, status, features, display } =
+    await useAdminForm(modelName, {
+        id: () => id,
+        onSuccess: () => {
+            emit('close', true)
+        },
+    })
+
+const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
 const uploading = computed(() => operation.value === 'upload')
 const editableFields = computed(() => fields.value.filter((field) => field.key !== 'slug'))
 const references = (value: unknown) => (Array.isArray(value) ? value : value ? [value] : [])
@@ -24,8 +28,8 @@ const assetUrl = (value: unknown) =>
         v-slot="{ values, saving }"
     >
         <UModal
-            :title="`${id ? 'Edit' : 'New'} ${entryLabel}`"
-            :description="id ? `Editing #${id}` : `Add a new ${entryLabel.toLowerCase()}`"
+            :title="`${id ? 'Edit' : 'New'} ${meta.label}`"
+            :description="id ? `Editing #${id}` : `Add a new ${meta.label.toLowerCase()}`"
             :dismissible="false"
             :ui="{ content: modelName === 'posts' ? 'sm:max-w-4xl' : 'sm:max-w-lg' }"
             @update:open="
@@ -46,12 +50,7 @@ const assetUrl = (value: unknown) =>
                         ><UButton label="Reload latest" @click="emit('close', true)"
                     /></template>
                 </UAlert>
-                <UAlert
-                    v-if="resource.error.value"
-                    :title="resource.error.value?.message"
-                    color="error"
-                    class="mb-4"
-                />
+                <UAlert v-if="error" :title="error?.message" color="error" class="mb-4" />
                 <form id="admin-entry-form" class="grid gap-4" @submit.prevent="form.handleSubmit">
                     <form.Field
                         v-for="descriptor in editableFields"
@@ -84,6 +83,7 @@ const assetUrl = (value: unknown) =>
                                     "
                                     class="grid gap-2"
                                 >
+                                    <!-- @vue-generic {boolean, File} -->
                                     <UFileUpload
                                         :model-value="null"
                                         reset
@@ -166,7 +166,7 @@ const assetUrl = (value: unknown) =>
                                     v-else-if="['textarea', 'markdown'].includes(descriptor.kind)"
                                     :model-value="String(field.value ?? '')"
                                     :rows="descriptor.kind === 'markdown' ? 16 : 3"
-                                    :placeholder="entryLabel + ' ' + descriptor.label"
+                                    :placeholder="meta.label + ' ' + descriptor.label"
                                     variant="soft"
                                     autoresize
                                     class="w-full"
@@ -184,7 +184,7 @@ const assetUrl = (value: unknown) =>
                                     :placeholder="
                                         descriptor.key === 'href'
                                             ? 'https://example.com'
-                                            : entryLabel + ' ' + descriptor.label
+                                            : meta.label + ' ' + descriptor.label
                                     "
                                     variant="soft"
                                     :size="descriptor.key === 'title' ? 'xl' : 'md'"
@@ -220,7 +220,7 @@ const assetUrl = (value: unknown) =>
                         ><UInput
                             :model-value="String(values.slug ?? '')"
                             @update:model-value="(value) => form.setFieldValue('slug', value)"
-                            :placeholder="entrySlugSuggestion(resource.display(values).title)"
+                            :placeholder="entrySlugSuggestion(display(values).title)"
                             variant="soft"
                             class="w-full"
                     /></UFormField>
@@ -230,7 +230,7 @@ const assetUrl = (value: unknown) =>
                 <UButton
                     type="submit"
                     form="admin-entry-form"
-                    :label="resource.features.value.publishing ? 'Save Draft' : 'Save'"
+                    :label="features.publishing ? 'Save Draft' : 'Save'"
                     color="neutral"
                     size="lg"
                     block

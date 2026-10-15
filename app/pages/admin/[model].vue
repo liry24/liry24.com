@@ -4,20 +4,16 @@ import type { Revision } from '@liria24/site-admin'
 import { LazyAdminFormEntryModal } from '#components'
 
 definePageMeta({
-    middleware: 'admin',
-    layout: 'admin',
     key: (route) => ('model' in route.params ? String(route.params.model) : route.path),
 })
 const modelName = String(useRoute('admin-model').params.model)
-const presentation = adminModels[modelName as keyof typeof adminModels]
-if (!presentation) throw createError({ statusCode: 404 })
 const resource = await useAdminEntries(modelName, {
     all: modelName !== 'posts',
 })
-const { data, error, status, page, features } = resource
+const { data, error, status, page, features, meta: presentation } = resource
 const items = computed(() => data.value?.items ?? [])
 type Entry = (typeof items.value)[number]
-const count = computed(() => resource.data.value?.total ?? 0)
+const count = computed(() => data.value?.total ?? 0)
 const busy = computed(() => status.value === 'pending')
 const pageSize = 20
 const modal = useOverlay().create(LazyAdminFormEntryModal)
@@ -47,15 +43,6 @@ async function edit(data?: Entry) {
     }).result
 }
 defineShortcuts({ n: () => edit() })
-async function operation(entry: Entry, action: string, extra: Record<string, unknown> = {}) {
-    if (busy.value) return
-    if (action === 'delete') await resource.remove(entry)
-    else if (action === 'publish') await resource.publish(entry)
-    else if (action === 'unpublish') await resource.unpublish(entry)
-    else if (action === 'schedule') await resource.schedule(entry, String(extra.at))
-    else if (action === 'cancel-schedule') await resource.cancelSchedule(entry)
-    else await resource.restore(entry, selectedRevision.value[entry.id]!)
-}
 function move(index: number, offset: number) {
     const target = index + offset
     if (busy.value || target < 0 || target >= items.value.length) return
@@ -68,7 +55,7 @@ const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, fiel
 </script>
 
 <template>
-    <AdminResourcePage :title="presentation.label" :icon="presentation.icon" :count>
+    <AdminResourcePage :title="presentation.plural" :icon="presentation.icon" :count>
         <template #trailing>
             <UButton
                 aria-label="Reload latest"
@@ -83,7 +70,7 @@ const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, fiel
         </template>
         <template #actions>
             <UButton
-                :label="`New ${presentation.entryLabel}`"
+                :label="`New ${presentation.label}`"
                 icon="mingcute:add-line"
                 variant="outline"
                 color="neutral"
@@ -184,9 +171,7 @@ const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, fiel
                                 color="neutral"
                                 size="sm"
                                 :disabled="busy"
-                                @click="
-                                    modelName === 'posts' ? edit(item) : operation(item, 'publish')
-                                "
+                                @click="modelName === 'posts' ? edit(item) : resource.publish(item)"
                             />
                             <UButton
                                 v-if="features.publishing && item.publishedRevisionId"
@@ -195,7 +180,7 @@ const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, fiel
                                 color="neutral"
                                 size="sm"
                                 :disabled="busy"
-                                @click="operation(item, 'unpublish')"
+                                @click="resource.unpublish(item)"
                             />
                             <UInput
                                 v-if="features.scheduling && modelName !== 'posts'"
@@ -212,11 +197,7 @@ const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, fiel
                                 color="neutral"
                                 size="sm"
                                 :disabled="busy || !schedule[item.id]"
-                                @click="
-                                    operation(item, 'schedule', {
-                                        at: new Date(schedule[item.id]!).toISOString(),
-                                    })
-                                "
+                                @click="resource.schedule(item, schedule[item.id]!)"
                             />
                             <UButton
                                 v-if="item.scheduledRevisionId"
@@ -225,7 +206,7 @@ const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, fiel
                                 color="neutral"
                                 size="sm"
                                 :disabled="busy"
-                                @click="operation(item, 'cancel-schedule')"
+                                @click="resource.cancelSchedule(item)"
                             />
                             <UButton
                                 v-if="features.revisions"
@@ -259,12 +240,7 @@ const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, fiel
                                     color="neutral"
                                     size="sm"
                                     :disabled="busy || !selectedRevision[item.id]"
-                                    @click="
-                                        operation(
-                                            item,
-                                            `revisions/${selectedRevision[item.id]}/restore`,
-                                        )
-                                    "
+                                    @click="resource.restore(item, selectedRevision[item.id]!)"
                                 />
                             </template>
                         </div>
@@ -285,7 +261,7 @@ const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, fiel
                             variant="ghost"
                             size="sm"
                             :disabled="busy"
-                            @click="operation(item, 'delete')"
+                            @click="resource.remove(item)"
                         />
                     </template>
                 </AdminResourceSortableItem>

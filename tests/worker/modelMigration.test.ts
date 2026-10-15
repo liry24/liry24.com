@@ -1,4 +1,4 @@
-import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { readFileSync, readdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -10,14 +10,24 @@ const folder = 'drizzle/20261015065248_model_fields'
 type Store = {
     exec: (sql: string) => unknown | Promise<unknown>
     all: (sql: string) => unknown[] | Promise<unknown[]>
+    batch: (sql: string[]) => unknown | Promise<unknown>
 }
-async function verify(store: Store) {
+async function verify(store: Store, target: Store) {
     for (const path of [
         'drizzle/20261001123048_baseline/migration.sql',
         'drizzle/20261009063435_wide_shadow_king/migration.sql',
     ])
         for (const sql of readFileSync(path, 'utf8').split('--> statement-breakpoint'))
             if (sql.trim()) await store.exec(sql)
+    await store.exec(
+        "INSERT INTO users(id,name,email,email_verified,role,created_at,updated_at) VALUES ('user','User','fixture@example.invalid',1,'admin',1700000000123,1700000000456)",
+    )
+    await store.exec(
+        "INSERT INTO sessions(id,token,user_id,expires_at,created_at,updated_at) VALUES ('session','token','user',2000000000123,1700000000123,1700000000456)",
+    )
+    await store.exec(
+        "INSERT INTO accounts(id,account_id,provider_id,user_id,created_at,updated_at) VALUES ('account','42','github','user',1700000000123,1700000000456)",
+    )
     await store.exec(
         "INSERT INTO site_admin_assets (id,storage,key,content_type,size,state,created_at,updated_at) VALUES ('asset','content','image','image/png',1,'ready','2026','2026')",
     )
@@ -130,14 +140,84 @@ async function verify(store: Store) {
     expect(
         await store.all("SELECT key FROM site_admin_meta WHERE key LIKE 'content_search:v1:%'"),
     ).toEqual([])
+    const migrations = readdirSync('db/migrations')
+        .filter((name) => name.endsWith('.sql'))
+        .sort()
+    for (const name of migrations)
+        for (const sql of readFileSync(join('db/migrations', name), 'utf8').split(
+            '--> statement-breakpoint',
+        ))
+            if (sql.trim()) await target.exec(sql)
+    const tables = (await target.all(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name",
+    )) as { name: string }[]
+    const quote = (name: string) => '"' + name.replaceAll('"', '""') + '"'
+    const literal = (value: unknown) =>
+        value === null
+            ? 'NULL'
+            : typeof value === 'number'
+              ? String(value)
+              : "'" + String(value).replaceAll("'", "''") + "'"
+    const statements = ['PRAGMA defer_foreign_keys=ON']
+    const expected = new Map<string, Record<string, unknown>[]>()
+    for (const { name } of tables) {
+        const rows = (await store.all(
+            'SELECT * FROM ' + quote(name) + ' ORDER BY rowid',
+        )) as Record<string, unknown>[]
+        expected.set(name, rows)
+        for (const row of rows)
+            statements.push(
+                'INSERT INTO ' +
+                    quote(name) +
+                    '(' +
+                    Object.keys(row).map(quote).join(',') +
+                    ') VALUES (' +
+                    Object.values(row).map(literal).join(',') +
+                    ')',
+            )
+    }
+    await target.batch(statements)
+    for (const { name } of tables)
+        expect(await target.all('SELECT * FROM ' + quote(name) + ' ORDER BY rowid')).toEqual(
+            expected.get(name),
+        )
+    expect(await target.all('PRAGMA foreign_key_check')).toEqual([])
+    for (const ledger of ['_void_migrations', 'd1_migrations']) {
+        await target.exec(
+            'CREATE TABLE ' + ledger + ' (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)',
+        )
+        for (const name of migrations)
+            await target.exec(
+                'INSERT INTO ' + ledger + ' VALUES (' + literal(name) + ", '2026-10-16')",
+            )
+        expect(await target.all('SELECT name FROM ' + ledger + ' ORDER BY name')).toEqual(
+            migrations.map((name) => ({ name })),
+        )
+    }
 }
 test('migrates every snapshot on SQLite without publishing pending edits', async () => {
     const db = new DatabaseSync(':memory:')
+    const next = new DatabaseSync(':memory:')
     db.exec('PRAGMA foreign_keys=ON')
     try {
-        await verify({ exec: (sql) => db.exec(sql), all: (sql) => db.prepare(sql).all() })
+        const store = (db: DatabaseSync): Store => ({
+            exec: (sql) => db.exec(sql),
+            all: (sql) => db.prepare(sql).all(),
+            batch: (statements) => {
+                db.exec('BEGIN')
+                try {
+                    for (const sql of statements) db.exec(sql)
+                    db.exec('COMMIT')
+                } catch (error) {
+                    db.exec('ROLLBACK')
+                    throw error
+                }
+            },
+        })
+        await verify(store(db), store(next))
     } finally {
         db.close()
+        next.close()
     }
 })
 test('migrates the same synthetic snapshots on native D1', async () => {
@@ -154,16 +234,24 @@ test('migrates the same synthetic snapshots on native D1', async () => {
                     database_name: 'test',
                     database_id: '00000000-0000-0000-0000-000000000001',
                 },
+                {
+                    binding: 'NEXT_DB',
+                    database_name: 'next',
+                    database_id: '00000000-0000-0000-0000-000000000002',
+                },
             ],
         }),
     )
     const proxy = await getPlatformProxy({ configPath, remoteBindings: false, persist: false })
     const db = proxy.env.DB as import('@cloudflare/workers-types').D1Database
+    const next = proxy.env.NEXT_DB as typeof db
     try {
-        await verify({
+        const store = (db: typeof next): Store => ({
             exec: (sql) => db.prepare(sql).run(),
             all: async (sql) => (await db.prepare(sql).all()).results,
+            batch: (statements) => db.batch(statements.map((sql) => db.prepare(sql))),
         })
+        await verify(store(db), store(next))
     } finally {
         await proxy.dispose()
         rmSync(dir, { recursive: true, force: true })

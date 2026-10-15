@@ -1,96 +1,55 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { readFile } from 'node:fs/promises'
 
-import { build, createNitro, prepare } from 'nitropack'
-import { expect, test } from 'vitest'
-import type { Unstable_RawConfig } from 'wrangler'
+import { expect, test, vi } from 'vitest'
 
 import nuxtConfig from '../../nuxt.config'
 
-test('Site Admin owns generated module bundling', () => {
-    expect(nuxtConfig.nitro!.externals).toBeUndefined()
-})
-
-test('Nitro owns production settings and preserves infrastructure and required secret bindings', () => {
-    const rawConfig = nuxtConfig.nitro!.cloudflare!.wrangler! as Unstable_RawConfig
-    expect(rawConfig.name).toBe('liry24-com')
-    expect(rawConfig.compatibility_date).toBe('2026-07-30')
-    expect(rawConfig.compatibility_flags).toEqual([
-        'nodejs_compat_v2',
-        'enable_nodejs_process_v2',
-        'nodejs_compat_populate_process_env',
-    ])
-    expect(rawConfig.workers_dev).toBe(false)
-    expect(rawConfig.preview_urls).toBe(true)
-    expect(rawConfig.routes).toEqual([{ pattern: 'liry24.com', custom_domain: true }])
-    expect(rawConfig.triggers?.crons).toEqual(['* * * * *'])
-    expect(rawConfig.d1_databases).toEqual([
-        {
-            binding: 'DB',
-            database_name: 'liry24-com',
-            database_id: '227d818f-cd40-4fca-9710-b57273be94ca',
-        },
-    ])
-    expect(rawConfig.r2_buckets).toEqual([{ binding: 'R2', bucket_name: 'liry24-com' }])
-    expect(rawConfig.ai).toBeUndefined()
-    expect(rawConfig.secrets?.required).toEqual([
-        'BETTER_AUTH_SECRET',
-        'NUXT_APP_SECRET',
-        'GITHUB_CLIENT_ID',
-        'GITHUB_CLIENT_SECRET',
-        'VERCEL_CLIENT_ID',
-        'VERCEL_CLIENT_SECRET',
-    ])
-    for (const name of rawConfig.secrets!.required!) expect(rawConfig.vars).not.toHaveProperty(name)
-})
-
-test('native Nitro generation preserves settings and v2 without an input Wrangler file', async () => {
-    const rootDir = await mkdtemp(join(tmpdir(), 'liry24-nitro-config-'))
-    const cloudflare = nuxtConfig.nitro!.cloudflare!
-    const nitro = await createNitro({
-        rootDir,
-        preset: 'cloudflare_module',
-        compatibilityDate: '2026-07-30',
-        nodeModulesDirs: [resolve('node_modules')],
-        cloudflare,
-    })
+const productionId = '227d818f-cd40-4fca-9710-b57273be94ca'
+test('Void isolates dev and production resources and owns deployment configuration', async () => {
+    expect(nuxtConfig.nitro?.externals).toBeUndefined()
+    expect(nuxtConfig.nitro?.cloudflare).toBeUndefined()
     try {
-        await prepare(nitro)
-        await build(nitro)
-        const output = JSON.parse(
-            await readFile(join(rootDir, '.output/server/wrangler.json'), 'utf8'),
-        ) as Unstable_RawConfig
-        const input = cloudflare.wrangler as Unstable_RawConfig
-        for (const key of [
-            'name',
-            'account_id',
-            'compatibility_date',
-            'compatibility_flags',
-            'workers_dev',
-            'preview_urls',
-            'routes',
-            'triggers',
-            'vars',
-            'secrets',
-            'd1_databases',
-            'r2_buckets',
-            'ai',
-            'observability',
-        ] as const)
-            expect(output[key]).toEqual(input[key])
-        expect(output.main).toBe('index.mjs')
-        expect(output.assets).toMatchObject({
-            binding: 'ASSETS',
-            not_found_handling: '404-page',
-        })
-        expect(output.assets.directory.replaceAll('\\', '/')).toBe('../public')
-        const redirect = JSON.parse(
-            await readFile(join(rootDir, '.wrangler/deploy/config.json'), 'utf8'),
-        )
-        expect(redirect.configPath.replaceAll('\\', '/')).toBe('../../.output/server/wrangler.json')
+        for (const production of [false, true]) {
+            vi.stubEnv('APP_ENV', production ? 'production' : 'dev')
+            vi.resetModules()
+            const { default: config } = await import('../../void.config')
+            const worker = config.cloudflare!
+            expect(worker.name).toBe(production ? 'liry24-com' : 'liry24-com-dev')
+            expect(worker.compatibility_flags).toContain('nodejs_compat_v2')
+            expect(worker.compatibility_flags).toContain('nodejs_als')
+            expect(worker.routes).toEqual(
+                production ? [{ pattern: 'liry24.com', custom_domain: true }] : [],
+            )
+            expect(worker.triggers?.crons).toEqual(production ? ['* * * * *'] : [])
+            expect(worker.d1_databases?.[0]).toMatchObject({
+                binding: 'DB',
+                migrations_dir: 'db/migrations',
+                database_name: worker.name,
+            })
+            expect(worker.d1_databases?.[0]?.database_id).toBe(
+                production ? productionId : undefined,
+            )
+            expect(worker.r2_buckets?.[0]).toMatchObject({
+                binding: 'STORAGE',
+                bucket_name: worker.name,
+            })
+            expect(worker.vars?.APP_ENV).toBe(production ? 'production' : 'dev')
+            for (const name of ['BETTER_AUTH_SECRET', 'NUXT_APP_SECRET', 'GITHUB_CLIENT_SECRET'])
+                expect(worker.vars).not.toHaveProperty(name)
+        }
     } finally {
-        await nitro.close()
-        await rm(rootDir, { recursive: true, force: true })
+        vi.unstubAllEnvs()
+        vi.resetModules()
     }
-}, 60_000)
+})
+
+test('dev deployment delegates resources and migrations to Void without a production job', async () => {
+    const workflow = await readFile('.github/workflows/preview.yml', 'utf8')
+    expect(workflow).toContain('branches: [dev]')
+    expect(workflow).toContain('void deploy --platform cloudflare')
+    expect(workflow).not.toContain('scripts/preview.mjs')
+    expect(workflow).not.toContain('preview:delete')
+    expect(nuxtConfig.routeRules?.['/admin/**']).toMatchObject({
+        auth: { user: { role: 'admin' } },
+    })
+})
