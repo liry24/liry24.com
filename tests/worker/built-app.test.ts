@@ -89,12 +89,9 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             ].map((name) => [name, `test-only-${name}-0123456789abcdef0123456789abcdef`]),
         )
         // Exercise Void's actual deploy rebundling, including the native OG renderer WASM.
-        const voidDist = resolve('node_modules/void/dist')
-        const buildOutput = (await readdir(voidDist)).find((name) =>
-            /^cf-build-output-.*\.mjs$/.test(name),
+        const { n: prepare } = await import(
+            pathToFileURL(resolve('node_modules/void/dist/cf-build-output-Bc8i3dzE.mjs')).href
         )
-        expect(buildOutput).toBeDefined()
-        const { n: prepare } = await import(pathToFileURL(join(voidDist, buildOutput!)).href)
         const prepared = await prepare({
             projectRoot: process.cwd(),
             configPath,
