@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 
@@ -183,9 +183,16 @@ if (action === 'deploy') {
         'drizzle/*/migration.sql',
     ])
     const { rebuildPreviewSearch } = await import('./preview-search.mjs')
-    await rebuildPreviewSearch(database, target.resourceName, (queries) =>
-        cf('d1', 'query', database.uuid, '--batch', JSON.stringify(queries)),
-    )
+    await mkdir('.cloudflare', { recursive: true })
+    const searchBatchPath = resolve('.cloudflare', `search-${target.name}.json`)
+    try {
+        await rebuildPreviewSearch(database, target.resourceName, async (queries) => {
+            await writeFile(searchBatchPath, JSON.stringify(queries), { mode: 0o600 })
+            return cf('d1', 'query', database.uuid, '--batch', '@' + searchBatchPath)
+        })
+    } finally {
+        await rm(searchBatchPath, { force: true })
+    }
     const secretInput = JSON.stringify(secrets)
     await wranglerPreview(
         ['preview', 'base-config', 'secret', 'bulk', '--worker-name', workerName],
