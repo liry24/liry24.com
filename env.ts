@@ -10,5 +10,5 @@ export default defineEnv({
     PREVIEW_GITHUB_TOKEN: production ? string().optional() : string(),
     VERCEL_CLIENT_ID: production ? string() : string().optional(),
     VERCEL_CLIENT_SECRET: production ? string() : string().optional(),
-    AI_GATEWAY_API_KEY: string().optional(),
+    OPENAI_API_KEY: string().optional(),
 })
