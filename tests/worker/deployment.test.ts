@@ -29,10 +29,9 @@ test('Void isolates dev and production resources and owns deployment configurati
             expect(worker.d1_databases?.[0]?.database_id).toBe(
                 production ? productionId : undefined,
             )
-            expect(worker.r2_buckets?.[0]).toMatchObject({
-                binding: 'STORAGE',
-                bucket_name: worker.name,
-            })
+            expect(worker.r2_buckets).toEqual(
+                production ? [{ binding: 'STORAGE', bucket_name: worker.name }] : [],
+            )
             expect(worker.vars?.APP_ENV).toBe(production ? 'production' : 'dev')
             for (const name of ['BETTER_AUTH_SECRET', 'NUXT_APP_SECRET', 'GITHUB_CLIENT_SECRET'])
                 expect(worker.vars).not.toHaveProperty(name)

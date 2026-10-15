@@ -28,7 +28,7 @@ export default defineConfig({
                 ...(production ? { database_id: '227d818f-cd40-4fca-9710-b57273be94ca' } : {}),
             },
         ],
-        r2_buckets: [{ binding: 'STORAGE', bucket_name: name }],
+        r2_buckets: production ? [{ binding: 'STORAGE', bucket_name: name }] : [],
         vars: {
             APP_ENV: production ? 'production' : 'dev',
             NUXT_PUBLIC_PREVIEW: production ? 'false' : 'true',
