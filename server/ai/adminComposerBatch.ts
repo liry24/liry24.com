@@ -307,6 +307,7 @@ export async function* composeAdminRequest(
     now = Date.now(),
 ): AsyncGenerator<ComposerEvent> {
     if (input.items) {
+        if (input.items.length === 1) signal = AbortSignal.any([signal, AbortSignal.timeout(5000)])
         const items = await parallel(input.items, (item) =>
             resolveItem(input, item, admin, evaluate, signal, now),
         )
@@ -314,8 +315,13 @@ export async function* composeAdminRequest(
         return
     }
     let plan: ComposerPlan | undefined
-    for await (const event of composeAdmin(input, admin, evaluate, signal, now, (count, routing) =>
-        splitAndResolve(input, count, routing, admin, evaluate, signal, now),
+    for await (const event of composeAdmin(
+        input,
+        admin,
+        evaluate,
+        AbortSignal.any([signal, AbortSignal.timeout(5000)]),
+        now,
+        (count, routing) => splitAndResolve(input, count, routing, admin, evaluate, signal, now),
     )) {
         if (event.type === 'plan' && input.batch) {
             plan = protectCreation(event.plan, input.entryId)

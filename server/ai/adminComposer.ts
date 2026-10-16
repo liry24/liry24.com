@@ -137,7 +137,6 @@ export async function* composeAdmin(
         },
     ) => Promise<ComposerBatch>,
 ): AsyncGenerator<ComposerEvent> {
-    signal = AbortSignal.any([signal, AbortSignal.timeout(5000)])
     signal.throwIfAborted()
     const models = admin.models
     const existing =

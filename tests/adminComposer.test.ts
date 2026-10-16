@@ -779,3 +779,54 @@ test('a duplicated profile in one batch requires correction instead of two creat
     expect(batch.items[1]?.plan).toBeUndefined()
     expect(batch.items[1]?.error).toContain('重複')
 })
+
+test('single requests keep a short deadline while multiple-item refinement can take longer', async () => {
+    vi.useFakeTimers()
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
+        const controller = new AbortController()
+        setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), ms)
+        return controller.signal
+    })
+    try {
+        const decide = evaluator([
+            { itemCount: '2' },
+            {
+                'i0.source': '「First」',
+                'i0.model': 'works',
+                'i0.intent': 'create',
+                'i0.formDetails': 'resolve',
+                'i1.source': '「Second」',
+                'i1.model': 'works',
+                'i1.intent': 'create',
+                'i1.formDetails': 'resolve',
+            },
+            {
+                'i0.intent': 'create',
+                'i0.field.title': 'First',
+                'i1.intent': 'create',
+                'i1.field.title': 'Second',
+            },
+        ])
+        const pending = collectBatch(
+            { ...batchInput, prompt: '「First」\n「Second」' },
+            async (request) => {
+                if (Object.keys(request.questions).some((key) => key.includes('.field.')))
+                    await new Promise((resolve) => setTimeout(resolve, 6000))
+                return decide(request)
+            },
+        )
+        await vi.advanceTimersByTimeAsync(6001)
+        const batch = getBatch(await pending)
+        expect(batch.items.map((item) => item.plan?.values.title)).toEqual(['First', 'Second'])
+        const single = collectBatch(batchInput, async (request) => {
+            await new Promise((resolve) => setTimeout(resolve, 6000))
+            return evaluator({ model: 'posts' })(request)
+        })
+        const rejected = expect(single).rejects.toMatchObject({ name: 'TimeoutError' })
+        await vi.advanceTimersByTimeAsync(6001)
+        await rejected
+    } finally {
+        timeout.mockRestore()
+        vi.useRealTimers()
+    }
+})
