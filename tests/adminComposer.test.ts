@@ -412,3 +412,12 @@ test('refinement retains explicitly supplied optional fields even if routing omi
     expect(plan.visibleFields).toContain('season')
     expect(plan.values).toMatchObject({ game: 'VALORANT', season: '2026 Act 2', rank: 'Diamond' })
 })
+
+test('management navigation shows only the action without an empty search result', async () => {
+    const admin = makeAdmin()
+    const evaluate = evaluator({ model: 'works', intent: 'manage' })
+    const plan = getPlan(await collect(input, evaluate, admin))
+    expect(Object.keys(defaultComposerSpec(plan).elements)).toEqual(['panel', 'action'])
+    expect(admin.list).not.toHaveBeenCalled()
+    expect(evaluate).toHaveBeenCalledTimes(1)
+})

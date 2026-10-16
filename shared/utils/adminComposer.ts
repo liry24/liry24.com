@@ -91,7 +91,7 @@ export function composerCandidates(plan: ComposerPlan) {
     } else if (plan.intent === 'settings') {
         nodes.push(candidate('action', 'Action', { kind: 'settings' }))
     } else if (plan.intent !== 'clarify') {
-        nodes.push(candidate('results', 'Results', {}))
+        if (plan.intent === 'search') nodes.push(candidate('results', 'Results', {}))
         if (plan.model) nodes.push(candidate('action', 'Action', { kind: 'list' }))
     }
     return nodes
