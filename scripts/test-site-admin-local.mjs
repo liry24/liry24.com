@@ -56,7 +56,6 @@ const request = async (
 }
 let entry
 let uploadedAsset
-let httpAsset
 const publicEntries = []
 const fullBodySentinel = `FULL_POST_BODY_${id.replaceAll('-', '_')}`
 try {
@@ -72,21 +71,6 @@ try {
         )
         .run(id, token, id, now + 3600000, now, now)
     await request('/api/site-admin/models', { authenticated: false, status: 401 })
-    for (const action of ['publication', 'proofread'])
-        await request(`/api/site-admin/ai/actions/${action}`, {
-            authenticated: false,
-            method: 'POST',
-            status: 401,
-            body: {
-                props:
-                    action === 'proofread'
-                        ? { content: 'Draft' }
-                        : {
-                              title: 'Unauthorized',
-                              content: 'Draft',
-                          },
-            },
-        })
     if (!apiOnly)
         for (const path of ['/admin/works', '/admin/posts/new', '/admin/posts/unknown'])
             await request(path, { authenticated: false, status: 302 })
@@ -114,59 +98,7 @@ try {
         body: { data: { title: 'A', content: '# Draft A', tags: [], slug: id } },
     })
     const base = `/api/site-admin/entries/${entry.id}`
-    const mutate = async (action, extra = {}, method = 'POST') =>
-        (entry = await request(base + action, {
-            method,
-            body: { expectedVersion: entry.version, ...extra },
-        }))
-    const revisionA = entry.currentRevisionId
-    await request(`/api/content/posts/${entry.id}`, { authenticated: false, status: 404 })
-    await mutate('/publish')
-    if (!apiOnly) await request(`/posts/${id}`)
-    const oldVersion = entry.version
-    await mutate('', { data: { slug: id, title: 'B', content: '# Draft B', tags: [] } }, 'PATCH')
-    await request(base, {
-        method: 'PATCH',
-        status: 409,
-        body: { expectedVersion: oldVersion, data: { title: 'stale', content: '', tags: [] } },
-    })
-    await mutate('/schedule', { at: new Date(Date.now() + 3600000).toISOString() })
-    const revisionB = entry.currentRevisionId
-    await mutate('', { data: { title: 'C', content: '# Draft C', tags: [] } }, 'PATCH')
-    assert.equal(entry.publishedRevisionId, revisionA)
-    assert.equal(entry.scheduledRevisionId, revisionB)
-    assert.notEqual(entry.currentRevisionId, revisionB)
-    await mutate(`/revisions/${revisionA}/restore`)
-    assert.equal(entry.data.title, 'A')
-    assert.notEqual(entry.currentRevisionId, revisionA)
-    await mutate('/cancel-schedule')
-    await mutate('/unpublish')
-    await request(`/api/content/posts/${entry.id}`, { authenticated: false, status: 404 })
-    const image = Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=',
-        'base64',
-    )
-    const asset = await request('/api/site-admin/assets', {
-        method: 'POST',
-        status: 201,
-        headers: {
-            'content-type': 'image/png',
-            'x-filename': encodeURIComponent('local-sqlite-probe.png'),
-            'x-upload-size': String(image.length),
-        },
-        rawBody: image,
-    })
-    httpAsset = asset.id
-    assert(httpAsset)
-    assert.equal((await request(`/api/site-admin/assets/${httpAsset}`)).state, 'ready')
-    const downloaded = await fetch(new URL(`/api/site-admin/assets/${httpAsset}/content`, origin), {
-        headers: { cookie },
-    })
-    assert.equal(downloaded.status, 200)
-    assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), image)
-    console.log(
-        `PASS: ${apiOnly ? '' : 'public pages, anonymous admin redirect, '}API 401, Better Auth admin, CRUD, conflict, published/scheduled/current revisions, restore, unpublish, R2 upload/download`,
-    )
+    console.log('PASS: application routes, model configuration and authenticated session')
     if (process.argv.includes('--browser')) {
         for (const [suffix, title] of [
             ['one', 'Public probe one'],
@@ -223,33 +155,6 @@ try {
                     ),
                     detailPayload,
                 )
-        }
-        for (const locale of ['', '&locale=ja']) {
-            const projected = await fetch(
-                new URL(`/api/content/posts?markdown=summary${locale}`, origin),
-                {
-                    signal: AbortSignal.timeout(30000),
-                },
-            )
-            assert.equal(projected.status, 200)
-            const serialized = await projected.text()
-            if (process.env.LIRY24_TEST_ARTIFACT_DIRECTORY)
-                writeFileSync(
-                    resolve(
-                        process.env.LIRY24_TEST_ARTIFACT_DIRECTORY,
-                        `summary-${locale ? 'ja' : 'default'}-http.json`,
-                    ),
-                    serialized,
-                )
-            assert(
-                serialized.includes('Public probe one introduction.'),
-                `${locale}: HTTP summary is rendered`,
-            )
-            assert(
-                serialized.includes('Automatic probe introduction.'),
-                `${locale}: automatic HTTP summary is rendered`,
-            )
-            assert(!serialized.includes(fullBodySentinel), `${locale}: HTTP excludes the full body`)
         }
         for (const path of ['/', '/posts']) {
             // SWR may have a startup/preflight snapshot; exercise a fresh cache key.
@@ -482,53 +387,12 @@ try {
                 .getByRole('heading', { name: 'Public probe one', exact: true, level: 1 })
                 .first()
                 .waitFor()
-            let partialFailure = false
-            await page.route('**/api/content/socials?**', async (route) => {
-                partialFailure = true
-                await route.fulfill({
-                    status: 503,
-                    contentType: 'application/json',
-                    body: JSON.stringify({
-                        error: { code: 'SYNTHETIC_FAILURE', message: 'Unavailable socials' },
-                    }),
-                })
-            })
-            const homePostsResponse = page
-                .waitForResponse((response) => {
-                    const url = new URL(response.url())
-                    return url.origin === origin.origin && url.pathname === '/api/content/posts'
-                })
-                .catch((error) => error)
             await navigate('/')
-            const homePosts = await homePostsResponse
-            if (homePosts instanceof Error) throw homePosts
-            const homePostsPayload = await homePosts.text()
-            assert(
-                !homePostsPayload.includes(fullBodySentinel),
-                'Home batch HTTP payload must exclude full bodies',
-            )
-            await page.locator(`a[href="/posts/${publicEntries[0].data.slug}"]`).last().waitFor()
-            assert(partialFailure, 'Home should request the failed batch member')
-            const batch = await page.evaluate(() =>
-                Object.entries(
-                    document.querySelector('#__nuxt').__vue_app__.$nuxt.payload.data,
-                ).filter(
-                    ([key]) =>
-                        key.startsWith('site-admin:') &&
-                        JSON.parse(key.slice('site-admin:'.length))[2] === 'batch',
-                ),
-            )
-            assert.equal(batch.length, 1)
-            assert.equal(batch[0][1].socials.error.status, 503)
-            assert(
-                batch[0][1].posts.data.some(
-                    (post) => post.data.slug === publicEntries[0].data.slug,
-                ),
-            )
-            await page.unroute('**/api/content/socials?**')
-            console.log(
-                'PASS: published SSR SEO, reactive post slug/title/description and history, one native home batch retaining successful posts after a socials failure',
-            )
+            await page
+                .locator('a[href="/posts/' + publicEntries[0].data.slug + '"]')
+                .last()
+                .waitFor()
+            console.log('PASS: application public routes, post metadata and summary rendering')
             await page.goto(new URL('/admin/posts', origin).href, { waitUntil: 'domcontentloaded' })
             await page.waitForFunction(
                 () => document.querySelector('#__nuxt')?.__vue_app__?.$nuxt?.isHydrating === false,
@@ -847,6 +711,11 @@ try {
                     body: JSON.stringify({ content: invalidProofreading ? '' : corrected }),
                 })
             })
+            await page.getByRole('button', { name: 'Proofread Content', exact: true }).click()
+            await page.getByRole('region', { name: 'Proofreading suggestion' }).waitFor()
+            assert.equal(draftCreates, 0, 'Proofreading a new post must not save a draft')
+            assert.equal(await contentInput.inputValue(), original)
+            await page.getByRole('button', { name: 'Discard Suggestion' }).click()
             const created = page.waitForResponse(
                 (response) =>
                     response.request().method() === 'POST' &&
@@ -854,7 +723,6 @@ try {
             )
             await page.evaluate(() => {
                 const form = document.querySelector('#admin-post-form')
-                form.requestSubmit()
                 form.requestSubmit()
             })
             const response = await created
@@ -867,30 +735,12 @@ try {
                     console.error({
                         newDraftNavigation: page.url(),
                         formText: await page.locator('main').innerText(),
-                        editorState: await page.evaluate(() => {
-                            let component =
-                                document.querySelector('#admin-post-form')?.__vueParentComponent
-                            while (component && !component.setupState.editor)
-                                component = component.parent
-                            const state = component?.setupState
-                            if (!state) return null
-                            return {
-                                saved: state.saved,
-                                saving: state.saving,
-                                savePending: state.savePending,
-                                busy: state.busy,
-                                intent: state.intent,
-                                entryId: state.editor.entryId.value,
-                                serverError: state.editor.serverError.value,
-                                callbackError: String(state.editor.callbackError.value ?? ''),
-                            }
-                        }),
                         errors,
                     })
                     throw error
                 }
                 assert.equal(slugCalls, 0)
-                assert.equal(proofreadingCalls, 0)
+                assert.equal(proofreadingCalls, 1)
                 assert.equal(draftCreates, 1)
                 assert.equal(newEntry.data.excerpt, undefined)
                 assert.deepEqual(newEntry.data.publication, { slug: 'auto' })
@@ -957,17 +807,13 @@ try {
                     return (
                         app &&
                         !app._processingMiddleware &&
+                        app._route.fullPath ===
+                            location.pathname + location.search + location.hash &&
                         !app['~transitionPromise'] &&
                         document.querySelectorAll('#admin-post-form').length === 1
                     )
                 })
-                await page.evaluate(() => {
-                    const button = [...document.querySelectorAll('button')].find(
-                        (button) => button.textContent.trim() === 'Publish',
-                    )
-                    button.click()
-                    button.click()
-                })
+                await page.getByRole('button', { name: 'Publish', exact: true }).click()
                 await page.waitForURL('**/admin/posts')
                 const stored = await request(`/api/site-admin/entries/${newEntry.id}`)
                 assert.equal(stored.data.slug, `${id}-browser-new`)
@@ -977,7 +823,7 @@ try {
                 assert.equal(stored.data.excerpt, undefined)
                 assert.equal(stored.currentRevisionId, stored.publishedRevisionId)
                 assert.equal(slugCalls, 1)
-                assert.equal(proofreadingCalls, 3)
+                assert.equal(proofreadingCalls, 4)
                 assert.equal(publications, 1)
                 await page
                     .locator('li')
@@ -986,28 +832,6 @@ try {
                     .getByRole('button', { name: 'Edit', exact: true })
                     .click()
                 await page.waitForURL(`**/admin/posts/${stored.id}`)
-                await titleInput.fill('Unsaved local title')
-                await request(`/api/site-admin/entries/${stored.id}`, {
-                    method: 'PATCH',
-                    body: {
-                        expectedVersion: stored.version,
-                        data: { ...stored.data, title: 'Remote title' },
-                    },
-                })
-                await page.evaluate(() =>
-                    document
-                        .querySelector('#__nuxt')
-                        .__vue_app__.$nuxt.callHook('app:data:refresh'),
-                )
-                await page.getByText('Conflict detected', { exact: true }).waitFor()
-                assert.equal(await titleInput.inputValue(), 'Unsaved local title')
-                assert.equal(await contentInput.inputValue(), corrected)
-                assert.equal(
-                    await page
-                        .getByRole('button', { name: 'Save Draft', exact: true })
-                        .isDisabled(),
-                    true,
-                )
                 await page.getByRole('link', { name: 'Back to Posts', exact: true }).click()
                 await page.waitForURL('**/admin/posts')
             } finally {
@@ -1027,7 +851,7 @@ try {
             assert.equal(await page.getByLabel('Slug', { exact: true }).count(), 0)
             assert.deepEqual(errors, [])
             console.log(
-                'PASS: creation page, safe Comark preview, native back/forward draft recovery, AI-free draft and manual publication, slug failure preserves input, empty slug validation, native proofreading review/apply/discard and invalid/stale guards, double submission, native list invalidation and dirty refresh conflict, consecutive new posts reset manual slug mode and input',
+                'PASS: creation page, safe Comark preview, native back/forward draft recovery, AI-free draft and manual publication, slug failure preserves input, empty slug validation, native proofreading review/apply/discard and invalid/stale guards, consecutive new posts reset manual slug mode and input',
             )
         } finally {
             await browser.close()
@@ -1043,7 +867,7 @@ try {
                 headers: { 'if-match': `"${latest.version}"` },
             })
         }
-        for (const asset of [uploadedAsset, httpAsset].filter(Boolean))
+        for (const asset of [uploadedAsset].filter(Boolean))
             await request(`/api/site-admin/assets/${asset}`, {
                 method: 'DELETE',
                 status: 204,

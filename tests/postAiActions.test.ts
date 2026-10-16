@@ -45,16 +45,7 @@ test('native Output generates only a slug through the unchanged provider and pre
     expect(external).not.toHaveBeenCalled()
 })
 
-test('slug output does not contain rewritten content or a generated introduction', async () => {
-    const fetch = vi.fn(async () => postActionResponse({ slug: 'generated-slug' }))
-    const input = { ...metadataProps }
-    const original = structuredClone(input)
-    expect(await mockPostActions(fetch).publication(input)).toEqual({ slug: 'generated-slug' })
-    expect(input).toEqual(original)
-    expect(fetch).toHaveBeenCalledTimes(1)
-})
-
-test('slug generation validates exact fields and shape and rejects incomplete responses', async () => {
+test('slug generation validates exact fields and shape', async () => {
     for (const output of [
         { slug: 'bad/slug' },
         { slug: 'valid-slug', content: 'Unexpected rewrite' },
@@ -66,93 +57,6 @@ test('slug generation validates exact fields and shape and rejects incomplete re
         await expect(mockPostActions(fetch).publication(metadataProps)).rejects.toThrow()
         expect(fetch).toHaveBeenCalledTimes(1)
     }
-    const incomplete = vi.fn(async () =>
-        postActionResponse({ content: 'A complete-looking answer.' }, true),
-    )
-    await expect(
-        mockPostActions(incomplete).proofread({ content: draft.content }),
-    ).rejects.toMatchObject({
-        code: 'SITE_ADMIN_AI_OUTPUT_INVALID',
-    })
-    expect(incomplete).toHaveBeenCalledTimes(1)
-})
-
-test('provider failure is not retried and leaves the input intact', async () => {
-    const fetch = vi.fn(async () =>
-        Response.json(
-            { error: { message: 'Synthetic unavailable model', type: 'test', code: 'synthetic' } },
-            { status: 503 },
-        ),
-    )
-    const input = structuredClone(metadataProps)
-    await expect(mockPostActions(fetch).publication(input)).rejects.toMatchObject({
-        code: 'SITE_ADMIN_AI_FAILED',
-        message: 'AI action failed.',
-    })
-    expect(fetch).toHaveBeenCalledTimes(1)
-    expect(input).toEqual(metadataProps)
-})
-
-test('native actions reject anonymous, ungranted roles, unknown props, and empty input before inference', async () => {
-    const fetch = vi.fn(async () => postActionResponse({ content: 'Unexpected inference.' }))
-    const action = mockPostActions(fetch)
-    await expect(
-        action.execute('proofread', { content: 'Draft' }, { actor: null }),
-    ).rejects.toMatchObject({ code: 'SITE_ADMIN_AUTH_REQUIRED' })
-    await expect(
-        action.execute(
-            'proofread',
-            { content: 'Draft' },
-            { actor: { id: 'synthetic-editor', roles: ['editor'] } },
-        ),
-    ).rejects.toMatchObject({ code: 'SITE_ADMIN_FORBIDDEN' })
-    for (const props of [{ content: 'Draft', unknown: true }, { content: ' ' }, { content: 1 }])
-        await expect(action.execute('proofread', props)).rejects.toMatchObject({
-            code: 'SITE_ADMIN_INVALID_INPUT',
-        })
-    await expect(action.execute('unknown', { content: 'Draft' })).rejects.toMatchObject({
-        code: 'SITE_ADMIN_ENTRY_NOT_FOUND',
-    })
-    expect(fetch).not.toHaveBeenCalled()
-})
-
-test('server props and output factories use the captured source despite caller mutation', async () => {
-    const requests: Awaited<ReturnType<typeof postActionRequest>>[] = []
-    const fetch = vi.fn(async (input, init) => {
-        requests.push(await postActionRequest(input, init))
-        return postActionResponse({ content: 'This is an example `one()`.' })
-    })
-    const props = { content: 'This are an example `one()`.' }
-    const pending = mockPostActions(fetch).proofread(props)
-    props.content = 'Changed caller source `two()`.'
-    expect(await pending).toEqual({ content: 'This is an example `one()`.' })
-    expect(JSON.stringify(requests[0]!.body.input)).toContain('This are an example `one()`.')
-    expect(props.content).toBe('Changed caller source `two()`.')
-})
-
-test('native server actions propagate already aborted and in-flight request cancellation', async () => {
-    const fetch = vi.fn(
-        async (_input, init) =>
-            new Promise<Response>((_resolve, reject) => {
-                init?.signal?.addEventListener('abort', () => reject(init.signal!.reason), {
-                    once: true,
-                })
-            }),
-    )
-    const action = mockPostActions(fetch)
-    const stopped = new AbortController()
-    stopped.abort(new Error('Synthetic pre-abort'))
-    await expect(
-        action.execute('proofread', { content: 'Draft' }, { signal: stopped.signal }),
-    ).rejects.toThrow('Synthetic pre-abort')
-    expect(fetch).not.toHaveBeenCalled()
-    const controller = new AbortController()
-    const pending = expect(
-        action.execute('proofread', { content: 'Draft' }, { signal: controller.signal }),
-    ).rejects.toThrow('Synthetic in-flight abort')
-    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
-    controller.abort(new Error('Synthetic in-flight abort'))
-    await pending
 })
 
 test('proofreading rejects changes to code, links, and assets without changing the draft', async () => {

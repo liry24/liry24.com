@@ -1,19 +1,30 @@
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 import type { SiteAdminDatabase } from '@liria24/site-admin/internal/adapter'
 import { useVoidDatabase } from '@liria24/site-admin/internal/runtime/database'
-import { readMigrationFiles } from 'drizzle-orm/migrator'
 import { withRuntimeEnv } from 'void/_env'
 
 import * as schema from '../../db/schema'
 import { sqliteD1 } from './d1'
 
+export const baselineStatements = () =>
+    readdirSync('db/migrations')
+        .filter((file) => file.endsWith('.sql'))
+        .sort()
+        .flatMap((file) =>
+            readFileSync(join('db/migrations', file), 'utf8')
+                .split('--> statement-breakpoint')
+                .map((sql) => sql.trim())
+                .filter(Boolean),
+        )
+
 // Tests get isolated SQLite-backed D1 bindings; application runtime uses Void's binding.
 export function openTestDatabase() {
     const sqlite = new DatabaseSync(':memory:')
     sqlite.exec('PRAGMA foreign_keys=ON')
-    for (const migration of readMigrationFiles({ migrationsFolder: 'db/migrations' }))
-        sqlite.exec(migration.sql.join(';'))
+    for (const sql of baselineStatements()) sqlite.exec(sql)
     const env = { DB: sqliteD1(sqlite) }
     return { sqlite, env, database: bindTestDatabase(env), close: () => sqlite.close() }
 }

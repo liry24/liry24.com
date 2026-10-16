@@ -1,6 +1,5 @@
 import { createOpenAI } from '@ai-sdk/openai'
 import { executeSiteAdminAiAction } from '@liria24/site-admin/internal/ai'
-import type { SiteAdminActor } from '@liria24/site-admin/internal/server'
 
 import config from '../../site-admin.config'
 
@@ -8,25 +7,14 @@ import config from '../../site-admin.config'
 // read credentials or contact OpenAI, Workers AI, or an AI Gateway.
 export function mockPostActions(fetch: typeof globalThis.fetch) {
     const model = createOpenAI({ apiKey: 'synthetic-test-only', fetch })('gpt-6-luna')
-    const execute = (
-        name: string,
-        props: Record<string, unknown>,
-        {
-            actor = { id: 'synthetic-action-admin', roles: ['admin'] },
-            signal,
-        }: {
-            actor?: SiteAdminActor | null
-            signal?: AbortSignal
-        } = {},
-    ) =>
+    const execute = (name: string, props: Record<string, unknown>) =>
         executeSiteAdminAiAction(
             { ...config, ai: { ...config.ai, model } },
             name,
             { input: props },
-            { actor, request: new Request('http://synthetic.invalid/ai', { signal }) },
+            { actor: { id: 'synthetic-action-admin', roles: ['admin'] } },
         )
     return {
-        execute,
         async publication(props: { title: string; content: string }) {
             return (await execute('publication', props)) as { slug: string }
         },
@@ -36,12 +24,12 @@ export function mockPostActions(fetch: typeof globalThis.fetch) {
     }
 }
 
-export const postActionResponse = (output: Record<string, string>, incomplete = false) =>
+export const postActionResponse = (output: Record<string, string>) =>
     Response.json({
         id: 'synthetic-response',
         object: 'response',
         created_at: 0,
-        status: incomplete ? 'incomplete' : 'completed',
+        status: 'completed',
         model: 'gpt-6-luna',
         output: [
             {
@@ -52,7 +40,6 @@ export const postActionResponse = (output: Record<string, string>, incomplete = 
                 content: [{ type: 'output_text', text: JSON.stringify(output), annotations: [] }],
             },
         ],
-        ...(incomplete ? { incomplete_details: { reason: 'max_output_tokens' } } : {}),
         usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
     })
 

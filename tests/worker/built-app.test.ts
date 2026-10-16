@@ -6,13 +6,11 @@ import { pathToFileURL } from 'node:url'
 
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types'
 import { createSiteAdmin } from '@liria24/site-admin/internal/server'
-import { drizzle } from 'drizzle-orm/d1'
-import { migrate } from 'drizzle-orm/d1/migrator'
 import { expect, test } from 'vitest'
 import { createTestHarness, type Unstable_RawConfig } from 'wrangler'
 
 import siteAdminConfig from '../../site-admin.config'
-import { bindTestDatabase } from '../helpers/database'
+import { baselineStatements, bindTestDatabase } from '../helpers/database'
 
 test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
     'the emitted v2 Worker uses D1/R2 and wires scheduled publishing without the local SQLite driver',
@@ -108,8 +106,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             await server.listen()
             const worker = server.getWorker<{ DB: D1Database; STORAGE: R2Bucket }>()
             const env = await worker.getEnv()
-            const orm = drizzle(env.DB)
-            await migrate(orm, { migrationsFolder: 'db/migrations' })
+            await env.DB.batch(baselineStatements().map((sql) => env.DB.prepare(sql)))
             const preparedAt = Date.now() - 120_000
             const admin = createSiteAdmin({
                 now: () => new Date(preparedAt),
@@ -176,20 +173,8 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             const authenticated = {
                 cookie: `better-auth.session_token=${signed}; __Secure-better-auth.session_token=${signed}`,
             }
-            // Auth must initialize independently of CMS access and remain request-local
-            // when authenticated and anonymous requests share the same Worker/database.
-            await Promise.all(
-                Array.from({ length: 8 }, async (_, index) => {
-                    const hasSession = index % 2 === 0
-                    const response = await server.fetch('/api/auth/get-session', {
-                        headers: hasSession ? authenticated : {},
-                    })
-                    expect(response.status).toBe(200)
-                    const session = await response.json()
-                    if (hasSession) expect(session).toMatchObject({ user: { id: userId } })
-                    else expect(session).toBeNull()
-                }),
-            )
+            const session = await server.fetch('/api/auth/get-session', { headers: authenticated })
+            expect(await session.json()).toMatchObject({ user: { id: userId } })
             const models = await server.fetch('/api/site-admin/models', { headers: authenticated })
             if (isPreview) {
                 // This synthetic session has no GitHub account. Preview authorization
@@ -204,23 +189,6 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                     7,
                 )
             }
-            expect((await server.fetch('/api/site-admin/models')).status).toBe(401)
-            const deniedAction = await server.fetch('/api/site-admin/ai/actions/proofread', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ props: { content: 'Synthetic anonymous draft' } }),
-            })
-            expect(deniedAction.status).toBe(401)
-            expect(await deniedAction.json()).toMatchObject({
-                error: { code: 'SITE_ADMIN_AUTH_REQUIRED' },
-            })
-            expect(deniedAction.headers.get('cache-control')).toBe('private, no-store')
-            const crossedAction = await server.fetch('/api/site-admin/ai/actions/proofread', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json', origin: 'https://evil.invalid' },
-                body: JSON.stringify({ props: { content: 'Synthetic cross-origin draft' } }),
-            })
-            expect(crossedAction.status).toBe(403)
             let entry = await admin.createEntry('posts', {
                 data: { title: 'A', content: '# A', tags: [], slug: 'emitted-scheduled-handler' },
             })

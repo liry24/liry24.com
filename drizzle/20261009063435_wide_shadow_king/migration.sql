@@ -1,1 +1,0 @@
-ALTER TABLE `site_admin_content_posts` ADD `field_publication` text;

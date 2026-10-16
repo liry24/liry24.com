@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { id } = defineProps<{ id?: string }>()
+const { locale } = useI18n()
 const publishAt = ref('')
 const uploadedName = ref('')
 
@@ -36,11 +37,10 @@ const {
     discard: discardSuggestion,
     run: proofread,
     apply: applyProofreading,
-} = await usePostProofreading(
-    form,
-    draft,
-    () => operation.value !== null || status.value === 'pending' || conflict.value,
-)
+} = usePostProofreading(form, {
+    identity: () => [id, locale.value],
+    blocked: () => operation.value !== null || status.value === 'pending' || conflict.value,
+})
 const busy = computed(
     () => operation.value !== null || proofreading.value || status.value === 'pending',
 )
@@ -223,7 +223,7 @@ onBeforeRouteLeave(() => {
                                 <h3 class="text-muted mb-2 text-sm">Suggested</h3>
                                 <pre
                                     class="bg-muted max-h-80 overflow-auto rounded-lg p-3 text-sm wrap-break-word whitespace-pre-wrap"
-                                    >{{ proposal?.data.content }}</pre>
+                                    >{{ proposal?.content }}</pre>
                             </div>
                         </div>
                         <div class="flex gap-2">
