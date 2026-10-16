@@ -17,9 +17,6 @@ const { form, fields, upload, operation, meta, error, status, features, display 
 const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
 const uploading = computed(() => operation.value === 'upload')
 const editableFields = computed(() => fields.value.filter((field) => field.key !== 'slug'))
-const references = (value: unknown) => (Array.isArray(value) ? value : value ? [value] : [])
-const assetUrl = (value: unknown) =>
-    value && typeof value === 'object' && 'url' in value ? String(value.url) : undefined
 </script>
 
 <template>
@@ -58,160 +55,18 @@ const assetUrl = (value: unknown) =>
                         :name="descriptor.name"
                     >
                         <template #default="{ field }">
-                            <UFormField
-                                :label="descriptor.label"
-                                :required="descriptor.required"
-                                :error="
-                                    field.errors
-                                        .map((error) =>
-                                            typeof error === 'string' ? error : error.message,
-                                        )
-                                        .join(', ') || undefined
-                                "
-                            >
-                                <USelect
-                                    v-if="descriptor.kind === 'select'"
-                                    :items="[...(descriptor.values || [])]"
-                                    :model-value="String(field.value ?? '')"
-                                    variant="soft"
-                                    class="w-full"
-                                    @update:model-value="field.handleChange"
-                                />
-                                <div
-                                    v-else-if="
-                                        ['image', 'images', 'file'].includes(descriptor.kind)
-                                    "
-                                    class="grid gap-2"
-                                >
-                                    <!-- @vue-generic {boolean, File} -->
-                                    <UFileUpload
-                                        :model-value="null"
-                                        reset
-                                        :multiple="descriptor.kind === 'images'"
-                                        :accept="
-                                            descriptor.accept?.join(',') ||
-                                            (descriptor.kind === 'file' ? '*' : 'image/*')
-                                        "
-                                        :label="
-                                            descriptor.kind === 'file'
-                                                ? 'Upload File'
-                                                : 'Upload Image'
-                                        "
-                                        icon="mingcute:upload-3-fill"
-                                        :disabled="uploading || saving"
-                                        class="min-h-32 w-full"
-                                        @update:model-value="
-                                            (files) => upload(descriptor.name, files)
-                                        "
-                                    />
-                                    <UProgress
-                                        v-if="uploading"
-                                        :model-value="undefined"
-                                        aria-label="Upload progress"
-                                    />
-                                    <div
-                                        v-for="(reference, index) in references(field.value)"
-                                        :key="adminAssetId(reference)"
-                                        class="flex min-w-0 items-center gap-2"
-                                    >
-                                        <img
-                                            v-if="descriptor.kind !== 'file'"
-                                            :src="
-                                                adminAssetId(reference)
-                                                    ? assetUrl(reference)
-                                                    : undefined
-                                            "
-                                            alt=""
-                                            class="size-10 shrink-0 rounded-md object-cover"
-                                        />
-                                        <UIcon v-else name="mingcute:file-fill" class="size-5" />
-                                        <span class="text-toned min-w-0 flex-1 truncate text-sm">{{
-                                            `${descriptor.kind === 'file' ? 'File' : 'Image'} ${index + 1}`
-                                        }}</span>
-                                        <UButton
-                                            aria-label="Clear reference"
-                                            title="Remove image"
-                                            icon="mingcute:close-line"
-                                            variant="ghost"
-                                            color="neutral"
-                                            size="sm"
-                                            :disabled="uploading || saving"
-                                            @click="
-                                                descriptor.kind === 'images'
-                                                    ? field.handleChange(
-                                                          references(field.value).filter(
-                                                              (_, i) => i !== index,
-                                                          ),
-                                                      )
-                                                    : field.handleChange(null)
-                                            "
-                                        />
-                                    </div>
-                                </div>
-                                <UTextarea
-                                    v-else-if="descriptor.kind === 'array'"
-                                    :model-value="
-                                        Array.isArray(field.value) ? field.value.join('\n') : ''
-                                    "
-                                    placeholder="One tag per line"
-                                    variant="soft"
-                                    class="w-full"
-                                    autoresize
-                                    @update:model-value="
-                                        (value) =>
-                                            field.handleChange(value.split('\n').filter(Boolean))
-                                    "
-                                />
-                                <UTextarea
-                                    v-else-if="['textarea', 'markdown'].includes(descriptor.kind)"
-                                    :model-value="String(field.value ?? '')"
-                                    :rows="descriptor.kind === 'markdown' ? 16 : 3"
-                                    :placeholder="meta.label + ' ' + descriptor.label"
-                                    variant="soft"
-                                    autoresize
-                                    class="w-full"
-                                    :ui="
-                                        descriptor.kind === 'markdown'
-                                            ? { base: 'font-mono text-sm' }
-                                            : undefined
-                                    "
-                                    @update:model-value="field.handleChange"
-                                    @blur="field.handleBlur"
-                                />
-                                <UInput
-                                    v-else
-                                    :model-value="String(field.value ?? '')"
-                                    :placeholder="
-                                        descriptor.key === 'href'
-                                            ? 'https://example.com'
-                                            : meta.label + ' ' + descriptor.label
-                                    "
-                                    variant="soft"
-                                    :size="descriptor.key === 'title' ? 'xl' : 'md'"
-                                    class="w-full"
-                                    @update:model-value="field.handleChange"
-                                    @blur="field.handleBlur"
-                                >
-                                    <template
-                                        v-if="descriptor.key === 'icon' && field.value"
-                                        #trailing
-                                        ><UIcon :name="String(field.value)" class="size-5"
-                                    /></template>
-                                </UInput>
-                                <div
-                                    v-if="descriptor.key === 'category' && categories?.length"
-                                    class="mt-2 flex flex-wrap gap-2"
-                                >
-                                    <UButton
-                                        v-for="category in categories"
-                                        :key="category"
-                                        :label="category"
-                                        variant="outline"
-                                        size="sm"
-                                        @click="field.handleChange(category)"
-                                    />
-                                </div>
-                            </UFormField>
+                            <AdminFormField
+                                :descriptor
+                                :model-value="field.value"
+                                :errors="field.errors"
+                                :disabled="uploading || saving"
+                                :uploading
+                                :label="meta.label"
+                                :categories
+                                @update:model-value="field.handleChange"
+                                @blur="field.handleBlur"
+                                @upload="(files) => upload(descriptor.name, files)"
+                            />
                         </template>
                     </form.Field>
                     <UFormField

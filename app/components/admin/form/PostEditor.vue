@@ -27,6 +27,20 @@ const { form, draft, publish, schedule, upload, operation, status, error } = awa
 
 const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
 const restored = ref(draft.isDirty.value)
+const { post: composerProposal, scope: composerScope } = useAdminComposer()
+const pendingComposer = computed(() =>
+    !id && composerProposal.value?.scope === composerScope.value ? composerProposal.value : null,
+)
+function applyComposer() {
+    const proposal = pendingComposer.value
+    if (!proposal) return
+    if (typeof proposal.values.title === 'string')
+        form.setFieldValue('title', proposal.values.title)
+    if (Array.isArray(proposal.values.tags)) form.setFieldValue('tags', proposal.values.tags)
+    publishAt.value = proposal.publishAt
+    composerProposal.value = null
+}
+if (!restored.value) applyComposer()
 const {
     error: editorialError,
     proposal,
@@ -95,6 +109,30 @@ onBeforeRouteLeave(() => {
                     @click="publish()"
                 />
             </template>
+            <UAlert
+                v-if="pendingComposer"
+                title="A prepared post is available"
+                :description="
+                    String(
+                        pendingComposer.values.title ??
+                            'Review the prepared title, tags and publication time.',
+                    )
+                "
+                color="neutral"
+            >
+                <template #actions>
+                    <UButton
+                        label="Apply prepared values"
+                        :disabled="busy"
+                        @click="applyComposer"
+                    />
+                    <UButton
+                        label="Keep existing input"
+                        variant="outline"
+                        @click="composerProposal = null"
+                    />
+                </template>
+            </UAlert>
             <UAlert
                 v-if="restored"
                 title="Unsaved input restored"

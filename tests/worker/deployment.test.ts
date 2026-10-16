@@ -15,6 +15,7 @@ test('Void isolates dev and production resources and owns deployment configurati
             const { default: config } = await import('../../void.config')
             const worker = config.cloudflare!
             expect(worker.name).toBe(production ? 'liry24-com' : 'liry24-com-dev')
+            expect(worker.ai).toEqual({ binding: 'AI', remote: true })
             expect(worker.compatibility_flags).toContain('nodejs_compat_v2')
             expect(worker.compatibility_flags).toContain('nodejs_als')
             expect(worker.routes).toEqual(
@@ -51,4 +52,19 @@ test('dev deployment delegates resources and migrations to Void without a produc
     expect(nuxtConfig.routeRules?.['/admin/**']).toMatchObject({
         auth: { user: { role: 'admin' } },
     })
+})
+
+test('local CI starts without remote AI bindings or Cloudflare credentials', async () => {
+    try {
+        vi.stubEnv('LIRY24_TEST_LOCAL', 'true')
+        vi.resetModules()
+        const { default: config } = await import('../../void.config')
+        expect(config.cloudflare?.ai).toBeUndefined()
+        expect(config.inference?.bindings?.ai).toBe(false)
+        const workflow = await readFile('.github/workflows/quality.yml', 'utf8')
+        expect(workflow).toContain("LIRY24_TEST_LOCAL: 'true'")
+    } finally {
+        vi.unstubAllEnvs()
+        vi.resetModules()
+    }
 })

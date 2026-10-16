@@ -11,6 +11,9 @@
         "@formkit/drag-and-drop": "^0.6.1",
         "@iconify-json/mingcute": "^1.2.8",
         "@iconify-json/simple-icons": "^1.2.100",
+        "@internationalized/date": "3.12.4",
+        "@json-render/core": "0.21.1",
+        "@json-render/vue": "0.21.1",
         "@liria24/site-admin": "https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@155fb20",
         "@nuxt/image": "^2.1.0",
         "@nuxt/ui": "^4.12.0",
@@ -428,6 +431,10 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.6.0", "", {}, "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
+
+    "@json-render/core": ["@json-render/core@0.21.1", "", { "dependencies": { "zod": "^4.3.6" } }, "sha512-5hUxJTOnNlBhLuSzS/Vs46jjAqQ2TnkGz9n/0RW2djYwxANZKhOTc1QOuL1Cgu+HxtfTPdJjzUs5dOei/Y+aag=="],
+
+    "@json-render/vue": ["@json-render/vue@0.21.1", "", { "dependencies": { "@json-render/core": "0.21.1" }, "peerDependencies": { "vue": "^3.5.0", "zod": "^4.0.0" } }, "sha512-tNpnlHjS0ruVq3oacFXHaPgXlslEFh3mjBEqLuzKAkIcH4yuvdCUCK1eMsx+QgOFkRi0OuelmM26boRsOtRpkw=="],
 
     "@levischuck/tiny-cbor": ["@levischuck/tiny-cbor@0.2.11", "", {}, "sha512-llBRm4dT4Z89aRsm6u2oEZ8tfwL/2l6BwpZ7JcyieouniDECM5AqNgr/y08zalEIvW3RSK4upYyybDcmjXqAow=="],
 

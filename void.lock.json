@@ -12,6 +12,10 @@
         ],
         "workers_dev": true,
         "preview_urls": false,
+        "ai": {
+            "binding": "AI",
+            "remote": true
+        },
         "triggers": {
             "crons": []
         },
@@ -82,7 +86,11 @@
             "NUXT_PUBLIC_IMAGES_DOMAIN": "https://liry24-com-dev.liry.workers.dev",
             "R2_DOMAIN": "https://liry24-com-dev.liry.workers.dev",
             "NUXT_PUBLIC_SITE_URL": "https://liry24-com-dev.liry.workers.dev"
+        },
+        "ai": {
+            "binding": "AI",
+            "remote": true
         }
     },
-    "text": "{\n  \"name\": \"liry24-com-dev\",\n  \"account_id\": \"422bd946004c77eb0d569ec489b40196\",\n  \"compatibility_date\": \"2026-10-13\",\n  \"compatibility_flags\": [\n    \"nodejs_compat_v2\",\n    \"nodejs_als\",\n    \"enable_nodejs_process_v2\",\n    \"nodejs_compat_populate_process_env\"\n  ],\n  \"workers_dev\": true,\n  \"preview_urls\": false,\n  \"triggers\": {\n    \"crons\": []\n  },\n  \"observability\": {\n    \"enabled\": true,\n    \"logs\": {\n      \"enabled\": true,\n      \"invocation_logs\": true\n    }\n  },\n  \"routes\": [],\n  \"d1_databases\": [\n    {\n      \"binding\": \"DB\",\n      \"database_name\": \"liry24-com-dev\",\n      \"migrations_dir\": \"./db/migrations\",\n      \"database_id\": \"3c7c6179-12d0-4108-9eea-b3e20d394cef\"\n    }\n  ],\n  \"r2_buckets\": [\n    {\n      \"binding\": \"STORAGE\",\n      \"bucket_name\": \"liry24-com-dev-storage\"\n    }\n  ],\n  \"vars\": {\n    \"APP_ENV\": \"dev\",\n    \"NUXT_PUBLIC_PREVIEW\": \"true\",\n    \"NUXT_PUBLIC_IMAGES_DOMAIN\": \"https://liry24-com-dev.liry.workers.dev\",\n    \"R2_DOMAIN\": \"https://liry24-com-dev.liry.workers.dev\",\n    \"NUXT_PUBLIC_SITE_URL\": \"https://liry24-com-dev.liry.workers.dev\"\n  }\n}\n"
+    "text": "{\n  \"name\": \"liry24-com-dev\",\n  \"account_id\": \"422bd946004c77eb0d569ec489b40196\",\n  \"compatibility_date\": \"2026-10-13\",\n  \"compatibility_flags\": [\n    \"nodejs_compat_v2\",\n    \"nodejs_als\",\n    \"enable_nodejs_process_v2\",\n    \"nodejs_compat_populate_process_env\"\n  ],\n  \"workers_dev\": true,\n  \"preview_urls\": false,\n  \"triggers\": {\n    \"crons\": []\n  },\n  \"observability\": {\n    \"enabled\": true,\n    \"logs\": {\n      \"enabled\": true,\n      \"invocation_logs\": true\n    }\n  },\n  \"routes\": [],\n  \"d1_databases\": [\n    {\n      \"binding\": \"DB\",\n      \"database_name\": \"liry24-com-dev\",\n      \"migrations_dir\": \"./db/migrations\",\n      \"database_id\": \"3c7c6179-12d0-4108-9eea-b3e20d394cef\"\n    }\n  ],\n  \"r2_buckets\": [\n    {\n      \"binding\": \"STORAGE\",\n      \"bucket_name\": \"liry24-com-dev-storage\"\n    }\n  ],\n  \"vars\": {\n    \"APP_ENV\": \"dev\",\n    \"NUXT_PUBLIC_PREVIEW\": \"true\",\n    \"NUXT_PUBLIC_IMAGES_DOMAIN\": \"https://liry24-com-dev.liry.workers.dev\",\n    \"R2_DOMAIN\": \"https://liry24-com-dev.liry.workers.dev\",\n    \"NUXT_PUBLIC_SITE_URL\": \"https://liry24-com-dev.liry.workers.dev\"\n  },\n  \"ai\": {\n    \"binding\": \"AI\",\n    \"remote\": true\n  }\n}\n"
 }

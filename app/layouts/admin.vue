@@ -4,10 +4,10 @@ const sidebarCollapsed = ref(false)
 useHead({ titleTemplate: '%s | Liry24 Admin' })
 const client = useAdminClient()
 const { locale } = useI18n()
-const { data: models } = await useAsyncData(
+const navigationKey = computed(
     () => `admin-navigation:${user.value?.id}:${user.value?.role}:${locale.value}`,
-    () => client.models(),
 )
+const { data: models } = await useAsyncData(navigationKey, () => client.models())
 const links = computed(() =>
     (models.value ?? []).map(({ name, meta }) => ({
         label: meta.plural,
@@ -78,6 +78,7 @@ const extraLinks = [
                     </div>
                 </template>
                 <template #default="{ collapsed }">
+                    <AdminComposerLauncher :collapsed />
                     <AdminNav
                         :links="links.filter((link) => link.to !== '/admin/posts')"
                         :collapsed

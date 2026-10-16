@@ -42,6 +42,7 @@ jobs:
           LIRY24_TEST_BUILT_WORKER: 'true'
       - name: Check local Void development
         env:
+          LIRY24_TEST_LOCAL: 'true'
           BETTER_AUTH_SECRET: test-only-local-ci-secret-0123456789abcdef
           NUXT_APP_SECRET: test-only-local-ci-app-secret-0123456789abcdef
         run: |

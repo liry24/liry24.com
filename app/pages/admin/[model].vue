@@ -6,9 +6,11 @@ import { LazyAdminFormEntryModal } from '#components'
 definePageMeta({
     key: (route) => ('model' in route.params ? String(route.params.model) : route.path),
 })
-const modelName = String(useRoute('admin-model').params.model)
+const route = useRoute('admin-model')
+const modelName = String(route.params.model)
 const resource = await useAdminEntries(modelName, {
     all: modelName !== 'posts',
+    q: () => String(route.query.q ?? ''),
 })
 const { data, error, status, page, features, meta: presentation } = resource
 const items = computed(() => data.value?.items ?? [])

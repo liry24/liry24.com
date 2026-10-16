@@ -23,7 +23,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             'enable_nodejs_process_v2',
             'nodejs_compat_populate_process_env',
         ])
-        expect(generated.ai).toBeUndefined()
+        expect(generated.ai?.binding).toBe('AI')
         const serverDirectory = resolve('.output/server')
         const chunks = await readdir(serverDirectory, { recursive: true })
         const ogImageBundle = await readFile(
@@ -144,6 +144,18 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 if (path === '/api/auth/get-session') expect(body).toBe('null')
                 if (path === '/login' && isPreview) expect(body).not.toContain('Vercel')
             }
+            const composeRequest = (headers: Record<string, string> = {}) =>
+                server.fetch('/api/admin/compose', {
+                    method: 'POST',
+                    headers: { ...headers, 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: 'new post',
+                        locale: 'ja',
+                        timeZone: 'Asia/Tokyo',
+                    }),
+                })
+            const compose = await composeRequest()
+            expect(compose.status, await compose.text()).toBe(401)
             const userId = 'synthetic-built-worker-admin'
             const token = 'synthetic-built-worker-session'
             const now = Date.now()
@@ -173,6 +185,10 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             const authenticated = {
                 cookie: `better-auth.session_token=${signed}; __Secure-better-auth.session_token=${signed}`,
             }
+            await env.DB.prepare("UPDATE users SET role = 'user' WHERE id = ?").bind(userId).run()
+            const nonAdmin = await composeRequest(authenticated)
+            expect(nonAdmin.status, await nonAdmin.text()).toBe(403)
+            await env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(userId).run()
             const session = await server.fetch('/api/auth/get-session', { headers: authenticated })
             expect(await session.json()).toMatchObject({ user: { id: userId } })
             const models = await server.fetch('/api/site-admin/models', { headers: authenticated })
@@ -180,6 +196,8 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 // This synthetic session has no GitHub account. Preview authorization
                 // must fail closed without attempting a real repository lookup.
                 expect(models.status).toBe(403)
+                const refused = await composeRequest(authenticated)
+                expect(refused.status, await refused.text()).toBe(403)
                 expect(await models.json()).toMatchObject({
                     error: { code: 'SITE_ADMIN_FORBIDDEN' },
                 })

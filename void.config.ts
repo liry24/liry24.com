@@ -1,10 +1,11 @@
 import { defineConfig } from 'void/config'
 
 const production = process.env.APP_ENV === 'production'
+const localTest = process.env.LIRY24_TEST_LOCAL === 'true'
 const name = production ? 'liry24-com' : 'liry24-com-dev'
 
 export default defineConfig({
-    inference: { bindings: { db: true, storage: true } },
+    inference: { bindings: { db: true, storage: true, ...(localTest ? { ai: false } : {}) } },
     cloudflare: {
         name,
         account_id: '422bd946004c77eb0d569ec489b40196',
@@ -17,6 +18,7 @@ export default defineConfig({
         ],
         workers_dev: !production,
         preview_urls: false,
+        ...(localTest ? {} : { ai: { binding: 'AI', remote: true } }),
         triggers: { crons: production ? ['* * * * *'] : [] },
         observability: { enabled: true, logs: { enabled: true, invocation_logs: true } },
         routes: production ? [{ pattern: 'liry24.com', custom_domain: true }] : [],
