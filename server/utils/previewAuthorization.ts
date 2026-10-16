@@ -70,3 +70,17 @@ export async function validatePreviewIdentity({
         errorDescription: 'このPreviewにはリポジトリの管理権限が必要です。',
     }
 }
+
+const requestChecks = new WeakMap<object, { actorId: string; allowed: Promise<boolean> }>()
+export function previewAuthorizationForRequest(
+    request: object,
+    actorId: string,
+    check: () => Promise<boolean>,
+): Promise<boolean> {
+    let cached = requestChecks.get(request)
+    if (!cached || cached.actorId !== actorId) {
+        cached = { actorId, allowed: check() }
+        requestChecks.set(request, cached)
+    }
+    return cached.allowed
+}

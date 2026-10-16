@@ -1,8 +1,7 @@
 import { parseDateTime, toZoned } from '@internationalized/date'
-import {
-    experimental_composeSpec,
-    type Experimental_CompositionEvaluator,
-    type Experimental_ChoiceQuestion,
+import type {
+    Experimental_CompositionEvaluator,
+    Experimental_ChoiceQuestion,
 } from '@json-render/core'
 
 import type {
@@ -12,14 +11,16 @@ import type {
     ComposerPlan,
     ComposerRequest,
 } from '../../shared/utils/adminComposer'
-import {
-    composerCandidates,
-    composerCatalog,
-    defaultComposerSpec,
-    validComposerSpec,
-} from '../../shared/utils/adminComposer'
+import { defaultComposerSpec } from '../../shared/utils/adminComposer'
 
-export type ComposerModelInfo = { name: ComposerModel; fields: ComposerField[] }
+export type ComposerModelInfo = {
+    name: ComposerModel
+    label?: string
+    fields: ComposerField[]
+    displayField?: string
+    features?: Record<string, boolean>
+    scheduling?: boolean
+}
 type Entry = { id: string; data: Record<string, unknown> }
 export type ComposerAdmin = {
     models: ComposerModelInfo[]
@@ -32,16 +33,15 @@ export type ComposerAdmin = {
 }
 const question = (
     instructions: string,
-    values: readonly string[],
-): Experimental_ChoiceQuestion => ({
-    type: 'choice',
-    instructions,
-    criteria: Object.fromEntries(values.map((value, index) => [`v${index}`, value])),
-})
+    criteria: Record<string, string>,
+): Experimental_ChoiceQuestion => ({ type: 'choice', instructions, criteria })
+const options = (values: readonly string[]) =>
+    Object.fromEntries([...new Set(values)].map((value, i) => ['v' + i, value]))
 
-// Neutral spans are choices, not keyword-based intent or date interpretation.
+// Parsing supplies facts and alternatives; the model decides what they mean.
 export function inputChoices(prompt: string, locale: string): string[] {
-    const words = [...new Intl.Segmenter(locale, { granularity: 'word' }).segment(prompt)].filter(
+    const text = prompt.replace(/https?:\/\/[^\s<>"「」]+/gu, (url) => ' '.repeat(url.length))
+    const words = [...new Intl.Segmenter(locale, { granularity: 'word' }).segment(text)].filter(
         (part) => part.isWordLike,
     )
     const spans = words.flatMap((word, index) =>
@@ -56,14 +56,39 @@ export function inputChoices(prompt: string, locale: string): string[] {
     const urls = [...prompt.matchAll(/https?:\/\/[^\s<>"「」]+/gu)].map((match) => match[0])
     const urlParts = urls.flatMap((value) => {
         try {
-            return new URL(value).pathname.split('/').filter(Boolean)
+            const url = new URL(value)
+            const parts = url.pathname
+                .split('/')
+                .filter(Boolean)
+                .map((part) => {
+                    try {
+                        return decodeURIComponent(part)
+                    } catch {
+                        return part
+                    }
+                })
+            return [
+                url.hostname,
+                ...url.hostname.split('.'),
+                ...parts,
+                ...parts.map((part) => '@' + part.replace(/^@/, '')),
+            ]
         } catch {
             return []
         }
     })
-    return [...new Set([...quotes, ...urls, ...urlParts, ...spans, prompt])]
-        .filter((value) => value.length > 0 && value.length <= 200)
-        .slice(0, 64)
+    return [
+        ...new Set([
+            ...quotes,
+            ...urls,
+            ...urlParts,
+            ...prompt.split(/[、,;；。\n]/u).map((part) => part.trim()),
+            prompt,
+            ...spans,
+        ]),
+    ]
+        .filter((value) => value.length > 0 && value.length <= 2000)
+        .slice(0, 40)
 }
 
 export function selectedDate(
@@ -72,7 +97,7 @@ export function selectedDate(
     currentTime: number,
     future: boolean,
 ) {
-    if (parts.some((part) => !part || part === 'Leave unchanged / ask the user')) return ''
+    if (parts.some((part) => !part || part === 'unchanged')) return ''
     const [year, month, day, hour, minute] = parts
     const value = `${year}-${month!.padStart(2, '0')}-${day!.padStart(2, '0')}T${hour!.padStart(2, '0')}:${minute!.padStart(2, '0')}`
     try {
@@ -91,175 +116,345 @@ export async function* composeAdmin(
     currentTime = Date.now(),
 ): AsyncGenerator<ComposerEvent> {
     signal.throwIfAborted()
-    const unchanged = 'Leave unchanged / ask the user'
+    const models = admin.models
     const existing =
         input.model && input.entryId ? await admin.get(input.model, input.entryId) : undefined
-    signal.throwIfAborted()
-    const existingValues = Object.fromEntries(
-        (admin.models.find((model) => model.name === input.model)?.fields ?? [])
-            .filter(
-                (field) => !['image', 'images', 'file', 'object', 'markdown'].includes(field.kind),
-            )
-            .flatMap((field) => {
-                const value = existing?.data[field.key]
-                return typeof value === 'string' && value.length <= 200 ? [[field.key, value]] : []
-            }),
-    )
+    const scalarData = (entry: Entry) =>
+        Object.fromEntries(
+            Object.entries(entry.data).flatMap(([key, value]) =>
+                typeof value === 'string' && value.length <= 200
+                    ? [[key, value]]
+                    : Array.isArray(value) && value.every((part) => typeof part === 'string')
+                      ? [
+                            [
+                                key,
+                                value
+                                    .slice(0, 20)
+                                    .filter((part) => part.length <= 100)
+                                    .join(', '),
+                            ],
+                        ]
+                      : [],
+            ),
+        )
+    const queryChoices = [
+        ...new Set([
+            ...[...input.prompt.matchAll(/「([^」]+)」|“([^”]+)”|"([^"]+)"/gu)].map(
+                (match) => match[1] || match[2] || match[3] || '',
+            ),
+            ...[...new Intl.Segmenter(input.locale, { granularity: 'word' }).segment(input.prompt)]
+                .filter((part) => part.isWordLike)
+                .map((part) => part.segment),
+        ]),
+    ]
+        .filter((value) => value.length <= 100)
+        .slice(0, 40)
+    const initialChoices = inputChoices(input.prompt, input.locale)
     const choices = [
-        ...new Set([...inputChoices(input.prompt, input.locale), ...Object.values(existingValues)]),
-    ].slice(0, 80)
-    const questions: Record<string, Experimental_ChoiceQuestion> = {
-        model: question(
-            'Which content model does the request concern? Choose clarify if unclear.',
-            [...admin.models.map((model) => model.name), 'clarify'],
-        ),
-        intent: question(
-            'Choose create, search, edit, manage (publish/delete/history/reorder), settings, or clarify. Editing an unspecified entry requires searching first.',
-            ['create', 'search', 'edit', 'manage', 'settings', 'clarify'],
-        ),
-        query: question(
-            'Select the search term identifying the existing entry. Leave unchanged for all entries.',
-            [unchanged, ...choices],
-        ),
-        datePurpose: question(
-            'What is the requested date for? Publishing only supported for posts here. No date means unchanged.',
-            [unchanged, 'Publication schedule', 'Creation date'],
-        ),
-    }
+        ...new Set([...initialChoices, ...Object.values(existing ? scalarData(existing) : {})]),
+    ]
     const fields = [
         ...new Map(
-            admin.models.flatMap((model) => model.fields).map((field) => [field.key, field]),
+            models.flatMap((model) => model.fields).map((field) => [field.key, field]),
         ).values(),
     ]
-    for (const field of fields) {
-        if (['image', 'images', 'file', 'datetime'].includes(field.kind) || field.key === 'slug')
-            continue
-        const values =
-            field.values ??
-            (field.key === 'icon'
-                ? [
-                      ...choices,
-                      'simple-icons:github',
-                      'simple-icons:x',
-                      'simple-icons:bluesky',
-                      'simple-icons:discord',
-                      'simple-icons:youtube',
-                      'simple-icons:instagram',
-                      'mingcute:link-fill',
-                  ]
-                : choices)
-        questions[`field.${field.key}`] = question(
-            `Select a value explicitly supported by the request for ${field.key}. Never invent prose. Fields unrelated to the requested model or missing information must be unchanged. For array fields select the full comma-separated list when present.`,
-            [unchanged, ...values],
-        )
-    }
     const zonedNow = new Intl.DateTimeFormat('sv-SE', {
         timeZone: input.timeZone,
         dateStyle: 'short',
         timeStyle: 'short',
     }).format(currentTime)
-    const currentYear = Number(zonedNow.slice(0, 4))
-    const existingYear =
-        typeof existing?.data.createdAt === 'string'
-            ? Number(existing.data.createdAt.slice(0, 4))
-            : undefined
-    const years = Array.from({ length: 21 }, (_, index) => String(currentYear - 10 + index))
-    if (existingYear && !years.includes(String(existingYear))) years.push(String(existingYear))
-    const dateOptions = { year: years, month: 12, day: 31, hour: 24, minute: 60 }
-    for (const [part, range] of Object.entries(dateOptions)) {
-        const values = Array.isArray(range)
-            ? range
-            : Array.from({ length: range }, (_, index) =>
-                  String(index + (part === 'month' || part === 'day' ? 1 : 0)),
-              )
-        questions[`date.${part}`] = question(
-            `Resolve the requested ${part} in the user's timezone, relative to the supplied current time. Choose unchanged when time is absent or ambiguous; do not invent a time. If an exact hour is requested, minute may be 0.`,
-            [unchanged, ...values],
+    const fieldQuestions = (
+        candidates: string[],
+        available: ComposerField[],
+        resolveValues: boolean,
+    ) =>
+        Object.fromEntries(
+            available
+                .filter((field) => field.kind !== 'datetime' && field.key !== 'slug')
+                .map((field) => {
+                    const icons = candidates
+                        .filter((value) => /^[a-z][a-z0-9-]*$/i.test(value))
+                        .map(
+                            (value) =>
+                                'simple-icons:' + value.toLowerCase().replace(/[^a-z0-9]/g, ''),
+                        )
+                    const values = ['image', 'images', 'file'].includes(field.kind)
+                        ? []
+                        : (field.values ??
+                          (field.key === 'icon'
+                              ? [
+                                    ...candidates.filter((value) =>
+                                        /^(simple-icons|mingcute):[a-z0-9-]+$/.test(value),
+                                    ),
+                                    ...icons,
+                                    'mingcute:link-fill',
+                                ]
+                              : field.kind === 'url'
+                                ? candidates.filter((value) => {
+                                      try {
+                                          return ['https:', 'http:'].includes(
+                                              new URL(value).protocol,
+                                          )
+                                      } catch {
+                                          return false
+                                      }
+                                  })
+                                : candidates))
+                    return [
+                        'field.' + field.key,
+                        question(
+                            `For ${field.key}, choose according to the selected model and shared field policy. Prefer a supported value over asking for information already present. ${resolveValues ? 'Select the best literal value; ask only if it cannot be determined.' : 'hide=not needed, ask=missing necessary information, fill=value can be inferred from the input.'}`,
+                            {
+                                hide: 'Unrelated, optional/defaulted and not requested, or unchanged: omit this field.',
+                                ask: 'Necessary input whose value cannot be inferred from the supplied facts.',
+                                ...(!resolveValues
+                                    ? {
+                                          fill: 'Show and fill from supplied content or factual URL/account/icon alternatives.',
+                                      }
+                                    : options(values)),
+                            },
+                        ),
+                    ]
+                }),
         )
-    }
-    const decision = await evaluate({
-        state: {
-            request: input.prompt,
-            locale: input.locale,
-            timeZone: input.timeZone,
-            currentTime: zonedNow,
-            selectedModel: input.model,
-            selectedEntry: input.entryId,
-            existingValues,
-            models: admin.models.map((model) => ({
-                name: model.name,
-                fields: model.fields.map((field) => field.key),
-            })),
-        },
-        questions,
-        signal,
+    const baseQuestions = (
+        candidates: string[],
+        available: ComposerField[],
+        resolveValues = false,
+    ): Record<string, Experimental_ChoiceQuestion> => ({
+        model: question(
+            'Which model best matches the user request? Screen context is a hint, not a restriction. Choose clarify only if the content type is ambiguous.',
+            {
+                ...Object.fromEntries(
+                    models.map((model) => [
+                        model.name,
+                        `${model.label ?? model.name}: ${model.fields.map((field) => field.key).join(', ')}`,
+                    ]),
+                ),
+                clarify: 'No clear matching content model.',
+            },
+        ),
+        intent: question(
+            'What does the user want? A bare resource such as a URL can imply adding it. Use lookup to check for an existing identity before creating a duplicate. An entry in lookup results is not automatically an edit request.',
+            {
+                create: 'Create a blank entry with no identity to check, or prepare a new entry AFTER an empty complete lookup.',
+                resolve:
+                    'A concrete identity is supplied (URL/account/title/company/game/name), including a named entry to schedule: first look for existing entries, then prepare creation or editing.',
+                edit: 'Modify an explicitly selected existing entry, or a matching entry confirmed by lookup results.',
+                search: 'The user wants to find, inspect or browse existing entries.',
+                manage: 'Open the existing screen for publishing, deletion, history or reordering.',
+                settings: 'Open account or site settings.',
+                clarify:
+                    'The purpose or content type cannot be inferred. Unknown existing status is NOT a reason to clarify: resolve handles that. Date questions handle incomplete dates.',
+            },
+        ),
+        ...Object.fromEntries(
+            models.map((model) => [
+                'query.' + model.name,
+                question(
+                    `For the ${model.label ?? model.name} model, select the concrete supplied VALUE identifying its ${model.displayField ?? 'name/title/account'} entry. Never choose a field label, model category or action word. For a supplied URL use the original account/path identifier, not the host or platform name; use the host only when there is no path identifier. Choose all only for browsing, none if no usable identifier is supplied.`,
+                    {
+                        all: 'Browse all entries without a filter.',
+                        none: 'No usable identifying value for this model.',
+                        ...options(queryChoices),
+                    },
+                ),
+            ]),
+        ),
+        datePurpose: question(
+            'Is a date actually requested? Creating an article does NOT imply a publication schedule. Default to none. Never expose scheduling merely because it is supported.',
+            {
+                none: 'No publication/creation date requested. Employment periods, seasons and generic creation are not creation timestamps.',
+                publication: 'The user explicitly wants to schedule publication.',
+                creation: 'The user explicitly supplies or changes an entry creation date.',
+            },
+        ),
+        ...fieldQuestions(candidates, available, resolveValues),
     })
+    const state = {
+        request: input.prompt,
+        locale: input.locale,
+        timeZone: input.timeZone,
+        currentTime: zonedNow,
+        context: input.context,
+        selectedModel: input.model,
+        selectedEntry: input.entryId,
+        existing: existing ? scalarData(existing) : undefined,
+        models: models.map((model) => ({
+            ...model,
+            fields: model.fields.map(({ required, hasDefault, ...field }) => ({
+                ...field,
+                needsInput: Boolean(required && !hasDefault),
+                defaulted: Boolean(hasDefault),
+            })),
+        })),
+        inputCandidates: choices,
+        fieldPolicy: [
+            'Prepare the minimum useful UI. Omit unrelated or unspecified optional/defaulted fields. Explicitly supplied optional information MUST be shown and filled.',
+            'ask is only for required nondefault input with no derivable value, or explicitly requested missing input.',
+            'Prefer supported facts over asking again: quoted values, URL parts and conventional account handles/icons may fill fields.',
+            'For a profile/account link, prefer the conventional @account label and known brand icon. A URL field should receive the supplied complete URL.',
+            'Never use action words or the whole command as a title, label, name or tag.',
+            'For search, settings and management navigation, hide all editable fields.',
+            'Publishing, deletion, history and reordering use the full management screen (manage). Only post publication-time preparation is available in this composer.',
+            'Defaulted arrays stay hidden unless the user supplies or asks for them.',
+        ],
+    }
+    let questions = baseQuestions(choices, fields)
+    let decision = await evaluate({ state, questions, signal })
     signal.throwIfAborted()
-    const value = (key: string) => questions[key]!.criteria[decision.answers[key]!.choice]!
-    const model =
-        input.model ?? admin.models.find((model) => model.name === value('model'))?.name ?? null
-    const info = admin.models.find((item) => item.name === model)
-    const intent = input.entryId ? 'edit' : (value('intent') as ComposerPlan['intent'])
+    const answer = (key: string) => decision.answers[key]?.choice ?? 'none'
+    const chosenValue = (key: string) => questions[key]?.criteria[answer(key)]
+    let model = input.model ?? models.find((item) => item.name === answer('model'))?.name ?? null
+    const initialIntent = input.entryId ? 'edit' : answer('intent')
+    const purpose = answer('datePurpose') as ComposerPlan['datePurpose']
+    const queries = new Map(
+        models.map((item) => {
+            const key = 'query.' + item.name
+            const choice = answer(key)
+            return [
+                item.name,
+                choice === 'none' ? null : choice === 'all' ? '' : (chosenValue(key) ?? ''),
+            ] as const
+        }),
+    )
+    const lookupModels =
+        input.entryId || !['resolve', 'search', 'edit'].includes(initialIntent)
+            ? []
+            : model
+              ? models.filter((item) => item.name === model)
+              : models
+    const pages = await Promise.all(
+        lookupModels.map(async (item) => ({
+            model: item.name,
+            ...(await admin.list(item.name, queries.get(item.name) ?? '', signal)),
+        })),
+    )
+    signal.throwIfAborted()
+    const entries = pages.flatMap((page) =>
+        page.items.map((entry) => ({ ...entry, model: page.model })),
+    )
+    const requestedFields = fields.filter(
+        (field) => answer('field.' + field.key) !== 'hide' && questions['field.' + field.key],
+    )
+    const prepares = Boolean(model && ['create', 'resolve', 'edit'].includes(initialIntent))
+    const needsValues =
+        prepares && requestedFields.some((field) => answer('field.' + field.key) === 'fill')
+    const needsLookupDecision = pages.length > 0 && !['search', 'manage'].includes(initialIntent)
+    if (needsLookupDecision || (prepares && purpose !== 'none') || needsValues) {
+        const candidates = [
+            ...new Set([
+                ...choices,
+                ...entries.flatMap((entry) => Object.values(scalarData(entry))),
+            ]),
+        ].slice(0, 40)
+        questions = baseQuestions(
+            candidates,
+            model ? models.find((item) => item.name === model)!.fields : fields,
+            true,
+        )
+        for (const key of Object.keys(questions))
+            if (key.startsWith('query.')) delete questions[key]
+        if (model) delete questions.model
+        delete questions.intent!.criteria.resolve
+        if (!entries.length && !input.entryId) delete questions.intent!.criteria.edit
+        if (pages.length)
+            questions.entry = question(
+                'Choose the existing entry matching the requested identity. Choose none only when no matching entry exists; select choose when ambiguous. An empty complete lookup permits new creation. Preserve an explicit search request as search even if one result exists.',
+                {
+                    none: 'No matching entry; a new entry may be prepared.',
+                    choose: 'Several entries or incomplete results need user selection.',
+                    ...Object.fromEntries(
+                        entries.map((entry) => [
+                            entry.id,
+                            JSON.stringify({ model: entry.model, ...scalarData(entry) }),
+                        ]),
+                    ),
+                },
+            )
+        if (purpose !== 'none') {
+            const year = Number(zonedNow.slice(0, 4))
+            const years = [
+                ...new Set([
+                    ...Array.from({ length: 21 }, (_, i) => String(year - 10 + i)),
+                    ...initialChoices.filter((value) => /^\d{4}$/.test(value)),
+                ]),
+            ]
+            for (const [part, range] of Object.entries({
+                year: years,
+                month: 12,
+                day: 31,
+                hour: 24,
+                minute: 60,
+            })) {
+                const values = Array.isArray(range)
+                    ? range
+                    : Array.from({ length: range }, (_, i) =>
+                          String(i + (part === 'month' || part === 'day' ? 1 : 0)),
+                      )
+                questions['date.' + part] = question(
+                    `Resolve the requested ${part} relative to currentTime in timeZone. Use unchanged if missing or ambiguous. Choose the clock time requested by the user, never copy the current clock as a default. For example, 18時 means hour 18 and minute 0. Use the current date only to resolve relative dates.`,
+                    {
+                        unchanged: 'Missing or ambiguous.',
+                        ...Object.fromEntries(values.map((value) => [value, value])),
+                    },
+                )
+            }
+        } else delete questions.datePurpose
+        decision = await evaluate({
+            state: {
+                ...state,
+                selectedModel: model,
+                initialIntent,
+                models: state.models.filter((item) => !model || item.name === model),
+                lookup: pages.map((page) => ({
+                    model: page.model,
+                    total: page.total,
+                    complete: page.items.length >= page.total,
+                    entries: page.items.map((entry) => ({ id: entry.id, data: scalarData(entry) })),
+                })),
+            },
+            questions,
+            signal,
+        })
+        signal.throwIfAborted()
+        model =
+            input.model ??
+            (questions.model
+                ? (models.find((item) => item.name === answer('model'))?.name ?? null)
+                : model)
+    }
+    const match = entries.find((entry) => entry.id === answer('entry'))
+    let intent = (input.entryId ? 'edit' : answer('intent')) as ComposerPlan['intent']
+    if ((intent as string) === 'resolve') intent = 'clarify'
+    let entryId = input.entryId
+    if (intent === 'edit' && !entryId) {
+        if (match) {
+            model = match.model
+            entryId = match.id
+        } else intent = 'search'
+    }
+    if (intent === 'create' && pages.some((page) => page.total > page.items.length) && !match)
+        intent = 'search'
+    if (answer('entry') === 'choose') intent = 'search'
+    if (!model && !['settings', 'search'].includes(intent)) intent = 'clarify'
+    const info = models.find((item) => item.name === model)
     const plan: ComposerPlan = {
         model,
-        intent: !model && intent !== 'settings' ? 'clarify' : intent,
-        entryId: input.entryId,
+        intent,
+        entryId,
         fields: info?.fields ?? [],
+        visibleFields: [],
         values: {},
+        datePurpose:
+            purpose === 'none' ? 'none' : (answer('datePurpose') as ComposerPlan['datePurpose']),
         publishAt: '',
         timeZone: input.timeZone,
         dateIncomplete: false,
-        query: value('query') === unchanged ? '' : value('query'),
-        results: [],
-        total: 0,
-    }
-    if (plan.intent === 'create' || (plan.intent === 'edit' && plan.entryId)) {
-        for (const field of plan.fields) {
-            const key = `field.${field.key}`
-            if (!questions[key] || value(key) === unchanged) continue
-            const proposed = value(key)
-            if (field.kind === 'url') {
-                try {
-                    if (!['https:', 'http:'].includes(new URL(proposed).protocol)) continue
-                } catch {
-                    continue
-                }
-            }
-            plan.values[field.key] =
-                field.kind === 'array'
-                    ? proposed
-                          .split(/[,、\n]/u)
-                          .map((value) => value.trim())
-                          .filter(Boolean)
-                    : proposed
-        }
-        const purpose = value('datePurpose')
-        if (purpose !== unchanged) {
-            const date = selectedDate(
-                ['year', 'month', 'day', 'hour', 'minute'].map((part) => value(`date.${part}`)),
-                input.timeZone,
-                currentTime,
-                purpose === 'Publication schedule',
-            )
-            plan.dateIncomplete = !date
-            if (purpose === 'Publication schedule' && model === 'posts') plan.publishAt = date
-            else if (
-                purpose === 'Creation date' &&
-                plan.fields.some((field) => field.key === 'createdAt') &&
-                date
-            )
-                plan.values.createdAt = toZoned(
-                    parseDateTime(date),
-                    input.timeZone,
-                    'reject',
-                ).toAbsoluteString()
-            else plan.dateIncomplete = true
-        }
-    } else if (model && plan.intent !== 'clarify' && plan.intent !== 'settings') {
-        if (plan.intent === 'edit') plan.intent = 'search'
-        const result = await admin.list(model, plan.query, signal)
-        plan.results = result.items.map((entry) => ({
+        query: model ? (queries.get(model) ?? '') : '',
+        results: entries.map((entry) => ({
             id: entry.id,
+            model: entry.model,
             title: String(
                 entry.data.title ??
                     entry.data.name ??
@@ -268,43 +463,64 @@ export async function* composeAdmin(
                     entry.data.label ??
                     entry.id,
             ),
-        }))
-        plan.total = result.total
+        })),
+        total: pages.reduce((sum, page) => sum + page.total, 0),
     }
+    if (plan.intent === 'create' || plan.intent === 'edit') {
+        for (const field of plan.fields) {
+            const key = 'field.' + field.key
+            const choice = answer(key)
+            if (
+                (choice !== 'hide' && questions[key]) ||
+                (field.required && !field.hasDefault && plan.intent === 'create')
+            )
+                plan.visibleFields.push(field.key)
+            if (!questions[key] || ['hide', 'ask', 'none'].includes(choice)) continue
+            const value = chosenValue(key)!
+            if (field.kind === 'url') {
+                try {
+                    if (!['https:', 'http:'].includes(new URL(value).protocol)) continue
+                } catch {
+                    continue
+                }
+            }
+            plan.values[field.key] =
+                field.kind === 'array'
+                    ? value
+                          .split(/[,、\n]/u)
+                          .map((part) => part.trim())
+                          .filter(Boolean)
+                    : value
+        }
+        if (plan.datePurpose !== 'none') {
+            const date = selectedDate(
+                ['year', 'month', 'day', 'hour', 'minute'].map((part) => {
+                    const key = 'date.' + part
+                    return answer(key) === 'unchanged' ? 'unchanged' : chosenValue(key)
+                }),
+                input.timeZone,
+                currentTime,
+                plan.datePurpose === 'publication',
+            )
+            if (plan.datePurpose === 'publication' && info?.scheduling && model === 'posts') {
+                plan.publishAt = date
+                plan.dateIncomplete = !date
+            } else if (
+                plan.datePurpose === 'creation' &&
+                plan.fields.some((field) => field.key === 'createdAt')
+            ) {
+                plan.visibleFields.push('createdAt')
+                plan.dateIncomplete = !date
+                if (date)
+                    plan.values.createdAt = toZoned(
+                        parseDateTime(date),
+                        input.timeZone,
+                        'reject',
+                    ).toAbsoluteString()
+            } else plan.datePurpose = 'none'
+        }
+    } else plan.datePurpose = 'none'
     signal.throwIfAborted()
     yield { type: 'plan', plan }
-    if (plan.intent === 'clarify') {
-        yield { type: 'complete', spec: defaultComposerSpec(plan), fallback: true }
-        return
-    }
-    for await (const event of experimental_composeSpec({
-        catalog: composerCatalog,
-        candidates: composerCandidates(plan),
-        prompt: input.prompt,
-        evaluate,
-        signal,
-        strategy: 'batch',
-        maxSteps: 2,
-        maxElements: 24,
-        maxDepth: 4,
-        context: { intent: plan.intent, model, fieldsWithValues: Object.keys(plan.values) },
-        instructions: {
-            root: 'Use Panel.',
-            next: 'Include all REQUIRED components and the final action. Include fields relevant to the request. Put related short fields together.',
-            parent: 'Panel contains the form. Group contains short related fields. Action comes last.',
-        },
-    })) {
-        signal.throwIfAborted()
-        if (event.type === 'step' && validComposerSpec(event.spec, plan, false))
-            yield { type: 'step', spec: event.spec }
-        else if (event.type === 'complete') {
-            const valid =
-                event.spec && event.stopReason === 'finish' && validComposerSpec(event.spec, plan)
-            yield {
-                type: 'complete',
-                spec: valid ? event.spec! : defaultComposerSpec(plan),
-                fallback: !valid,
-            }
-        }
-    }
+    yield { type: 'complete', spec: defaultComposerSpec(plan), fallback: false }
 }

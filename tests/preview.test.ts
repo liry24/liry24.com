@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest'
 
 import {
     isPreviewGitHubAccountAdmin,
+    previewAuthorizationForRequest,
     validatePreviewIdentity,
 } from '../server/utils/previewAuthorization'
 
@@ -65,4 +66,20 @@ test('Preview login fails closed and rechecks a GitHub account after permission 
         if (previous.token === undefined) delete process.env.PREVIEW_GITHUB_TOKEN
         else process.env.PREVIEW_GITHUB_TOKEN = previous.token
     }
+})
+
+test('Preview authorization is shared only within one request and actor', async () => {
+    const request = {}
+    const check = vi.fn(async () => true)
+    expect(
+        await Promise.all([
+            previewAuthorizationForRequest(request, 'admin', check),
+            previewAuthorizationForRequest(request, 'admin', check),
+        ]),
+    ).toEqual([true, true])
+    expect(check).toHaveBeenCalledTimes(1)
+    check.mockResolvedValue(false)
+    expect(await previewAuthorizationForRequest({}, 'admin', check)).toBe(false)
+    expect(await previewAuthorizationForRequest(request, 'other', check)).toBe(false)
+    expect(check).toHaveBeenCalledTimes(3)
 })

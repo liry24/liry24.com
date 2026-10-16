@@ -18,6 +18,8 @@ const plan: ComposerPlan = {
     model: 'socials',
     intent: 'create',
     fields: [],
+    visibleFields: [],
+    datePurpose: 'none',
     values: {},
     publishAt: '',
     timeZone: 'Asia/Tokyo',

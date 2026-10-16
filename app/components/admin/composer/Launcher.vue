@@ -29,14 +29,10 @@ defineShortcuts({
         :dismissible="!busy"
         :close="!busy"
         title="Compose content"
-        description="Create, find, or edit site content."
         :ui="{ content: 'sm:max-w-3xl', body: 'bg-elevated/40' }"
     >
-        <template #body>
-            <Suspense>
-                <AdminComposerPanel v-if="open" />
-                <template #fallback><USkeleton class="h-40" /></template>
-            </Suspense>
+        <template #content>
+            <div class="p-6"><AdminComposerPanel v-if="open" /></div>
         </template>
     </UModal>
 </template>

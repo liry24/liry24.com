@@ -13,6 +13,7 @@ import { composeAdmin } from '../../ai/adminComposer'
 import { evaluateClef } from '../../ai/clef'
 
 export default defineEventHandler(async (event) => {
+    const started = performance.now()
     await requireUserSession(getNitroRequest(event), { user: { role: 'admin' } })
     if (!event.req.headers.get('content-type')?.startsWith('application/json'))
         throw createError({ statusCode: 415, statusMessage: 'JSON required' })
@@ -26,6 +27,11 @@ export default defineEventHandler(async (event) => {
         .filter((name) => allowed.some((model) => model.name === name))
         .map((name) => ({
             name,
+            label: config.models[name].meta.label,
+            displayField: config.models[name].displayFields.title,
+            features: allowed.find((model) => model.name === name)!.features,
+            scheduling:
+                !('scheduling' in config.models[name]) || config.models[name].scheduling !== false,
             fields: Object.entries(config.models[name].fields)
                 .filter(([key, field]) =>
                     name === 'posts' ? ['title', 'tags'].includes(key) : field.kind !== 'object',
@@ -35,11 +41,17 @@ export default defineEventHandler(async (event) => {
                     kind: field.kind,
                     label: typeof field.label === 'string' ? field.label : key,
                     required: field.required,
+                    hasDefault: 'default' in field && field.default !== undefined,
                     values: 'values' in field ? (field.values as readonly string[]) : undefined,
                 })),
         }))
+    if (!models.length) throw createError({ statusCode: 403, statusMessage: 'No models available' })
     if (input.data.model && !models.some((model) => model.name === input.data.model))
         throw createError({ statusCode: 403, statusMessage: 'Model unavailable' })
+    const authorizationMs = performance.now() - started
+    let inferenceMs = 0,
+        inferenceCalls = 0,
+        lookupMs = 0
     const abort = new AbortController()
     const signal = AbortSignal.any([event.req.signal, abort.signal, AbortSignal.timeout(5000)])
     const encoder = new TextEncoder()
@@ -50,16 +62,28 @@ export default defineEventHandler(async (event) => {
                     input.data,
                     {
                         models,
-                        list: (model, q, signal) =>
-                            admin.entries.list(model, {
+                        list: async (model, q, signal) => {
+                            const lookupStart = performance.now()
+                            const page = await admin.entries.list(model, {
                                 q,
                                 limit: 5,
                                 locale: input.data.locale,
                                 signal,
-                            }),
+                            })
+                            lookupMs += performance.now() - lookupStart
+                            return page
+                        },
                         get: (model, id) => admin.entries.get(model, id),
                     },
-                    evaluateClef,
+                    async (request) => {
+                        const inferenceStart = performance.now()
+                        inferenceCalls++
+                        try {
+                            return await evaluateClef(request)
+                        } finally {
+                            inferenceMs += performance.now() - inferenceStart
+                        }
+                    },
                     signal,
                 )) {
                     signal.throwIfAborted()
@@ -77,6 +101,13 @@ export default defineEventHandler(async (event) => {
                     encoder.encode(JSON.stringify({ type: 'error', message }) + '\n'),
                 )
             } finally {
+                console.info('admin-compose', {
+                    authorizationMs,
+                    lookupMs,
+                    inferenceMs,
+                    inferenceCalls,
+                    totalMs: performance.now() - started,
+                })
                 if (!abort.signal.aborted) controller.close()
             }
         },
@@ -88,6 +119,7 @@ export default defineEventHandler(async (event) => {
         headers: {
             'Content-Type': 'application/x-ndjson; charset=utf-8',
             'Cache-Control': 'private, no-store',
+            'Server-Timing': 'authorize;dur=' + authorizationMs.toFixed(1),
         },
     })
 })

@@ -1,17 +1,23 @@
 <script setup lang="ts">
+import {
+    siteAdminManagementClientOptions,
+    useSiteAdminAuthScope,
+    useSiteAdminModels,
+} from '#build/site-admin/client'
 const { signOut, user } = useUserSession()
 const sidebarCollapsed = ref(false)
 useHead({ titleTemplate: '%s | Liry24 Admin' })
-const client = useAdminClient()
-const { locale } = useI18n()
-const navigationKey = computed(
-    () => `admin-navigation:${user.value?.id}:${user.value?.role}:${locale.value}`,
-)
-const { data: models } = await useAsyncData(navigationKey, () => client.models())
+const mounted = useMounted()
+const connection = siteAdminManagementClientOptions()
+const auth = useSiteAdminAuthScope(undefined, connection)
+const models = useSiteAdminModels(connection, auth, false)
+onMounted(() => {
+    if (!models.data.value) void models.execute({ dedupe: 'defer' })
+})
 const links = computed(() =>
-    (models.value ?? []).map(({ name, meta }) => ({
-        label: meta.plural,
-        icon: meta.icon,
+    Object.entries(mounted.value ? (models.data.value?.models ?? {}) : {}).map(([name, model]) => ({
+        label: model.meta?.plural ?? name,
+        icon: model.meta?.icon,
         to: '/admin/' + name,
     })),
 )

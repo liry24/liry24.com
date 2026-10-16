@@ -47,7 +47,14 @@ const busy = computed(() => props.pending || operation.value !== null || status.
 const descriptors = computed(() =>
     Object.fromEntries(fields.value.map((field) => [field.key, field])),
 )
-const spec = computed(() => (full.value ? defaultComposerSpec(props.plan) : props.spec))
+const spec = computed(() =>
+    full.value
+        ? defaultComposerSpec({
+              ...props.plan,
+              visibleFields: props.plan.fields.map((field) => field.key),
+          })
+        : props.spec,
+)
 </script>
 
 <template>

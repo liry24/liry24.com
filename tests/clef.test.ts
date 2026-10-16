@@ -12,7 +12,7 @@ test('Void inference uses Clef-flash, passes cancellation and rejects missing or
             task: {
                 type: 'choice' as const,
                 instructions: 'Choose',
-                criteria: { create: 'Create' },
+                criteria: { create: 'Create', search: 'Search' },
             },
         },
         signal,

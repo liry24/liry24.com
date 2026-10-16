@@ -52,6 +52,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
         )
         const server = createTestHarness({ workers: [{ configPath, secrets }] })
         let browser
+        const errors: string[] = []
         try {
             const { url } = await server.listen()
             config.vars.NUXT_PUBLIC_SITE_URL = url.origin
@@ -120,7 +121,6 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 'Synthetic session is accepted',
             )
             const page = await context.newPage()
-            const errors: string[] = []
             page.on('pageerror', (error) => errors.push(error.message))
             let calls = 0,
                 writes = 0
@@ -131,7 +131,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.route('**/api/admin/compose', async (route) => {
                 calls++
                 const request = route.request().postDataJSON()
-                const model = request.prompt === 'new post' ? 'posts' : 'socials'
+                const model = request.prompt.startsWith('new post') ? 'posts' : 'socials'
                 const fields =
                     model === 'posts'
                         ? [
@@ -149,6 +149,12 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                     intent: request.entryId ? 'edit' : 'create',
                     entryId: request.entryId,
                     fields,
+                    visibleFields:
+                        model === 'posts' && request.prompt === 'new post'
+                            ? ['title']
+                            : fields.map((field) => field.key),
+                    datePurpose:
+                        request.prompt === 'new post with schedule' ? 'publication' : 'none',
                     values:
                         model === 'posts'
                             ? { title: 'Prepared post', tags: ['vue', 'nuxt'] }
@@ -162,7 +168,8 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                                             : 'GitHub',
                                     icon: 'simple-icons:github',
                                 },
-                    publishAt: model === 'posts' ? '2027-01-20T18:00' : '',
+                    publishAt:
+                        request.prompt === 'new post with schedule' ? '2027-01-20T18:00' : '',
                     timeZone: request.timeZone,
                     dateIncomplete: false,
                     query: '',
@@ -182,18 +189,57 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                         '\n',
                 })
             })
+            const html = await (await server.fetch('/admin', { headers: { cookie } })).text()
+            assert.match(
+                html,
+                /<input[^>]*id="admin-compose-input"/,
+                'The input must be server rendered',
+            )
+            for (const text of [
+                'What would you like to do?',
+                'Create, find, or',
+                'Changes are saved',
+            ])
+                assert(!html.includes(text), 'Unnecessary composer copy is absent')
+            const noJsContext = await browser.newContext({ javaScriptEnabled: false })
+            await noJsContext.addCookies(await context.cookies())
+            const noJsPage = await noJsContext.newPage()
+            await noJsPage.goto(new URL('/admin', url).href)
+            assert(await noJsPage.getByRole('textbox', { name: 'Content request' }).isVisible())
+            await noJsContext.close()
+            let releaseModels!: () => void
+            const modelsGate = new Promise<void>((resolve) => {
+                releaseModels = resolve
+            })
+            let modelRequests = 0
+            await page.route('**/api/site-admin/models**', async (route) => {
+                modelRequests++
+                await modelsGate
+                await route.continue()
+            })
             await page.goto(new URL('/admin', url).href, { waitUntil: 'domcontentloaded' })
+            assert(
+                await page.getByRole('textbox', { name: 'Content request' }).isVisible(),
+                'Input does not wait for models',
+            )
+            releaseModels()
+            await page.waitForFunction(
+                () =>
+                    (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
+                        .$nuxt?.isHydrating === false,
+            )
             assert(
                 !(await page.locator('body').innerText()).includes('Back to Home'),
                 'Admin SSR failed',
             )
-            await page.getByLabel('What would you like to do?').fill('new social')
+            await page.getByLabel('Content request').fill('new social')
             await page.getByRole('button', { name: 'Save', exact: true }).waitFor()
             await page.getByLabel('Label', { exact: true }).fill('My GitHub')
-            await page.getByLabel('What would you like to do?').fill('second')
+            await page.getByLabel('Content request').fill('second')
             await page.getByText('Preparing…', { exact: true }).waitFor({ state: 'hidden' })
             assert.equal(await page.getByLabel('Label', { exact: true }).inputValue(), 'My GitHub')
             assert.equal(writes, 0, 'Inference must not mutate content')
+            assert.equal(modelRequests, 1, 'Navigation and form reuse one models request')
             await page.screenshot({ path: '.tmp/composer-desktop.png', fullPage: true })
             let releaseSave!: () => void
             const saveGate = new Promise<void>((resolve) => {
@@ -209,7 +255,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                     (document.querySelector('#__nuxt') as any).__vue_app__.config.globalProperties
                         .$nuxt.payload.state['$sadmin-composer-busy'] === true,
             )
-            assert(await page.getByLabel('What would you like to do?').isDisabled())
+            assert(await page.getByLabel('Content request').isDisabled())
             await page.keyboard.press('Control+k')
             assert.equal(await page.getByRole('dialog').count(), 0, 'Saving keeps its form mounted')
             await page.getByRole('link', { name: 'Works', exact: true }).click()
@@ -217,6 +263,11 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             releaseSave()
             await page.getByText('Saved', { exact: true }).waitFor()
             assert.equal(writes, 1, 'Saving is explicit')
+            await page.getByLabel('Content request').fill('new post')
+            await page.getByRole('button', { name: 'Continue in Post Editor' }).waitFor()
+            assert.equal(await page.getByLabel('Title', { exact: true }).count(), 1)
+            assert.equal(await page.getByText('Publication schedule', { exact: true }).count(), 0)
+            assert.equal(await page.getByLabel('Tags', { exact: true }).count(), 0)
             const entries = await server.fetch('/api/site-admin/entries?model=socials&locale=ja', {
                 headers: { cookie },
             })
@@ -240,7 +291,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 )
             })
             await page.getByRole('link', { name: 'Admin home', exact: true }).click()
-            await page.getByLabel('What would you like to do?').fill('new post')
+            await page.getByLabel('Content request').fill('new post with schedule')
             await page.getByRole('button', { name: 'Continue in Post Editor' }).click()
             await page.waitForURL('**/admin/posts/new')
             assert.equal(
@@ -266,13 +317,13 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.getByRole('dialog').waitFor({ state: 'hidden' })
             await page.keyboard.press('Control+k')
             await page.getByRole('dialog').waitFor()
-            await page.getByRole('dialog').getByLabel('What would you like to do?').waitFor()
+            await page.getByRole('dialog').getByLabel('Content request').waitFor()
             assert.equal(await page.locator('#admin-compose-input').count(), 1)
             await page.keyboard.press('Escape')
             await page.getByRole('dialog').waitFor({ state: 'hidden' })
             await page.setViewportSize({ width: 390, height: 844 })
             await page.goto(new URL('/admin', url).href, { waitUntil: 'domcontentloaded' })
-            await page.getByLabel('What would you like to do?').waitFor()
+            await page.getByLabel('Content request').waitFor()
             assert(
                 await page.evaluate(
                     () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -280,7 +331,12 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 'Mobile layout overflows',
             )
             await page.screenshot({ path: '.tmp/composer-mobile.png', fullPage: true })
-            await page.getByLabel('What would you like to do?').fill('mobile social')
+            await page.waitForFunction(
+                () =>
+                    (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
+                        .$nuxt?.isHydrating === false,
+            )
+            await page.getByLabel('Content request').fill('mobile social')
             await page.getByRole('button', { name: 'Save', exact: true }).waitFor()
             assert(
                 await page.evaluate(
@@ -298,6 +354,18 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             if (page) {
                 await page.screenshot({ path: '.tmp/composer-error.png', fullPage: true })
                 console.log((await page.locator('body').innerText()).slice(0, 3000))
+                console.log(
+                    await page.locator('input,textarea').evaluateAll((inputs) =>
+                        inputs.map((input) => ({
+                            id: input.id,
+                            labels: Array.from((input as HTMLInputElement).labels ?? []).map(
+                                (label) => label.textContent,
+                            ),
+                            name: input.getAttribute('name'),
+                        })),
+                    ),
+                )
+                console.log(errors)
             }
             throw error
         } finally {
