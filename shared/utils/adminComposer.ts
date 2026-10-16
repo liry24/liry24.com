@@ -12,13 +12,39 @@ export const composerModels = [
     'posts',
 ] as const
 export type ComposerModel = (typeof composerModels)[number]
+export const composerModelDescriptions: Record<ComposerModel, string> = {
+    socials:
+        'External service account or profile links intended for social presence. A service homepage, product page, or arbitrary URL alone is insufficient.',
+    works: 'Projects, products, commissioned deliverables, or professional accomplishments presented as portfolio or commercial work.',
+    arts: 'Standalone illustrations, 3D/CG creations, or other visual artworks. Prefer this when the artwork itself is the subject, rather than a product or project accomplishment.',
+    careers:
+        "The owner's personal career history, including employment, education, organizational roles, and professional milestones.",
+    skills: 'Tools, languages, software, technologies, or services the owner knows or can use. Distinguish an ability from an account link or a created work.',
+    ranks: 'Competitive ranks, tiers, or ranking achievements in video games, optionally associated with a season.',
+    posts: 'Blog articles and requests to create, write, edit, or manage their content.',
+}
 const selection = z.object({
     model: z.enum(composerModels).optional(),
     entryId: z.string().min(1).max(200).optional(),
 })
+export const composerItemInput = selection
+    .extend({
+        id: z.string().min(1).max(110),
+        source: z
+            .object({ start: z.number().int().min(0), end: z.number().int().min(1).max(2000) })
+            .strict(),
+    })
+    .strict()
+export type ComposerItemInput = z.infer<typeof composerItemInput>
 export const composerRequest = selection
     .extend({
         prompt: z.string().trim().min(1).max(2000),
+        batch: z.literal(true).optional(),
+        requestId: z
+            .string()
+            .regex(/^[a-zA-Z0-9_-]{1,90}$/)
+            .optional(),
+        items: z.array(composerItemInput).min(1).max(10).optional(),
         locale: z.enum(['ja', 'en']),
         timeZone: z
             .string()
@@ -35,6 +61,22 @@ export const composerRequest = selection
     })
     .strict()
     .refine((value) => !value.entryId || value.model, 'An entry needs a model')
+    .refine((value) => !value.batch || Boolean(value.requestId), 'A batch needs a request ID')
+    .refine(
+        (value) =>
+            !value.items ||
+            (value.batch &&
+                new Set(value.items.map((item) => item.id)).size === value.items.length &&
+                value.items.every(
+                    (item) =>
+                        item.id.startsWith(value.requestId + '.') &&
+                        /^\d$/.test(item.id.slice(value.requestId!.length + 1)) &&
+                        item.source.start < item.source.end &&
+                        item.source.end <= value.prompt.length &&
+                        (!item.entryId || item.model),
+                )),
+        'Invalid batch items',
+    )
 export type ComposerRequest = z.infer<typeof composerRequest>
 export type ComposerField = {
     key: string
@@ -60,6 +102,9 @@ export type ComposerPlan = {
     results: { id: string; model: ComposerModel; title: string }[]
     total: number
 }
+export type ComposerItem = ComposerItemInput & { plan?: ComposerPlan; spec?: Spec; error?: string }
+export type ComposerBatch = { requestId: string; items: ComposerItem[]; notice?: string }
+
 export const composerCatalog = defineCatalog(schema, {
     components: {
         Panel: { props: z.object({}), slots: ['default'], description: 'Main form container' },
@@ -144,6 +189,7 @@ export function validComposerSpec(spec: Spec, plan: ComposerPlan): boolean {
 }
 
 export type ComposerEvent =
+    | { type: 'batch'; batch: ComposerBatch }
     | { type: 'plan'; plan: ComposerPlan }
     | { type: 'step'; spec: Spec }
     | { type: 'complete'; spec: Spec; fallback: boolean }

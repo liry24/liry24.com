@@ -9,6 +9,7 @@ import {
     type ComposerAdmin,
     type ComposerModelInfo,
 } from '../server/ai/adminComposer'
+import { composeAdminRequest, composerSources } from '../server/ai/adminComposerBatch'
 import {
     composerModels,
     composerRequest,
@@ -485,4 +486,296 @@ test('a specifically requested optional field is shown even without a supplied v
     expect(plan.visibleFields).toEqual(['title', 'description'])
     expect(plan.values).toEqual({})
     expect(plan.datePurpose).toBe('none')
+})
+
+async function collectBatch(
+    request: ComposerRequest,
+    evaluate: Experimental_CompositionEvaluator,
+    admin = makeAdmin(),
+) {
+    const events: ComposerEvent[] = []
+    for await (const event of composeAdminRequest(
+        request,
+        admin,
+        evaluate,
+        new AbortController().signal,
+        Date.parse('2026-10-16T03:00:00Z'),
+    ))
+        events.push(event)
+    return events
+}
+const batchInput = { ...input, batch: true, requestId: 'request1' } as const
+function getBatch(events: ComposerEvent[]) {
+    const event = events.find((event) => event.type === 'batch')
+    if (event?.type !== 'batch') throw new Error('Missing batch')
+    return event.batch
+}
+
+test('new clients add only the count question for a single record', async () => {
+    const evaluate = evaluator({ model: 'posts', itemCount: 'one' })
+    const plan = getPlan(await collectBatch(batchInput, evaluate))
+    expect(plan.visibleFields).toEqual(['title'])
+    expect(evaluate).toHaveBeenCalledTimes(1)
+    expect(Object.keys(evaluate.mock.calls[0]![0].questions)).toHaveLength(12)
+    expect(evaluate.mock.calls[0]![0].questions.model!.criteria).toMatchObject({
+        socials: expect.stringContaining('profile'),
+        works: expect.stringContaining('products'),
+        arts: expect.stringContaining('illustrations'),
+        careers: expect.stringContaining('career'),
+        skills: expect.stringContaining('knows'),
+        ranks: expect.stringContaining('video games'),
+        posts: expect.stringContaining('Blog'),
+    })
+})
+
+test('an unknown profile service can supply an empty icon without schema changes', async () => {
+    const evaluate = evaluator([
+        { model: 'socials', intent: 'resolve', formDetails: 'resolve', 'query.socials': 'alice' },
+        {
+            intent: 'create',
+            entry: 'none',
+            'field.href': 'https://unknown.invalid/alice',
+            'field.label': '@alice',
+            'field.icon': 'empty',
+        },
+    ])
+    const plan = getPlan(
+        await collect({ ...input, prompt: 'https://unknown.invalid/alice' }, evaluate),
+    )
+    expect(plan.values).toEqual({
+        href: 'https://unknown.invalid/alice',
+        label: '@alice',
+        icon: '',
+    })
+    expect(config.models.socials.fields.icon.required).toBe(true)
+    const icons = Object.values(evaluate.mock.calls[1]![0].questions['field.icon']!.criteria)
+    expect(evaluate.mock.calls[1]![0].questions['field.icon']!.criteria.empty).toContain('unknown')
+    expect(icons).not.toContain('mingcute:link-fill')
+})
+
+test('mixed records share routing/refinement and keep each source and values separate', async () => {
+    const prompt = 'https://x.com/alice\nスキル「Blender」を追加'
+    const evaluate = evaluator([
+        { itemCount: '2' },
+        {
+            'i0.source': 'https://x.com/alice',
+            'i0.model': 'socials',
+            'i0.intent': 'resolve',
+            'i0.query': 'alice',
+            'i0.formDetails': 'resolve',
+            'i1.source': 'スキル「Blender」を追加',
+            'i1.model': 'skills',
+            'i1.intent': 'resolve',
+            'i1.query': 'Blender',
+            'i1.formDetails': 'resolve',
+        },
+        {
+            'i0.intent': 'create',
+            'i0.entry': 'none',
+            'i0.field.href': 'https://x.com/alice',
+            'i0.field.label': '@alice',
+            'i0.field.icon': 'simple-icons:x',
+            'i1.intent': 'create',
+            'i1.entry': 'none',
+            'i1.field.name': 'Blender',
+            'i1.field.icon': 'simple-icons:blender',
+        },
+    ])
+    const admin = makeAdmin()
+    const batch = getBatch(await collectBatch({ ...batchInput, prompt }, evaluate, admin))
+    expect(evaluate).toHaveBeenCalledTimes(3)
+    expect(Object.keys(evaluate.mock.calls[1]![0].questions)).toHaveLength(12)
+    expect(batch.items.map((item) => item.id)).toEqual(['request1.0', 'request1.1'])
+    expect(batch.items.map((item) => item.plan?.model)).toEqual(['socials', 'skills'])
+    expect(batch.items[0]?.plan?.values).toEqual({
+        href: 'https://x.com/alice',
+        label: '@alice',
+        icon: 'simple-icons:x',
+    })
+    expect(batch.items[1]?.plan?.values).toMatchObject({
+        name: 'Blender',
+        icon: 'simple-icons:blender',
+    })
+    expect(prompt.slice(batch.items[1]!.source.start, batch.items[1]!.source.end)).toBe(
+        'スキル「Blender」を追加',
+    )
+    expect(admin.list).toHaveBeenCalledTimes(2)
+    expect(evaluate.mock.calls[2]![0].state.items.i0.request).toBe('https://x.com/alice')
+    expect(evaluate.mock.calls[2]![0].state.items.i1.request).toBe('スキル「Blender」を追加')
+})
+
+test('ten detailed records split refinement into bounded groups with at most two concurrent evaluations', async () => {
+    const sources = Array.from({ length: 10 }, (_, i) => `作品「Project${i}」を作成`)
+    const grouped = Object.fromEntries(
+        sources.flatMap((source, i) =>
+            Object.entries({
+                source,
+                model: 'works',
+                intent: 'resolve',
+                query: 'Project' + i,
+                formDetails: 'resolve',
+            }).map(([key, value]) => [`i${i}.${key}`, value]),
+        ),
+    )
+    const details = Object.fromEntries(
+        sources.flatMap((_, i) => [
+            [`i${i}.intent`, 'create'],
+            [`i${i}.entry`, 'none'],
+            [`i${i}.field.title`, 'Project' + i],
+        ]),
+    )
+    const decide = evaluator([{ itemCount: '10' }, grouped, details])
+    let concurrent = 0,
+        maximum = 0
+    const evaluate: Experimental_CompositionEvaluator = async (request) => {
+        concurrent++
+        maximum = Math.max(maximum, concurrent)
+        try {
+            await new Promise((resolve) => setTimeout(resolve, 5))
+            return await decide(request)
+        } finally {
+            concurrent--
+        }
+    }
+    const batch = getBatch(
+        await collectBatch({ ...batchInput, prompt: sources.join('\n') }, evaluate),
+    )
+    expect(batch.items).toHaveLength(10)
+    expect(batch.items.map((item) => item.plan?.values.title)).toEqual(
+        sources.map((_, i) => 'Project' + i),
+    )
+    expect(maximum).toBe(2)
+    expect(Object.keys(decide.mock.calls[1]![0].questions)).toHaveLength(60)
+    for (const [request] of decide.mock.calls)
+        expect(Object.keys(request.questions).length).toBeLessThanOrEqual(64)
+})
+
+test.each(['unclear', 'overflow'])(
+    'ambiguous or excessive record count returns guidance, never a truncated batch (%s)',
+    async (itemCount) => {
+        const evaluate = evaluator({ itemCount })
+        const admin = makeAdmin()
+        const batch = getBatch(await collectBatch(batchInput, evaluate, admin))
+        expect(batch.items).toEqual([])
+        expect(batch.notice).toBeTruthy()
+        expect(evaluate).toHaveBeenCalledTimes(1)
+        expect(admin.list).not.toHaveBeenCalled()
+    },
+)
+
+test('an explicit model selection resolves only that source with stable identity and add intent', async () => {
+    const prompt = '不明な項目\nもう一つ'
+    const evaluate = evaluator({ model: 'posts', intent: 'create' })
+    const item = {
+        id: 'request1.1',
+        source: { start: 6, end: prompt.length },
+        model: 'skills' as const,
+    }
+    const batch = getBatch(await collectBatch({ ...batchInput, prompt, items: [item] }, evaluate))
+    expect(batch.items[0]).toMatchObject({ ...item, plan: { model: 'skills', intent: 'create' } })
+    expect(evaluate).toHaveBeenCalledTimes(1)
+    const request = evaluate.mock.calls[0]![0]
+    expect(request.state.request).toBe(prompt.slice(6))
+    expect(request.questions.itemCount).toBeUndefined()
+    expect(request.questions.intent!.criteria.search).toBeUndefined()
+})
+
+test('batch errors stay local and matching existing entries are not automatically changed', async () => {
+    const request = {
+        ...batchInput,
+        prompt: 'first\nsecond',
+        items: [
+            { id: 'request1.0', source: { start: 0, end: 5 }, model: 'works' as const },
+            { id: 'request1.1', source: { start: 6, end: 12 }, model: 'skills' as const },
+        ],
+    }
+    const admin = makeAdmin()
+    vi.mocked(admin.list).mockImplementation(async (model) => {
+        if (model === 'skills') throw new Error('synthetic failure')
+        return { items: [{ id: 'exists', data: { title: 'first' } }], total: 1 }
+    })
+    const evaluate = evaluator([{ intent: 'resolve' }, { intent: 'edit', entry: 'exists' }])
+    const batch = getBatch(await collectBatch(request, evaluate, admin))
+    expect(batch.items[0]?.plan).toMatchObject({
+        intent: 'search',
+        values: {},
+        results: [{ id: 'exists' }],
+    })
+    expect(batch.items[1]?.error).toBeTruthy()
+})
+
+test('batch input validates source ranges, identities and selection dependencies', () => {
+    const valid = {
+        ...batchInput,
+        items: [{ id: 'request1.0', source: { start: 0, end: input.prompt.length } }],
+    }
+    expect(composerRequest.safeParse(valid).success).toBe(true)
+    for (const item of [
+        { id: 'other.0', source: { start: 0, end: 1 } },
+        { id: 'request1.10', source: { start: 0, end: 1 } },
+        { id: 'request1.0', source: { start: 2, end: 1 } },
+        { id: 'request1.0', source: { start: 0, end: 2000 } },
+        { id: 'request1.0', source: { start: 0, end: 1 }, entryId: 'existing' },
+    ])
+        expect(composerRequest.safeParse({ ...valid, items: [item] }).success).toBe(false)
+    expect(
+        composerRequest.safeParse({ ...valid, items: [valid.items[0], valid.items[0]] }).success,
+    ).toBe(false)
+    expect(composerRequest.safeParse({ ...valid, batch: undefined }).success).toBe(false)
+    const prompt = Array.from({ length: 80 }, (_, i) => `作品${i}`).join('\n')
+    expect(composerSources(prompt).at(-2)!.end).toBeGreaterThan(40)
+})
+
+test('explicit blank copies remain separate records even with the same source', async () => {
+    const evaluate = evaluator([
+        { itemCount: '2' },
+        {
+            'i0.source': '記事を2件作成',
+            'i0.model': 'posts',
+            'i0.intent': 'create',
+            'i0.query': 'none',
+            'i1.source': '記事を2件作成',
+            'i1.model': 'posts',
+            'i1.intent': 'create',
+            'i1.query': 'none',
+        },
+    ])
+    const batch = getBatch(await collectBatch({ ...batchInput, prompt: '記事を2件作成' }, evaluate))
+    expect(batch.items.map((item) => item.plan?.intent)).toEqual(['create', 'create'])
+    expect(batch.items[0]!.source).toEqual(batch.items[1]!.source)
+    expect(batch.items[0]!.id).not.toBe(batch.items[1]!.id)
+    expect(evaluate).toHaveBeenCalledTimes(2)
+})
+
+test('a duplicated profile in one batch requires correction instead of two creates', async () => {
+    const evaluate = evaluator([
+        { itemCount: '2' },
+        {
+            'i0.model': 'socials',
+            'i0.intent': 'resolve',
+            'i0.query': 'alice',
+            'i0.formDetails': 'resolve',
+            'i1.model': 'socials',
+            'i1.intent': 'resolve',
+            'i1.query': 'alice',
+            'i1.formDetails': 'resolve',
+        },
+        Object.fromEntries(
+            [0, 1].flatMap((i) =>
+                Object.entries({
+                    intent: 'create',
+                    entry: 'none',
+                    'field.href': 'https://x.com/alice',
+                    'field.label': '@alice',
+                    'field.icon': 'simple-icons:x',
+                }).map(([key, value]) => [`i${i}.${key}`, value]),
+            ),
+        ),
+    ])
+    const batch = getBatch(
+        await collectBatch({ ...batchInput, prompt: 'https://x.com/alice' }, evaluate),
+    )
+    expect(batch.items[0]?.plan?.intent).toBe('create')
+    expect(batch.items[1]?.plan).toBeUndefined()
+    expect(batch.items[1]?.error).toContain('重複')
 })

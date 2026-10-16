@@ -1,8 +1,8 @@
-import type { Spec } from '@json-render/core'
 import { watchDebounced } from '@vueuse/core'
 import { onScopeDispose, ref, shallowRef, watch, type Ref } from 'vue'
 import {
     defaultComposerSpec,
+    type ComposerBatch,
     type ComposerEvent,
     type ComposerPlan,
     type ComposerRequest,
@@ -11,8 +11,8 @@ import {
 export function useAdminComposerRequest(
     input: () => ComposerRequest | null,
     composing: Ref<boolean>,
+    result: Ref<ComposerBatch | null> = shallowRef(null),
 ) {
-    const result = shallowRef<{ plan: ComposerPlan; spec: Spec } | null>(null)
     const running = ref(false)
     const error = ref('')
     const fallback = ref(false)
@@ -29,6 +29,7 @@ export function useAdminComposerRequest(
             cancel()
             running.value = Boolean(input() && !composing.value)
             error.value = ''
+            if (!input() || result.value?.requestId !== input()?.requestId) result.value = null
         },
         { flush: 'sync', deep: true },
     )
@@ -42,6 +43,34 @@ export function useAdminComposerRequest(
         error.value = ''
         let plan: ComposerPlan | undefined
         let complete = false
+        function apply(batch: ComposerBatch) {
+            if (request!.requestId && batch.requestId !== request!.requestId)
+                throw new Error('The response belongs to another request.')
+            result.value =
+                request!.items && result.value?.requestId === batch.requestId
+                    ? {
+                          ...result.value,
+                          items: result.value.items.map(
+                              (item) => batch.items.find((next) => next.id === item.id) ?? item,
+                          ),
+                      }
+                    : batch
+        }
+        function single(spec: NonNullable<ComposerBatch['items'][number]['spec']>) {
+            apply({
+                requestId: request!.requestId ?? '',
+                items: [
+                    {
+                        id: (request!.requestId ?? '') + '.0',
+                        source: { start: 0, end: request!.prompt.length },
+                        model: request!.model,
+                        entryId: request!.entryId,
+                        plan,
+                        spec,
+                    },
+                ],
+            })
+        }
         try {
             const response = await fetch('/api/admin/compose', {
                 method: 'POST',
@@ -71,9 +100,12 @@ export function useAdminComposerRequest(
                         if (!line) continue
                         const event = JSON.parse(line) as ComposerEvent
                         if (event.type === 'error') throw new Error(event.message)
-                        if (event.type === 'plan') plan = event.plan
+                        if (event.type === 'batch') {
+                            apply(event.batch)
+                            complete = true
+                        } else if (event.type === 'plan') plan = event.plan
                         else if (plan && (event.type === 'step' || event.type === 'complete')) {
-                            result.value = { plan, spec: event.spec }
+                            single(event.spec)
                             if (event.type === 'complete') {
                                 complete = true
                                 fallback.value = event.fallback
@@ -93,14 +125,29 @@ export function useAdminComposerRequest(
             if (ownGeneration !== generation) return
             error.value = cause instanceof Error ? cause.message : 'Could not prepare the form.'
             if (plan) {
-                result.value = { plan, spec: defaultComposerSpec(plan) }
+                single(defaultComposerSpec(plan))
                 fallback.value = true
             }
         } finally {
             if (ownGeneration === generation) running.value = false
         }
     }
-    watchDebounced([input, composing], run, { debounce: 300, deep: true, immediate: true })
+    watchDebounced(
+        [input, composing],
+        () => {
+            const request = input()
+            if (
+                request?.requestId &&
+                result.value?.requestId === request.requestId &&
+                !request.items
+            ) {
+                running.value = false
+                return
+            }
+            return run()
+        },
+        { debounce: 300, deep: true, immediate: true },
+    )
     onScopeDispose(cancel)
     return { result, running, error, fallback, run, cancel }
 }

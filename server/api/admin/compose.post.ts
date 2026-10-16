@@ -9,7 +9,7 @@ import {
     type ComposerField,
 } from '../../../shared/utils/adminComposer'
 import config from '../../../site-admin.config'
-import { composeAdmin } from '../../ai/adminComposer'
+import { composeAdminRequest } from '../../ai/adminComposerBatch'
 import { evaluateClef } from '../../ai/clef'
 
 export default defineEventHandler(async (event) => {
@@ -46,6 +46,12 @@ export default defineEventHandler(async (event) => {
                 })),
         }))
     if (!models.length) throw createError({ statusCode: 403, statusMessage: 'No models available' })
+    if (
+        input.data.items?.some(
+            (item) => item.model && !models.some((model) => model.name === item.model),
+        )
+    )
+        throw createError({ statusCode: 403, statusMessage: 'Model unavailable' })
     if (input.data.model && !models.some((model) => model.name === input.data.model))
         throw createError({ statusCode: 403, statusMessage: 'Model unavailable' })
     const inferences: { durationMs: number; questionCount: number; payloadBytes: number }[] = []
@@ -61,12 +67,16 @@ export default defineEventHandler(async (event) => {
         }
     }
     const abort = new AbortController()
-    const signal = AbortSignal.any([event.req.signal, abort.signal, AbortSignal.timeout(5000)])
+    const signal = AbortSignal.any([
+        event.req.signal,
+        abort.signal,
+        AbortSignal.timeout(input.data.batch ? 15000 : 5000),
+    ])
     const encoder = new TextEncoder()
     const stream = new ReadableStream({
         async start(controller) {
             try {
-                for await (const item of composeAdmin(
+                for await (const item of composeAdminRequest(
                     input.data,
                     {
                         models,
@@ -111,7 +121,8 @@ export default defineEventHandler(async (event) => {
                 const message =
                     error instanceof UsageLimit
                         ? 'AI usage limit reached. You can continue with the regular form.'
-                        : signal.aborted
+                        : signal.aborted ||
+                            (error instanceof Error && error.name === 'TimeoutError')
                           ? 'The request timed out. You can continue with the regular form.'
                           : 'Could not prepare the form. Try again or choose a content type.'
                 controller.enqueue(

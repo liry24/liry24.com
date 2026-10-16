@@ -5,13 +5,14 @@ import type {
 } from '@json-render/core'
 
 import type {
+    ComposerBatch,
     ComposerEvent,
     ComposerField,
     ComposerModel,
     ComposerPlan,
     ComposerRequest,
 } from '../../shared/utils/adminComposer'
-import { defaultComposerSpec } from '../../shared/utils/adminComposer'
+import { composerModelDescriptions, defaultComposerSpec } from '../../shared/utils/adminComposer'
 
 export type ComposerModelInfo = {
     name: ComposerModel
@@ -31,11 +32,11 @@ export type ComposerAdmin = {
     ) => Promise<{ items: Entry[]; total: number }>
     get: (model: ComposerModel, id: string) => Promise<Entry>
 }
-const question = (
+export const question = (
     instructions: string,
     criteria: Record<string, string>,
 ): Experimental_ChoiceQuestion => ({ type: 'choice', instructions, criteria })
-const options = (values: readonly string[]) =>
+export const options = (values: readonly string[]) =>
     Object.fromEntries([...new Set(values)].map((value, i) => ['v' + i, value]))
 
 // Parsing supplies facts and alternatives; the model decides what they mean.
@@ -91,6 +92,20 @@ export function inputChoices(prompt: string, locale: string): string[] {
         .slice(0, 40)
 }
 
+export const inputQueryChoices = (prompt: string, locale: string): string[] =>
+    [
+        ...new Set([
+            ...[...prompt.matchAll(/「([^」]+)」|“([^”]+)”|"([^"]+)"/gu)].map(
+                (match) => match[1] || match[2] || match[3] || '',
+            ),
+            ...[...new Intl.Segmenter(locale, { granularity: 'word' }).segment(prompt)]
+                .filter((part) => part.isWordLike)
+                .map((part) => part.segment),
+        ]),
+    ]
+        .filter((value) => value.length <= 100)
+        .slice(0, 40)
+
 export function selectedDate(
     parts: (string | undefined)[],
     timeZone: string,
@@ -114,7 +129,15 @@ export async function* composeAdmin(
     evaluate: Experimental_CompositionEvaluator,
     signal: AbortSignal,
     currentTime = Date.now(),
+    multiple?: (
+        count: string,
+        routing: {
+            state: Record<string, unknown>
+            questions: Record<string, Experimental_ChoiceQuestion>
+        },
+    ) => Promise<ComposerBatch>,
 ): AsyncGenerator<ComposerEvent> {
+    signal = AbortSignal.any([signal, AbortSignal.timeout(5000)])
     signal.throwIfAborted()
     const models = admin.models
     const existing =
@@ -137,18 +160,7 @@ export async function* composeAdmin(
                       : [],
             ),
         )
-    const queryChoices = [
-        ...new Set([
-            ...[...input.prompt.matchAll(/「([^」]+)」|“([^”]+)”|"([^"]+)"/gu)].map(
-                (match) => match[1] || match[2] || match[3] || '',
-            ),
-            ...[...new Intl.Segmenter(input.locale, { granularity: 'word' }).segment(input.prompt)]
-                .filter((part) => part.isWordLike)
-                .map((part) => part.segment),
-        ]),
-    ]
-        .filter((value) => value.length <= 100)
-        .slice(0, 40)
+    const queryChoices = inputQueryChoices(input.prompt, input.locale)
     const initialChoices = inputChoices(input.prompt, input.locale)
     const choices = [
         ...new Set([...initialChoices, ...Object.values(existing ? scalarData(existing) : {})]),
@@ -183,7 +195,6 @@ export async function* composeAdmin(
                                         /^(simple-icons|mingcute):[a-z0-9-]+$/.test(value),
                                     ),
                                     ...icons,
-                                    'mingcute:link-fill',
                                 ]
                               : field.kind === 'url'
                                 ? candidates.filter((value) => {
@@ -201,6 +212,11 @@ export async function* composeAdmin(
                         question(`Choose ${field.key} according to fieldPolicy.`, {
                             hide: 'Unrelated, optional/defaulted and not requested, or unchanged: omit this field.',
                             ask: 'Necessary input whose value cannot be inferred from the supplied facts.',
+                            ...(field.key === 'icon'
+                                ? {
+                                      empty: 'No confidently recognized applicable icon; leave this value empty. For an unknown profile service choose empty, never invent a brand or substitute a generic link icon.',
+                                  }
+                                : {}),
                             ...options(values),
                         }),
                     ]
@@ -208,10 +224,10 @@ export async function* composeAdmin(
         )
     const routingQuestions: Record<string, Experimental_ChoiceQuestion> = {
         model: question(
-            'Which model best matches the user request? Screen context is a hint, not a restriction. Choose clarify only if the content type is ambiguous.',
+            'Choose by the subject and intended use of this record. Distinguish a service profile from a tool skill, and a standalone artwork from a product/project achievement. Screen context is only a hint. When the subject is ambiguous choose clarify instead of guessing.',
             {
                 ...Object.fromEntries(
-                    models.map((model) => [model.name, model.label ?? model.name]),
+                    models.map((model) => [model.name, composerModelDescriptions[model.name]]),
                 ),
                 clarify: 'No clear matching content model.',
             },
@@ -261,6 +277,27 @@ export async function* composeAdmin(
             },
         ),
     }
+    if (input.model && !input.entryId) {
+        for (const key of ['edit', 'search', 'manage', 'settings'])
+            delete routingQuestions.intent!.criteria[key]
+        routingQuestions.intent!.instructions +=
+            ' The user explicitly selected this model to add data. Choose create for a blank entry or resolve to check an identifying value before adding.'
+    }
+    if (input.batch)
+        routingQuestions.itemCount = question(
+            'How many separate new records are requested? Count records, not fields, tags, search results or game ranks. For search/navigation/editing or one record choose one. Follow explicit counts and separately listed subjects. Use unclear if the quantity cannot be established; never invent extra records.',
+            {
+                one: 'One record or one non-creation operation.',
+                ...Object.fromEntries(
+                    Array.from({ length: 9 }, (_, i) => [
+                        String(i + 2),
+                        String(i + 2) + ' separate records to add.',
+                    ]),
+                ),
+                unclear: 'The requested quantity is ambiguous.',
+                overflow: 'More than ten new records are requested.',
+            },
+        )
     const state = {
         request: input.prompt,
         locale: input.locale,
@@ -285,7 +322,7 @@ export async function* composeAdmin(
             'Prepare the minimum useful UI. Omit unrelated or unspecified optional/defaulted fields. Explicitly supplied optional information MUST be shown and filled.',
             'For each field, choose hide if unnecessary or unchanged; ask only for required nondefault or explicitly requested missing input; otherwise select the best supplied literal value.',
             'Prefer supported facts over asking again: quoted values, URL parts and conventional account handles/icons may fill fields.',
-            'For a profile/account link, prefer the conventional @account label and known brand icon. A URL field should receive the supplied complete URL.',
+            'For a profile/account link, prefer the conventional @account label. Only choose a confidently recognized existing applicable brand icon; candidate slugs are possibilities, not proof that an icon exists; for unknown services an empty icon is valid and complete, do not ask for an icon or invent one. A URL field receives the complete supplied URL.',
             'Never use action words or the whole command as a title, label, name or tag.',
             'For search, settings and management navigation, hide all editable fields.',
             'Publishing, deletion, history and reordering use the full management screen (manage). Only post publication-time preparation is available in this composer.',
@@ -297,6 +334,10 @@ export async function* composeAdmin(
     signal.throwIfAborted()
     const answer = (key: string) => decision.answers[key]?.choice ?? 'none'
     const chosenValue = (key: string) => questions[key]?.criteria[answer(key)]
+    if (input.batch && multiple && !input.entryId && answer('itemCount') !== 'one') {
+        yield { type: 'batch', batch: await multiple(answer('itemCount'), { state, questions }) }
+        return
+    }
     let model = input.model ?? models.find((item) => item.name === answer('model'))?.name ?? null
     const initialIntent = input.entryId ? 'edit' : answer('intent')
     const purpose = answer('datePurpose') as ComposerPlan['datePurpose']
@@ -348,6 +389,9 @@ export async function* composeAdmin(
                 model ? models.find((item) => item.name === model)!.fields : fields,
             ),
         }
+        if (entries.length)
+            questions.intent!.criteria.edit =
+                'An existing entry matches the supplied identity. Select it for user confirmation instead of creating a duplicate.'
         delete questions.intent!.criteria.resolve
         if (!entries.length && !input.entryId) delete questions.intent!.criteria.edit
         if (pages.length)
@@ -468,7 +512,7 @@ export async function* composeAdmin(
             )
                 plan.visibleFields.push(field.key)
             if (!questions[key] || ['hide', 'ask', 'none'].includes(choice)) continue
-            const value = chosenValue(key)!
+            const value = field.key === 'icon' && choice === 'empty' ? '' : chosenValue(key)!
             if (field.kind === 'url') {
                 try {
                     if (!['https:', 'http:'].includes(new URL(value).protocol)) continue

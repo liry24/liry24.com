@@ -1,35 +1,43 @@
 <script setup lang="ts">
-const { id } = defineProps<{ id?: string }>()
+import type { SiteAdminFormModels } from '@liria24/site-admin/internal/client'
+import type { UseEntryFormOptions } from '@liria24/site-admin/internal/form'
+const { id, composerId } = defineProps<{ id?: string; composerId?: string }>()
 const { locale } = useI18n()
 const publishAt = ref('')
 const uploadedName = ref('')
+const { post: composerProposal, scope: composerScope, saved } = useAdminComposer()
 
-const { form, draft, publish, schedule, upload, operation, status, error } = await useAdminForm(
-    'posts',
-    {
-        id: () => id,
-        beforeUnload: (): boolean => busy.value,
-        defaultValues: {
-            publication: { slug: !id ? 'auto' : undefined },
-        },
-        onBeforeSubmit: ({ operation }) => {
-            if (operation !== 'save' && proposal.value)
-                throw new Error('Apply or discard the proofreading suggestion before publishing.')
-        },
-        onUpload: ({ files }) => {
-            uploadedName.value = files[0]?.name ?? ''
-        },
-        onSuccess: async () => {
-            await navigateTo('/admin/posts')
-        },
+const options: UseEntryFormOptions<SiteAdminFormModels['posts']> = {
+    beforeUnload: (): boolean => busy.value,
+    defaultValues: { publication: { slug: !id ? 'auto' : undefined } },
+    onBeforeSubmit: ({ operation }) => {
+        if (operation !== 'save' && proposal.value)
+            throw new Error('Apply or discard the proofreading suggestion before publishing.')
     },
-)
+    onUpload: ({ files }) => {
+        uploadedName.value = files[0]?.name ?? ''
+    },
+    onSuccess: async () => {
+        if (composerId) saved.value[composerId] = true
+        await navigateTo('/admin/posts')
+    },
+}
+const resource = composerId
+    ? useComposerForm<SiteAdminFormModels['posts']>('posts', composerId, {
+          ...options,
+          editor: true,
+      })
+    : useAdminForm('posts', { ...options, id: () => id })
+const { form, draft, publish, schedule, upload, operation, status, error } = await resource
 
 const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
 const restored = ref(draft.isDirty.value)
-const { post: composerProposal, scope: composerScope } = useAdminComposer()
 const pendingComposer = computed(() =>
-    !id && composerProposal.value?.scope === composerScope.value ? composerProposal.value : null,
+    !id &&
+    composerProposal.value?.scope === composerScope.value &&
+    composerProposal.value.itemId === composerId
+        ? composerProposal.value
+        : null,
 )
 function applyComposer() {
     const proposal = pendingComposer.value

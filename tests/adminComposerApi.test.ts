@@ -135,3 +135,23 @@ test.each([
     expect(JSON.stringify(metrics)).not.toContain('@NewLabel')
     expect(network).not.toHaveBeenCalled()
 })
+
+test('batch selections cannot bypass allowed model checks', async () => {
+    vi.stubGlobal(
+        'requireUserSession',
+        vi.fn(async () => {}),
+    )
+    vi.mocked(useAdmin).mockReturnValue({
+        models: vi.fn(async () => [{ name: 'socials', features: {} }]),
+    } as never)
+    vi.mocked(readBody).mockResolvedValue({
+        prompt: 'test',
+        locale: 'ja',
+        timeZone: 'Asia/Tokyo',
+        batch: true,
+        requestId: 'request1',
+        items: [{ id: 'request1.0', source: { start: 0, end: 4 }, model: 'works' }],
+    })
+    await expect(handler(event())).rejects.toMatchObject({ statusCode: 403 })
+    expect(evaluateClef).not.toHaveBeenCalled()
+})

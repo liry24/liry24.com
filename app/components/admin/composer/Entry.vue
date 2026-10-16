@@ -2,36 +2,35 @@
 import type { Spec } from '@json-render/core'
 import { defaultComposerSpec, type ComposerPlan } from '~~/shared/utils/adminComposer'
 
-const props = defineProps<{ plan: ComposerPlan; spec: Spec; pending: boolean }>()
-const emit = defineEmits<{ saved: [] }>()
+const props = defineProps<{ plan: ComposerPlan; spec: Spec; pending: boolean; itemId: string }>()
+const emit = defineEmits<{ saved: []; ready: [submit: (() => Promise<void>) | undefined] }>()
 const full = ref(false)
-const { open, busy: writing } = useAdminComposer()
-const { form, fields, upload, operation, error, status, features, draft } = await useAdminForm(
-    String(props.plan.model),
-    {
-        id: () => props.plan.entryId,
-        onSuccess: () => emit('saved'),
-    },
-)
+const { open, busy: writing, setBusy } = useAdminComposer()
+const { form, fields, upload, operation, error, status, features } = await useComposerForm<
+    Record<string, unknown>
+>(String(props.plan.model), props.itemId, {
+    id: props.plan.entryId,
+    defaultValues: props.plan.values,
+    onSuccess: () => emit('saved'),
+})
 watch(
     operation,
     (value) => {
-        writing.value = value !== null
+        setBusy(props.itemId, value !== null)
     },
     { flush: 'sync', immediate: true },
 )
 onScopeDispose(() => {
-    writing.value = false
+    setBusy(props.itemId, false)
+    emit('ready', undefined)
 })
 const removeNavigationGuard = useRouter().beforeEach(() => operation.value === null)
 onScopeDispose(removeNavigationGuard)
-const restored = draft.isDirty.value
-if (restored) full.value = true
 const baseline: Record<string, unknown> = structuredClone(toRaw(form.state.values))
 watch(
     () => props.plan.values,
     (values) => {
-        if (restored || operation.value) return
+        if (operation.value) return
         for (const [key, value] of Object.entries(
             composerValueUpdates(form.state.values, baseline, values),
         )) {
@@ -43,7 +42,11 @@ watch(
     { immediate: true },
 )
 const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
-const busy = computed(() => props.pending || operation.value !== null || status.value === 'pending')
+const busy = computed(() => props.pending || writing.value || status.value === 'pending')
+async function submit() {
+    if (!operation.value && status.value !== 'pending' && !conflict.value) await form.handleSubmit()
+}
+onMounted(() => emit('ready', submit))
 const descriptors = computed(() =>
     Object.fromEntries(fields.value.map((field) => [field.key, field])),
 )
@@ -59,13 +62,7 @@ const spec = computed(() =>
 
 <template>
     <form.Subscribe :selector="(state) => ({ saving: state.isSubmitting })" v-slot="{ saving }">
-        <form class="grid gap-4" @submit.prevent="!busy && !conflict && form.handleSubmit()">
-            <UAlert
-                v-if="restored"
-                title="Unsaved input restored"
-                description="Your existing input is kept. Suggestions have not replaced it."
-                color="neutral"
-            />
+        <form class="grid gap-4" @submit.prevent="!busy && submit()">
             <UAlert
                 v-if="error"
                 :title="error.message"

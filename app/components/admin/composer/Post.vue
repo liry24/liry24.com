@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { Spec } from '@json-render/core'
 import type { ComposerPlan } from '~~/shared/utils/adminComposer'
-const props = defineProps<{ plan: ComposerPlan; spec: Spec; pending: boolean }>()
+const props = defineProps<{ plan: ComposerPlan; spec: Spec; pending: boolean; itemId: string }>()
 const { preparePost, preparation } = useAdminComposer()
-const { values, publishAt, baseline } = toRefs(preparation.value)
+const { values, publishAt, baseline } = toRefs(preparation(props.itemId))
 watch(
     () => props.plan,
     (plan) => {
@@ -59,7 +59,7 @@ watch(
                     size="lg"
                     block
                     :disabled="pending"
-                    @click="preparePost(values, publishAt)"
+                    @click="preparePost(itemId, values, publishAt)"
                 />
             </template>
         </AdminComposerSurface>

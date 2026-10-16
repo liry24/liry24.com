@@ -12,7 +12,7 @@ import { defaultComposerSpec, type ComposerPlan } from '../../shared/utils/admin
 import { baselineStatements } from '../helpers/database'
 
 test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
-    'composer preserves input, saves explicitly and hands posts to the editor',
+    'composer isolates requests, selects models, saves mixed batches and keeps post drafts separate',
     async () => {
         await mkdir('.tmp', { recursive: true })
         const config = JSON.parse(await readFile('.void-wrangler.jsonc', 'utf8'))
@@ -131,51 +131,104 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.route('**/api/admin/compose', async (route) => {
                 calls++
                 const request = route.request().postDataJSON()
-                const model = request.prompt.startsWith('new post') ? 'posts' : 'socials'
-                const fields =
-                    model === 'posts'
-                        ? [
-                              { key: 'title', label: 'Title', kind: 'text', required: true },
-                              { key: 'tags', label: 'Tags', kind: 'array', required: true },
-                          ]
-                        : [
-                              { key: 'href', label: 'URL', kind: 'url', required: true },
-                              { key: 'label', label: 'Label', kind: 'text', required: true },
-                              { key: 'icon', label: 'Icon', kind: 'text', required: true },
-                              { key: 'slug', label: 'Slug', kind: 'text' },
-                          ]
-                const plan: ComposerPlan = {
-                    model,
-                    intent: request.entryId ? 'edit' : 'create',
-                    entryId: request.entryId,
-                    fields,
-                    visibleFields:
-                        model === 'posts' && request.prompt === 'new post'
-                            ? ['title']
-                            : fields.map((field) => field.key),
-                    datePurpose:
-                        request.prompt === 'new post with schedule' ? 'publication' : 'none',
-                    values:
+                const makePlan = (
+                    model: ComposerPlan['model'],
+                    values: ComposerPlan['values'] = {},
+                ): ComposerPlan => {
+                    const fields =
                         model === 'posts'
-                            ? { title: 'Prepared post', tags: ['vue', 'nuxt'] }
-                            : request.entryId
-                              ? {}
-                              : {
-                                    href: 'https://github.com/example',
-                                    label:
-                                        request.prompt === 'second'
-                                            ? 'Another suggestion'
-                                            : 'GitHub',
-                                    icon: 'simple-icons:github',
-                                },
-                    publishAt:
-                        request.prompt === 'new post with schedule' ? '2027-01-20T18:00' : '',
-                    timeZone: request.timeZone,
-                    dateIncomplete: false,
-                    query: '',
-                    results: [],
-                    total: 0,
+                            ? [
+                                  { key: 'title', label: 'Title', kind: 'text', required: true },
+                                  { key: 'tags', label: 'Tags', kind: 'array', required: true },
+                              ]
+                            : model === 'skills'
+                              ? [
+                                    { key: 'name', label: 'Name', kind: 'text', required: true },
+                                    { key: 'icon', label: 'Icon', kind: 'text', required: true },
+                                ]
+                              : [
+                                    { key: 'href', label: 'URL', kind: 'url', required: true },
+                                    { key: 'label', label: 'Label', kind: 'text', required: true },
+                                    { key: 'icon', label: 'Icon', kind: 'text', required: true },
+                                ]
+                    return {
+                        model,
+                        intent: model ? 'create' : 'clarify',
+                        fields,
+                        visibleFields:
+                            model === 'posts' ? ['title'] : fields.map((field) => field.key),
+                        datePurpose:
+                            request.prompt === 'new post with schedule' ? 'publication' : 'none',
+                        values,
+                        publishAt:
+                            request.prompt === 'new post with schedule' ? '2027-01-20T18:00' : '',
+                        timeZone: request.timeZone,
+                        dateIncomplete: false,
+                        query: '',
+                        results: [],
+                        total: 0,
+                    }
                 }
+                if (request.prompt.startsWith('batch') || request.prompt === 'unknown') {
+                    const plans =
+                        request.prompt === 'unknown'
+                            ? [
+                                  request.items
+                                      ? makePlan(request.items[0].model, {
+                                            name: 'Chosen skill',
+                                            icon: '',
+                                        })
+                                      : makePlan(null),
+                              ]
+                            : request.prompt === 'batch partial'
+                              ? [0, 1].map((i) =>
+                                    makePlan('socials', {
+                                        href: `https://unknown.invalid/partial${i}`,
+                                        label: `Partial ${i}`,
+                                        icon: '',
+                                    }),
+                                )
+                              : [
+                                    makePlan('socials', {
+                                        href: 'https://unknown.invalid/alice',
+                                        label: '@alice',
+                                        icon: '',
+                                    }),
+                                    makePlan('skills', {
+                                        name: 'Blender',
+                                        icon: 'simple-icons:blender',
+                                    }),
+                                    makePlan('posts', { title: 'First article' }),
+                                    makePlan('posts', { title: 'Second article' }),
+                                ]
+                    await route.fulfill({
+                        contentType: 'application/x-ndjson',
+                        body:
+                            JSON.stringify({
+                                type: 'batch',
+                                batch: {
+                                    requestId: request.requestId,
+                                    items: plans.map((plan, i) => ({
+                                        id: request.requestId + '.' + i,
+                                        source: { start: 0, end: request.prompt.length },
+                                        plan,
+                                        spec: defaultComposerSpec(plan),
+                                    })),
+                                },
+                            }) + '\n',
+                    })
+                    return
+                }
+                const plan = makePlan(
+                    request.prompt.startsWith('new post') ? 'posts' : 'socials',
+                    request.prompt.startsWith('new post')
+                        ? { title: 'Prepared post', tags: ['vue', 'nuxt'] }
+                        : {
+                              href: 'https://github.com/example',
+                              label: request.prompt === 'second' ? 'Another suggestion' : 'GitHub',
+                              icon: 'simple-icons:github',
+                          },
+                )
                 await route.fulfill({
                     contentType: 'application/x-ndjson',
                     body:
@@ -237,7 +290,12 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.getByLabel('Label', { exact: true }).fill('My GitHub')
             await page.getByLabel('Content request').fill('second')
             await page.getByText('Preparing…', { exact: true }).waitFor({ state: 'hidden' })
-            assert.equal(await page.getByLabel('Label', { exact: true }).inputValue(), 'My GitHub')
+            assert.equal(
+                await page.getByLabel('Label', { exact: true }).inputValue(),
+                'Another suggestion',
+            )
+            assert.equal(await page.getByText('Unsaved input restored', { exact: true }).count(), 0)
+            await page.getByLabel('Label', { exact: true }).fill('My GitHub')
             assert.equal(writes, 0, 'Inference must not mutate content')
             assert.equal(modelRequests, 1, 'Navigation and form reuse one models request')
             await page.screenshot({ path: '.tmp/composer-desktop.png', fullPage: true })
@@ -293,20 +351,16 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.getByRole('link', { name: 'Admin home', exact: true }).click()
             await page.getByLabel('Content request').fill('new post with schedule')
             await page.getByRole('button', { name: 'Continue in Post Editor' }).click()
-            await page.waitForURL('**/admin/posts/new')
-            assert.equal(
-                await page.getByLabel('Title', { exact: true }).inputValue(),
-                'Existing unsaved title',
-            )
-            await page.getByRole('button', { name: 'Apply prepared values' }).click()
+            await page.waitForURL('**/admin/posts/new?composer=*', { timeout: 10000 })
             assert.equal(
                 await page.getByLabel('Title', { exact: true }).inputValue(),
                 'Prepared post',
             )
             assert.equal(
-                await page.getByLabel('Content', { exact: true }).inputValue(),
-                'Existing unsaved body',
+                await page.getByRole('button', { name: 'Apply prepared values' }).count(),
+                0,
             )
+            assert.equal(await page.getByLabel('Content', { exact: true }).inputValue(), '')
             assert.equal(
                 await page.getByLabel('Publish at', { exact: true }).inputValue(),
                 '2027-01-20T18:00',
@@ -321,6 +375,114 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             assert.equal(await page.locator('#admin-compose-input').count(), 1)
             await page.keyboard.press('Escape')
             await page.getByRole('dialog').waitFor({ state: 'hidden' })
+            await page.getByRole('link', { name: 'Admin home', exact: true }).click()
+            await page.getByLabel('Content request').fill('unknown')
+            await page.getByText('どの種類のデータを追加しますか？').waitFor()
+            const beforeSelect = calls
+            await page.getByRole('button', { name: 'Skills', exact: true }).click()
+            await page.getByLabel('Name', { exact: true }).waitFor()
+            assert.equal(
+                await page.getByLabel('Name', { exact: true }).inputValue(),
+                'Chosen skill',
+            )
+            assert.equal(calls, beforeSelect + 1)
+            await page.getByLabel('Content request').fill('batch mixed')
+            await page.locator('[data-composer-item]').nth(3).waitFor()
+            const cards = page.locator('[data-composer-item]')
+            await cards.nth(0).getByRole('button', { name: 'Save', exact: true }).waitFor()
+            await cards.nth(1).getByRole('button', { name: 'Save Draft', exact: true }).waitFor()
+            assert.equal(await cards.nth(0).getByLabel('Icon', { exact: true }).inputValue(), '')
+            const beforeAll = writes
+            await page.getByRole('button', { name: 'Save all', exact: true }).click()
+            await cards.nth(1).getByText('Saved', { exact: true }).waitFor()
+            assert.equal(writes, beforeAll + 2, 'Save all excludes posts')
+            const savedSocials = (await (
+                await server.fetch('/api/site-admin/entries?model=socials&locale=ja', {
+                    headers: { cookie },
+                })
+            ).json()) as any
+            assert.equal(
+                savedSocials.items.find((entry: any) => entry.data.label === '@alice').data.icon,
+                '',
+            )
+            assert.equal(modelRequests, 1, 'All composer forms share model metadata')
+            await cards.nth(2).getByRole('button', { name: 'Continue in Post Editor' }).click()
+            await page.waitForURL('**/admin/posts/new?composer=*', { timeout: 10000 })
+            await page.getByLabel('Title', { exact: true }).fill('First edited article')
+            await page.getByLabel('Content', { exact: true }).fill('First article body')
+            await page.getByRole('button', { name: 'Compose content', exact: true }).click()
+            await page
+                .getByRole('dialog')
+                .locator('[data-composer-item]')
+                .nth(3)
+                .getByRole('button', { name: 'Continue in Post Editor' })
+                .click()
+            await page.getByRole('dialog').waitFor({ state: 'hidden' })
+            await page.getByLabel('Title', { exact: true }).waitFor()
+            assert.equal(
+                await page.getByLabel('Title', { exact: true }).inputValue(),
+                'Second article',
+            )
+            assert.equal(await page.getByLabel('Content', { exact: true }).inputValue(), '')
+            await page.getByLabel('Content', { exact: true }).fill('Second article body')
+            await page.getByRole('button', { name: 'Compose content', exact: true }).click()
+            await page
+                .getByRole('dialog')
+                .locator('[data-composer-item]')
+                .nth(2)
+                .getByRole('button', { name: 'Continue in Post Editor' })
+                .click()
+            await page.getByRole('dialog').waitFor({ state: 'hidden' })
+            await page.getByLabel('Title', { exact: true }).waitFor()
+            assert.equal(
+                await page.getByLabel('Title', { exact: true }).inputValue(),
+                'First edited article',
+            )
+            assert.equal(
+                await page.getByLabel('Content', { exact: true }).inputValue(),
+                'First article body',
+            )
+            await page.getByRole('link', { name: 'Posts', exact: true }).click()
+            await page.getByRole('button', { name: /^New Post/ }).click()
+            assert.equal(
+                await page.getByLabel('Title', { exact: true }).inputValue(),
+                'Existing unsaved title',
+            )
+            assert.equal(
+                await page.getByLabel('Content', { exact: true }).inputValue(),
+                'Existing unsaved body',
+            )
+            await page.getByRole('link', { name: 'Admin home', exact: true }).click()
+            await page.getByLabel('Content request').fill('batch partial')
+            await page
+                .locator('[data-composer-item]')
+                .nth(1)
+                .getByRole('button', { name: 'Save', exact: true })
+                .waitFor()
+            let attempts = 0
+            await page.route('**/api/site-admin/entries/socials', async (route) => {
+                if (++attempts === 2)
+                    await route.fulfill({
+                        status: 500,
+                        contentType: 'application/json',
+                        body: JSON.stringify({
+                            error: { code: 'SYNTHETIC_FAILURE', message: 'Synthetic save failure' },
+                        }),
+                    })
+                else await route.continue()
+            })
+            const beforePartial = writes
+            await page.getByRole('button', { name: 'Save all', exact: true }).click()
+            await page.getByText('Synthetic save failure', { exact: true }).first().waitFor()
+            assert.equal(await page.getByText('Saved', { exact: true }).count(), 1)
+            assert.equal(await page.getByLabel('Label', { exact: true }).inputValue(), 'Partial 1')
+            await page.getByRole('button', { name: 'Save all', exact: true }).click()
+            await page
+                .locator('[data-composer-item]')
+                .nth(1)
+                .getByText('Saved', { exact: true })
+                .waitFor()
+            assert.equal(writes, beforePartial + 3, 'Retry saves only the failed item')
             await page.setViewportSize({ width: 390, height: 844 })
             await page.goto(new URL('/admin', url).href, { waitUntil: 'domcontentloaded' })
             await page.getByLabel('Content request').waitFor()
@@ -347,7 +509,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.screenshot({ path: '.tmp/composer-mobile-form.png', fullPage: true })
             assert.deepEqual(errors, [])
             assert(calls >= 4)
-            assert.equal(writes, 1)
+            assert.equal(writes, 6)
         } catch (error) {
             server.debug()
             const page = browser?.contexts()[0]?.pages()[0]
@@ -373,5 +535,5 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await server.close()
         }
     },
-    120000,
+    180000,
 )
