@@ -113,8 +113,8 @@ test('input spans preserve quoted prose, URLs and Unicode without deciding inten
 test('decision-only creation supplies initial values and completes a bounded catalog spec', async () => {
     const spy = vi.fn(
         evaluate({
-            'field:href': 'https://github.com/liry24',
-            'field:icon': 'simple-icons:github',
+            'field.href': 'https://github.com/liry24',
+            'field.icon': 'simple-icons:github',
         }),
     )
     const events = await collect(input, spy)
@@ -147,17 +147,17 @@ test('model-selected relative dates are assembled in the user timezone; absent t
     const decision = {
         model: 'posts',
         datePurpose: 'Publication schedule',
-        'date:year': '2026',
-        'date:month': '10',
-        'date:day': '17',
-        'date:hour': '18',
-        'date:minute': '0',
+        'date.year': '2026',
+        'date.month': '10',
+        'date.day': '17',
+        'date.hour': '18',
+        'date.minute': '0',
     }
     const events = await collect({ ...input, prompt: '明日の18時に投稿を予約' }, evaluate(decision))
     expect(getPlan(events)).toMatchObject({ publishAt: '2026-10-17T18:00', dateIncomplete: false })
     const incomplete = await collect(
         { ...input, prompt: '明日に投稿' },
-        evaluate({ ...decision, 'date:hour': 'Leave unchanged / ask the user' }),
+        evaluate({ ...decision, 'date.hour': 'Leave unchanged / ask the user' }),
     )
     expect(getPlan(incomplete)).toMatchObject({ publishAt: '', dateIncomplete: true })
 })
@@ -219,4 +219,22 @@ test('new suggestions preserve fields the user has edited', () => {
             tags: ['nuxt'],
         }),
     ).toEqual({ description: 'Description', tags: ['nuxt'] })
+})
+
+test('all decision and layout questions follow the Clef API input contract', async () => {
+    const evaluator = vi.fn<Experimental_CompositionEvaluator>(async (request) => {
+        const questions = Object.entries(request.questions)
+        expect(questions.length).toBeGreaterThanOrEqual(1)
+        expect(questions.length).toBeLessThanOrEqual(64)
+        for (const [id, question] of questions) {
+            expect(id).toMatch(/^[A-Za-z0-9_.-]{1,100}$/)
+            expect(question.type).toBe('choice')
+            const options = Object.keys(question.criteria)
+            expect(options.length).toBeGreaterThanOrEqual(2)
+            expect(options.length).toBeLessThanOrEqual(255)
+        }
+        return evaluate()(request)
+    })
+    await collect(input, evaluator)
+    expect(evaluator).toHaveBeenCalledTimes(3)
 })

@@ -148,7 +148,7 @@ export async function* composeAdmin(
                       'mingcute:link-fill',
                   ]
                 : choices)
-        questions[`field:${field.key}`] = question(
+        questions[`field.${field.key}`] = question(
             `Select a value explicitly supported by the request for ${field.key}. Never invent prose. Fields unrelated to the requested model or missing information must be unchanged. For array fields select the full comma-separated list when present.`,
             [unchanged, ...values],
         )
@@ -172,7 +172,7 @@ export async function* composeAdmin(
             : Array.from({ length: range }, (_, index) =>
                   String(index + (part === 'month' || part === 'day' ? 1 : 0)),
               )
-        questions[`date:${part}`] = question(
+        questions[`date.${part}`] = question(
             `Resolve the requested ${part} in the user's timezone, relative to the supplied current time. Choose unchanged when time is absent or ambiguous; do not invent a time. If an exact hour is requested, minute may be 0.`,
             [unchanged, ...values],
         )
@@ -215,7 +215,7 @@ export async function* composeAdmin(
     }
     if (plan.intent === 'create' || (plan.intent === 'edit' && plan.entryId)) {
         for (const field of plan.fields) {
-            const key = `field:${field.key}`
+            const key = `field.${field.key}`
             if (!questions[key] || value(key) === unchanged) continue
             const proposed = value(key)
             if (field.kind === 'url') {
@@ -236,7 +236,7 @@ export async function* composeAdmin(
         const purpose = value('datePurpose')
         if (purpose !== unchanged) {
             const date = selectedDate(
-                ['year', 'month', 'day', 'hour', 'minute'].map((part) => value(`date:${part}`)),
+                ['year', 'month', 'day', 'hour', 'minute'].map((part) => value(`date.${part}`)),
                 input.timeZone,
                 currentTime,
                 purpose === 'Publication schedule',
