@@ -18,8 +18,8 @@ export default defineEventHandler(async (event) => {
     if (!event.req.headers.get('content-type')?.startsWith('application/json'))
         throw createError({ statusCode: 415, statusMessage: 'JSON required' })
     const admin = useAdmin(event)
-    // Authorizes through the existing admin/Preview GitHub permission hook before inference.
     const allowed = await admin.models()
+    const authorizationMs = performance.now() - started
     const input = composerRequest.safeParse(await readBody(event))
     if (!input.success)
         throw createError({ statusCode: 400, statusMessage: 'Invalid composer input' })
@@ -48,10 +48,18 @@ export default defineEventHandler(async (event) => {
     if (!models.length) throw createError({ statusCode: 403, statusMessage: 'No models available' })
     if (input.data.model && !models.some((model) => model.name === input.data.model))
         throw createError({ statusCode: 403, statusMessage: 'Model unavailable' })
-    const authorizationMs = performance.now() - started
-    let inferenceMs = 0,
-        inferenceCalls = 0,
-        lookupMs = 0
+    const inferences: { durationMs: number; questionCount: number; payloadBytes: number }[] = []
+    let lookupMs = 0,
+        activeLookups = 0,
+        lookupStarted = 0
+    async function lookup<T>(read: () => Promise<T>): Promise<T> {
+        if (activeLookups++ === 0) lookupStarted = performance.now()
+        try {
+            return await read()
+        } finally {
+            if (--activeLookups === 0) lookupMs += performance.now() - lookupStarted
+        }
+    }
     const abort = new AbortController()
     const signal = AbortSignal.any([event.req.signal, abort.signal, AbortSignal.timeout(5000)])
     const encoder = new TextEncoder()
@@ -62,26 +70,35 @@ export default defineEventHandler(async (event) => {
                     input.data,
                     {
                         models,
-                        list: async (model, q, signal) => {
-                            const lookupStart = performance.now()
-                            const page = await admin.entries.list(model, {
-                                q,
-                                limit: 5,
-                                locale: input.data.locale,
-                                signal,
-                            })
-                            lookupMs += performance.now() - lookupStart
-                            return page
-                        },
-                        get: (model, id) => admin.entries.get(model, id),
+                        list: (model, q, signal) =>
+                            lookup(() =>
+                                admin.entries.list(model, {
+                                    q,
+                                    limit: 5,
+                                    locale: input.data.locale,
+                                    signal,
+                                }),
+                            ),
+                        get: (model, id) => lookup(() => admin.entries.get(model, id)),
                     },
                     async (request) => {
+                        const measurement = {
+                            durationMs: 0,
+                            questionCount: Object.keys(request.questions).length,
+                            payloadBytes: encoder.encode(
+                                JSON.stringify({
+                                    model: 'clef-flash',
+                                    state: request.state,
+                                    questions: request.questions,
+                                }),
+                            ).byteLength,
+                        }
+                        inferences.push(measurement)
                         const inferenceStart = performance.now()
-                        inferenceCalls++
                         try {
                             return await evaluateClef(request)
                         } finally {
-                            inferenceMs += performance.now() - inferenceStart
+                            measurement.durationMs = performance.now() - inferenceStart
                         }
                     },
                     signal,
@@ -103,9 +120,10 @@ export default defineEventHandler(async (event) => {
             } finally {
                 console.info('admin-compose', {
                     authorizationMs,
-                    lookupMs,
-                    inferenceMs,
-                    inferenceCalls,
+                    lookupMs: lookupMs + (activeLookups ? performance.now() - lookupStarted : 0),
+                    inferenceMs: inferences.reduce((total, item) => total + item.durationMs, 0),
+                    inferenceCalls: inferences.length,
+                    inferences,
                     totalMs: performance.now() - started,
                 })
                 if (!abort.signal.aborted) controller.close()

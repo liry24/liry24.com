@@ -192,21 +192,20 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             const session = await server.fetch('/api/auth/get-session', { headers: authenticated })
             expect(await session.json()).toMatchObject({ user: { id: userId } })
             const models = await server.fetch('/api/site-admin/models', { headers: authenticated })
-            if (isPreview) {
-                // This synthetic session has no GitHub account. Preview authorization
-                // must fail closed without attempting a real repository lookup.
-                expect(models.status).toBe(403)
-                const refused = await composeRequest(authenticated)
-                expect(refused.status, await refused.text()).toBe(403)
-                expect(await models.json()).toMatchObject({
-                    error: { code: 'SITE_ADMIN_FORBIDDEN' },
-                })
-            } else {
-                expect(models.status).toBe(200)
-                expect(Object.keys((await models.json<{ models: object }>()).models)).toHaveLength(
-                    7,
-                )
-            }
+            // Login already checked GitHub; this session needs no linked account or lookup.
+            expect(models.status).toBe(200)
+            expect(Object.keys((await models.json<{ models: object }>()).models)).toHaveLength(7)
+            const invalidCompose = await server.fetch('/api/admin/compose', {
+                method: 'POST',
+                headers: { ...authenticated, 'content-type': 'application/json' },
+                body: JSON.stringify({ prompt: '' }),
+            })
+            expect(invalidCompose.status, await invalidCompose.text()).toBe(400)
+            await env.DB.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?')
+                .bind(now - 1, userId)
+                .run()
+            const expired = await composeRequest(authenticated)
+            expect(expired.status, await expired.text()).toBe(401)
             let entry = await admin.createEntry('posts', {
                 data: { title: 'A', content: '# A', tags: [], slug: 'emitted-scheduled-handler' },
             })

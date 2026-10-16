@@ -140,6 +140,14 @@ test.each(composerModels)(
             dateIncomplete: false,
         })
         expect(evaluate).toHaveBeenCalledTimes(1)
+        expect(Object.keys(evaluate.mock.calls[0]![0].questions)).toHaveLength(
+            composerModels.length + 4,
+        )
+        expect(
+            Object.keys(evaluate.mock.calls[0]![0].questions).some((key) =>
+                key.startsWith('field.'),
+            ),
+        ).toBe(false)
         expect(admin.list).not.toHaveBeenCalled()
         expect(
             evaluate.mock.calls[0]![0].state.models.map((item: ComposerModelInfo) => item.name),
@@ -391,7 +399,7 @@ test('punctuation-only input still sends valid choice questions and asks for cla
 
 test('refinement retains explicitly supplied optional fields even if routing omitted them', async () => {
     const evaluate = evaluator([
-        { model: 'ranks', intent: 'resolve', 'field.game': 'fill' },
+        { model: 'ranks', intent: 'resolve', formDetails: 'resolve' },
         {
             model: 'ranks',
             intent: 'create',
@@ -420,4 +428,61 @@ test('management navigation shows only the action without an empty search result
     expect(Object.keys(defaultComposerSpec(plan).elements)).toEqual(['panel', 'action'])
     expect(admin.list).not.toHaveBeenCalled()
     expect(evaluate).toHaveBeenCalledTimes(1)
+})
+
+test.each([
+    ['works', 'style', 'large'],
+    ['arts', 'description', 'Artwork details'],
+    ['careers', 'position', 'Engineer'],
+    ['ranks', 'season', '2026 Act 2'],
+    ['skills', 'category', 'Frontend'],
+    ['socials', 'label', '@Liry24g'],
+    ['posts', 'tags', 'nuxt'],
+] as const)(
+    '%s resolves supplied field values only after routing to that model',
+    async (model, key, value) => {
+        const evaluate = evaluator([
+            { model, intent: 'create', formDetails: 'resolve' },
+            { intent: 'create', ['field.' + key]: value },
+        ])
+        const admin = makeAdmin()
+        const plan = getPlan(
+            await collect({ ...input, prompt: `追加、${key}「${value}」` }, evaluate, admin),
+        )
+        expect(evaluate).toHaveBeenCalledTimes(2)
+        expect(admin.list).not.toHaveBeenCalled()
+        expect(plan.visibleFields).toContain(key)
+        expect(plan.values[key]).toEqual(model === 'posts' ? [value] : value)
+        const refined = evaluate.mock.calls[1]![0]
+        expect(refined.state.models.map((item: ComposerModelInfo) => item.name)).toEqual([model])
+        expect(
+            Object.keys(refined.questions)
+                .filter((name) => name.startsWith('field.'))
+                .sort(),
+        ).toEqual(
+            models
+                .find((item) => item.name === model)!
+                .fields.filter((field) => field.key !== 'slug' && field.kind !== 'datetime')
+                .map((field) => 'field.' + field.key)
+                .sort(),
+        )
+        expect(Object.keys(refined.questions).some((name) => name.startsWith('query.'))).toBe(false)
+        expect(refined.questions).not.toHaveProperty('formDetails')
+        expect(refined.questions).not.toHaveProperty('model')
+        expect(evaluate.mock.calls[0]![0].questions.intent!.criteria).toHaveProperty('resolve')
+    },
+)
+
+test('a specifically requested optional field is shown even without a supplied value', async () => {
+    const evaluate = evaluator([
+        { model: 'works', intent: 'create', formDetails: 'resolve' },
+        { intent: 'create', 'field.description': 'ask' },
+    ])
+    const plan = getPlan(
+        await collect({ ...input, prompt: '作品を作成、説明も入力したい' }, evaluate),
+    )
+    expect(evaluate).toHaveBeenCalledTimes(2)
+    expect(plan.visibleFields).toEqual(['title', 'description'])
+    expect(plan.values).toEqual({})
+    expect(plan.datePurpose).toBe('none')
 })

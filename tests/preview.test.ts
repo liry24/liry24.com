@@ -1,8 +1,8 @@
-import { expect, test, vi } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 
+import createAuthConfig from '../server/auth.config'
 import {
     isPreviewGitHubAccountAdmin,
-    previewAuthorizationForRequest,
     validatePreviewIdentity,
 } from '../server/utils/previewAuthorization'
 
@@ -68,18 +68,51 @@ test('Preview login fails closed and rechecks a GitHub account after permission 
     }
 })
 
-test('Preview authorization is shared only within one request and actor', async () => {
-    const request = {}
-    const check = vi.fn(async () => true)
-    expect(
-        await Promise.all([
-            previewAuthorizationForRequest(request, 'admin', check),
-            previewAuthorizationForRequest(request, 'admin', check),
-        ]),
-    ).toEqual([true, true])
-    expect(check).toHaveBeenCalledTimes(1)
-    check.mockResolvedValue(false)
-    expect(await previewAuthorizationForRequest({}, 'admin', check)).toBe(false)
-    expect(await previewAuthorizationForRequest(request, 'other', check)).toBe(false)
-    expect(check).toHaveBeenCalledTimes(3)
+afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+})
+
+test('Preview sessions check GitHub at login and refuse missing accounts or failed permission checks', async () => {
+    vi.stubEnv('APP_ENV', 'dev')
+    vi.stubEnv('PREVIEW_GITHUB_TOKEN', 'test-only')
+    let permission = 'admin'
+    let status = 200
+    const fetcher = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(
+            async (input) =>
+                new Response(
+                    JSON.stringify(
+                        String(input).endsWith('/user/42')
+                            ? { id: 42, login: 'admin' }
+                            : { permission, user: { id: 42 } },
+                    ),
+                    { status },
+                ),
+        )
+    const config = createAuthConfig({} as never)
+    const before = config.databaseHooks.session.create.before
+    const findAccounts = vi.fn(async () => [{ providerId: 'github', accountId: '42' }])
+    const context = { context: { internalAdapter: { findAccounts } } } as never
+    const session = { userId: 'admin' } as never
+    expect(Object.keys(config.socialProviders)).toEqual(['github'])
+    expect(config.plugins.some((plugin) => plugin.id === 'passkey')).toBe(false)
+    expect(config.user.validateUserInfo).toBe(validatePreviewIdentity)
+    expect(await before(session, context)).toBeUndefined()
+    expect(findAccounts).toHaveBeenCalledWith('admin')
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    permission = 'write'
+    expect(await before(session, context)).toBe(false)
+    permission = 'admin'
+    status = 503
+    expect(await before(session, context)).toBe(false)
+    findAccounts.mockResolvedValue([])
+    fetcher.mockClear()
+    expect(await before(session, context)).toBe(false)
+    expect(fetcher).not.toHaveBeenCalled()
+    vi.stubEnv('APP_ENV', 'production')
+    const production = createAuthConfig({} as never)
+    expect(await production.databaseHooks.session.create.before(session, context)).toBeUndefined()
+    expect(fetcher).not.toHaveBeenCalled()
 })

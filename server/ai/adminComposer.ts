@@ -163,11 +163,7 @@ export async function* composeAdmin(
         dateStyle: 'short',
         timeStyle: 'short',
     }).format(currentTime)
-    const fieldQuestions = (
-        candidates: string[],
-        available: ComposerField[],
-        resolveValues: boolean,
-    ) =>
+    const fieldQuestions = (candidates: string[], available: ComposerField[]) =>
         Object.fromEntries(
             available
                 .filter((field) => field.kind !== 'datetime' && field.key !== 'slug')
@@ -202,34 +198,20 @@ export async function* composeAdmin(
                                 : candidates))
                     return [
                         'field.' + field.key,
-                        question(
-                            `For ${field.key}, choose according to the selected model and shared field policy. Prefer a supported value over asking for information already present. ${resolveValues ? 'Select the best literal value; ask only if it cannot be determined.' : 'hide=not needed, ask=missing necessary information, fill=value can be inferred from the input.'}`,
-                            {
-                                hide: 'Unrelated, optional/defaulted and not requested, or unchanged: omit this field.',
-                                ask: 'Necessary input whose value cannot be inferred from the supplied facts.',
-                                ...(!resolveValues
-                                    ? {
-                                          fill: 'Show and fill from supplied content or factual URL/account/icon alternatives.',
-                                      }
-                                    : options(values)),
-                            },
-                        ),
+                        question(`Choose ${field.key} according to fieldPolicy.`, {
+                            hide: 'Unrelated, optional/defaulted and not requested, or unchanged: omit this field.',
+                            ask: 'Necessary input whose value cannot be inferred from the supplied facts.',
+                            ...options(values),
+                        }),
                     ]
                 }),
         )
-    const baseQuestions = (
-        candidates: string[],
-        available: ComposerField[],
-        resolveValues = false,
-    ): Record<string, Experimental_ChoiceQuestion> => ({
+    const routingQuestions: Record<string, Experimental_ChoiceQuestion> = {
         model: question(
             'Which model best matches the user request? Screen context is a hint, not a restriction. Choose clarify only if the content type is ambiguous.',
             {
                 ...Object.fromEntries(
-                    models.map((model) => [
-                        model.name,
-                        `${model.label ?? model.name}: ${model.fields.map((field) => field.key).join(', ')}`,
-                    ]),
+                    models.map((model) => [model.name, model.label ?? model.name]),
                 ),
                 clarify: 'No clear matching content model.',
             },
@@ -252,7 +234,7 @@ export async function* composeAdmin(
             models.map((model) => [
                 'query.' + model.name,
                 question(
-                    `For the ${model.label ?? model.name} model, select the concrete supplied VALUE identifying its ${model.displayField ?? 'name/title/account'} entry. Never choose a field label, model category or action word. For a supplied URL use the original account/path identifier, not the host or platform name; use the host only when there is no path identifier. Choose all only for browsing, none if no usable identifier is supplied.`,
+                    `Choose the ${model.label ?? model.name} identifier (${model.displayField ?? 'name/title/account'}) according to queryPolicy.`,
                     {
                         all: 'Browse all entries without a filter.',
                         none: 'No usable identifying value for this model.',
@@ -269,8 +251,16 @@ export async function* composeAdmin(
                 creation: 'The user explicitly supplies or changes an entry creation date.',
             },
         ),
-        ...fieldQuestions(candidates, available, resolveValues),
-    })
+        formDetails: question(
+            'Does this request need detailed field decisions? Consider all fields of the chosen model and fieldPolicy, including optional/defaulted fields explicitly supplied or requested.',
+            {
+                minimum:
+                    'A blank creation needs only required nondefault inputs, or the request only searches or navigates. No supplied values or specific optional fields need resolving.',
+                resolve:
+                    'Resolve supplied values, requested optional fields (even without a value), or the fields to edit. URL/account/icon alternatives count as supplied values. Do not drop optional details.',
+            },
+        ),
+    }
     const state = {
         request: input.prompt,
         locale: input.locale,
@@ -289,9 +279,11 @@ export async function* composeAdmin(
             })),
         })),
         inputCandidates: choices,
+        queryPolicy:
+            'Choose a concrete supplied value identifying the entry, never a field label, model category or action word. For a URL prefer its original account/path identifier over the host or platform; use the host only without a path identifier. Choose all only for browsing, none without a usable identifier.',
         fieldPolicy: [
             'Prepare the minimum useful UI. Omit unrelated or unspecified optional/defaulted fields. Explicitly supplied optional information MUST be shown and filled.',
-            'ask is only for required nondefault input with no derivable value, or explicitly requested missing input.',
+            'For each field, choose hide if unnecessary or unchanged; ask only for required nondefault or explicitly requested missing input; otherwise select the best supplied literal value.',
             'Prefer supported facts over asking again: quoted values, URL parts and conventional account handles/icons may fill fields.',
             'For a profile/account link, prefer the conventional @account label and known brand icon. A URL field should receive the supplied complete URL.',
             'Never use action words or the whole command as a title, label, name or tag.',
@@ -300,7 +292,7 @@ export async function* composeAdmin(
             'Defaulted arrays stay hidden unless the user supplies or asks for them.',
         ],
     }
-    let questions = baseQuestions(choices, fields)
+    let questions = routingQuestions
     let decision = await evaluate({ state, questions, signal })
     signal.throwIfAborted()
     const answer = (key: string) => decision.answers[key]?.choice ?? 'none'
@@ -334,12 +326,8 @@ export async function* composeAdmin(
     const entries = pages.flatMap((page) =>
         page.items.map((entry) => ({ ...entry, model: page.model })),
     )
-    const requestedFields = fields.filter(
-        (field) => answer('field.' + field.key) !== 'hide' && questions['field.' + field.key],
-    )
     const prepares = Boolean(model && ['create', 'resolve', 'edit'].includes(initialIntent))
-    const needsValues =
-        prepares && requestedFields.some((field) => answer('field.' + field.key) === 'fill')
+    const needsValues = prepares && answer('formDetails') === 'resolve'
     const needsLookupDecision = pages.length > 0 && !['search', 'manage'].includes(initialIntent)
     if (needsLookupDecision || (prepares && purpose !== 'none') || needsValues) {
         const candidates = [
@@ -348,14 +336,18 @@ export async function* composeAdmin(
                 ...entries.flatMap((entry) => Object.values(scalarData(entry))),
             ]),
         ].slice(0, 40)
-        questions = baseQuestions(
-            candidates,
-            model ? models.find((item) => item.name === model)!.fields : fields,
-            true,
-        )
-        for (const key of Object.keys(questions))
-            if (key.startsWith('query.')) delete questions[key]
-        if (model) delete questions.model
+        questions = {
+            ...(!model ? { model: routingQuestions.model! } : {}),
+            intent: {
+                ...routingQuestions.intent!,
+                criteria: { ...routingQuestions.intent!.criteria },
+            },
+            ...(purpose !== 'none' ? { datePurpose: routingQuestions.datePurpose! } : {}),
+            ...fieldQuestions(
+                candidates,
+                model ? models.find((item) => item.name === model)!.fields : fields,
+            ),
+        }
         delete questions.intent!.criteria.resolve
         if (!entries.length && !input.entryId) delete questions.intent!.criteria.edit
         if (pages.length)
