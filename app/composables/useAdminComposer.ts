@@ -1,4 +1,3 @@
-import type { SiteAdminSessionDraft } from '@liria24/site-admin/internal/model'
 import type { ComposerBatch, ComposerPlan } from '~~/shared/utils/adminComposer'
 
 export function useAdminComposer() {
@@ -13,10 +12,6 @@ export function useAdminComposer() {
     const requestId = useState('admin-composer-request', () => '')
     const result = useState<ComposerBatch | null>('admin-composer-result', () => null)
     const saved = useState<Record<string, boolean>>('admin-composer-saved', () => ({}))
-    const drafts = useState<Record<string, SiteAdminSessionDraft>>(
-        'admin-composer-drafts',
-        () => ({}),
-    )
     const post = useState<{
         scope: string
         itemId: string
@@ -55,7 +50,6 @@ export function useAdminComposer() {
             requestId.value = value ? crypto.randomUUID() : ''
             result.value = null
             saved.value = {}
-            drafts.value = {}
             preparations.value = {}
         },
         { flush: 'sync', immediate: true },
@@ -95,6 +89,5 @@ export function useAdminComposer() {
         result,
         saved,
         setBusy,
-        drafts,
     }
 }

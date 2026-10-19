@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import type { Spec } from '@json-render/core'
-import { defaultComposerSpec, type ComposerPlan } from '~~/shared/utils/adminComposer'
+import type { ComposerPlan } from '~~/shared/utils/adminComposer'
 
-const props = defineProps<{ plan: ComposerPlan; spec: Spec; pending: boolean; itemId: string }>()
+const props = defineProps<{ plan: ComposerPlan; pending: boolean; itemId: string }>()
 const emit = defineEmits<{ saved: []; ready: [submit: (() => Promise<void>) | undefined] }>()
 const full = ref(false)
 const { open, busy: writing, setBusy } = useAdminComposer()
-const { form, fields, upload, operation, error, status, features } = await useComposerForm<
-    Record<string, unknown>
->(String(props.plan.model), props.itemId, {
-    id: props.plan.entryId,
-    defaultValues: props.plan.values,
-    onSuccess: () => emit('saved'),
-})
+const { form, fields, upload, operation, error, status, features } = await useAdminForm(
+    String(props.plan.model),
+    {
+        instance: 'composer:' + props.itemId,
+        id: props.plan.entryId,
+        defaultValues: props.plan.values,
+        onSuccess: () => emit('saved'),
+    },
+)
 watch(
     operation,
     (value) => {
@@ -50,13 +51,13 @@ onMounted(() => emit('ready', submit))
 const descriptors = computed(() =>
     Object.fromEntries(fields.value.map((field) => [field.key, field])),
 )
-const spec = computed(() =>
+const visiblePlan = computed(() =>
     full.value
-        ? defaultComposerSpec({
+        ? {
               ...props.plan,
               visibleFields: props.plan.fields.map((field) => field.key),
-          })
-        : props.spec,
+          }
+        : props.plan,
 )
 </script>
 
@@ -74,8 +75,8 @@ const spec = computed(() =>
                 color="error"
             />
             <fieldset :disabled="busy || conflict" class="min-w-0">
-                <AdminComposerSurface :spec>
-                    <template #field="{ name }">
+                <AdminComposerSurface :plan="visiblePlan">
+                    <template #field="{ fieldName: name }">
                         <form.Field v-if="descriptors[name]" :name="descriptors[name].name">
                             <template #default="{ field }">
                                 <AdminFormField

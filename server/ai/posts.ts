@@ -80,12 +80,13 @@ const protectedMarkdown = async (content: string) => {
         plugins: [{ name: 'protect-editorial-markdown', markdownItPlugins: [inspect] }],
     })
     // Literal asset references need protection even outside Markdown links.
+    protectedValues.push(content.match(/<game:[a-z0-9][a-z0-9-]*>/g) ?? [])
     protectedValues.push(content.match(/(?:https?:\/\/|site-admin:)[^\s<>]+/gu) ?? [])
     return protectedValues
 }
 
 const postProofreadingPrompt = ({ content }: { content: string }) =>
-    `Proofread only content. Correct spelling, grammar, and unclear wording conservatively while retaining the author's intent, voice, and language. Preserve Markdown structure, the <!-- more --> summary delimiter and its surrounding blank lines, code blocks, inline code, links, URLs, every asset reference, raw HTML tags and entire HTML blocks exactly. Do not add facts or rewrite the article into a summary.\nDraft JSON:\n${JSON.stringify({ content })}`
+    `Proofread only content. Correct spelling, grammar, and unclear wording conservatively while retaining the author's intent, voice, and language. Preserve Markdown structure, the <!-- more --> summary delimiter and its surrounding blank lines, code blocks, inline code, links, URLs, every asset reference, raw HTML tags, entire HTML blocks and every <game:slug> mention exactly. Do not add facts or rewrite the article into a summary.\nDraft JSON:\n${JSON.stringify({ content })}`
 
 const postProofreadingOutput = ({ content }: { content: string }) =>
     Output.object({

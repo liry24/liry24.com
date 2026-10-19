@@ -5,6 +5,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { evaluateClef } from '../server/ai/clef'
 import handler from '../server/api/admin/compose.post'
 import { composerModels } from '../shared/utils/adminComposer'
+import { adminModels } from './helpers/adminModels'
 
 vi.mock('@liria24/site-admin/server', () => ({ useAdmin: vi.fn() }))
 vi.mock('@liria24/site-admin/internal/runtime/nitro2', () => ({
@@ -55,7 +56,7 @@ test.each([
     const admin = {
         models: vi.fn(async () => {
             await delay(15)
-            return composerModels.map((name) => ({ name, features: {} }))
+            return adminModels
         }),
         entries: {
             list: vi.fn(async () => {
@@ -109,7 +110,7 @@ test.each([
     expect(response.status).toBe(200)
     expect(body).toContain(fails ? '"type":"error"' : '"type":"complete"')
     expect(response.headers.get('Server-Timing')).toBe('authorize;dur=25.0')
-    expect(admin.entries.list).toHaveBeenCalledTimes(selected ? 0 : 7)
+    expect(admin.entries.list).toHaveBeenCalledTimes(selected ? 0 : composerModels.length)
     expect(admin.entries.get).toHaveBeenCalledTimes(selected ? 1 : 0)
     expect(logs).toHaveBeenCalledTimes(1)
     expect(logs.mock.calls[0]![0]).toBe('admin-compose')
@@ -122,7 +123,7 @@ test.each([
         totalMs: selected ? 95 : fails ? 85 : 145,
     })
     expect(metrics.inferences).toHaveLength(selected ? 2 : 1)
-    expect(metrics.inferences[0].questionCount).toBe(11)
+    expect(metrics.inferences[0].questionCount).toBe(composerModels.length + 4)
     for (const inference of metrics.inferences) {
         expect(Object.keys(inference).sort()).toEqual([
             'durationMs',
@@ -142,7 +143,7 @@ test('batch selections cannot bypass allowed model checks', async () => {
         vi.fn(async () => {}),
     )
     vi.mocked(useAdmin).mockReturnValue({
-        models: vi.fn(async () => [{ name: 'socials', features: {} }]),
+        models: vi.fn(async () => adminModels.filter((model) => model.name === 'socials')),
     } as never)
     vi.mocked(readBody).mockResolvedValue({
         prompt: 'test',

@@ -202,6 +202,32 @@ export const content_72616e6b73 = sqliteTable('site_admin_content_ranks', {
     image: text('field_image', { mode: 'json' }).notNull(),
     href: text('field_href'),
 })
+export const content_67616d6573 = sqliteTable('site_admin_content_games', {
+    revisionId: text('revision_id')
+        .primaryKey()
+        .references(() => revisions.id, { onDelete: 'cascade' }),
+    slug: text('field_slug').notNull(),
+    igdbId: integer('field_igdbId').notNull(),
+    name: text('field_name').notNull(),
+    cover: text('field_cover'),
+    icon: text('field_icon', { mode: 'json' }),
+    primaryMetric: text('field_primaryMetric'),
+    metrics: text('field_metrics', { mode: 'json' }),
+})
+export const content_67616d655374617473 = sqliteTable('site_admin_content_gameStats', {
+    revisionId: text('revision_id')
+        .primaryKey()
+        .references(() => revisions.id, { onDelete: 'cascade' }),
+    slug: text('field_slug'),
+    game: text('field_game').notNull(),
+    periodKey: text('field_periodKey').notNull(),
+    period: text('field_period').notNull(),
+    order: integer('field_order').notNull(),
+    start: text('field_start'),
+    end: text('field_end'),
+    values: text('field_values', { mode: 'json' }).notNull(),
+    href: text('field_href'),
+})
 export const content_736b696c6c73 = sqliteTable('site_admin_content_skills', {
     revisionId: text('revision_id')
         .primaryKey()
@@ -226,6 +252,8 @@ export const content_706f737473 = sqliteTable('site_admin_content_posts', {
         .references(() => revisions.id, { onDelete: 'cascade' }),
     slug: text('field_slug'),
     title: text('field_title').notNull(),
+    plainTitle: text('field_plainTitle'),
+    gameMentions: text('field_gameMentions', { mode: 'json' }),
     content: text('field_content').notNull(),
     publication: text('field_publication', { mode: 'json' }),
     tags: text('field_tags', { mode: 'json' }).notNull(),

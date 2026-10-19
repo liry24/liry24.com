@@ -4,7 +4,6 @@ import type {
 } from '@json-render/core'
 
 import {
-    defaultComposerSpec,
     type ComposerBatch,
     type ComposerEvent,
     type ComposerItem,
@@ -87,7 +86,7 @@ async function resolveItem(
             if (event.type === 'plan') plan = protectCreation(event.plan, item.entryId)
         }
         if (!plan) throw new Error('No form was prepared')
-        return { ...item, plan, spec: defaultComposerSpec(plan) }
+        return { ...item, plan }
     } catch (error) {
         return {
             ...item,
@@ -291,7 +290,6 @@ async function splitAndResolve(
         const identity = new URL(href).href
         if (identities.has(identity)) {
             item.plan = undefined
-            item.spec = undefined
             item.error = '同じプロフィールURLが重複しています。入力を確認してください。'
         }
         identities.add(identity)
@@ -314,7 +312,6 @@ export async function* composeAdminRequest(
         yield { type: 'batch', batch: { requestId: input.requestId!, items } }
         return
     }
-    let plan: ComposerPlan | undefined
     for await (const event of composeAdmin(
         input,
         admin,
@@ -323,11 +320,8 @@ export async function* composeAdminRequest(
         now,
         (count, routing) => splitAndResolve(input, count, routing, admin, evaluate, signal, now),
     )) {
-        if (event.type === 'plan' && input.batch) {
-            plan = protectCreation(event.plan, input.entryId)
-            yield { type: 'plan', plan }
-        } else if (event.type === 'complete' && plan)
-            yield { ...event, spec: defaultComposerSpec(plan) }
+        if (event.type === 'plan' && input.batch)
+            yield { type: 'plan', plan: protectCreation(event.plan, input.entryId) }
         else yield event
     }
 }

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { cn } from 'cn'
+
 import {
     siteAdminManagementClientOptions,
     useSiteAdminAuthScope,

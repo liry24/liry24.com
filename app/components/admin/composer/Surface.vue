@@ -1,23 +1,28 @@
 <script setup lang="ts">
-import type { Spec } from '@json-render/core'
-import { defineRegistry, JSONUIProvider, Renderer } from '@json-render/vue'
-import { composerCatalog } from '~~/shared/utils/adminComposer'
-
-defineProps<{ spec: Spec }>()
-const slots = useSlots()
-const { registry } = defineRegistry(composerCatalog, {
-    components: {
-        Panel: ({ children }) => h('div', { class: 'grid min-w-0 gap-5' }, children),
-        Field: ({ props }) => slots.field?.({ name: props.name }) ?? null,
-        Schedule: () => slots.schedule?.() ?? null,
-        Results: () => slots.results?.() ?? null,
-        Action: ({ props }) => slots.action?.({ kind: props.kind }) ?? null,
-    },
-})
+import type { ComposerPlan } from '~~/shared/utils/adminComposer'
+defineProps<{ plan: ComposerPlan }>()
 </script>
 
 <template>
-    <JSONUIProvider :registry>
-        <Renderer :spec :registry />
-    </JSONUIProvider>
+    <div class="grid min-w-0 gap-5">
+        <template v-if="plan.intent === 'create' || plan.intent === 'edit'">
+            <template v-for="field in plan.fields" :key="field.key">
+                <slot
+                    v-if="plan.visibleFields.includes(field.key)"
+                    name="field"
+                    :field-name="field.key"
+                />
+            </template>
+            <slot
+                v-if="plan.model === 'posts' && plan.datePurpose === 'publication'"
+                name="schedule"
+            />
+            <slot name="action" />
+        </template>
+        <slot v-else-if="plan.intent === 'settings'" name="action" />
+        <template v-else-if="plan.intent !== 'clarify'">
+            <slot v-if="plan.intent === 'search'" name="results" />
+            <slot v-if="plan.model" name="action" />
+        </template>
+    </div>
 </template>

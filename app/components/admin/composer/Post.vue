@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import type { Spec } from '@json-render/core'
 import type { ComposerPlan } from '~~/shared/utils/adminComposer'
-const props = defineProps<{ plan: ComposerPlan; spec: Spec; pending: boolean; itemId: string }>()
+const props = defineProps<{ plan: ComposerPlan; pending: boolean; itemId: string }>()
 const { preparePost, preparation } = useAdminComposer()
 const { values, publishAt, baseline } = toRefs(preparation(props.itemId))
 watch(
@@ -27,8 +26,8 @@ watch(
 
 <template>
     <fieldset :disabled="pending">
-        <AdminComposerSurface :spec>
-            <template #field="{ name }">
+        <AdminComposerSurface :plan>
+            <template #field="{ fieldName: name }">
                 <AdminFormField
                     v-if="plan.fields.find((field) => field.key === name)"
                     :descriptor="plan.fields.find((field) => field.key === name)!"

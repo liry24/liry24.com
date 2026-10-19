@@ -37,9 +37,11 @@ jobs:
       - run: bun run typecheck
       - run: bun run test
       - run: bun run build
-      - run: bun x vitest run tests/worker/built-app.test.ts
+      - run: bun x playwright-core install --with-deps chromium
+      - run: bun x vitest run tests/worker/built-app.test.ts tests/worker/adminComposer.browser.test.ts
         env:
           LIRY24_TEST_BUILT_WORKER: 'true'
+          LIRY24_TEST_ADMIN_COMPOSER_BROWSER: 'true'
       - name: Check local Void development
         env:
           LIRY24_TEST_LOCAL: 'true'
@@ -59,5 +61,5 @@ jobs:
             sleep 1
           done
           test "$ready" = true
-          export LIRY24_TEST_DB_PATH="$(find .wrangler/state/v3/d1 -name '*.sqlite' -print -quit)"
-          node scripts/test-site-admin-local.mjs http://127.0.0.1:3101
+          export LIRY24_TEST_DB_PATH="$(find .wrangler/state/v3/d1 -name '*.sqlite' ! -name 'metadata.sqlite' -print -quit)"
+          node scripts/test-site-admin-local.mjs http://127.0.0.1:3101 --browser

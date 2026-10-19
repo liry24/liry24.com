@@ -194,7 +194,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             const models = await server.fetch('/api/site-admin/models', { headers: authenticated })
             // Login already checked GitHub; this session needs no linked account or lookup.
             expect(models.status).toBe(200)
-            expect(Object.keys((await models.json<{ models: object }>()).models)).toHaveLength(7)
+            expect(Object.keys((await models.json<{ models: object }>()).models)).toHaveLength(9)
             const invalidCompose = await server.fetch('/api/admin/compose', {
                 method: 'POST',
                 headers: { ...authenticated, 'content-type': 'application/json' },

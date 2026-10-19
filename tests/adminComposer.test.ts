@@ -4,6 +4,7 @@ import { expect, test, vi } from 'vitest'
 import { composerValueUpdates } from '../app/utils/composerValues'
 import {
     composeAdmin,
+    composerModelInfo,
     inputChoices,
     selectedDate,
     type ComposerAdmin,
@@ -13,31 +14,12 @@ import { composeAdminRequest, composerSources } from '../server/ai/adminComposer
 import {
     composerModels,
     composerRequest,
-    defaultComposerSpec,
-    validComposerSpec,
     type ComposerEvent,
     type ComposerRequest,
 } from '../shared/utils/adminComposer'
-import config from '../site-admin.config'
+import { adminModels } from './helpers/adminModels'
 
-const models: ComposerModelInfo[] = composerModels.map((name) => ({
-    name,
-    label: config.models[name].meta.label,
-    displayField: config.models[name].displayFields.title,
-    scheduling: !('scheduling' in config.models[name]) || config.models[name].scheduling !== false,
-    fields: Object.entries(config.models[name].fields)
-        .filter(([key, field]) =>
-            name === 'posts' ? ['title', 'tags'].includes(key) : field.kind !== 'object',
-        )
-        .map(([key, field]) => ({
-            key,
-            kind: field.kind,
-            label: typeof field.label === 'string' ? field.label : key,
-            required: field.required,
-            hasDefault: 'default' in field && field.default !== undefined,
-            values: 'values' in field ? field.values : undefined,
-        })),
-}))
+const models = composerModelInfo(adminModels)
 const input: ComposerRequest = {
     prompt: '記事「テスト」を作成',
     locale: 'ja',
@@ -101,8 +83,13 @@ function getPlan(events: ComposerEvent[]) {
     return event.plan
 }
 
-test('all configured models are available and input boundaries validate selection and context', () => {
-    expect([...composerModels].sort()).toEqual(Object.keys(config.models).sort())
+test('active models are available and input boundaries validate selection and context', () => {
+    expect([...composerModels].sort()).toEqual(
+        adminModels
+            .map((model) => model.name)
+            .filter((name) => name !== 'ranks')
+            .sort(),
+    )
     for (const value of [
         { prompt: 'x'.repeat(2001) },
         { timeZone: 'not/a-zone' },
@@ -136,7 +123,7 @@ test.each(composerModels)(
         const plan = getPlan(events)
         expect(plan).toMatchObject({
             model,
-            intent: 'create',
+            intent: ['games', 'gameStats'].includes(model) ? 'manage' : 'create',
             datePurpose: 'none',
             dateIncomplete: false,
         })
@@ -159,19 +146,19 @@ test.each(composerModels)(
             ),
         ).toBe(false)
         expect(plan.visibleFields).toEqual(
-            plan.fields
-                .filter((field) => field.required && !field.hasDefault)
-                .map((field) => field.key),
+            ['games', 'gameStats'].includes(model)
+                ? []
+                : plan.fields
+                      .filter((field) => field.required && !field.hasDefault)
+                      .map((field) => field.key),
         )
-        expect(validComposerSpec(defaultComposerSpec(plan), plan)).toBe(true)
-        expect(events.at(-1)).toMatchObject({ type: 'complete', fallback: false })
+        expect(events.at(-1)).toMatchObject({ type: 'complete' })
     },
 )
 
 test('a plain article request shows only the title, with no tags, schedule or date warning', async () => {
     const plan = getPlan(await collect())
     expect(plan.visibleFields).toEqual(['title'])
-    expect(Object.keys(defaultComposerSpec(plan).elements)).toEqual(['panel', 'title', 'action'])
     expect(plan.dateIncomplete).toBe(false)
 })
 
@@ -224,7 +211,11 @@ test.each(composerModels)(
             { model, intent: 'edit', entry: 'existing' },
         ])
         const plan = getPlan(await collect(input, evaluate, admin))
-        expect(plan).toMatchObject({ model, intent: 'edit', entryId: 'existing' })
+        expect(plan).toMatchObject({
+            model,
+            intent: ['games', 'gameStats'].includes(model) ? 'manage' : 'edit',
+            entryId: 'existing',
+        })
         expect(evaluate).toHaveBeenCalledTimes(2)
         expect(admin.list).toHaveBeenCalledTimes(1)
     },
@@ -254,9 +245,8 @@ test('cross-model lookup preserves model identities and does not turn browsing i
     const plan = getPlan(await collect(input, evaluate, admin))
     expect(plan.intent).toBe('search')
     expect(plan.results.map((entry) => entry.model)).toEqual(composerModels)
-    expect(admin.list).toHaveBeenCalledTimes(7)
+    expect(admin.list).toHaveBeenCalledTimes(composerModels.length)
     expect(evaluate).toHaveBeenCalledTimes(1)
-    expect(Object.keys(defaultComposerSpec(plan).elements)).toEqual(['panel', 'results'])
 })
 
 test('an incomplete lookup cannot be treated as proof that a new identity is unregistered', async () => {
@@ -302,7 +292,7 @@ test('only a requested date adds a second inference; missing time stays incomple
         dateIncomplete: false,
     })
     expect(plan.visibleFields).toEqual(['title'])
-    expect(defaultComposerSpec(plan).elements.schedule).toBeDefined()
+    expect(plan.datePurpose).toBe('publication')
     expect(evaluate).toHaveBeenCalledTimes(2)
     const incomplete = getPlan(
         await collect(input, evaluator({ ...decision, 'date.hour': 'unchanged' })),
@@ -336,32 +326,6 @@ test('date validation rejects impossible dates, past schedules and DST ambiguity
     expect(selectedDate(['2028', '2', '29', '12', '0'], 'Asia/Tokyo', now, true)).toBe(
         '2028-02-29T12:00',
     )
-})
-
-test('the spec rejects arbitrary actions, fields, cycles and missing chosen controls', async () => {
-    const plan = getPlan(await collect())
-    const original = defaultComposerSpec(plan)
-    for (const mutate of [
-        (spec: typeof original) => {
-            spec.elements.title!.on = { press: { action: 'delete' } }
-        },
-        (spec: typeof original) => {
-            spec.elements.title!.props = { name: 'password' }
-        },
-        (spec: typeof original) => {
-            spec.elements.panel!.children!.push('title')
-        },
-        (spec: typeof original) => {
-            spec.elements.panel!.children!.push('panel')
-        },
-        (spec: typeof original) => {
-            delete spec.elements.title
-        },
-    ]) {
-        const spec = structuredClone(original)
-        mutate(spec)
-        expect(validComposerSpec(spec, plan)).toBe(false)
-    }
 })
 
 test('cancellation prevents reads or UI publication from a stale inference', async () => {
@@ -400,33 +364,37 @@ test('punctuation-only input still sends valid choice questions and asks for cla
 
 test('refinement retains explicitly supplied optional fields even if routing omitted them', async () => {
     const evaluate = evaluator([
-        { model: 'ranks', intent: 'resolve', formDetails: 'resolve' },
+        { model: 'works', intent: 'resolve', formDetails: 'resolve' },
         {
-            model: 'ranks',
+            model: 'works',
             intent: 'create',
-            'field.game': 'VALORANT',
-            'field.season': '2026 Act 2',
-            'field.rank': 'Diamond',
+            'field.title': 'Portfolio',
+            'field.description': 'Project details',
+            'field.href': 'https://example.invalid/project',
         },
     ])
     const plan = getPlan(
         await collect(
             {
                 ...input,
-                prompt: 'ゲーム「VALORANT」、シーズン「2026 Act 2」、ランク「Diamond」を追加',
+                prompt: '作品「Portfolio」、説明「Project details」、URL「https://example.invalid/project」を追加',
             },
             evaluate,
         ),
     )
-    expect(plan.visibleFields).toContain('season')
-    expect(plan.values).toMatchObject({ game: 'VALORANT', season: '2026 Act 2', rank: 'Diamond' })
+    expect(plan.visibleFields).toContain('description')
+    expect(plan.values).toMatchObject({
+        title: 'Portfolio',
+        description: 'Project details',
+        href: 'https://example.invalid/project',
+    })
 })
 
 test('management navigation shows only the action without an empty search result', async () => {
     const admin = makeAdmin()
     const evaluate = evaluator({ model: 'works', intent: 'manage' })
     const plan = getPlan(await collect(input, evaluate, admin))
-    expect(Object.keys(defaultComposerSpec(plan).elements)).toEqual(['panel', 'action'])
+    expect(plan.intent).toBe('manage')
     expect(admin.list).not.toHaveBeenCalled()
     expect(evaluate).toHaveBeenCalledTimes(1)
 })
@@ -435,7 +403,7 @@ test.each([
     ['works', 'style', 'large'],
     ['arts', 'description', 'Artwork details'],
     ['careers', 'position', 'Engineer'],
-    ['ranks', 'season', '2026 Act 2'],
+    ['works', 'description', 'Project details'],
     ['skills', 'category', 'Frontend'],
     ['socials', 'label', '@Liry24g'],
     ['posts', 'tags', 'nuxt'],
@@ -516,14 +484,16 @@ test('new clients add only the count question for a single record', async () => 
     const plan = getPlan(await collectBatch(batchInput, evaluate))
     expect(plan.visibleFields).toEqual(['title'])
     expect(evaluate).toHaveBeenCalledTimes(1)
-    expect(Object.keys(evaluate.mock.calls[0]![0].questions)).toHaveLength(12)
+    expect(Object.keys(evaluate.mock.calls[0]![0].questions)).toHaveLength(
+        composerModels.length + 5,
+    )
     expect(evaluate.mock.calls[0]![0].questions.model!.criteria).toMatchObject({
         socials: expect.stringContaining('profile'),
         works: expect.stringContaining('products'),
         arts: expect.stringContaining('illustrations'),
         careers: expect.stringContaining('career'),
         skills: expect.stringContaining('knows'),
-        ranks: expect.stringContaining('video games'),
+        gameStats: expect.stringContaining('video game stats'),
         posts: expect.stringContaining('Blog'),
     })
 })
@@ -547,7 +517,7 @@ test('an unknown profile service can supply an empty icon without schema changes
         label: '@alice',
         icon: '',
     })
-    expect(config.models.socials.fields.icon.required).toBe(true)
+    expect(adminModels.find((model) => model.name === 'socials')!.fields.icon!.required).toBe(true)
     const icons = Object.values(evaluate.mock.calls[1]![0].questions['field.icon']!.criteria)
     expect(evaluate.mock.calls[1]![0].questions['field.icon']!.criteria.empty).toContain('unknown')
     expect(icons).not.toContain('mingcute:link-fill')

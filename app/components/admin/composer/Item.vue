@@ -22,7 +22,8 @@ const labels = {
     arts: 'Arts',
     careers: 'Careers',
     skills: 'Skills',
-    ranks: 'Ranks',
+    games: 'Games',
+    gameStats: 'Game Stats',
     socials: 'Socials',
     posts: 'Posts',
 }
@@ -61,7 +62,7 @@ function edit(model: ComposerModel, id: string) {
             /></template>
         </UAlert>
 
-        <template v-else-if="plan && item.spec">
+        <template v-else-if="plan">
             <UAlert
                 v-if="plan.dateIncomplete"
                 title="Choose a date and time"
@@ -91,7 +92,6 @@ function edit(model: ComposerModel, id: string) {
                     :key="item.id + ':posts'"
                     :item-id="item.id"
                     :plan
-                    :spec="item.spec"
                     :pending
                 />
 
@@ -99,7 +99,6 @@ function edit(model: ComposerModel, id: string) {
                     <AdminComposerEntry
                         :item-id="item.id"
                         :plan
-                        :spec="item.spec"
                         :pending
                         @saved="saved[item.id] = true"
                         @ready="(submit) => emit('ready', submit)"
@@ -109,7 +108,7 @@ function edit(model: ComposerModel, id: string) {
                 </Suspense>
             </template>
 
-            <AdminComposerSurface v-else :spec="item.spec">
+            <AdminComposerSurface v-else :plan>
                 <template #results>
                     <div class="grid gap-2">
                         <p v-if="!plan.results.length" class="text-muted text-sm">

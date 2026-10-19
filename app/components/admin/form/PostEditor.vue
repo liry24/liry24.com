@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import type { SiteAdminFormModels } from '@liria24/site-admin/internal/client'
-import type { UseEntryFormOptions } from '@liria24/site-admin/internal/form'
+import { postPublicationSettings } from '~~/shared/utils/postEditorial'
+import { postMarkdownSecurity } from '~~/shared/utils/postMarkdown'
 const { id, composerId } = defineProps<{ id?: string; composerId?: string }>()
 const { locale } = useI18n()
 const publishAt = ref('')
 const uploadedName = ref('')
 const { post: composerProposal, scope: composerScope, saved } = useAdminComposer()
 
-const options: UseEntryFormOptions<SiteAdminFormModels['posts']> = {
+const resource = useAdminForm('posts', {
+    id: () => id,
+    instance: composerId ? 'composer-editor:' + composerId : undefined,
     beforeUnload: (): boolean => busy.value,
     defaultValues: { publication: { slug: !id ? 'auto' : undefined } },
     onBeforeSubmit: ({ operation }) => {
@@ -21,13 +23,7 @@ const options: UseEntryFormOptions<SiteAdminFormModels['posts']> = {
         if (composerId) saved.value[composerId] = true
         await navigateTo('/admin/posts')
     },
-}
-const resource = composerId
-    ? useComposerForm<SiteAdminFormModels['posts']>('posts', composerId, {
-          ...options,
-          editor: true,
-      })
-    : useAdminForm('posts', { ...options, id: () => id })
+})
 const { form, draft, publish, schedule, upload, operation, status, error } = await resource
 
 const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
@@ -169,11 +165,8 @@ onBeforeRouteLeave(() => {
                                         .join(', ') || undefined
                                 "
                             >
-                                <UInput
+                                <AdminFormGameInput
                                     :model-value="String(field.value ?? '')"
-                                    size="xl"
-                                    variant="soft"
-                                    class="w-full"
                                     placeholder="Post title"
                                     @update:model-value="
                                         (value) => form.setFieldValue('title', value)
@@ -198,13 +191,9 @@ onBeforeRouteLeave(() => {
                                             .join(', ') || undefined
                                     "
                                 >
-                                    <UTextarea
+                                    <AdminFormGameInput
                                         :model-value="String(field.value ?? '')"
-                                        :rows="20"
-                                        autoresize
-                                        variant="soft"
-                                        class="w-full"
-                                        :ui="{ base: 'font-mono text-sm' }"
+                                        multiline
                                         placeholder="Write your post…"
                                         @update:model-value="
                                             (value) => form.setFieldValue('content', value)
@@ -219,6 +208,9 @@ onBeforeRouteLeave(() => {
                             class="border-default min-w-0 rounded-lg border p-4"
                         >
                             <h2 class="text-muted mb-4 text-sm font-medium">Preview</h2>
+                            <h3 class="mb-4 text-2xl font-bold">
+                                <PostTitle :title="String(values.title || '')" />
+                            </h3>
                             <Suspense>
                                 <Markdown
                                     :value="values.content"

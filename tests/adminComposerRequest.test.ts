@@ -2,11 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { effectScope, nextTick, ref } from 'vue'
 
 import { useAdminComposerRequest } from '../app/composables/useAdminComposerRequest'
-import {
-    defaultComposerSpec,
-    type ComposerPlan,
-    type ComposerRequest,
-} from '../shared/utils/adminComposer'
+import { type ComposerPlan, type ComposerRequest } from '../shared/utils/adminComposer'
 
 const scopes: ReturnType<typeof effectScope>[] = []
 afterEach(() => {
@@ -32,7 +28,7 @@ const response = (title = '') =>
     new Response(
         JSON.stringify({ type: 'plan', plan: { ...plan, values: { label: title } } }) +
             '\n' +
-            JSON.stringify({ type: 'complete', spec: defaultComposerSpec(plan), fallback: false }) +
+            JSON.stringify({ type: 'complete' }) +
             '\n',
     )
 function setup() {
@@ -107,7 +103,7 @@ test('stream failure preserves a usable complete form; permission errors are exp
     input.value = request
     await tick()
     expect(state.error.value).toBe('Usage limit reached')
-    expect(state.result.value?.items[0]?.spec).toEqual(defaultComposerSpec(plan))
+    expect(state.result.value?.items[0]?.plan).toEqual(plan)
     fetcher.mockImplementation(async () => new Response('', { status: 403 }))
     await state.run()
     expect(state.error.value).toContain('Sign in again')
@@ -122,6 +118,19 @@ test('unmounting cancels inference and inactive surfaces never request it', asyn
     await tick()
     scope.stop()
     expect(fetcher.mock.calls[0]![1].signal!.aborted).toBe(true)
+})
+
+test('an early stream end keeps the received plan available for editing', async () => {
+    vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response(JSON.stringify({ type: 'plan', plan }) + '\n')),
+    )
+    const { input, state } = setup()
+    input.value = request
+    await tick()
+    expect(state.error.value).toContain('ended early')
+    expect(state.result.value?.items[0]?.plan).toEqual(plan)
+    expect(state.running.value).toBe(false)
 })
 
 test('a new request removes old forms immediately, even when inference fails', async () => {
@@ -149,14 +158,12 @@ test('item selection merges only its response and keeps other items and IDs', as
                       {
                           ...request.items[0],
                           plan: { ...plan, model: 'skills' },
-                          spec: defaultComposerSpec(plan),
                       },
                   ]
                 : [0, 1].map((i) => ({
                       id: 'request1.' + i,
                       source: { start: 0, end: 5 },
                       plan,
-                      spec: defaultComposerSpec(plan),
                   }))
             return new Response(
                 JSON.stringify({ type: 'batch', batch: { requestId: 'request1', items } }) + '\n',

@@ -1,12 +1,11 @@
-import { defineCatalog, type Spec } from '@json-render/core'
-import { schema } from '@json-render/vue/schema'
 import { z } from 'zod'
 
 export const composerModels = [
     'works',
     'arts',
     'careers',
-    'ranks',
+    'games',
+    'gameStats',
     'skills',
     'socials',
     'posts',
@@ -20,7 +19,9 @@ export const composerModelDescriptions: Record<ComposerModel, string> = {
     careers:
         "The owner's personal career history, including employment, education, organizational roles, and professional milestones.",
     skills: 'Tools, languages, software, technologies, or services the owner knows or can use. Distinguish an ability from an account link or a created work.',
-    ranks: 'Competitive ranks, tiers, or ranking achievements in video games, optionally associated with a season.',
+    games: 'The shared IGDB video games catalogue and game metric definitions. Open the dedicated editor.',
+    gameStats:
+        'Manually recorded video game stats, including highest rank, per Act or season. Open the dedicated editor.',
     posts: 'Blog articles and requests to create, write, edit, or manage their content.',
 }
 const selection = z.object({
@@ -102,95 +103,11 @@ export type ComposerPlan = {
     results: { id: string; model: ComposerModel; title: string }[]
     total: number
 }
-export type ComposerItem = ComposerItemInput & { plan?: ComposerPlan; spec?: Spec; error?: string }
+export type ComposerItem = ComposerItemInput & { plan?: ComposerPlan; error?: string }
 export type ComposerBatch = { requestId: string; items: ComposerItem[]; notice?: string }
-
-export const composerCatalog = defineCatalog(schema, {
-    components: {
-        Panel: { props: z.object({}), slots: ['default'], description: 'Main form container' },
-        Field: { props: z.object({ name: z.string() }), description: 'An existing editable field' },
-        Schedule: { props: z.object({}), description: 'Review a requested publication time' },
-        Results: { props: z.object({}), description: 'Select an existing entry' },
-        Action: {
-            props: z.object({ kind: z.enum(['save', 'editor', 'list', 'settings']) }),
-            description: 'An explicit user action',
-        },
-    },
-    actions: {},
-})
-
-export function composerCandidates(plan: ComposerPlan) {
-    const candidate = (id: string, type: string, props: Record<string, unknown>) => ({
-        id,
-        element: { type, props },
-    })
-    const nodes = [candidate('panel', 'Panel', {})]
-    if (plan.intent === 'create' || plan.intent === 'edit') {
-        for (const field of plan.fields.filter((field) => plan.visibleFields.includes(field.key)))
-            nodes.push(candidate(field.key, 'Field', { name: field.key }))
-        if (plan.model === 'posts' && plan.datePurpose === 'publication')
-            nodes.push(candidate('schedule', 'Schedule', {}))
-        nodes.push(
-            candidate('action', 'Action', { kind: plan.model === 'posts' ? 'editor' : 'save' }),
-        )
-    } else if (plan.intent === 'settings') {
-        nodes.push(candidate('action', 'Action', { kind: 'settings' }))
-    } else if (plan.intent !== 'clarify') {
-        if (plan.intent === 'search') nodes.push(candidate('results', 'Results', {}))
-        if (plan.model) nodes.push(candidate('action', 'Action', { kind: 'list' }))
-    }
-    return nodes
-}
-
-export function defaultComposerSpec(plan: ComposerPlan): Spec {
-    const nodes = composerCandidates(plan)
-    return {
-        root: 'panel',
-        elements: Object.fromEntries(
-            nodes.map((node) => [
-                node.id,
-                {
-                    ...node.element,
-                    children: node.id === 'panel' ? nodes.slice(1).map((child) => child.id) : [],
-                },
-            ]),
-        ),
-    }
-}
-
-// Only app-owned fields and actions may appear in a rendered form.
-export function validComposerSpec(spec: Spec, plan: ComposerPlan): boolean {
-    if (!composerCatalog.validate(spec).success || Object.keys(spec.elements).length > 24)
-        return false
-    const candidates = composerCandidates(plan)
-    const seen = new Set<string>()
-    const recipes = new Set<string>()
-    function visit(id: string): boolean {
-        const node = spec.elements[id]
-        if (!node || seen.has(id) || node.on || node.visible || node.repeat || node.slots)
-            return false
-        seen.add(id)
-        const recipe = candidates.find(
-            (item) =>
-                item.element.type === node.type &&
-                JSON.stringify(item.element.props) === JSON.stringify(node.props),
-        )
-        if (!recipe || recipes.has(recipe.id)) return false
-        recipes.add(recipe.id)
-        if (node.type !== 'Panel' && node.children?.length) return false
-        return (node.children ?? []).every(visit)
-    }
-    return (
-        visit(spec.root) &&
-        spec.elements[spec.root]?.type === 'Panel' &&
-        seen.size === Object.keys(spec.elements).length &&
-        candidates.every((node) => recipes.has(node.id))
-    )
-}
 
 export type ComposerEvent =
     | { type: 'batch'; batch: ComposerBatch }
     | { type: 'plan'; plan: ComposerPlan }
-    | { type: 'step'; spec: Spec }
-    | { type: 'complete'; spec: Spec; fallback: boolean }
+    | { type: 'complete' }
     | { type: 'error'; message: string }

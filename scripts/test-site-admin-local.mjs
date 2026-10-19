@@ -77,13 +77,37 @@ try {
     const session = await request('/api/auth/get-session')
     assert.equal(session.user.id, id)
     const models = await request('/api/site-admin/models')
-    assert.equal(Object.keys(models.models).length, 7)
+    for (const name of [
+        'arts',
+        'works',
+        'careers',
+        'ranks',
+        'games',
+        'gameStats',
+        'skills',
+        'socials',
+        'posts',
+    ])
+        assert(models.models[name], `Required model: ${name}`)
+    assert.equal(models.models.posts.fields.content.kind, 'markdown')
+    assert.equal(
+        models.models.games.fields.metrics.item.fields.positions.item.fields.image.kind,
+        'image',
+    )
+    assert.equal(models.models.gameStats.fields.game.kind, 'relation')
+    assert.equal(models.models.posts.publishing, true)
+    assert.equal(models.models.posts.scheduling, true)
+    for (const name of ['socials', 'ranks', 'games', 'gameStats']) {
+        assert.equal(models.models[name].scheduling, false)
+        assert.equal(models.models[name].revisions, false)
+    }
     await request('/__site-admin-devtools/snapshot', { authenticated: false, status: 401 })
     const snapshot = await request('/__site-admin-devtools/snapshot')
     assert.equal(snapshot.database.schemaReady, true)
     assert.equal(snapshot.database.devDatabase, true)
     assert.equal(snapshot.database.connector, 'void')
-    assert.equal(Object.keys(snapshot.models).length, 7)
+    for (const name of Object.keys(models.models))
+        assert(snapshot.models[name], `Inspectable authorized model: ${name}`)
     assert.equal(snapshot.assets.cleanup.minimumAge, 86400)
     if (!apiOnly) {
         // Browser fixtures must exist before the first cacheable posts/home SSR request.
@@ -180,7 +204,7 @@ try {
             )
         }
         const { chromium } = await import('playwright-core')
-        const browser = await chromium.launch({ channel: 'chrome', headless: true })
+        const browser = await chromium.launch({ headless: true })
         try {
             const context = await browser.newContext()
             await context.route('**/*', (route) =>

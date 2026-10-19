@@ -7,6 +7,8 @@ import {
     images,
     markdown,
     object,
+    number,
+    relation,
     select,
     text,
     textarea,
@@ -14,6 +16,12 @@ import {
 } from '@liria24/site-admin'
 
 import { postAiActions } from './server/ai/posts.ts'
+import {
+    validateGame,
+    validateGameStats,
+    validatePostGames,
+} from './server/content/gameValidation.ts'
+import { gameColorPattern, metricKeyPattern, gameSlugPattern } from './shared/utils/games.ts'
 import { postMarkdownSecurity } from './shared/utils/postMarkdown.ts'
 
 export default defineSiteAdminConfig({
@@ -81,7 +89,7 @@ export default defineSiteAdminConfig({
         ranks: {
             meta: {
                 label: 'Rank',
-                plural: 'Ranks',
+                plural: 'Legacy Ranks',
                 icon: 'mingcute:chess-fill',
                 fields: ['season', 'rank'],
             },
@@ -96,6 +104,92 @@ export default defineSiteAdminConfig({
                 season: text(),
                 rank: text({ required: true }),
                 image: image({ required: true }),
+                href: url({ label: 'URL' }),
+            },
+        },
+
+        games: {
+            meta: {
+                label: 'Game',
+                plural: 'Games',
+                icon: 'mingcute:game-2-fill',
+                fields: ['slug'],
+            },
+            publishing: false,
+            scheduling: false,
+            revisions: false,
+            sortable: true,
+            route: false,
+            displayFields: { title: 'name', image: 'icon' },
+            validate: validateGame,
+            fields: {
+                slug: text({ required: true, pattern: gameSlugPattern.source }),
+                igdbId: number({ required: true, integer: true, min: 1 }),
+                name: text({ required: true, minLength: 1 }),
+                cover: url(),
+                icon: image(),
+                primaryMetric: text(),
+                metrics: array(
+                    object(
+                        {
+                            key: text({ required: true, pattern: metricKeyPattern.source }),
+                            label: text({ required: true, minLength: 1 }),
+                            format: select(['integer', 'decimal', 'percent'], { required: true }),
+                            unit: text(),
+                            positions: array(
+                                object(
+                                    {
+                                        value: number({ required: true, min: 0 }),
+                                        label: text({ required: true, minLength: 1 }),
+                                        image: image(),
+                                        color: text({ pattern: gameColorPattern.source }),
+                                    },
+                                    { required: true },
+                                ),
+                                { default: [], maxItems: 100 },
+                            ),
+                        },
+                        { required: true },
+                    ),
+                    { default: [], maxItems: 30 },
+                ),
+            },
+        },
+        gameStats: {
+            meta: {
+                label: 'Game Stats',
+                plural: 'Game Stats',
+                icon: 'mingcute:chess-fill',
+                fields: ['periodKey'],
+            },
+            publishing: false,
+            scheduling: false,
+            revisions: false,
+            sortable: true,
+            route: false,
+            displayFields: { title: 'period' },
+            validate: validateGameStats,
+            fields: {
+                slug: text({ default: '' }),
+                game: relation('games', { required: true }),
+                periodKey: text({ required: true }),
+                period: text({ required: true }),
+                order: number({ required: true, integer: true, default: 0 }),
+                start: datetime(),
+                end: datetime(),
+                values: array(
+                    object(
+                        {
+                            key: text({ required: true }),
+                            value: number({ required: true, min: 0 }),
+                            label: text(),
+                            image: image(),
+                            color: text({ pattern: gameColorPattern.source }),
+                        },
+                        { required: true },
+                    ),
+                    { required: true, default: [], maxItems: 30 },
+                ),
                 href: url({ label: 'URL' }),
             },
         },
@@ -143,11 +237,17 @@ export default defineSiteAdminConfig({
                 fields: ['slug'],
             },
             route: '/posts/:slug',
-            seo: { type: 'article' },
+            seo: (entry) => ({
+                type: 'article',
+                title: String(entry.data.plainTitle || entry.data.title),
+            }),
+            validate: validatePostGames,
             displayFields: { title: 'title', description: 'content', image: 'image' },
             fields: {
                 slug: text({ default: '', i18n: true }),
                 title: text({ required: true, i18n: true }),
+                plainTitle: text({ i18n: true }),
+                gameMentions: array(relation('games'), { default: [], i18n: true }),
                 content: markdown({ required: true, i18n: true }),
                 publication: object(
                     {
@@ -164,7 +264,7 @@ export default defineSiteAdminConfig({
         },
     },
 
-    markdown: { plugins: [postMarkdownSecurity] },
+    markdown: { plugins: [postMarkdownSecurity], summary: { inlineTags: ['game-mention'] } },
 
     assets: {
         storage: 'content',

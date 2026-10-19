@@ -134,6 +134,15 @@ const handleMouseLeave = () => {
                     <p class="leading-none text-nowrap">{{ new Date().getFullYear() }} © Liry24</p>
                 </div>
 
+                <NuxtLink
+                    v-if="route.path === '/' || route.path.startsWith('/posts')"
+                    to="https://www.igdb.com"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-dimmed text-xs"
+                    >Game data by IGDB</NuxtLink
+                >
+
                 <span
                     class="text-dimmed/30 max-w-dvw overflow-clip mask-b-from-40% mask-b-to-80% font-[Special_Gothic_Expanded_One] text-[28cqw] select-none"
                 >

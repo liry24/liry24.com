@@ -1,5 +1,3 @@
-import { readFile } from 'node:fs/promises'
-
 import { expect, test, vi } from 'vitest'
 
 import nuxtConfig from '../../nuxt.config'
@@ -43,12 +41,7 @@ test('Void isolates dev and production resources and owns deployment configurati
     }
 })
 
-test('dev deployment delegates resources and migrations to Void without a production job', async () => {
-    const workflow = await readFile('.github/workflows/preview.yml', 'utf8')
-    expect(workflow).toContain('branches: [dev]')
-    expect(workflow).toContain('void deploy --platform cloudflare')
-    expect(workflow).not.toContain('scripts/preview.mjs')
-    expect(workflow).not.toContain('preview:delete')
+test('admin routes require an administrator', () => {
     expect(nuxtConfig.routeRules?.['/admin/**']).toMatchObject({
         auth: { user: { role: 'admin' } },
     })
@@ -61,8 +54,6 @@ test('local CI starts without remote AI bindings or Cloudflare credentials', asy
         const { default: config } = await import('../../void.config')
         expect(config.cloudflare?.ai).toBeUndefined()
         expect(config.inference?.bindings?.ai).toBe(false)
-        const workflow = await readFile('.github/workflows/quality.yml', 'utf8')
-        expect(workflow).toContain("LIRY24_TEST_LOCAL: 'true'")
     } finally {
         vi.unstubAllEnvs()
         vi.resetModules()

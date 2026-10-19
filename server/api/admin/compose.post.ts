@@ -3,12 +3,8 @@ import { useAdmin } from '@liria24/site-admin/server'
 import { defineEventHandler, createError, readBody } from 'nuxt/server'
 import { UsageLimit } from 'void/limits'
 
-import {
-    composerModels,
-    composerRequest,
-    type ComposerField,
-} from '../../../shared/utils/adminComposer'
-import config from '../../../site-admin.config'
+import { composerRequest } from '../../../shared/utils/adminComposer'
+import { composerModelInfo } from '../../ai/adminComposer'
 import { composeAdminRequest } from '../../ai/adminComposerBatch'
 import { evaluateClef } from '../../ai/clef'
 
@@ -23,28 +19,7 @@ export default defineEventHandler(async (event) => {
     const input = composerRequest.safeParse(await readBody(event))
     if (!input.success)
         throw createError({ statusCode: 400, statusMessage: 'Invalid composer input' })
-    const models = composerModels
-        .filter((name) => allowed.some((model) => model.name === name))
-        .map((name) => ({
-            name,
-            label: config.models[name].meta.label,
-            displayField: config.models[name].displayFields.title,
-            features: allowed.find((model) => model.name === name)!.features,
-            scheduling:
-                !('scheduling' in config.models[name]) || config.models[name].scheduling !== false,
-            fields: Object.entries(config.models[name].fields)
-                .filter(([key, field]) =>
-                    name === 'posts' ? ['title', 'tags'].includes(key) : field.kind !== 'object',
-                )
-                .map(([key, field]): ComposerField => ({
-                    key,
-                    kind: field.kind,
-                    label: typeof field.label === 'string' ? field.label : key,
-                    required: field.required,
-                    hasDefault: 'default' in field && field.default !== undefined,
-                    values: 'values' in field ? (field.values as readonly string[]) : undefined,
-                })),
-        }))
+    const models = composerModelInfo(allowed)
     if (!models.length) throw createError({ statusCode: 403, statusMessage: 'No models available' })
     if (
         input.data.items?.some(

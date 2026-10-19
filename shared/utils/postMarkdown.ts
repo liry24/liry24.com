@@ -1,9 +1,13 @@
 import type { ComarkPlugin, Node } from 'comark'
 import security from 'comark/plugins/security'
 
-// Posts support prose HTML, never executable tags or application components.
+import { gameMentionRule } from './gameMentions.js'
+import { gameSlugPattern } from './games.js'
+
+// Posts allow prose HTML and the game mention component.
 const proseSecurity = security({
     allowedTags: [
+        'game-mention',
         'p',
         'br',
         'hr',
@@ -81,6 +85,7 @@ const proseAttributes = new Set([
 
 export const postMarkdownSecurity: ComarkPlugin = {
     ...proseSecurity,
+    markdownItPlugins: [gameMentionRule],
     async post(state) {
         await proseSecurity.post?.(state)
         // Prose components consume props such as to/as/copy after URL/tag validation.
@@ -88,6 +93,12 @@ export const postMarkdownSecurity: ComarkPlugin = {
         const filter = (nodes: Node[]) => {
             for (const node of nodes) {
                 if (typeof node === 'string') continue
+                if (node[0] === 'game-mention') {
+                    const slug = node[1].slug
+                    node[1] = typeof slug === 'string' && gameSlugPattern.test(slug) ? { slug } : {}
+                    node.splice(2, node.length - 2, typeof slug === 'string' ? slug : '')
+                    continue
+                }
                 node[1] = Object.fromEntries(
                     Object.entries(node[1]).filter(
                         ([name, value]) =>

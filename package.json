@@ -17,7 +17,7 @@
         "content:generate": "site-admin generate && oxfmt db/schema.ts --write && void db generate"
     },
     "dependencies": {
-        "@ai-sdk/openai": "^4.0.94",
+        "@ai-sdk/openai": "^4.0.95",
         "@better-auth/passkey": "1.7.10",
         "@comark/nuxt": "0.7.0",
         "@formkit/drag-and-drop": "^0.6.1",
@@ -25,25 +25,25 @@
         "@iconify-json/simple-icons": "^1.2.100",
         "@internationalized/date": "3.12.4",
         "@json-render/core": "0.21.1",
-        "@json-render/vue": "0.21.1",
-        "@liria24/site-admin": "https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@155fb20",
+        "@liria24/site-admin": "https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@ae6ad1c",
         "@nuxt/image": "^2.1.0",
         "@nuxt/ui": "^4.12.0",
         "@nuxtjs/better-auth": "0.3.10",
         "@nuxtjs/i18n": "10.6.0",
         "@nuxtjs/robots": "7.0.2",
         "@nuxtjs/sitemap": "9.1.0",
-        "@takumi-rs/core": "2.16.2",
-        "@takumi-rs/wasm": "2.16.2",
+        "@takumi-rs/core": "2.16.3",
+        "@takumi-rs/wasm": "2.16.3",
+        "@tanstack/charts": "^1.1.0",
         "@vueuse/nuxt": "^15.0.0",
         "@yeger/vue-masonry-wall": "^6.1.4",
-        "ai": "7.0.141",
+        "ai": "7.0.142",
         "better-auth": "1.7.10",
-        "cn": "^0.4.0",
+        "cn": "^0.5.0",
         "comark": "0.7.0",
         "files-sdk": "3.1.1",
-        "motion-v": "^2.7.0",
-        "nuxt": "^4.6.1",
+        "motion-v": "^2.8.0",
+        "nuxt": "^4.6.2",
         "nuxt-files-sdk": "0.3.1",
         "nuxt-llms": "0.2.0",
         "nuxt-og-image": "7.0.7",
@@ -52,11 +52,11 @@
         "nuxt-site-config": "5.0.3",
         "ufo": "^1.6.4",
         "void": "1.1.11",
-        "vue": "3.6.0-rc.11",
+        "vue": "3.6.0-rc.12",
         "zod": "4.6.7"
     },
     "devDependencies": {
-        "@cloudflare/workers-types": "^5.20261015.1",
+        "@cloudflare/workers-types": "^5.20261016.1",
         "@nuxt/a11y": "^1.0.0-alpha.1",
         "@nuxt/fonts": "1.0.1",
         "@nuxt/hints": "^1.1.5",
@@ -69,13 +69,13 @@
         "typescript": "^6.0.3",
         "vitest": "^5.0.5",
         "vue-tsc": "^3.3.13",
-        "wrangler": "^4.151.0"
+        "wrangler": "^4.151.1"
     },
     "overrides": {
-        "@vue/compiler-sfc": "3.6.0-rc.11",
+        "@vue/compiler-sfc": "3.6.0-rc.12",
         "auth": "1.7.10",
         "better-auth": "1.7.10",
-        "vue": "3.6.0-rc.11"
+        "vue": "3.6.0-rc.12"
     },
     "packageManager": "bun@1.4.3",
     "patchedDependencies": {

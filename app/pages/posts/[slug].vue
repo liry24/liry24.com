@@ -20,7 +20,7 @@ if (!data.value) throw createError({ statusCode: 404, statusMessage: 'Post not f
 const location = useBrowserLocation()
 
 const { isSupported: isShareSupported, share } = useShare(() => ({
-    title: data.value?.title,
+    title: data.value?.plainTitle || data.value?.title,
     url: location.value.href,
 }))
 
@@ -31,7 +31,7 @@ const { isSupported: isCopySupported, copy, copied } = useClipboard()
     <UPage v-if="data" :ui="{ center: 'flex flex-col gap-6 items-center' }">
         <UContainer class="flex max-w-4xl flex-col items-center gap-6">
             <h1 class="text-center text-4xl font-bold">
-                {{ data.title }}
+                <PostTitle :title="data.title" />
             </h1>
 
             <div class="flex items-center gap-1">

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { formatDate } from '@vueuse/core'
 import type { ComposerField } from '~~/shared/utils/adminComposer'
+
+import { adminAssetId } from '~/utils/adminPresentation'
 const {
     descriptor,
     modelValue,

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { cn } from 'cn'
 import { motion } from 'motion-v'
 
 import { LazyStacksModal } from '#components'
@@ -15,6 +14,8 @@ const { data: batch } = await useContent({
     socials: { list: 'socials' },
     careers: { list: 'careers' },
     ranks: { list: 'ranks' },
+    games: { list: 'games' },
+    gameStats: { list: 'gameStats' },
     posts: { list: 'posts', markdown: 'summary' },
 })
 const data = computed(() => ({
@@ -24,6 +25,7 @@ const data = computed(() => ({
     ranks:
         batch.value?.ranks.data?.map((entry) => ({
             ...entry.data,
+            entryId: entry.id,
             imageUrl: entry.data.image?.url,
         })) || [],
     posts:
@@ -33,6 +35,30 @@ const data = computed(() => ({
             createdAt: entry.data.createdAt || entry.publishedAt,
         })) || [],
 }))
+
+const statGames = computed(() =>
+    (batch.value?.games.data ?? [])
+        .map((game) => ({
+            ...game,
+            periods: (batch.value?.gameStats.data ?? [])
+                .filter((period) => period.data.game?.id === game.id)
+                .map((period) => period.data),
+        }))
+        .filter((game) => game.periods.length),
+)
+
+// shortcut: retain unmigrated rank cards until the legacy model is retired.
+const legacyRanks = computed(() =>
+    data.value.ranks.filter(
+        (rank) =>
+            !batch.value?.gameStats.data?.some(
+                (period) => period.id === `legacy-${rank.entryId}`,
+            ) &&
+            !statGames.value.some(
+                (game) => game.data.name.toLowerCase() === rank.game.toLowerCase(),
+            ),
+    ),
+)
 
 const rotateArray = <T>(arr: T[], n: number): T[] => {
     const len = arr.length
@@ -213,24 +239,22 @@ useKeyCommand(modalStacks.open)
                     Ranks
                 </h2>
 
+                <GameStats
+                    v-for="game in statGames"
+                    :key="game.id"
+                    :game="game.data"
+                    :periods="game.periods"
+                />
                 <NuxtLink
-                    v-for="(rank, index) in data.ranks"
-                    :key="`rank-${index}`"
+                    v-for="(rank, index) in legacyRanks"
+                    :key="`legacy-rank-${index}`"
                     :to="rank.href || undefined"
                     target="_blank"
-                    :class="
-                        cn(
-                            'mx-auto flex items-center gap-1 px-6 py-3 text-2xl leading-none text-nowrap',
-                            rank.href && 'hover:bg-muted rounded-xl transition-colors',
-                        )
-                    "
-                >
-                    <p class="leading-none font-bold">{{ rank.game }}</p>
-                    <p class="text-muted leading-none font-extralight tracking-tight">
-                        {{ rank.season }}
-                    </p>
-                    <NuxtImg :src="rank.imageUrl" :alt="rank.rank" :width="40" :height="40" />
-                </NuxtLink>
+                    class="hover:bg-muted mx-auto flex items-center gap-1 rounded-xl px-6 py-3 text-2xl"
+                    ><span class="font-bold">{{ rank.game }}</span
+                    ><span class="text-muted font-light">{{ rank.season }}</span
+                    ><NuxtImg :src="rank.imageUrl" :alt="rank.rank" :width="40" :height="40"
+                /></NuxtLink>
             </Motion>
         </div>
 
@@ -262,7 +286,7 @@ useKeyCommand(modalStacks.open)
                         class="hover:bg-muted flex h-fit flex-col gap-3 rounded-xl p-6 transition-colors"
                     >
                         <h2 class="line-clamp-2 text-2xl font-bold">
-                            <NuxtLink :to="`/posts/${post.slug}`">{{ post.title }}</NuxtLink>
+                            <PostTitle :title="post.title" :to="`/posts/${post.slug}`" />
                         </h2>
 
                         <MarkdownDocument

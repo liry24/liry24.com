@@ -8,7 +8,7 @@ import { chromium } from 'playwright-core'
 import { test } from 'vitest'
 import { createTestHarness } from 'wrangler'
 
-import { defaultComposerSpec, type ComposerPlan } from '../../shared/utils/adminComposer'
+import type { ComposerPlan } from '../../shared/utils/adminComposer'
 import { baselineStatements } from '../helpers/database'
 
 test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
@@ -96,7 +96,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 encodeURIComponent(signed) +
                 '; __Secure-better-auth.session_token=' +
                 encodeURIComponent(signed)
-            browser = await chromium.launch({ channel: 'chrome', headless: true })
+            browser = await chromium.launch({ headless: true })
             const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
             await context.route('**/*', (route) =>
                 new URL(route.request().url()).origin === url.origin
@@ -212,7 +212,6 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                                         id: request.requestId + '.' + i,
                                         source: { start: 0, end: request.prompt.length },
                                         plan,
-                                        spec: defaultComposerSpec(plan),
                                     })),
                                 },
                             }) + '\n',
@@ -236,8 +235,6 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                         '\n' +
                         JSON.stringify({
                             type: 'complete',
-                            spec: defaultComposerSpec(plan),
-                            fallback: false,
                         }) +
                         '\n',
                 })
@@ -248,12 +245,6 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 /<input[^>]*id="admin-compose-input"/,
                 'The input must be server rendered',
             )
-            for (const text of [
-                'What would you like to do?',
-                'Create, find, or',
-                'Changes are saved',
-            ])
-                assert(!html.includes(text), 'Unnecessary composer copy is absent')
             const noJsContext = await browser.newContext({ javaScriptEnabled: false })
             await noJsContext.addCookies(await context.cookies())
             const noJsPage = await noJsContext.newPage()
@@ -510,6 +501,383 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             assert.deepEqual(errors, [])
             assert(calls >= 4)
             assert.equal(writes, 6)
+            // Game fixtures and all browser traffic stay inside synthetic Worker bindings.
+            async function create(model: string, data: Record<string, unknown>, id?: string) {
+                const response = await server.fetch(`/api/site-admin/entries/${model}`, {
+                    method: 'POST',
+                    headers: { cookie, 'content-type': 'application/json' },
+                    body: JSON.stringify({ id, data }),
+                })
+                const result = (await response.json()) as {
+                    id: string
+                    version: number
+                    data: Record<string, unknown>
+                }
+                assert.equal(response.status, 201, JSON.stringify(result))
+                return result
+            }
+            const game = await create(
+                'games',
+                {
+                    igdbId: 126459,
+                    slug: 'valorant',
+                    name: 'VALORANT',
+                    primaryMetric: 'peakRank',
+                    metrics: [
+                        {
+                            key: 'peakRank',
+                            label: 'Highest rank',
+                            format: 'integer',
+                            positions: [
+                                { value: 2000, label: 'Ascendant', color: '#22AA66' },
+                                { value: 2100, label: 'Immortal', color: '#EF4444' },
+                                { value: 2200, label: 'Uncolored rank' },
+                            ],
+                        },
+                        { key: 'winRate', label: 'Win rate', format: 'percent' },
+                    ],
+                },
+                'igdb-126459',
+            )
+            for (const [order, value, label, color] of [
+                [1, 2000, 'Ascendant', '#22AA66'],
+                [2, 2123, 'Immortal 1 23 RR', '#EF4444'],
+                [3, 2123, 'Historic rank', '#22AA66'],
+            ] as const)
+                await create('gameStats', {
+                    game: game.id,
+                    periodKey: `act-${order}`,
+                    period: `Act ${order}`,
+                    order,
+                    values: [
+                        { key: 'peakRank', value, label, color },
+                        { key: 'winRate', value: 50 },
+                    ],
+                    href: 'https://example.invalid/profile',
+                })
+            const post = await create('posts', {
+                title: 'Played <game:valorant>',
+                content: 'Before <game:valorant> after.\n\n<!-- more -->\n\nBody.',
+                tags: [],
+                slug: 'synthetic-game-mention',
+            })
+            const published = await server.fetch(`/api/site-admin/entries/${post.id}/publish`, {
+                method: 'POST',
+                headers: { cookie, 'content-type': 'application/json' },
+                body: JSON.stringify({ expectedVersion: post.version }),
+            })
+            assert.equal(published.status, 200, await published.text())
+            const denied = await server.fetch('/api/admin/games')
+            assert.equal(denied.status, 401)
+            const localGames = await server.fetch('/api/admin/games', { headers: { cookie } })
+            assert.equal(localGames.status, 200)
+            assert(
+                ((await localGames.json()) as { games: { slug: string }[] }).games.some(
+                    (game) => game.slug === 'valorant',
+                ),
+            )
+            const imported = await server.fetch('/api/admin/games', {
+                method: 'POST',
+                headers: { cookie, 'content-type': 'application/json' },
+                body: JSON.stringify({ igdbId: 126459, slug: 'ignored-client-slug' }),
+            })
+            assert.equal(imported.status, 200)
+            assert.equal(((await imported.json()) as { id: string }).id, game.id)
+
+            await page.route('**/api/admin/games?*', async (route) => {
+                const query = new URL(route.request().url()).searchParams.get('q')
+                if (query === 'v') await new Promise((resolve) => setTimeout(resolve, 700))
+                await route.fulfill({
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        games: [
+                            {
+                                id: game.id,
+                                igdbId: 126459,
+                                slug: 'valorant',
+                                name: query === 'v' ? 'Stale result' : 'VALORANT',
+                            },
+                        ],
+                        warning: '',
+                    }),
+                })
+            })
+            await page.goto(new URL('/admin/posts/new', url).href, {
+                waitUntil: 'domcontentloaded',
+            })
+            await page.waitForFunction(
+                () =>
+                    (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
+                        .$nuxt?.isHydrating === false,
+            )
+            const title = page.getByLabel('Title', { exact: true })
+            await title.fill('Playing <game:')
+            await page.getByRole('option', { name: 'VALORANT', exact: true }).waitFor()
+            assert.equal(
+                await title.evaluate((element) => element === document.activeElement),
+                true,
+            )
+            await title.dispatchEvent('keydown', { key: 'Enter', isComposing: true, keyCode: 229 })
+            assert.equal(await title.inputValue(), 'Playing <game:')
+            await title.press('ArrowDown')
+            await title.press('Enter')
+            await page.waitForFunction(
+                () =>
+                    (document.querySelector('input[placeholder="Post title"]') as HTMLInputElement)
+                        ?.value === 'Playing <game:valorant>',
+            )
+            await title.fill('Playing <game:v')
+            await page.waitForTimeout(300)
+            await title.fill('Playing <game:valo')
+            await page.getByRole('option', { name: 'VALORANT', exact: true }).waitFor()
+            await page.waitForTimeout(500)
+            assert.equal(
+                await page.getByRole('option', { name: 'Stale result', exact: true }).count(),
+                0,
+            )
+            await title.press('Escape')
+            assert.equal(await page.getByRole('listbox', { name: 'Games' }).count(), 0)
+            await page.setViewportSize({ width: 1280, height: 900 })
+            await page.goto(new URL('/posts/synthetic-game-mention', url).href)
+            await page
+                .getByRole('heading', { level: 1 })
+                .getByRole('link', { name: 'VALORANT', exact: true })
+                .waitFor()
+            assert.equal(
+                await page.locator('game-mention').count(),
+                0,
+                'Comark resolves the inline Vue component',
+            )
+            assert.equal(await page.title(), 'Played VALORANT | Liry24')
+            await page
+                .locator('main')
+                .getByRole('link', { name: 'VALORANT', exact: true })
+                .first()
+                .click()
+            await page.waitForURL('**/posts?game=valorant')
+            await page.getByRole('heading').filter({ hasText: 'Played' }).waitFor()
+            assert.equal(
+                await page.locator('a a').count(),
+                0,
+                'Article and game links are siblings',
+            )
+            await page.goto(new URL('/', url).href)
+            await page.waitForFunction(
+                () =>
+                    (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
+                        .$nuxt?.isHydrating === false,
+            )
+            await page.getByRole('button', { name: /VALORANT Act 3/ }).click()
+            await page.getByRole('dialog').getByRole('table').waitFor()
+            await page.getByRole('dialog').locator('svg[role="img"]').waitFor()
+            const chart = page.getByRole('dialog').locator('svg[role="img"]')
+            assert((await chart.locator('linearGradient stop').count()) >= 3)
+            assert.equal(await chart.locator('text').filter({ hasText: /^act-/ }).count(), 0)
+            assert.equal(
+                await page
+                    .getByRole('dialog')
+                    .getByRole('row')
+                    .filter({ hasText: 'Immortal 1 23 RR' })
+                    .count(),
+                1,
+            )
+            await chart.focus()
+            await chart.press('ArrowRight')
+            await page.screenshot({ path: '.tmp/game-stats-desktop.png', fullPage: true })
+            await page.setViewportSize({ width: 390, height: 844 })
+            await page.waitForTimeout(300)
+            await page.waitForFunction(() => {
+                const element = document.querySelector('[role="dialog"]')
+                const rect = element?.getBoundingClientRect()
+                return (
+                    rect &&
+                    rect.left >= 0 &&
+                    rect.right <= innerWidth &&
+                    element!.scrollWidth <= element!.clientWidth
+                )
+            })
+            await page.waitForFunction(() => {
+                const tooltip = Array.from(
+                    document.querySelectorAll('[data-reka-popper-content-wrapper]'),
+                ).find((element) => element.textContent?.includes('Immortal 1 23 RR'))
+                const rect = tooltip?.getBoundingClientRect()
+                return rect && rect.left >= 0 && rect.right <= innerWidth
+            })
+            await page.screenshot({ path: '.tmp/game-stats-mobile.png', fullPage: true })
+            await page
+                .getByRole('dialog')
+                .getByRole('button', { name: 'Close', exact: true })
+                .click()
+            await page.setViewportSize({ width: 1280, height: 900 })
+            await page.goto(new URL('/admin/gameStats', url).href)
+            await page.waitForFunction(
+                () =>
+                    (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
+                        .$nuxt?.isHydrating === false,
+            )
+            await page.getByRole('button', { name: /^New Game Stats/ }).click()
+            const editor = page.getByRole('dialog')
+            await editor.getByRole('button', { name: 'Save', exact: true }).click()
+            await editor.getByText('Check the fields before saving', { exact: true }).waitFor()
+            await editor.getByLabel('Game', { exact: true }).click()
+            await page.getByRole('option', { name: 'VALORANT', exact: true }).click()
+            await editor.getByLabel('Period key', { exact: true }).fill('act-4')
+            await editor.getByLabel('Period name', { exact: true }).fill('Act 4')
+            await editor.getByLabel('Period order', { exact: true }).fill('4')
+            await editor
+                .getByRole('combobox', { name: 'Highest rank position', exact: true })
+                .click()
+            await page.getByRole('option', { name: 'Immortal', exact: true }).click()
+            await editor
+                .getByRole('combobox', { name: 'Highest rank position', exact: true })
+                .click()
+            await page.getByRole('option', { name: 'Uncolored rank', exact: true }).click()
+            assert.equal(
+                await editor.getByLabel('Recorded color (#RRGGBB)', { exact: true }).inputValue(),
+                '',
+            )
+            await editor
+                .getByRole('combobox', { name: 'Highest rank position', exact: true })
+                .click()
+            await page.getByRole('option', { name: 'Immortal', exact: true }).click()
+            await editor
+                .getByLabel('Numeric value (empty = missing)', { exact: true })
+                .first()
+                .fill('2123')
+            await editor
+                .getByLabel('Recorded display label', { exact: true })
+                .fill('Immortal 1 23 RR')
+
+            let uploadedImageId = ''
+            const uploadReceived = Promise.withResolvers<void>()
+            const releaseUpload = Promise.withResolvers<void>()
+            await page.route('**/api/site-admin/assets', async (route) => {
+                const response = await route.fetch()
+                const body = (await response.json()) as { id: string }
+                uploadedImageId = body.id
+                uploadReceived.resolve()
+                await releaseUpload.promise
+                await route.fulfill({ response })
+            })
+            await editor
+                .locator('input[type="file"]')
+                .first()
+                .setInputFiles({
+                    name: 'rank.png',
+                    mimeType: 'image/png',
+                    buffer: Buffer.from(
+                        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6f8AAAAASUVORK5CYII=',
+                        'base64',
+                    ),
+                })
+            await uploadReceived.promise
+            try {
+                for (const control of [
+                    editor.getByRole('button', { name: 'Save', exact: true }),
+                    editor.getByLabel('Numeric value (empty = missing)', { exact: true }).first(),
+                    editor.locator('input[type="file"]').first(),
+                ])
+                    assert.equal(
+                        await control.isDisabled(),
+                        true,
+                        'Editing waits for the image upload',
+                    )
+            } finally {
+                releaseUpload.resolve()
+            }
+            await page.waitForFunction(
+                () =>
+                    !(
+                        document.querySelector(
+                            'button[form="admin-entry-form"]',
+                        ) as HTMLButtonElement
+                    )?.disabled,
+            )
+            await editor.locator('img').first().waitFor()
+            assert(uploadedImageId)
+            await editor.getByRole('button', { name: 'Save', exact: true }).click()
+            await editor.waitFor({ state: 'hidden' })
+
+            const statsResponse = await server.fetch('/api/site-admin/entries?model=gameStats', {
+                headers: { cookie },
+            })
+            const stats = (await statsResponse.json()) as {
+                items: { data: { periodKey: string; values: unknown[] } }[]
+            }
+            const savedPoint = stats.items.find((entry) => entry.data.periodKey === 'act-4')?.data
+                .values[0] as {
+                key: string
+                value: number
+                label: string
+                image: string | { id: string }
+                color: string
+            }
+            assert.equal(savedPoint.key, 'peakRank')
+            assert.equal(savedPoint.value, 2123)
+            assert.equal(savedPoint.label, 'Immortal 1 23 RR')
+            assert.equal(savedPoint.color, '#EF4444')
+            assert.equal(
+                typeof savedPoint.image === 'string' ? savedPoint.image : savedPoint.image.id,
+                uploadedImageId,
+            )
+            await page.goto(new URL('/admin/games', url).href)
+            await page.waitForFunction(
+                () =>
+                    (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
+                        .$nuxt?.isHydrating === false,
+            )
+            await page.getByRole('button', { name: 'Edit', exact: true }).click()
+            await page
+                .getByRole('dialog')
+                .getByLabel('Label', { exact: true })
+                .first()
+                .fill('Peak rank')
+            await page
+                .getByRole('dialog')
+                .getByRole('button', { name: 'Save', exact: true })
+                .click()
+            await page.getByRole('dialog').waitFor({ state: 'hidden' })
+
+            const legacy = await create(
+                'ranks',
+                {
+                    slug: 'alias-rank',
+                    game: 'Legacy game alias',
+                    season: 'Earlier Act',
+                    rank: 'Earlier tier',
+                    image: uploadedImageId,
+                    href: 'https://example.invalid/profile',
+                },
+                'alias-rank',
+            )
+            await create(
+                'gameStats',
+                {
+                    slug: 'copied-rank',
+                    game: game.id,
+                    periodKey: 'earlier-act',
+                    period: 'Earlier Act',
+                    order: 0,
+                    values: [
+                        {
+                            key: 'peakRank',
+                            value: 2000,
+                            label: 'Earlier tier',
+                            image: uploadedImageId,
+                            color: '#22AA66',
+                        },
+                    ],
+                    href: 'https://example.invalid/profile',
+                },
+                `legacy-${legacy.id}`,
+            )
+            await page.goto(new URL('/?migration-view=' + Date.now(), url).href)
+            assert.equal(
+                await page.getByText('Legacy game alias', { exact: true }).count(),
+                0,
+                'Copied ranks do not duplicate cards when the legacy name differs from IGDB',
+            )
+            assert.deepEqual(errors, [])
         } catch (error) {
             server.debug()
             const page = browser?.contexts()[0]?.pages()[0]

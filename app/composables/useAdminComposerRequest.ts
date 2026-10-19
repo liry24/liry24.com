@@ -1,7 +1,6 @@
 import { watchDebounced } from '@vueuse/core'
 import { onScopeDispose, ref, shallowRef, watch, type Ref } from 'vue'
 import {
-    defaultComposerSpec,
     type ComposerBatch,
     type ComposerEvent,
     type ComposerPlan,
@@ -15,7 +14,6 @@ export function useAdminComposerRequest(
 ) {
     const running = ref(false)
     const error = ref('')
-    const fallback = ref(false)
     let controller: AbortController | undefined
     let generation = 0
     const cancel = () => {
@@ -56,7 +54,7 @@ export function useAdminComposerRequest(
                       }
                     : batch
         }
-        function single(spec: NonNullable<ComposerBatch['items'][number]['spec']>) {
+        function single() {
             apply({
                 requestId: request!.requestId ?? '',
                 items: [
@@ -66,7 +64,6 @@ export function useAdminComposerRequest(
                         model: request!.model,
                         entryId: request!.entryId,
                         plan,
-                        spec,
                     },
                 ],
             })
@@ -104,12 +101,9 @@ export function useAdminComposerRequest(
                             apply(event.batch)
                             complete = true
                         } else if (event.type === 'plan') plan = event.plan
-                        else if (plan && (event.type === 'step' || event.type === 'complete')) {
-                            single(event.spec)
-                            if (event.type === 'complete') {
-                                complete = true
-                                fallback.value = event.fallback
-                            }
+                        else if (plan && event.type === 'complete') {
+                            single()
+                            complete = true
                         }
                     }
                 }
@@ -124,10 +118,7 @@ export function useAdminComposerRequest(
         } catch (cause) {
             if (ownGeneration !== generation) return
             error.value = cause instanceof Error ? cause.message : 'Could not prepare the form.'
-            if (plan) {
-                single(defaultComposerSpec(plan))
-                fallback.value = true
-            }
+            if (plan) single()
         } finally {
             if (ownGeneration === generation) running.value = false
         }
@@ -149,5 +140,5 @@ export function useAdminComposerRequest(
         { debounce: 300, deep: true, immediate: true },
     )
     onScopeDispose(cancel)
-    return { result, running, error, fallback, run, cancel }
+    return { result, running, error, run, cancel }
 }

@@ -3,6 +3,7 @@ import type {
     Experimental_CompositionEvaluator,
     Experimental_ChoiceQuestion,
 } from '@json-render/core'
+import type { ServerAdmin } from '@liria24/site-admin/server'
 
 import type {
     ComposerBatch,
@@ -12,7 +13,7 @@ import type {
     ComposerPlan,
     ComposerRequest,
 } from '../../shared/utils/adminComposer'
-import { composerModelDescriptions, defaultComposerSpec } from '../../shared/utils/adminComposer'
+import { composerModelDescriptions, composerModels } from '../../shared/utils/adminComposer'
 
 export type ComposerModelInfo = {
     name: ComposerModel
@@ -21,6 +22,38 @@ export type ComposerModelInfo = {
     displayField?: string
     features?: Record<string, boolean>
     scheduling?: boolean
+}
+
+export function composerModelInfo(
+    allowed: Awaited<ReturnType<ServerAdmin['models']>>,
+): ComposerModelInfo[] {
+    return composerModels.flatMap((name) => {
+        const model = allowed.find((model) => model.name === name)
+        if (!model) return []
+        return [
+            {
+                name,
+                label: model.meta.label,
+                displayField: model.displayFields?.title,
+                features: model.features,
+                scheduling: model.features.scheduling,
+                fields: Object.entries(model.fields)
+                    .filter(([key, field]) =>
+                        name === 'posts'
+                            ? ['title', 'tags'].includes(key)
+                            : field.kind !== 'object',
+                    )
+                    .map(([key, field]) => ({
+                        key,
+                        kind: field.kind,
+                        label: field.label ?? key,
+                        required: field.required,
+                        hasDefault: field.default !== undefined,
+                        values: field.values,
+                    })),
+            },
+        ]
+    })
 }
 type Entry = { id: string; data: Record<string, unknown> }
 export type ComposerAdmin = {
@@ -501,6 +534,11 @@ export async function* composeAdmin(
         })),
         total: pages.reduce((sum, page) => sum + page.total, 0),
     }
+    if (
+        ['games', 'gameStats'].includes(plan.model ?? '') &&
+        ['create', 'edit'].includes(plan.intent)
+    )
+        plan.intent = 'manage'
     if (plan.intent === 'create' || plan.intent === 'edit') {
         for (const field of plan.fields) {
             const key = 'field.' + field.key
@@ -557,5 +595,5 @@ export async function* composeAdmin(
     } else plan.datePurpose = 'none'
     signal.throwIfAborted()
     yield { type: 'plan', plan }
-    yield { type: 'complete', spec: defaultComposerSpec(plan), fallback: false }
+    yield { type: 'complete' }
 }

@@ -30,7 +30,7 @@ async function edit(data?: Entry) {
         await navigateTo(data ? `/admin/posts/${encodeURIComponent(data.id)}` : '/admin/posts/new')
         return
     }
-    await modal.open({
+    const changed = await modal.open({
         modelName,
         id: data?.id,
         categories: [
@@ -43,6 +43,7 @@ async function edit(data?: Entry) {
             ),
         ],
     }).result
+    if (changed) await resource.refresh()
 }
 defineShortcuts({ n: () => edit() })
 function move(index: number, offset: number) {
