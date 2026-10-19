@@ -1,0 +1,14 @@
+diff --git a/dist/runtime/server/utils/auth.d.ts b/dist/runtime/server/utils/auth.d.ts
+index b1a4895fb7e222756a85d67ee122cd2925423477..98cd9c437d6328376f52ca22d9173cce46e0d139 100644
+--- a/dist/runtime/server/utils/auth.d.ts
++++ b/dist/runtime/server/utils/auth.d.ts
+@@ -9,8 +9,7 @@ type UserAuthConfig = AuthOptions & {
+     trustedOrigins?: BetterAuthOptions['trustedOrigins'];
+     secondaryStorage?: BetterAuthOptions['secondaryStorage'];
+ };
+-type ResolvedAuthOptions = Omit<UserAuthConfig, 'secret' | 'baseURL' | 'trustedOrigins' | 'database' | 'plugins'> & {
+-    plugins?: BetterAuthOptions['plugins'];
++type ResolvedAuthOptions = Omit<UserAuthConfig, 'secret' | 'baseURL' | 'trustedOrigins' | 'database'> & {
+     secret: string;
+     baseURL: string;
+     trustedOrigins?: BetterAuthOptions['trustedOrigins'];

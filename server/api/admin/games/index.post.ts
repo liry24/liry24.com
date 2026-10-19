@@ -1,12 +1,9 @@
-import { getNitroRequest } from '@liria24/site-admin/internal/runtime/nitro2'
 import { useAdmin } from '@liria24/site-admin/server'
 import { defineEventHandler, readBody, createError } from 'nuxt/server'
 import { z } from 'zod'
 
-import { savedGames } from '../../../content/gameValidation'
-import { queryIgdb } from '../../../utils/igdb'
 export default defineEventHandler(async (event) => {
-    await requireUserSession(getNitroRequest(event), { user: { role: 'admin' } })
+    await requireAdminPermission(event, { 'siteAdmin:model:games': ['create'] })
     if (!event.req.headers.get('content-type')?.startsWith('application/json'))
         throw createError({ statusCode: 415, statusMessage: 'JSON required' })
     const admin = useAdmin(event)

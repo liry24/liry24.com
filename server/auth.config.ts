@@ -1,7 +1,9 @@
 import { passkey } from '@better-auth/passkey'
 import { defineServerAuth } from '@nuxtjs/better-auth/config'
-import { jwt, lastLoginMethod } from 'better-auth/plugins'
+import { admin, jwt, lastLoginMethod, username } from 'better-auth/plugins'
 
+import { adminAccess, adminRoles } from '../shared/auth/access.js'
+import { authActivity } from './utils/authActivity.js'
 import {
     isPreviewGitHubAccountAdmin,
     validatePreviewIdentity,
@@ -88,6 +90,13 @@ export default defineServerAuth(() => {
         },
 
         plugins: [
+            admin({ ac: adminAccess, roles: adminRoles }),
+            username({
+                minUsernameLength: 1,
+                maxUsernameLength: 64,
+                usernameValidator: (value) => /^[a-z\d_.-]{1,64}$/i.test(value),
+            }),
+            authActivity,
             ...(!isPreview ? [passkey()] : []),
             lastLoginMethod(),
             jwt({

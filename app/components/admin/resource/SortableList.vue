@@ -30,7 +30,7 @@ watch(
 </script>
 
 <template>
-    <ul ref="parent" class="grid min-w-0 grid-cols-1 gap-2">
+    <ul ref="parent" class="min-w-0 gap-2">
         <li v-for="item in values" :key="item.id" class="min-w-0"><slot :item /></li>
     </ul>
 </template>

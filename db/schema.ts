@@ -160,11 +160,11 @@ export const content_776f726b73 = sqliteTable('site_admin_content_works', {
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
-    slug: text('field_slug'),
     title: text('field_title').notNull(),
+    image: text('field_image', { mode: 'json' }),
+    slug: text('field_slug'),
     description: text('field_description'),
     category: text('field_category'),
-    image: text('field_image', { mode: 'json' }),
     icon: text('field_icon'),
     href: text('field_href'),
     price: text('field_price'),
@@ -175,31 +175,31 @@ export const content_61727473 = sqliteTable('site_admin_content_arts', {
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
-    slug: text('field_slug'),
     title: text('field_title').notNull(),
+    images: text('field_images', { mode: 'json' }).notNull(),
+    slug: text('field_slug'),
     description: text('field_description'),
     href: text('field_href'),
-    images: text('field_images', { mode: 'json' }).notNull(),
     createdAt: text('field_createdAt'),
 })
 export const content_63617265657273 = sqliteTable('site_admin_content_careers', {
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
+    company: text('field_company').notNull(),
     slug: text('field_slug'),
     period: text('field_period').notNull(),
     position: text('field_position').notNull(),
-    company: text('field_company').notNull(),
 })
 export const content_72616e6b73 = sqliteTable('site_admin_content_ranks', {
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
-    slug: text('field_slug'),
     game: text('field_game').notNull(),
+    image: text('field_image', { mode: 'json' }).notNull(),
+    slug: text('field_slug'),
     season: text('field_season'),
     rank: text('field_rank').notNull(),
-    image: text('field_image', { mode: 'json' }).notNull(),
     href: text('field_href'),
 })
 export const content_67616d6573 = sqliteTable('site_admin_content_games', {
@@ -232,8 +232,8 @@ export const content_736b696c6c73 = sqliteTable('site_admin_content_skills', {
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
-    slug: text('field_slug'),
     name: text('field_name').notNull(),
+    slug: text('field_slug'),
     icon: text('field_icon').notNull(),
     category: text('field_category'),
 })
@@ -241,10 +241,10 @@ export const content_736f6369616c73 = sqliteTable('site_admin_content_socials', 
     revisionId: text('revision_id')
         .primaryKey()
         .references(() => revisions.id, { onDelete: 'cascade' }),
+    label: text('field_label').notNull(),
     slug: text('field_slug'),
     href: text('field_href').notNull(),
     icon: text('field_icon').notNull(),
-    label: text('field_label').notNull(),
 })
 export const content_706f737473 = sqliteTable('site_admin_content_posts', {
     revisionId: text('revision_id')
@@ -279,6 +279,8 @@ export const users = sqliteTable('users', {
     banned: integer('banned', { mode: 'boolean' }).default(false),
     banReason: text('ban_reason'),
     banExpires: integer('ban_expires', { mode: 'timestamp_ms' }),
+    username: text('username').unique(),
+    displayUsername: text('display_username'),
 })
 
 export const sessions = sqliteTable(
@@ -350,6 +352,20 @@ export const verifications = sqliteTable(
             .notNull(),
     },
     (table) => [index('verifications_identifier_idx').on(table.identifier)],
+)
+
+export const adminEvents = sqliteTable(
+    'admin_events',
+    {
+        id: text('id').primaryKey(),
+        actorId: text('actor_id').notNull(),
+        action: text('action').notNull(),
+        targetId: text('target_id').notNull(),
+        model: text('model'),
+        label: text('label'),
+        createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    },
+    (table) => [index('admin_events_actor_time').on(table.actorId, table.createdAt)],
 )
 
 export const passkeys = sqliteTable(

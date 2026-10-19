@@ -30,9 +30,9 @@ const target = computed(() =>
     plan.value?.intent === 'settings'
         ? '/admin/settings'
         : {
-              path: plan.value?.model ? '/admin/' + plan.value.model : '/admin',
+              path: '/admin/data',
 
-              query: plan.value?.query ? { q: plan.value.query } : undefined,
+              query: { model: plan.value?.model, q: plan.value?.query || undefined },
           },
 )
 

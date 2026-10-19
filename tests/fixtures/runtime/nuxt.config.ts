@@ -16,7 +16,7 @@ export default defineNuxtConfig({
         presets: [
             {
                 from: root + 'tests/fixtures/runtime/boundaries.ts',
-                imports: ['useUserSession', 'useI18n', 'useAdminClient', 'useAi'],
+                imports: ['useUserSession', 'useAuthClient', 'useI18n', 'useAdminClient', 'useAi'],
             },
         ],
     },

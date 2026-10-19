@@ -2,6 +2,9 @@
 export function useUserSession(): any {
     throw new Error('Mock the session boundary')
 }
+export function useAuthClient(): any {
+    throw new Error('Mock the auth client boundary')
+}
 export function useI18n(): any {
     throw new Error('Mock the locale boundary')
 }

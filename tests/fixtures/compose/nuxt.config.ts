@@ -13,6 +13,13 @@ export default defineNuxtConfig({
     pages: false,
     nitro: {
         preset: 'node-server',
+        imports: {
+            dirs: [path('../../../server/utils')],
+            imports: [
+                { name: 'savedGames', from: path('./games.ts'), priority: 10 },
+                { name: 'queryIgdb', from: path('./games.ts'), priority: 10 },
+            ],
+        },
         alias: {
             '@liria24/site-admin/server': path('./sdk.ts'),
             '@liria24/site-admin/internal/runtime/nitro2': path('./sdk.ts'),

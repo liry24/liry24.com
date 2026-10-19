@@ -1,4 +1,3 @@
-import { getNitroRequest } from '@liria24/site-admin/internal/runtime/nitro2'
 import { useAdmin } from '@liria24/site-admin/server'
 import { defineEventHandler, createError, readBody } from 'nuxt/server'
 import { UsageLimit } from 'void/limits'
@@ -9,7 +8,7 @@ import { evaluateClef } from '../../utils/clef'
 
 export default defineEventHandler(async (event) => {
     const started = performance.now()
-    await requireUserSession(getNitroRequest(event), { user: { role: 'admin' } })
+    await requireAdminPermission(event, { adminPanel: ['compose'] })
     if (!event.req.headers.get('content-type')?.startsWith('application/json'))
         throw createError({ statusCode: 415, statusMessage: 'JSON required' })
     const admin = useAdmin(event)

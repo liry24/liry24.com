@@ -21,7 +21,7 @@ const resource = useAdminForm('posts', {
     },
     onSuccess: async () => {
         if (composerId) saved.value[composerId] = true
-        await navigateTo('/admin/posts')
+        await navigateTo('/admin/data?model=posts')
     },
 })
 const { form, draft, publish, schedule, upload, operation, status, error } = await resource
@@ -89,7 +89,7 @@ onBeforeRouteLeave(() => {
         <AdminResourcePage :title="id ? 'Edit Post' : 'New Post'" icon="mingcute:book-3-fill">
             <template #actions>
                 <UButton
-                    to="/admin/posts"
+                    to="/admin/data?model=posts"
                     label="Back to Posts"
                     variant="ghost"
                     color="neutral"

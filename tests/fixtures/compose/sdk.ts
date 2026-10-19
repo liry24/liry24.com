@@ -1,10 +1,12 @@
 import type { RequestEvent } from 'nuxt/schema'
 
 import { composerModels } from '../../../shared/utils/adminComposer'
+import { configureGameFixture, createGame, game } from './games'
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 export const getNitroRequest = (event: RequestEvent) => event.req
 export function useAdmin(event: RequestEvent) {
     const scenario = event.req.headers.get('x-fixture-case')
+    configureGameFixture(scenario)
     return {
         async models() {
             await delay(15)
@@ -19,7 +21,9 @@ export function useAdmin(event: RequestEvent) {
                 }))
         },
         entries: {
+            create: createGame,
             async list(model: string) {
+                if (model === 'games') return { items: [{ id: 'igdb-1', data: game }], total: 1 }
                 const fails = scenario === 'lookup-failure' && model === 'works'
                 await delay(fails ? 40 : 100)
                 if (fails) throw new Error('Synthetic lookup failure')

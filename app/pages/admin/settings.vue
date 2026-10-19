@@ -2,14 +2,6 @@
 const { signOut, user } = useUserSession()
 
 const isPreview = String(useRuntimeConfig().public.preview) === 'true'
-const failure = ref('')
-
-const revokeOthers = async () => {
-    const client = useAuthClient()
-    if (!client) return
-    const result = await client.revokeOtherSessions()
-    failure.value = result.error?.message || ''
-}
 </script>
 
 <template>
@@ -45,28 +37,6 @@ const revokeOthers = async () => {
         </UCard>
         <section v-if="!isPreview" id="passkeys"><AdminSettingsPasskeys /></section>
         <section id="accounts"><AdminSettingsAccounts /></section>
-        <section id="sessions">
-            <UCard>
-                <template #header
-                    ><h2 class="my-2 text-xl leading-none font-semibold">Sessions</h2></template
-                >
-                <UPageCard
-                    title="Logout Other Sessions"
-                    description="Logout all other sessions."
-                    orientation="horizontal"
-                    variant="naked"
-                >
-                    <UButton
-                        label="Logout Other Sessions"
-                        variant="subtle"
-                        color="neutral"
-                        loading-auto
-                        class="ml-auto w-fit min-w-48"
-                        @click="revokeOthers"
-                    />
-                </UPageCard>
-            </UCard>
-        </section>
-        <UAlert v-if="failure" :title="failure" color="error" />
+        <section id="sessions"><AdminSettingsSessions /></section>
     </AdminResourcePage>
 </template>

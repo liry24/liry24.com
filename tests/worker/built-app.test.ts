@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types'
+import { createSiteAdminManagementClient } from '@liria24/site-admin/internal/client'
 import { createSiteAdmin } from '@liria24/site-admin/internal/server'
 import { expect, test } from 'vitest'
 import { createTestHarness, type Unstable_RawConfig } from 'wrangler'
@@ -88,7 +89,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
         )
         // Exercise Void's actual deploy rebundling, including the native OG renderer WASM.
         const { n: prepare } = await import(
-            pathToFileURL(resolve('node_modules/void/dist/cf-build-output-Bc8i3dzE.mjs')).href
+            pathToFileURL(resolve('node_modules/void/dist/cf-build-output-ChEKWan2.mjs')).href
         )
         const prepared = await prepare({
             projectRoot: process.cwd(),
@@ -201,6 +202,185 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 body: JSON.stringify({ prompt: '' }),
             })
             expect(invalidCompose.status, await invalidCompose.text()).toBe(400)
+            const client = createSiteAdminManagementClient({
+                fetch: (input, init) =>
+                    server.fetch(String(input), {
+                        ...init,
+                        headers: {
+                            ...Object.fromEntries(new Headers(init?.headers)),
+                            ...authenticated,
+                        },
+                    }),
+            })
+            let logged = await client.createEntry('posts', {
+                data: {
+                    title: 'Activity snapshot',
+                    content: 'PRIVATE CONTENT',
+                    tags: [],
+                    slug: 'activity-check',
+                },
+            })
+            const firstRevision = logged.currentRevisionId!
+            logged = await client.updateEntry(logged.id, {
+                expectedVersion: logged.version,
+                data: { ...logged.data, title: 'Changed title' },
+            })
+            logged = await client.publishEntry(logged.id, { expectedVersion: logged.version })
+            logged = await client.unpublishEntry(logged.id, { expectedVersion: logged.version })
+            logged = await client.schedulePublish(logged.id, {
+                expectedVersion: logged.version,
+                at: new Date(now + 86400000).toISOString(),
+            })
+            logged = await client.cancelScheduledPublish(logged.id, {
+                expectedVersion: logged.version,
+            })
+            logged = await client.restoreRevision(logged.id, firstRevision, {
+                expectedVersion: logged.version,
+            })
+            await client.deleteEntry(logged.id, { expectedVersion: logged.version })
+            const sortable = await client.createEntry('socials', {
+                data: {
+                    label: 'Sort snapshot',
+                    slug: 'sort-snapshot',
+                    href: 'https://example.invalid',
+                    icon: '',
+                },
+            })
+            await client.setSortOrder(sortable.id, 5, sortable.version)
+            const users = await server.fetch('/api/admin/users', { headers: authenticated })
+            expect(users.status).toBe(200)
+            expect(await users.json()).toMatchObject({ items: [{ id: userId }], total: 1 })
+            const activityResponse = await server.fetch(`/api/admin/users/~${userId}/activity`, {
+                headers: authenticated,
+            })
+            expect(activityResponse.status).toBe(200)
+            const activity = await activityResponse.json<{
+                items: { action: string; label: string; actorId: string }[]
+            }>()
+            expect(activity.items.map((event) => event.action)).toEqual(
+                expect.arrayContaining([
+                    'content.create',
+                    'content.update',
+                    'content.publish',
+                    'content.unpublish',
+                    'content.schedule',
+                    'content.cancelSchedule',
+                    'content.restore',
+                    'content.delete',
+                    'content.sort',
+                ]),
+            )
+            expect(activity.items.find((event) => event.action === 'content.delete')).toMatchObject(
+                { label: 'Activity snapshot', actorId: userId },
+            )
+            expect(JSON.stringify(activity)).not.toContain('PRIVATE CONTENT')
+            expect(JSON.stringify(activity)).not.toContain(token)
+            await env.DB.prepare(
+                'INSERT INTO users (id,name,email,email_verified,username,role,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
+            )
+                .bind(
+                    'activity-owner',
+                    'Activity owner',
+                    'owner@example.invalid',
+                    1,
+                    'activity-owner',
+                    'user',
+                    now,
+                    now,
+                )
+                .run()
+            await env.DB.prepare(
+                'INSERT INTO sessions (id,token,user_id,expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?)',
+            )
+                .bind('owner-session', 'owner-token', 'activity-owner', now + 3600000, now, now)
+                .run()
+            await env.DB.prepare(
+                'INSERT INTO admin_events (id,actor_id,action,target_id,label,created_at) VALUES (?,?,?,?,?,?)',
+            )
+                .bind(
+                    'private-event',
+                    'activity-owner',
+                    'session.revoke',
+                    'private-session',
+                    'Private session activity',
+                    now,
+                )
+                .run()
+            const ownerSignature = encodeURIComponent(
+                `owner-token.${createHmac('sha256', secrets.BETTER_AUTH_SECRET!)
+                    .update('owner-token')
+                    .digest('base64')}`,
+            )
+            const ownerHeaders = {
+                cookie: `better-auth.session_token=${ownerSignature}; __Secure-better-auth.session_token=${ownerSignature}`,
+            }
+            expect((await server.fetch('/admin/users', { headers: ownerHeaders })).status).toBe(403)
+            const adminPermissions = await server.fetch('/api/auth/admin/has-permission', {
+                method: 'POST',
+                headers: {
+                    ...authenticated,
+                    'content-type': 'application/json',
+                    origin: 'http://localhost:3000',
+                },
+                body: JSON.stringify({
+                    permissions: {
+                        user: ['list', 'get'],
+                        activity: ['readOwn', 'readAny'],
+                        adminPanel: ['access', 'compose'],
+                        'siteAdmin:model:games': ['readDraft', 'create'],
+                    },
+                }),
+            })
+            expect(await adminPermissions.json()).toMatchObject({ success: true })
+            for (const headers of [ownerHeaders, authenticated]) {
+                const allowed = await server.fetch('/api/admin/users/activity-owner/activity', {
+                    headers,
+                })
+                expect(allowed.status).toBe(200)
+                expect(allowed.headers.get('cache-control')).toBe('private, no-store')
+                expect(await allowed.json()).toMatchObject({
+                    items: [{ action: 'session.revoke', label: 'Private session activity' }],
+                })
+            }
+            expect(
+                (
+                    await server.fetch(`/api/admin/users/~${userId}/activity`, {
+                        headers: ownerHeaders,
+                    })
+                ).status,
+            ).toBe(403)
+            await env.DB.prepare("UPDATE users SET role = 'editor' WHERE id = ?").bind(userId).run()
+            const deniedActivity = await server.fetch('/api/admin/users/activity-owner/activity', {
+                headers: authenticated,
+            })
+            expect(deniedActivity.status).toBe(403)
+            expect(await deniedActivity.text()).not.toContain('Private session activity')
+            expect(
+                (
+                    await server.fetch(`/api/admin/users/~${userId}/activity`, {
+                        headers: authenticated,
+                    })
+                ).status,
+            ).toBe(403)
+            await env.DB.prepare("UPDATE users SET role = 'user' WHERE id = ?").bind(userId).run()
+            expect(
+                (
+                    await server.fetch(`/api/admin/users/~${userId}/activity`, {
+                        headers: authenticated,
+                    })
+                ).status,
+            ).toBe(200)
+            const permissionCheck = await server.fetch('/api/auth/admin/has-permission', {
+                method: 'POST',
+                headers: {
+                    ...authenticated,
+                    'content-type': 'application/json',
+                    origin: 'http://localhost:3000',
+                },
+                body: JSON.stringify({ role: 'admin', permissions: { activity: ['readAny'] } }),
+            })
+            expect(await permissionCheck.json()).toMatchObject({ success: false })
+            await env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(userId).run()
             await env.DB.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?')
                 .bind(now - 1, userId)
                 .run()

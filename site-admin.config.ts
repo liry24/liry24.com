@@ -19,7 +19,7 @@ import {
     validateGame,
     validateGameStats,
     validatePostGames,
-} from './server/content/gameValidation.ts'
+} from './server/utils/gameValidation.ts'
 import { postAiActions } from './server/utils/posts.ts'
 import { gameColorPattern, metricKeyPattern, gameSlugPattern } from './shared/utils/games.ts'
 import { postMarkdownSecurity } from './shared/utils/postMarkdown.ts'
@@ -40,11 +40,11 @@ export default defineSiteAdminConfig({
             sortable: true,
             displayFields: { title: 'title', description: 'description', image: 'image' },
             fields: {
-                slug: text({ default: '' }),
                 title: text({ required: true }),
+                image: image(),
+                slug: text({ default: '' }),
                 description: textarea(),
                 category: text(),
-                image: image(),
                 icon: text(),
                 href: url({ label: 'URL' }),
                 price: text(),
@@ -62,11 +62,11 @@ export default defineSiteAdminConfig({
             sortable: true,
             displayFields: { title: 'title', description: 'description' },
             fields: {
-                slug: text({ default: '' }),
                 title: text({ required: true }),
+                images: images({ required: true }),
+                slug: text({ default: '' }),
                 description: textarea(),
                 href: url({ label: 'URL' }),
-                images: images({ required: true }),
                 createdAt: datetime(),
             },
         },
@@ -80,10 +80,10 @@ export default defineSiteAdminConfig({
             sortable: true,
             displayFields: { title: 'company' },
             fields: {
+                company: text({ required: true }),
                 slug: text({ default: '' }),
                 period: text({ required: true }),
                 position: text({ required: true }),
-                company: text({ required: true }),
             },
         },
         ranks: {
@@ -99,11 +99,11 @@ export default defineSiteAdminConfig({
             sortable: true,
             displayFields: { title: 'game', image: 'image' },
             fields: {
-                slug: text({ default: '' }),
                 game: text({ required: true }),
+                image: image({ required: true }),
+                slug: text({ default: '' }),
                 season: text(),
                 rank: text({ required: true }),
-                image: image({ required: true }),
                 href: url({ label: 'URL' }),
             },
         },
@@ -203,8 +203,8 @@ export default defineSiteAdminConfig({
             sortable: true,
             displayFields: { title: 'name' },
             fields: {
-                slug: text({ default: '' }),
                 name: text({ required: true }),
+                slug: text({ default: '' }),
                 icon: text({ required: true }),
                 category: text(),
             },
@@ -223,10 +223,10 @@ export default defineSiteAdminConfig({
             displayFields: { title: 'label' },
             route: { path: '/:slug', redirect: 'href', sitemap: false, llms: false },
             fields: {
+                label: text({ required: true }),
                 slug: text({ default: '' }),
                 href: url({ required: true, label: 'URL' }),
                 icon: text({ required: true }),
-                label: text({ required: true }),
             },
         },
         posts: {

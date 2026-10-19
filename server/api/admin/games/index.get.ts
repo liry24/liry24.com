@@ -1,10 +1,8 @@
-import { getNitroRequest } from '@liria24/site-admin/internal/runtime/nitro2'
 import { useAdmin } from '@liria24/site-admin/server'
 import { defineEventHandler, getQuery, createError } from 'nuxt/server'
 
-import { queryIgdb } from '../../../utils/igdb'
 export default defineEventHandler(async (event) => {
-    await requireUserSession(getNitroRequest(event), { user: { role: 'admin' } })
+    await requireAdminPermission(event, { 'siteAdmin:model:games': ['readDraft'] })
     const admin = useAdmin(event)
     const query = String(getQuery(event).q ?? '').trim()
     if (query.length > 100)

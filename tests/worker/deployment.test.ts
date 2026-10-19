@@ -41,9 +41,10 @@ test('Void isolates dev and production resources and owns deployment configurati
     }
 })
 
-test('admin routes require an administrator', () => {
+test('admin routes require a session and the permission-checking middleware', () => {
     expect(nuxtConfig.routeRules?.['/admin/**']).toMatchObject({
-        auth: { user: { role: 'admin' } },
+        auth: true,
+        appMiddleware: 'admin',
     })
 })
 

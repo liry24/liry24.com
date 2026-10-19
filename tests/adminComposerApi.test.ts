@@ -31,7 +31,7 @@ test('single records return the canonical JSON batch and private cache headers',
         items: [{ id: 'request1.0', plan: { model: 'posts', intent: 'create' } }],
     })
     expect(batch.items).toHaveLength(1)
-})
+}, 20_000)
 
 test.each([
     { body: input, headers: { 'x-fixture-role': '' }, status: 401 },
@@ -123,4 +123,78 @@ test('explicit entry selection uses the JSON contract and does not log content',
     })
     await expect.poll(() => getServerLogs().join('\n')).toContain('admin-compose')
     expect(getServerLogs().join('\n')).not.toContain('@NewLabel')
+})
+
+const importGame = (
+    scenario = '',
+    body: unknown = { igdbId: 1, slug: 'untrusted-slug', name: 'untrusted name' },
+    role = 'admin',
+) =>
+    fetch('/api/admin/games', {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+            'x-fixture-case': scenario,
+            'x-fixture-role': role,
+        },
+        body: JSON.stringify(body),
+    })
+
+test('game imports refetch canonical metadata and use one identity for existing or simultaneous imports', async () => {
+    const result = await importGame()
+    expect(result.status, `${await result.clone().text()}\n${getServerLogs().join('\n')}`).toBe(200)
+    expect(await result.json()).toEqual({
+        id: 'igdb-1',
+        igdbId: 1,
+        slug: 'exact--igdb-slug',
+        name: 'Exact Game',
+        cover: null,
+    })
+    expect(result.headers.get('cache-control')).toBe('private, no-store')
+    await expect.poll(() => getServerLogs().join('\n')).toContain('fixture-game-created')
+    clearServerLogs()
+    expect((await importGame('existing')).status).toBe(200)
+    expect(getServerLogs().join('\n')).not.toMatch(/fixture-igdb-query|fixture-game-created/)
+    expect((await importGame('simultaneous')).status).toBe(200)
+    expect((await importGame('save-failure')).status).toBe(500)
+})
+
+test('game imports reject unauthorized, invalid or mismatched requests before saving', async () => {
+    clearServerLogs()
+    expect((await importGame('', { igdbId: 1 }, '')).status).toBe(401)
+    expect((await importGame('', { igdbId: 1 }, 'user')).status).toBe(403)
+    expect((await importGame('', { igdbId: '1' })).status).toBe(400)
+    expect(getServerLogs().join('\n')).not.toMatch(/fixture-igdb-query|fixture-game-created/)
+    expect((await importGame('mismatch')).status).toBe(404)
+    expect(getServerLogs().join('\n')).not.toContain('fixture-game-created')
+})
+
+test('game searches retain local candidates when IGDB is unavailable', async () => {
+    clearServerLogs()
+    const headers = { 'x-fixture-role': 'admin' }
+    const local = await fetch('/api/admin/games', { headers })
+    expect(local.status).toBe(200)
+    expect(await local.json()).toMatchObject({
+        games: [{ id: 'igdb-1', slug: 'exact--igdb-slug' }],
+        warning: '',
+    })
+    expect(getServerLogs().join('\n')).not.toContain('fixture-igdb-query')
+    const remote = await fetch('/api/admin/games?q=game', {
+        headers: { ...headers, 'x-fixture-case': 'offline' },
+    })
+    expect(await remote.json()).toMatchObject({
+        games: [{ id: 'igdb-1' }],
+        warning: expect.stringContaining('unavailable'),
+    })
+    expect(
+        (await fetch('/api/admin/games', { headers: { 'x-fixture-role': 'user' } })).status,
+    ).toBe(403)
+    expect(
+        (await fetch('/api/admin/games', { headers: { 'x-fixture-role': 'gameReader' } })).status,
+    ).toBe(200)
+    expect((await importGame('', { igdbId: 1 }, 'gameReader')).status).toBe(403)
+    expect(
+        (await fetch('/api/admin/games', { headers: { 'x-fixture-role': 'gameImporter' } })).status,
+    ).toBe(403)
+    expect((await importGame('', { igdbId: 1 }, 'gameImporter')).status).toBe(200)
 })

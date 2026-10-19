@@ -13,7 +13,7 @@ export default defineNuxtConfig({
 
     future: { compatibilityVersion: 5 },
 
-    devtools: { enabled: true },
+    devtools: { enabled: true, timeline: { enabled: true } },
 
     css: ['~/assets/css/main.css'],
 
@@ -80,7 +80,7 @@ export default defineNuxtConfig({
         '/works/**': { swr: 300 },
         '/posts/**': { swr: 300 },
         '/admin/**': {
-            auth: { user: { role: 'admin' } },
+            auth: true,
             appMiddleware: 'admin',
             appLayout: 'admin',
             headers: { 'cache-control': 'private, no-store' },
@@ -161,7 +161,13 @@ export default defineNuxtConfig({
 
     icon: {
         clientBundle: {
-            icons: ['mingcute:sun-fill', 'mingcute:moon-fill'],
+            icons: [
+                'mingcute:sun-fill',
+                'mingcute:moon-fill',
+                'mingcute:pad-line',
+                'mingcute:cellphone-line',
+                'mingcute:computer-line',
+            ],
             scan: true,
             includeCustomCollections: true,
         },

@@ -532,6 +532,76 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             assert.deepEqual(errors, [])
             assert(calls >= 4)
             assert.equal(writes, 6)
+            // Verify real user links, activity and session revocation against the emitted app.
+            await env.DB.prepare('UPDATE users SET username = ?, display_username = ? WHERE id = ?')
+                .bind('synthetic-admin', 'Synthetic-Admin', 'composer-admin')
+                .run()
+            await page.setViewportSize({ width: 1280, height: 900 })
+            await page.goto(new URL('/admin/users', url).href)
+            const userLink = page.getByRole('link', { name: 'Synthetic admin', exact: true })
+            await userLink.waitFor()
+            assert.equal(await userLink.getAttribute('href'), '/admin/@synthetic-admin')
+            await userLink.click()
+            await page.getByRole('heading', { name: 'Activity', exact: true }).waitFor()
+            await page
+                .getByRole('region', { name: 'Activity', exact: true })
+                .getByText('Created', { exact: true })
+                .first()
+                .waitFor()
+            await page.screenshot({ path: '.tmp/admin-user-desktop.png', fullPage: true })
+            await page.setViewportSize({ width: 390, height: 844 })
+            await page.screenshot({ path: '.tmp/admin-user-mobile.png', fullPage: true })
+            assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+            await page.setViewportSize({ width: 1280, height: 900 })
+            for (const id of ['device-one', 'device-two'])
+                await env.DB.prepare(
+                    'INSERT INTO sessions (id,token,user_id,expires_at,created_at,updated_at,user_agent,ip_address) VALUES (?,?,?,?,?,?,?,?)',
+                )
+                    .bind(
+                        id,
+                        `token-${id}`,
+                        'composer-admin',
+                        now + 3600000,
+                        now,
+                        now,
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0.0.0 Safari/537.36',
+                        '192.0.2.1',
+                    )
+                    .run()
+            await page.goto(new URL('/admin/settings', url).href)
+            await page.getByText('Current session', { exact: true }).waitFor()
+            await page.getByRole('button', { name: 'Revoke', exact: true }).first().click()
+            await page.waitForFunction(
+                () =>
+                    [...document.querySelectorAll('button')].filter(
+                        (button) => button.textContent?.trim() === 'Revoke',
+                    ).length === 1,
+            )
+            await page.screenshot({ path: '.tmp/admin-sessions-desktop.png', fullPage: true })
+            await page.getByRole('button', { name: 'Logout Other Sessions', exact: true }).click()
+            await page
+                .getByRole('button', { name: 'Revoke', exact: true })
+                .waitFor({ state: 'hidden' })
+            assert.equal(
+                (
+                    await env.DB.prepare('SELECT COUNT(*) AS count FROM sessions WHERE user_id = ?')
+                        .bind('composer-admin')
+                        .first<{ count: number }>()
+                )?.count,
+                1,
+            )
+            await page.goto(new URL('/admin/users', url).href)
+            const userRow = page.getByRole('row').filter({ hasText: 'composer@example.invalid' })
+            await page.waitForFunction(
+                () =>
+                    (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
+                        .$nuxt?.isHydrating === false,
+            )
+            await userRow.focus()
+            assert(await userRow.evaluate((element) => element === document.activeElement))
+            await userRow.press('Enter')
+            await page.waitForURL('**/admin/@synthetic-admin')
+            await page.getByText('Revoked a session', { exact: true }).first().waitFor()
             // Game fixtures and all browser traffic stay inside synthetic Worker bindings.
             async function create(model: string, data: Record<string, unknown>, id?: string) {
                 const response = await server.fetch(`/api/site-admin/entries/${model}`, {
@@ -547,6 +617,84 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 assert.equal(response.status, 201, JSON.stringify(result))
                 return result
             }
+            for (let index = 0; index < 21; index++)
+                await create('posts', {
+                    title: `Page Probe ${index}`,
+                    content: 'Synthetic draft',
+                    tags: [],
+                    slug: `page-probe-${index}`,
+                })
+            await page.goto(new URL('/admin/@synthetic-admin', url).href)
+            const timeline = page.getByRole('region', { name: 'Activity', exact: true })
+            await page.waitForFunction(
+                () =>
+                    (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
+                        .$nuxt?.isHydrating === false,
+            )
+            await timeline.getByRole('button', { name: 'Load more', exact: true }).click()
+            await page.waitForFunction(
+                () => document.querySelectorAll('[aria-label="Activity"] ol li').length > 20,
+            )
+            await page.goto(new URL('/admin/posts?q=Page%20Probe', url).href)
+            const postsSection = page.locator('[data-model="posts"]')
+            await postsSection.getByRole('link', { name: 'Page Probe 20', exact: true }).waitFor()
+            assert.equal(new URL(page.url()).pathname, '/admin/data')
+            assert.equal(new URL(page.url()).searchParams.get('model'), 'posts')
+            assert.equal(new URL(page.url()).searchParams.get('q'), 'Page Probe')
+            assert.equal(await postsSection.locator('tbody tr').count(), 20)
+            await postsSection.locator('[data-slot="next"]').click()
+            await page.waitForFunction(
+                () => document.querySelectorAll('[data-model="posts"] tbody tr').length === 1,
+            )
+            await postsSection
+                .getByRole('textbox', { name: 'Search posts', exact: true })
+                .fill('Page Probe 20')
+            await postsSection.getByRole('link', { name: 'Page Probe 20', exact: true }).waitFor()
+            await postsSection.getByRole('row').filter({ hasText: 'Page Probe 20' }).focus()
+            await postsSection.getByRole('row').filter({ hasText: 'Page Probe 20' }).press('Enter')
+            await page.getByLabel('Title', { exact: true }).waitFor()
+            assert.equal(
+                await page.getByLabel('Title', { exact: true }).inputValue(),
+                'Page Probe 20',
+            )
+            await page.goto(new URL('/admin/posts?q=Page%20Probe%2020', url).href)
+            await postsSection.getByRole('button', { name: 'Entry actions', exact: true }).click()
+            await page.getByRole('button', { name: 'Delete', exact: true }).click()
+            await postsSection.getByText('No posts found.', { exact: true }).waitFor()
+            await page.keyboard.press('Escape')
+            await create('skills', { name: 'Sort first', icon: 'mingcute:check-line' })
+            await create('skills', { name: 'Sort second', icon: 'mingcute:check-line' })
+            await page.goto(new URL('/admin/skills', url).href)
+            const skillSection = page.locator('[data-model="skills"]')
+            const reorder = skillSection
+                .getByRole('button', { name: 'Reorder (arrow keys move item)', exact: true })
+                .first()
+            await reorder.waitFor()
+            const nextTitle = await skillSection
+                .locator('article button.truncate')
+                .nth(1)
+                .innerText()
+            const sorted = page.waitForResponse(
+                (response) =>
+                    response.url().includes('/api/site-admin/entries/skills/reorder') &&
+                    response.request().method() === 'POST',
+            )
+            await reorder.press('ArrowRight')
+            assert.equal((await sorted).status(), 200)
+            await page.waitForFunction(
+                (expected) =>
+                    document
+                        .querySelector('[data-model="skills"] article button.truncate')
+                        ?.textContent?.trim() === expected,
+                nextTitle,
+            )
+            await page.screenshot({ path: '.tmp/admin-data-desktop.png', fullPage: true })
+            await page.setViewportSize({ width: 390, height: 844 })
+            assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+            await page.screenshot({ path: '.tmp/admin-data-mobile.png', fullPage: true })
+            await page.setViewportSize({ width: 1280, height: 900 })
+            // Keep the independent game flow within the real per-minute auth limits.
+            await env.DB.prepare('DELETE FROM rate_limits').run()
             const game = await create(
                 'games',
                 {
@@ -857,7 +1005,10 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                     (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
                         .$nuxt?.isHydrating === false,
             )
-            await page.getByRole('button', { name: 'Edit', exact: true }).click()
+            await page
+                .locator('[data-model="games"]')
+                .getByRole('button', { name: 'Edit', exact: true })
+                .click()
             await page
                 .getByRole('dialog')
                 .getByLabel('Label', { exact: true })

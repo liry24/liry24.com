@@ -15,6 +15,13 @@
             "when": 1792141514627,
             "tag": "20261016090514_tranquil_logan",
             "breakpoints": true
+        },
+        {
+            "idx": 2,
+            "version": "6",
+            "when": 1792444711159,
+            "tag": "20261019211831_complex_mad_thinker",
+            "breakpoints": true
         }
     ]
 }

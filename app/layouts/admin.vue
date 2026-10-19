@@ -6,13 +6,14 @@ import {
 } from '#build/site-admin/client'
 
 const { user } = useUserSession()
+const { data: permissions } = await useAdminPermissions()
 const { open, busy } = useAdminComposer()
 const connection = siteAdminManagementClientOptions()
 const auth = useSiteAdminAuthScope(undefined, connection)
 const models = useSiteAdminModels(connection, auth, false)
 
 const sidebarCollapsed = ref(false)
-const navigation = [
+const navigation = computed(() => [
     [
         {
             label: 'Dashboard',
@@ -26,11 +27,15 @@ const navigation = [
         },
     ],
     [
-        {
-            label: 'Users',
-            icon: 'mingcute:group-2-fill',
-            to: '/admin/users',
-        },
+        ...(permissions.value?.users
+            ? [
+                  {
+                      label: 'Users',
+                      icon: 'mingcute:group-2-fill',
+                      to: '/admin/users',
+                  },
+              ]
+            : []),
         {
             label: 'Settings',
             icon: 'mingcute:settings-1-fill',
@@ -50,7 +55,7 @@ const navigation = [
             to: '/',
         },
     ],
-]
+])
 
 onMounted(() => {
     if (!models.data.value) void models.execute({ dedupe: 'defer' })
@@ -60,7 +65,7 @@ defineShortcuts({
     meta_k: {
         usingInput: true,
         handler: () => {
-            if (!busy.value) open.value = !open.value
+            if (permissions.value?.compose && !busy.value) open.value = !open.value
         },
     },
 })
@@ -169,6 +174,7 @@ useHead({ titleTemplate: '%s | Liry24 Admin' })
         </UDashboardGroup>
 
         <UModal
+            v-if="permissions?.compose"
             v-model:open="open"
             :dismissible="!busy"
             :close="!busy"
