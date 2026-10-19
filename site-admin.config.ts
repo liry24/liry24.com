@@ -15,12 +15,12 @@ import {
     url,
 } from '@liria24/site-admin'
 
-import { postAiActions } from './server/ai/posts.ts'
 import {
     validateGame,
     validateGameStats,
     validatePostGames,
 } from './server/content/gameValidation.ts'
+import { postAiActions } from './server/utils/posts.ts'
 import { gameColorPattern, metricKeyPattern, gameSlugPattern } from './shared/utils/games.ts'
 import { postMarkdownSecurity } from './shared/utils/postMarkdown.ts'
 

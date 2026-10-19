@@ -1,6 +1,9 @@
 import { createError } from 'nuxt/server'
 import { z } from 'zod'
 
+import { gameSlugPattern } from '../../shared/utils/games'
+import type { GameSearchResult } from '../../shared/utils/igdb'
+
 const result = z.array(
     z.object({
         id: z.number().int().positive(),

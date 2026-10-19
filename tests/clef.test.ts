@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest'
 import { ai } from 'void/ai'
 
-import { evaluateClef } from '../server/ai/clef'
+import { evaluateClef } from '../server/utils/clef'
 
 vi.mock('void/ai', () => ({ ai: { run: vi.fn() } }))
 test('Void inference uses Clef-flash, passes cancellation and rejects missing or unoffered choices', async () => {

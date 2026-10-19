@@ -1,9 +1,15 @@
+import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 import { afterEach, expect, test, vi } from 'vitest'
 import { effectScope, ref } from 'vue'
 
-import { useGameSearch } from '../app/composables/useGameSearch'
-import type { GameSearchResult } from '../shared/utils/igdb'
+import { useGameSearch } from '../../app/composables/useGameSearch'
+import type { GameSearchResult } from '../../shared/utils/igdb'
 
+const { sessionBoundary } = vi.hoisted(() => ({ sessionBoundary: vi.fn() }))
+mockNuxtImport('useUserSession', () => sessionBoundary)
+
+const { fetchBoundary } = vi.hoisted(() => ({ fetchBoundary: vi.fn() }))
+mockNuxtImport('$fetch', () => fetchBoundary)
 const scopes: ReturnType<typeof effectScope>[] = []
 afterEach(() => {
     scopes.splice(0).forEach((scope) => scope.stop())
@@ -17,7 +23,7 @@ function setup(initial: string | null = null) {
     const query = ref(initial)
     const user = ref({ id: 'alice', role: 'admin' })
     const session = ref({ id: 'session-1' })
-    vi.stubGlobal('useUserSession', () => ({ user, session }))
+    sessionBoundary.mockReturnValue({ user, session })
     const scope = effectScope()
     scopes.push(scope)
     return {
@@ -31,8 +37,10 @@ function setup(initial: string | null = null) {
 const pause = () => vi.advanceTimersByTimeAsync(250)
 
 test('disabled searches make no request, an empty query finds saved games, and typing is debounced', async () => {
-    const fetcher = vi.fn(async () => result)
-    vi.stubGlobal('$fetch', fetcher)
+    const fetcher = vi.fn(
+        async (_url: string, _options: { query?: { q: string }; signal: AbortSignal }) => result,
+    )
+    fetchBoundary.mockImplementation(fetcher)
     const { query, state } = setup()
     await pause()
     expect(fetcher).not.toHaveBeenCalled()
@@ -55,7 +63,7 @@ test('disabled searches make no request, an empty query finds saved games, and t
 test('late search responses and errors cannot replace the latest candidates or poison its cache', async () => {
     const first = Promise.withResolvers<typeof result>()
     const fetcher = vi.fn().mockReturnValueOnce(first.promise).mockResolvedValue(result)
-    vi.stubGlobal('$fetch', fetcher)
+    fetchBoundary.mockImplementation(fetcher)
     const { query, state } = setup('first')
     await pause()
     query.value = 'second'
@@ -78,8 +86,10 @@ test('late search responses and errors cannot replace the latest candidates or p
 })
 
 test('caches belong to each search and are cleared when the authentication session changes', async () => {
-    const fetcher = vi.fn(async () => result)
-    vi.stubGlobal('$fetch', fetcher)
+    const fetcher = vi.fn(
+        async (_url: string, _options: { query?: { q: string }; signal: AbortSignal }) => result,
+    )
+    fetchBoundary.mockImplementation(fetcher)
     const first = setup('game')
     await pause()
     const second = setup('game')
@@ -95,7 +105,7 @@ test('caches belong to each search and are cleared when the authentication sessi
 test('imports use canonical saved data, preserve failures, and ignore responses after authentication changes', async () => {
     const pending = Promise.withResolvers<GameSearchResult>()
     const fetcher = vi.fn().mockReturnValueOnce(pending.promise)
-    vi.stubGlobal('$fetch', fetcher)
+    fetchBoundary.mockImplementation(fetcher)
     const { user, state } = setup()
     const importing = state.importGame(game)
     expect(await state.importGame(game)).toBeUndefined()
@@ -121,8 +131,10 @@ test('imports use canonical saved data, preserve failures, and ignore responses 
 })
 
 test('disposal cancels pending searches and imports', async () => {
-    const fetcher = vi.fn(() => new Promise(() => {}))
-    vi.stubGlobal('$fetch', fetcher)
+    const fetcher = vi.fn(
+        (_url: string, _options: { signal: AbortSignal }) => new Promise(() => {}),
+    )
+    fetchBoundary.mockImplementation(fetcher)
     const { scope, state } = setup('game')
     await pause()
     void state.importGame(game)

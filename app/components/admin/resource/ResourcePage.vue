@@ -14,6 +14,9 @@ useHead(() => ({ title: props.title }))
         >
             <template #header>
                 <UDashboardNavbar :title :icon>
+                    <template #trailing>
+                        <slot name="trailing" />
+                    </template>
                     <template #right>
                         <slot name="actions" />
                     </template>

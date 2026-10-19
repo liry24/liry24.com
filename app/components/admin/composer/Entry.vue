@@ -10,7 +10,7 @@ const emit = defineEmits<{
     ready: [submit: (() => Promise<void>) | undefined]
 }>()
 
-const { open, busy: writing, setBusy } = useAdminComposer()
+const { open, busy: writing, setBusy, preparation } = useAdminComposer()
 const { form, fields, upload, operation, error, status, features } = await useAdminForm(
     String(plan.model),
     {
@@ -21,7 +21,10 @@ const { form, fields, upload, operation, error, status, features } = await useAd
     },
 )
 
-const baseline: Record<string, unknown> = structuredClone(toRaw(form.state.values))
+const { baseline } = preparation(
+    itemId + ':' + plan.model + ':' + (plan.entryId ?? 'new'),
+    form.state.values,
+)
 const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
 const busy = computed(() => pending || writing.value || status.value === 'pending')
 

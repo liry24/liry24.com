@@ -37,14 +37,10 @@ export const composerItemInput = selection
     })
     .strict()
 export type ComposerItemInput = z.infer<typeof composerItemInput>
-export const composerRequest = selection
-    .extend({
+export const composerRequest = z
+    .object({
         prompt: z.string().trim().min(1).max(2000),
-        batch: z.literal(true).optional(),
-        requestId: z
-            .string()
-            .regex(/^[a-zA-Z0-9_-]{1,90}$/)
-            .optional(),
+        requestId: z.string().regex(/^[a-zA-Z0-9_-]{1,90}$/),
         items: z.array(composerItemInput).min(1).max(10).optional(),
         locale: z.enum(['ja', 'en']),
         timeZone: z
@@ -58,20 +54,20 @@ export const composerRequest = selection
                     return false
                 }
             }),
-        context: selection.strict().optional(),
+        context: selection
+            .strict()
+            .refine((value) => !value.entryId || value.model, 'An entry needs a model')
+            .optional(),
     })
     .strict()
-    .refine((value) => !value.entryId || value.model, 'An entry needs a model')
-    .refine((value) => !value.batch || Boolean(value.requestId), 'A batch needs a request ID')
     .refine(
         (value) =>
             !value.items ||
-            (value.batch &&
-                new Set(value.items.map((item) => item.id)).size === value.items.length &&
+            (new Set(value.items.map((item) => item.id)).size === value.items.length &&
                 value.items.every(
                     (item) =>
                         item.id.startsWith(value.requestId + '.') &&
-                        /^\d$/.test(item.id.slice(value.requestId!.length + 1)) &&
+                        /^\d$/.test(item.id.slice(value.requestId.length + 1)) &&
                         item.source.start < item.source.end &&
                         item.source.end <= value.prompt.length &&
                         (!item.entryId || item.model),
@@ -105,9 +101,3 @@ export type ComposerPlan = {
 }
 export type ComposerItem = ComposerItemInput & { plan?: ComposerPlan; error?: string }
 export type ComposerBatch = { requestId: string; items: ComposerItem[]; notice?: string }
-
-export type ComposerEvent =
-    | { type: 'batch'; batch: ComposerBatch }
-    | { type: 'plan'; plan: ComposerPlan }
-    | { type: 'complete' }
-    | { type: 'error'; message: string }

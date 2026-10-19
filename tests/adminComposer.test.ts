@@ -3,18 +3,15 @@ import { expect, test, vi } from 'vitest'
 
 import { composerValueUpdates } from '../app/utils/composerValues'
 import {
-    composeAdmin,
+    composeAdminRequest,
     composerModelInfo,
-    inputChoices,
-    selectedDate,
     type ComposerAdmin,
     type ComposerModelInfo,
-} from '../server/ai/adminComposer'
-import { composeAdminRequest, composerSources } from '../server/ai/adminComposerBatch'
+} from '../server/utils/adminComposer'
 import {
     composerModels,
     composerRequest,
-    type ComposerEvent,
+    type ComposerBatch,
     type ComposerRequest,
 } from '../shared/utils/adminComposer'
 import { adminModels } from './helpers/adminModels'
@@ -22,6 +19,7 @@ import { adminModels } from './helpers/adminModels'
 const models = composerModelInfo(adminModels)
 const input: ComposerRequest = {
     prompt: '記事「テスト」を作成',
+    requestId: 'request1',
     locale: 'ja',
     timeZone: 'Asia/Tokyo',
 }
@@ -43,7 +41,7 @@ function evaluator(overrides: Record<string, string> | Record<string, string>[] 
                     expect(key).toMatch(/^[A-Za-z0-9_.-]{1,100}$/)
                     expect(Object.keys(question.criteria).length).toBeGreaterThanOrEqual(2)
                     expect(Object.keys(question.criteria).length).toBeLessThanOrEqual(255)
-                    const value = values[key]
+                    const value = values[key] ?? (key === 'itemCount' ? 'one' : undefined)
                     const choice =
                         value === undefined
                             ? Object.keys(question.criteria)[0]!
@@ -60,27 +58,18 @@ function evaluator(overrides: Record<string, string> | Record<string, string>[] 
         }
     })
 }
-async function collect(
+function collect(
     request = input,
-    evaluate = evaluator({ model: 'posts' }),
+    evaluate: Experimental_CompositionEvaluator = evaluator({ model: 'posts' }),
     admin = makeAdmin(),
     signal = new AbortController().signal,
 ) {
-    const events: ComposerEvent[] = []
-    for await (const event of composeAdmin(
-        request,
-        admin,
-        evaluate,
-        signal,
-        Date.parse('2026-10-16T03:00:00Z'),
-    ))
-        events.push(event)
-    return events
+    return composeAdminRequest(request, admin, evaluate, signal, Date.parse('2026-10-16T03:00:00Z'))
 }
-function getPlan(events: ComposerEvent[]) {
-    const event = events.find((event) => event.type === 'plan')!
-    if (event.type !== 'plan') throw Error('Missing plan')
-    return event.plan
+function getPlan(batch: ComposerBatch) {
+    const plan = batch.items[0]?.plan
+    if (!plan) throw Error('Missing plan: ' + JSON.stringify(batch))
+    return plan
 }
 
 test('active models are available and input boundaries validate selection and context', () => {
@@ -100,14 +89,16 @@ test('active models are available and input boundaries validate selection and co
         expect(composerRequest.safeParse({ ...input, ...value }).success).toBe(false)
 })
 
-test('facts preserve quotes, whole prose, URL components and account alternatives', () => {
-    const values = inputChoices('作品「春の庭」を https://x.com/Liry24g に追加', 'ja')
+test('facts preserve quotes, whole prose, URL components and account alternatives', async () => {
+    const evaluate = evaluator({ model: 'posts' })
+    await collect({ ...input, prompt: '作品「春の庭」を https://x.com/Liry24g に追加' }, evaluate)
+    const values = evaluate.mock.calls[0]![0].state.inputCandidates
     for (const value of ['春の庭', 'https://x.com/Liry24g', 'x', 'Liry24g', '@Liry24g'])
         expect(values).toContain(value)
     expect(values.length).toBeLessThanOrEqual(40)
-    expect(inputChoices('A description longer than four words can remain intact', 'en')).toContain(
-        'A description longer than four words can remain intact',
-    )
+    const prose = 'A description longer than four words can remain intact'
+    await collect({ ...input, prompt: prose, locale: 'en' }, evaluate)
+    expect(evaluate.mock.calls[1]![0].state.inputCandidates).toContain(prose)
 })
 
 test.each(composerModels)(
@@ -129,7 +120,7 @@ test.each(composerModels)(
         })
         expect(evaluate).toHaveBeenCalledTimes(1)
         expect(Object.keys(evaluate.mock.calls[0]![0].questions)).toHaveLength(
-            composerModels.length + 4,
+            composerModels.length + 5,
         )
         expect(
             Object.keys(evaluate.mock.calls[0]![0].questions).some((key) =>
@@ -152,7 +143,7 @@ test.each(composerModels)(
                       .filter((field) => field.required && !field.hasDefault)
                       .map((field) => field.key),
         )
-        expect(events.at(-1)).toMatchObject({ type: 'complete' })
+        expect(events.requestId).toBe(input.requestId)
     },
 )
 
@@ -199,7 +190,7 @@ test('URL facts can prepare a new social after a complete empty lookup', async (
 })
 
 test.each(composerModels)(
-    '%s can resolve an existing identity and prepare editing',
+    '%s resolves an existing identity for explicit selection',
     async (model) => {
         const admin = makeAdmin()
         vi.mocked(admin.list).mockResolvedValue({
@@ -213,8 +204,8 @@ test.each(composerModels)(
         const plan = getPlan(await collect(input, evaluate, admin))
         expect(plan).toMatchObject({
             model,
-            intent: ['games', 'gameStats'].includes(model) ? 'manage' : 'edit',
-            entryId: 'existing',
+            intent: ['games', 'gameStats'].includes(model) ? 'manage' : 'search',
+            entryId: ['games', 'gameStats'].includes(model) ? 'existing' : undefined,
         })
         expect(evaluate).toHaveBeenCalledTimes(2)
         expect(admin.list).toHaveBeenCalledTimes(1)
@@ -225,7 +216,23 @@ test('an explicit entry is fetched once, while screen context is only a hint', a
     const admin = makeAdmin()
     const evaluate = evaluator({ model: 'works', intent: 'edit' })
     expect(
-        getPlan(await collect({ ...input, model: 'socials', entryId: 'entry-1' }, evaluate, admin)),
+        getPlan(
+            await collect(
+                {
+                    ...input,
+                    items: [
+                        {
+                            id: 'request1.0',
+                            source: { start: 0, end: input.prompt.length },
+                            model: 'socials',
+                            entryId: 'entry-1',
+                        },
+                    ],
+                },
+                evaluate,
+                admin,
+            ),
+        ),
     ).toMatchObject({ model: 'socials', intent: 'edit', entryId: 'entry-1' })
     expect(admin.get).toHaveBeenCalledWith('socials', 'entry-1')
     expect(admin.list).not.toHaveBeenCalled()
@@ -317,16 +324,61 @@ test('creation date and lookup are resolved together without a third inference',
     expect(evaluate).toHaveBeenCalledTimes(2)
 })
 
-test('date validation rejects impossible dates, past schedules and DST ambiguity', () => {
-    const now = Date.parse('2026-10-16T03:00:00Z')
-    expect(selectedDate(['2026', '2', '30', '12', '0'], 'Asia/Tokyo', now, false)).toBe('')
-    expect(selectedDate(['2026', '10', '15', '12', '0'], 'Asia/Tokyo', now, true)).toBe('')
-    expect(selectedDate(['2026', '3', '8', '2', '30'], 'America/New_York', 0, false)).toBe('')
-    expect(selectedDate(['2026', '11', '1', '1', '30'], 'America/New_York', 0, false)).toBe('')
-    expect(selectedDate(['2028', '2', '29', '12', '0'], 'Asia/Tokyo', now, true)).toBe(
-        '2028-02-29T12:00',
-    )
-})
+test.each([
+    {
+        parts: ['2026', '2', '30', '12', '0'],
+        timeZone: 'Asia/Tokyo',
+        purpose: 'creation',
+        expected: '',
+    },
+    {
+        parts: ['2026', '10', '15', '12', '0'],
+        timeZone: 'Asia/Tokyo',
+        purpose: 'publication',
+        expected: '',
+    },
+    {
+        parts: ['2026', '3', '8', '2', '30'],
+        timeZone: 'America/New_York',
+        purpose: 'creation',
+        expected: '',
+    },
+    {
+        parts: ['2026', '11', '1', '1', '30'],
+        timeZone: 'America/New_York',
+        purpose: 'creation',
+        expected: '',
+    },
+    {
+        parts: ['2028', '2', '29', '12', '0'],
+        timeZone: 'Asia/Tokyo',
+        purpose: 'publication',
+        expected: '2028-02-29T12:00',
+    },
+])(
+    'date validation handles impossible dates, past schedules and DST ($parts)',
+    async ({ parts, timeZone, purpose, expected }) => {
+        const plan = getPlan(
+            await collect(
+                { ...input, timeZone },
+                evaluator({
+                    model: purpose === 'publication' ? 'posts' : 'works',
+                    datePurpose: purpose,
+                    ...Object.fromEntries(
+                        ['year', 'month', 'day', 'hour', 'minute'].map((part, index) => [
+                            'date.' + part,
+                            parts[index]!,
+                        ]),
+                    ),
+                }),
+            ),
+        )
+        expect(purpose === 'publication' ? plan.publishAt : (plan.values.createdAt ?? '')).toBe(
+            expected,
+        )
+        expect(plan.dateIncomplete).toBe(!expected)
+    },
+)
 
 test('cancellation prevents reads or UI publication from a stale inference', async () => {
     const abort = new AbortController()
@@ -456,30 +508,10 @@ test('a specifically requested optional field is shown even without a supplied v
     expect(plan.datePurpose).toBe('none')
 })
 
-async function collectBatch(
-    request: ComposerRequest,
-    evaluate: Experimental_CompositionEvaluator,
-    admin = makeAdmin(),
-) {
-    const events: ComposerEvent[] = []
-    for await (const event of composeAdminRequest(
-        request,
-        admin,
-        evaluate,
-        new AbortController().signal,
-        Date.parse('2026-10-16T03:00:00Z'),
-    ))
-        events.push(event)
-    return events
-}
-const batchInput = { ...input, batch: true, requestId: 'request1' } as const
-function getBatch(events: ComposerEvent[]) {
-    const event = events.find((event) => event.type === 'batch')
-    if (event?.type !== 'batch') throw new Error('Missing batch')
-    return event.batch
-}
+const collectBatch = collect
+const batchInput = input
 
-test('new clients add only the count question for a single record', async () => {
+test('single records use the same batch contract with one count question', async () => {
     const evaluate = evaluator({ model: 'posts', itemCount: 'one' })
     const plan = getPlan(await collectBatch(batchInput, evaluate))
     expect(plan.visibleFields).toEqual(['title'])
@@ -552,7 +584,7 @@ test('mixed records share routing/refinement and keep each source and values sep
         },
     ])
     const admin = makeAdmin()
-    const batch = getBatch(await collectBatch({ ...batchInput, prompt }, evaluate, admin))
+    const batch = await collectBatch({ ...batchInput, prompt }, evaluate, admin)
     expect(evaluate).toHaveBeenCalledTimes(3)
     expect(Object.keys(evaluate.mock.calls[1]![0].questions)).toHaveLength(12)
     expect(batch.items.map((item) => item.id)).toEqual(['request1.0', 'request1.1'])
@@ -607,9 +639,7 @@ test('ten detailed records split refinement into bounded groups with at most two
             concurrent--
         }
     }
-    const batch = getBatch(
-        await collectBatch({ ...batchInput, prompt: sources.join('\n') }, evaluate),
-    )
+    const batch = await collectBatch({ ...batchInput, prompt: sources.join('\n') }, evaluate)
     expect(batch.items).toHaveLength(10)
     expect(batch.items.map((item) => item.plan?.values.title)).toEqual(
         sources.map((_, i) => 'Project' + i),
@@ -625,7 +655,7 @@ test.each(['unclear', 'overflow'])(
     async (itemCount) => {
         const evaluate = evaluator({ itemCount })
         const admin = makeAdmin()
-        const batch = getBatch(await collectBatch(batchInput, evaluate, admin))
+        const batch = await collectBatch(batchInput, evaluate, admin)
         expect(batch.items).toEqual([])
         expect(batch.notice).toBeTruthy()
         expect(evaluate).toHaveBeenCalledTimes(1)
@@ -641,7 +671,7 @@ test('an explicit model selection resolves only that source with stable identity
         source: { start: 6, end: prompt.length },
         model: 'skills' as const,
     }
-    const batch = getBatch(await collectBatch({ ...batchInput, prompt, items: [item] }, evaluate))
+    const batch = await collectBatch({ ...batchInput, prompt, items: [item] }, evaluate)
     expect(batch.items[0]).toMatchObject({ ...item, plan: { model: 'skills', intent: 'create' } })
     expect(evaluate).toHaveBeenCalledTimes(1)
     const request = evaluate.mock.calls[0]![0]
@@ -665,7 +695,7 @@ test('batch errors stay local and matching existing entries are not automaticall
         return { items: [{ id: 'exists', data: { title: 'first' } }], total: 1 }
     })
     const evaluate = evaluator([{ intent: 'resolve' }, { intent: 'edit', entry: 'exists' }])
-    const batch = getBatch(await collectBatch(request, evaluate, admin))
+    const batch = await collectBatch(request, evaluate, admin)
     expect(batch.items[0]?.plan).toMatchObject({
         intent: 'search',
         values: {},
@@ -691,9 +721,7 @@ test('batch input validates source ranges, identities and selection dependencies
     expect(
         composerRequest.safeParse({ ...valid, items: [valid.items[0], valid.items[0]] }).success,
     ).toBe(false)
-    expect(composerRequest.safeParse({ ...valid, batch: undefined }).success).toBe(false)
-    const prompt = Array.from({ length: 80 }, (_, i) => `作品${i}`).join('\n')
-    expect(composerSources(prompt).at(-2)!.end).toBeGreaterThan(40)
+    expect(composerRequest.safeParse({ ...valid, requestId: undefined }).success).toBe(false)
 })
 
 test('explicit blank copies remain separate records even with the same source', async () => {
@@ -710,7 +738,7 @@ test('explicit blank copies remain separate records even with the same source', 
             'i1.query': 'none',
         },
     ])
-    const batch = getBatch(await collectBatch({ ...batchInput, prompt: '記事を2件作成' }, evaluate))
+    const batch = await collectBatch({ ...batchInput, prompt: '記事を2件作成' }, evaluate)
     expect(batch.items.map((item) => item.plan?.intent)).toEqual(['create', 'create'])
     expect(batch.items[0]!.source).toEqual(batch.items[1]!.source)
     expect(batch.items[0]!.id).not.toBe(batch.items[1]!.id)
@@ -742,9 +770,7 @@ test('a duplicated profile in one batch requires correction instead of two creat
             ),
         ),
     ])
-    const batch = getBatch(
-        await collectBatch({ ...batchInput, prompt: 'https://x.com/alice' }, evaluate),
-    )
+    const batch = await collectBatch({ ...batchInput, prompt: 'https://x.com/alice' }, evaluate)
     expect(batch.items[0]?.plan?.intent).toBe('create')
     expect(batch.items[1]?.plan).toBeUndefined()
     expect(batch.items[1]?.error).toContain('重複')
@@ -786,7 +812,7 @@ test('single requests keep a short deadline while multiple-item refinement can t
             },
         )
         await vi.advanceTimersByTimeAsync(6001)
-        const batch = getBatch(await pending)
+        const batch = await pending
         expect(batch.items.map((item) => item.plan?.values.title)).toEqual(['First', 'Second'])
         const single = collectBatch(batchInput, async (request) => {
             await new Promise((resolve) => setTimeout(resolve, 6000))

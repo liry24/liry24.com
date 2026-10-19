@@ -85,36 +85,6 @@ const protectedMarkdown = async (content: string) => {
     return protectedValues
 }
 
-const postProofreadingPrompt = ({ content }: { content: string }) =>
-    `Proofread only content. Correct spelling, grammar, and unclear wording conservatively while retaining the author's intent, voice, and language. Preserve Markdown structure, the <!-- more --> summary delimiter and its surrounding blank lines, code blocks, inline code, links, URLs, every asset reference, raw HTML tags, entire HTML blocks and every <game:slug> mention exactly. Do not add facts or rewrite the article into a summary.\nDraft JSON:\n${JSON.stringify({ content })}`
-
-const postProofreadingOutput = ({ content }: { content: string }) =>
-    Output.object({
-        name: 'PostProofreading',
-        schema: z.strictObject({ content: nonEmptyText }).refine(async (output) => {
-            const [before, after] = await Promise.all([
-                protectedMarkdown(content),
-                protectedMarkdown(output.content),
-            ])
-            return JSON.stringify(before) === JSON.stringify(after)
-        }, 'Protected Markdown must remain unchanged.'),
-    })
-
-const postSlugOutput = () =>
-    Output.object({
-        name: 'PostSlug',
-        schema: z.strictObject({
-            slug: z
-                .string()
-                .min(1)
-                .max(80)
-                .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u),
-        }),
-    })
-
-const postSlugPrompt = ({ title, content }: { title: string; content: string }) =>
-    `Generate only a concise English URL slug for this blog post. Do not rewrite the title or content or return any other field.\nDraft JSON:\n${JSON.stringify({ title, content })}`
-
 export const postAiActions = {
     publication: {
         type: 'text-generation',
@@ -122,8 +92,18 @@ export const postAiActions = {
             title: z.string().refine((value) => Boolean(value.trim()), 'Write a title.'),
             content: z.string().refine((value) => Boolean(value.trim()), 'Write content.'),
         }),
-        prompt: postSlugPrompt,
-        output: postSlugOutput(),
+        prompt: ({ title, content }: { title: string; content: string }) =>
+            `Generate only a concise English URL slug for this blog post. Do not rewrite the title or content or return any other field.\nDraft JSON:\n${JSON.stringify({ title, content })}`,
+        output: Output.object({
+            name: 'PostSlug',
+            schema: z.strictObject({
+                slug: z
+                    .string()
+                    .min(1)
+                    .max(80)
+                    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u),
+            }),
+        }),
         options: {
             system,
             maxRetries: 0,
@@ -134,8 +114,19 @@ export const postAiActions = {
         input: z.strictObject({
             content: z.string().refine((value) => Boolean(value.trim()), 'Write content.'),
         }),
-        prompt: postProofreadingPrompt,
-        output: postProofreadingOutput,
+        prompt: ({ content }: { content: string }) =>
+            `Proofread only content. Correct spelling, grammar, and unclear wording conservatively while retaining the author's intent, voice, and language. Preserve Markdown structure, the <!-- more --> summary delimiter and its surrounding blank lines, code blocks, inline code, links, URLs, every asset reference, raw HTML tags, entire HTML blocks and every <game:slug> mention exactly. Do not add facts or rewrite the article into a summary.\nDraft JSON:\n${JSON.stringify({ content })}`,
+        output: ({ content }: { content: string }) =>
+            Output.object({
+                name: 'PostProofreading',
+                schema: z.strictObject({ content: nonEmptyText }).refine(async (output) => {
+                    const [before, after] = await Promise.all([
+                        protectedMarkdown(content),
+                        protectedMarkdown(output.content),
+                    ])
+                    return JSON.stringify(before) === JSON.stringify(after)
+                }, 'Protected Markdown must remain unchanged.'),
+            }),
         options: {
             system,
             maxRetries: 0,

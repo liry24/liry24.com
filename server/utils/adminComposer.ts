@@ -4,10 +4,12 @@ import type {
     Experimental_ChoiceQuestion,
 } from '@json-render/core'
 import type { ServerAdmin } from '@liria24/site-admin/server'
+import { UsageLimit } from 'void/limits'
 
 import type {
     ComposerBatch,
-    ComposerEvent,
+    ComposerItem,
+    ComposerItemInput,
     ComposerField,
     ComposerModel,
     ComposerPlan,
@@ -65,15 +67,15 @@ export type ComposerAdmin = {
     ) => Promise<{ items: Entry[]; total: number }>
     get: (model: ComposerModel, id: string) => Promise<Entry>
 }
-export const question = (
+const question = (
     instructions: string,
     criteria: Record<string, string>,
 ): Experimental_ChoiceQuestion => ({ type: 'choice', instructions, criteria })
-export const options = (values: readonly string[]) =>
+const options = (values: readonly string[]) =>
     Object.fromEntries([...new Set(values)].map((value, i) => ['v' + i, value]))
 
 // Parsing supplies facts and alternatives; the model decides what they mean.
-export function inputChoices(prompt: string, locale: string): string[] {
+function inputChoices(prompt: string, locale: string): string[] {
     const text = prompt.replace(/https?:\/\/[^\s<>"「」]+/gu, (url) => ' '.repeat(url.length))
     const words = [...new Intl.Segmenter(locale, { granularity: 'word' }).segment(text)].filter(
         (part) => part.isWordLike,
@@ -125,7 +127,7 @@ export function inputChoices(prompt: string, locale: string): string[] {
         .slice(0, 40)
 }
 
-export const inputQueryChoices = (prompt: string, locale: string): string[] =>
+const inputQueryChoices = (prompt: string, locale: string): string[] =>
     [
         ...new Set([
             ...[...prompt.matchAll(/「([^」]+)」|“([^”]+)”|"([^"]+)"/gu)].map(
@@ -139,7 +141,7 @@ export const inputQueryChoices = (prompt: string, locale: string): string[] =>
         .filter((value) => value.length <= 100)
         .slice(0, 40)
 
-export function selectedDate(
+function selectedDate(
     parts: (string | undefined)[],
     timeZone: string,
     currentTime: number,
@@ -156,42 +158,90 @@ export function selectedDate(
     }
 }
 
-export async function* composeAdmin(
-    input: ComposerRequest,
+type Decision = Awaited<ReturnType<Experimental_CompositionEvaluator>>
+type ItemInput = Pick<ComposerRequest, 'prompt' | 'locale' | 'timeZone' | 'context'> &
+    Pick<ComposerItemInput, 'model' | 'entryId'>
+type Classification = {
+    model: ComposerModel | null
+    intent: ComposerPlan['intent'] | 'resolve'
+    purpose: ComposerPlan['datePurpose']
+    details: boolean
+    queries: Map<ComposerModel, string | null>
+}
+
+const scalarData = (entry: Entry) =>
+    Object.fromEntries(
+        Object.entries(entry.data).flatMap(([key, value]) =>
+            typeof value === 'string' && value.length <= 200
+                ? [[key, value]]
+                : Array.isArray(value) && value.every((part) => typeof part === 'string')
+                  ? [
+                        [
+                            key,
+                            value
+                                .slice(0, 20)
+                                .filter((part) => part.length <= 100)
+                                .join(', '),
+                        ],
+                    ]
+                  : [],
+        ),
+    )
+
+const fieldQuestions = (candidates: string[], available: ComposerField[]) =>
+    Object.fromEntries(
+        available
+            .filter((field) => field.kind !== 'datetime' && field.key !== 'slug')
+            .map((field) => {
+                const icons = candidates
+                    .filter((value) => /^[a-z][a-z0-9-]*$/i.test(value))
+                    .map((value) => 'simple-icons:' + value.toLowerCase().replace(/[^a-z0-9]/g, ''))
+                const values = ['image', 'images', 'file'].includes(field.kind)
+                    ? []
+                    : (field.values ??
+                      (field.key === 'icon'
+                          ? [
+                                ...candidates.filter((value) =>
+                                    /^(simple-icons|mingcute):[a-z0-9-]+$/.test(value),
+                                ),
+                                ...icons,
+                            ]
+                          : field.kind === 'url'
+                            ? candidates.filter((value) => {
+                                  try {
+                                      return ['https:', 'http:'].includes(new URL(value).protocol)
+                                  } catch {
+                                      return false
+                                  }
+                              })
+                            : candidates))
+                return [
+                    'field.' + field.key,
+                    question(`Choose ${field.key} according to fieldPolicy.`, {
+                        hide: 'Unrelated, optional/defaulted and not requested, or unchanged: omit this field.',
+                        ask: 'Necessary input whose value cannot be inferred from the supplied facts.',
+                        ...(field.key === 'icon'
+                            ? {
+                                  empty: 'No confidently recognized applicable icon; leave this value empty. For an unknown profile service choose empty, never invent a brand or substitute a generic link icon.',
+                              }
+                            : {}),
+                        ...options(values),
+                    }),
+                ]
+            }),
+    )
+
+async function createContext(
+    input: ItemInput,
     admin: ComposerAdmin,
-    evaluate: Experimental_CompositionEvaluator,
     signal: AbortSignal,
-    currentTime = Date.now(),
-    multiple?: (
-        count: string,
-        routing: {
-            state: Record<string, unknown>
-            questions: Record<string, Experimental_ChoiceQuestion>
-        },
-    ) => Promise<ComposerBatch>,
-): AsyncGenerator<ComposerEvent> {
+    currentTime: number,
+    countRecords = false,
+) {
     signal.throwIfAborted()
     const models = admin.models
     const existing =
         input.model && input.entryId ? await admin.get(input.model, input.entryId) : undefined
-    const scalarData = (entry: Entry) =>
-        Object.fromEntries(
-            Object.entries(entry.data).flatMap(([key, value]) =>
-                typeof value === 'string' && value.length <= 200
-                    ? [[key, value]]
-                    : Array.isArray(value) && value.every((part) => typeof part === 'string')
-                      ? [
-                            [
-                                key,
-                                value
-                                    .slice(0, 20)
-                                    .filter((part) => part.length <= 100)
-                                    .join(', '),
-                            ],
-                        ]
-                      : [],
-            ),
-        )
     const queryChoices = inputQueryChoices(input.prompt, input.locale)
     const initialChoices = inputChoices(input.prompt, input.locale)
     const choices = [
@@ -207,53 +257,6 @@ export async function* composeAdmin(
         dateStyle: 'short',
         timeStyle: 'short',
     }).format(currentTime)
-    const fieldQuestions = (candidates: string[], available: ComposerField[]) =>
-        Object.fromEntries(
-            available
-                .filter((field) => field.kind !== 'datetime' && field.key !== 'slug')
-                .map((field) => {
-                    const icons = candidates
-                        .filter((value) => /^[a-z][a-z0-9-]*$/i.test(value))
-                        .map(
-                            (value) =>
-                                'simple-icons:' + value.toLowerCase().replace(/[^a-z0-9]/g, ''),
-                        )
-                    const values = ['image', 'images', 'file'].includes(field.kind)
-                        ? []
-                        : (field.values ??
-                          (field.key === 'icon'
-                              ? [
-                                    ...candidates.filter((value) =>
-                                        /^(simple-icons|mingcute):[a-z0-9-]+$/.test(value),
-                                    ),
-                                    ...icons,
-                                ]
-                              : field.kind === 'url'
-                                ? candidates.filter((value) => {
-                                      try {
-                                          return ['https:', 'http:'].includes(
-                                              new URL(value).protocol,
-                                          )
-                                      } catch {
-                                          return false
-                                      }
-                                  })
-                                : candidates))
-                    return [
-                        'field.' + field.key,
-                        question(`Choose ${field.key} according to fieldPolicy.`, {
-                            hide: 'Unrelated, optional/defaulted and not requested, or unchanged: omit this field.',
-                            ask: 'Necessary input whose value cannot be inferred from the supplied facts.',
-                            ...(field.key === 'icon'
-                                ? {
-                                      empty: 'No confidently recognized applicable icon; leave this value empty. For an unknown profile service choose empty, never invent a brand or substitute a generic link icon.',
-                                  }
-                                : {}),
-                            ...options(values),
-                        }),
-                    ]
-                }),
-        )
     const routingQuestions: Record<string, Experimental_ChoiceQuestion> = {
         model: question(
             'Choose by the subject and intended use of this record. Distinguish a service profile from a tool skill, and a standalone artwork from a product/project achievement. Screen context is only a hint. When the subject is ambiguous choose clarify instead of guessing.',
@@ -315,7 +318,7 @@ export async function* composeAdmin(
         routingQuestions.intent!.instructions +=
             ' The user explicitly selected this model to add data. Choose create for a blank entry or resolve to check an identifying value before adding.'
     }
-    if (input.batch)
+    if (countRecords)
         routingQuestions.itemCount = question(
             'How many separate new records are requested? Count records, not fields, tags, search results or game ranks. For search/navigation/editing or one record choose one. Follow explicit counts and separately listed subjects. Use unclear if the quantity cannot be established; never invent extra records.',
             {
@@ -361,28 +364,65 @@ export async function* composeAdmin(
             'Defaulted arrays stay hidden unless the user supplies or asks for them.',
         ],
     }
-    let questions = routingQuestions
-    let decision = await evaluate({ state, questions, signal })
-    signal.throwIfAborted()
-    const answer = (key: string) => decision.answers[key]?.choice ?? 'none'
-    const chosenValue = (key: string) => questions[key]?.criteria[answer(key)]
-    if (input.batch && multiple && !input.entryId && answer('itemCount') !== 'one') {
-        yield { type: 'batch', batch: await multiple(answer('itemCount'), { state, questions }) }
-        return
+    return {
+        input,
+        models,
+        initialChoices,
+        choices,
+        fields,
+        zonedNow,
+        currentTime,
+        state,
+        questions: routingQuestions,
     }
-    let model = input.model ?? models.find((item) => item.name === answer('model'))?.name ?? null
-    const initialIntent = input.entryId ? 'edit' : answer('intent')
-    const purpose = answer('datePurpose') as ComposerPlan['datePurpose']
-    const queries = new Map(
-        models.map((item) => {
-            const key = 'query.' + item.name
-            const choice = answer(key)
-            return [
-                item.name,
-                choice === 'none' ? null : choice === 'all' ? '' : (chosenValue(key) ?? ''),
-            ] as const
-        }),
-    )
+}
+
+function readClassification(
+    context: Awaited<ReturnType<typeof createContext>>,
+    decision: Decision,
+): Classification {
+    const { input, models, questions } = context
+    const answer = (key: string) => decision.answers[key]?.choice ?? 'none'
+    return {
+        model: input.model ?? models.find((model) => model.name === answer('model'))?.name ?? null,
+        intent: input.entryId ? 'edit' : (answer('intent') as Classification['intent']),
+        purpose: answer('datePurpose') as Classification['purpose'],
+        details: answer('formDetails') === 'resolve',
+        queries: new Map(
+            models.map((model) => {
+                const key = 'query.' + model.name
+                const choice = answer(key)
+                return [
+                    model.name,
+                    choice === 'none'
+                        ? null
+                        : choice === 'all'
+                          ? ''
+                          : (questions[key]?.criteria[choice] ?? ''),
+                ]
+            }),
+        ),
+    }
+}
+
+async function prepareItem(
+    context: Awaited<ReturnType<typeof createContext>>,
+    classification: Classification,
+    admin: ComposerAdmin,
+    signal: AbortSignal,
+) {
+    const {
+        input,
+        models,
+        choices,
+        initialChoices,
+        fields,
+        zonedNow,
+        state,
+        questions: routingQuestions,
+    } = context
+    const { model, intent: initialIntent, purpose, queries } = classification
+    let questions: Record<string, Experimental_ChoiceQuestion> = {}
     const lookupModels =
         input.entryId || !['resolve', 'search', 'edit'].includes(initialIntent)
             ? []
@@ -400,7 +440,7 @@ export async function* composeAdmin(
         page.items.map((entry) => ({ ...entry, model: page.model })),
     )
     const prepares = Boolean(model && ['create', 'resolve', 'edit'].includes(initialIntent))
-    const needsValues = prepares && answer('formDetails') === 'resolve'
+    const needsValues = prepares && classification.details
     const needsLookupDecision = pages.length > 0 && !['search', 'manage'].includes(initialIntent)
     if (needsLookupDecision || (prepares && purpose !== 'none') || needsValues) {
         const candidates = [
@@ -469,31 +509,50 @@ export async function* composeAdmin(
                 )
             }
         } else delete questions.datePurpose
-        decision = await evaluate({
-            state: {
-                ...state,
-                selectedModel: model,
-                initialIntent,
-                models: state.models.filter((item) => !model || item.name === model),
-                lookup: pages.map((page) => ({
-                    model: page.model,
-                    total: page.total,
-                    complete: page.items.length >= page.total,
-                    entries: page.items.map((entry) => ({ id: entry.id, data: scalarData(entry) })),
-                })),
-            },
-            questions,
-            signal,
-        })
-        signal.throwIfAborted()
-        model =
-            input.model ??
-            (questions.model
-                ? (models.find((item) => item.name === answer('model'))?.name ?? null)
-                : model)
     }
+    return {
+        context,
+        classification,
+        questions,
+        pages,
+        entries,
+        state: {
+            ...state,
+            selectedModel: model,
+            initialIntent,
+            models: state.models.filter((item) => !model || item.name === model),
+            lookup: pages.map((page) => ({
+                model: page.model,
+                total: page.total,
+                complete: page.items.length >= page.total,
+                entries: page.items.map((entry) => ({ id: entry.id, data: scalarData(entry) })),
+            })),
+        },
+    }
+}
+
+function finishItem(
+    prepared: Awaited<ReturnType<typeof prepareItem>>,
+    decision?: Decision,
+): ComposerPlan {
+    const { context, classification, questions, pages, entries } = prepared
+    const { input, models, currentTime } = context
+    const { purpose, queries } = classification
+    const answer = (key: string) => decision?.answers[key]?.choice ?? 'none'
+    const chosenValue = (key: string) => questions[key]?.criteria[answer(key)]
+    let model =
+        input.model ??
+        (questions.model
+            ? (models.find((item) => item.name === answer('model'))?.name ?? null)
+            : classification.model)
     const match = entries.find((entry) => entry.id === answer('entry'))
-    let intent = (input.entryId ? 'edit' : answer('intent')) as ComposerPlan['intent']
+    let intent = (
+        input.entryId
+            ? 'edit'
+            : answer('intent') === 'none'
+              ? classification.intent
+              : answer('intent')
+    ) as ComposerPlan['intent']
     if ((intent as string) === 'resolve') intent = 'clarify'
     let entryId = input.entryId
     if (intent === 'edit' && !entryId) {
@@ -593,7 +652,326 @@ export async function* composeAdmin(
             } else plan.datePurpose = 'none'
         }
     } else plan.datePurpose = 'none'
+    if (!input.entryId && plan.intent === 'edit') {
+        plan.intent = 'search'
+        plan.entryId = undefined
+        plan.visibleFields = []
+        plan.values = {}
+        plan.datePurpose = 'none'
+        plan.publishAt = ''
+        plan.dateIncomplete = false
+    }
+    return plan
+}
+
+async function parallel<T, R>(
+    values: T[],
+    task: (value: T, index: number) => Promise<R>,
+): Promise<R[]> {
+    const result: R[] = []
+    let next = 0
+    await Promise.all(
+        Array.from({ length: Math.min(2, values.length) }, async () => {
+            while (next < values.length) {
+                const index = next++
+                result[index] = await task(values[index]!, index)
+            }
+        }),
+    )
+    return result
+}
+
+function composerSources(prompt: string) {
+    const ranges = [
+        ...prompt.matchAll(/[^\n、;；]+/gu),
+        ...prompt.matchAll(/https?:\/\/[^\s<>"「」]+/gu),
+        ...prompt.matchAll(/「[^」]+」|“[^”]+”|"[^"]+"/gu),
+    ].map((match) => ({ start: match.index, end: match.index + match[0].length }))
+    ranges.push({ start: 0, end: prompt.length })
+    return [...new Map(ranges.map((range) => [range.start + ':' + range.end, range])).values()]
+}
+
+async function splitItems(
+    input: ComposerRequest,
+    count: string,
+    routing: Awaited<ReturnType<typeof createContext>>,
+    admin: ComposerAdmin,
+    evaluate: Experimental_CompositionEvaluator,
+    signal: AbortSignal,
+    now: number,
+): Promise<ComposerBatch> {
+    const empty = { requestId: input.requestId, items: [] }
+    const size = Number(count)
+    if (!Number.isInteger(size) || size < 2 || size > 10)
+        return {
+            ...empty,
+            notice:
+                count === 'overflow'
+                    ? '一度に作成できるのは10件までです。入力を分けてください。'
+                    : '何件作成するか、または作成する項目を入力してください。',
+        }
+    const sources = composerSources(input.prompt)
+    const queryValues = [
+        ...new Set(
+            sources.flatMap((source) =>
+                inputQueryChoices(input.prompt.slice(source.start, source.end), input.locale),
+            ),
+        ),
+    ]
+    if (sources.length > 255 || queryValues.length > 253)
+        return { ...empty, notice: '入力が複雑すぎるため、いくつかの依頼に分けてください。' }
+    const questions: Record<string, Experimental_ChoiceQuestion> = {}
+    for (let index = 0; index < size; index++) {
+        const fields: Record<string, Experimental_ChoiceQuestion> = {
+            source: question(
+                'Select the smallest COMPLETE original range for this record, including its requested details. Use the whole request only if the record cannot be isolated. Identical ranges are valid for explicitly requested blank copies.',
+                Object.fromEntries(
+                    sources.map((source, i) => [
+                        's' + i,
+                        input.prompt.slice(source.start, source.end),
+                    ]),
+                ),
+            ),
+            model: routing.questions.model!,
+            intent: question(
+                routing.questions.intent!.instructions,
+                Object.fromEntries(
+                    Object.entries(routing.questions.intent!.criteria).filter(([key]) =>
+                        ['create', 'resolve', 'clarify'].includes(key),
+                    ),
+                ),
+            ),
+            query: question(
+                "Choose this record's identifying VALUE following queryPolicy. Do not borrow another record's name or URL. Choose none for a blank creation.",
+                { none: 'No identifying value.', ...options(queryValues) },
+            ),
+            datePurpose: routing.questions.datePurpose!,
+            formDetails: routing.questions.formDetails!,
+        }
+        if (sources.length === 1) delete fields.source
+        if (!queryValues.length) delete fields.query
+        for (const [key, value] of Object.entries(fields))
+            questions['i' + index + '.' + key] = {
+                ...value,
+                instructions: `For record ${index + 1} of ${size} in input order: ${value.instructions}`,
+            }
+    }
+    const split = await evaluate({
+        state: { ...routing.state, sources, itemCount: size },
+        questions,
+        signal,
+    })
+    const answer = (index: number, key: string) =>
+        key === 'source' && sources.length === 1
+            ? 's0'
+            : (split.answers['i' + index + '.' + key]?.choice ?? (key === 'query' ? 'none' : ''))
+    const items = Array.from({ length: size }, (_, index): ComposerItemInput => {
+        const source = sources[Number(answer(index, 'source').slice(1))]
+        if (!source) throw new Error('Invalid source')
+        return { id: input.requestId + '.' + index, source, model: undefined }
+    })
+
+    const prepared = await Promise.all(
+        items.map(async (item, index) => {
+            try {
+                signal.throwIfAborted()
+                const context = await createContext(
+                    { ...input, prompt: input.prompt.slice(item.source.start, item.source.end) },
+                    admin,
+                    signal,
+                    now,
+                )
+                const model =
+                    admin.models.find((model) => model.name === answer(index, 'model'))?.name ??
+                    null
+                const query =
+                    answer(index, 'query') === 'none'
+                        ? null
+                        : (questions['i' + index + '.query']?.criteria[answer(index, 'query')] ??
+                          null)
+                const classification: Classification = {
+                    model,
+                    intent: answer(index, 'intent') as Classification['intent'],
+                    purpose: answer(index, 'datePurpose') as Classification['purpose'],
+                    details: answer(index, 'formDetails') === 'resolve',
+                    queries: new Map(
+                        admin.models.map((candidate) => [
+                            candidate.name,
+                            candidate.name === model ? query : null,
+                        ]),
+                    ),
+                }
+                return {
+                    index,
+                    item,
+                    prepared: await prepareItem(context, classification, admin, signal),
+                }
+            } catch (error) {
+                return { index, item: failedItem(item, error, signal), prepared: undefined }
+            }
+        }),
+    )
     signal.throwIfAborted()
-    yield { type: 'plan', plan }
-    yield { type: 'complete' }
+    const resolved: ComposerItem[] = prepared.map(({ item }) => item)
+    const chunks: (typeof prepared)[] = []
+    let questionCount = 0
+    for (const job of prepared) {
+        if (!job.prepared) continue
+        const count = Object.keys(job.prepared.questions).length
+        if (!count) {
+            resolved[job.index] = { ...job.item, plan: finishItem(job.prepared) }
+            continue
+        }
+        if (count > 64) throw new Error('Too many questions for one item')
+        if (!chunks.length || questionCount + count > 64) {
+            chunks.push([])
+            questionCount = 0
+        }
+        chunks.at(-1)!.push(job)
+        questionCount += count
+    }
+    await parallel(chunks, async (chunk) => {
+        const questions: Record<string, Experimental_ChoiceQuestion> = {}
+        const states: Record<string, unknown> = {}
+        for (const job of chunk) {
+            states['i' + job.index] = job.prepared!.state
+            for (const [key, question] of Object.entries(job.prepared!.questions)) {
+                questions['i' + job.index + '.' + key] = {
+                    ...question,
+                    instructions: `Use ONLY state.items.i${job.index} for record ${job.index + 1}; apply its fieldPolicy. ${question.instructions}`,
+                }
+            }
+        }
+        try {
+            signal.throwIfAborted()
+            const decision = await evaluate({
+                state: { originalRequest: input.prompt, items: states },
+                questions,
+                signal,
+            })
+            signal.throwIfAborted()
+            for (const job of chunk) {
+                const answers = Object.fromEntries(
+                    Object.keys(job.prepared!.questions).map((key) => [
+                        key,
+                        decision.answers['i' + job.index + '.' + key]!,
+                    ]),
+                )
+                resolved[job.index] = { ...job.item, plan: finishItem(job.prepared!, { answers }) }
+            }
+        } catch (error) {
+            for (const job of chunk) resolved[job.index] = failedItem(job.item, error, signal)
+        }
+    })
+    signal.throwIfAborted()
+    const identities = new Set<string>()
+    for (const item of resolved) {
+        const href = item.plan?.model === 'socials' ? item.plan.values.href : undefined
+        if (typeof href !== 'string') continue
+        const identity = new URL(href).href
+        if (identities.has(identity)) {
+            item.plan = undefined
+            item.error = '同じプロフィールURLが重複しています。入力を確認してください。'
+        }
+        identities.add(identity)
+    }
+    return { requestId: input.requestId, items: resolved }
+}
+
+function failedItem(item: ComposerItemInput, error: unknown, signal: AbortSignal): ComposerItem {
+    signal.throwIfAborted()
+    if (error instanceof UsageLimit || (error instanceof Error && error.name === 'TimeoutError'))
+        throw error
+    return { ...item, error: 'この項目を準備できませんでした。再試行してください。' }
+}
+
+export async function composeAdminRequest(
+    input: ComposerRequest,
+    admin: ComposerAdmin,
+    evaluate: Experimental_CompositionEvaluator,
+    requestSignal: AbortSignal,
+    now = Date.now(),
+): Promise<ComposerBatch> {
+    const signal = AbortSignal.any([requestSignal, AbortSignal.timeout(15000)])
+    const singleSignal = AbortSignal.any([signal, AbortSignal.timeout(5000)])
+    async function resolveItem(
+        item: ComposerItemInput,
+        itemSignal: AbortSignal,
+    ): Promise<ComposerItem> {
+        try {
+            const context = await createContext(
+                {
+                    ...input,
+                    ...item,
+                    prompt: input.prompt.slice(item.source.start, item.source.end),
+                },
+                admin,
+                itemSignal,
+                now,
+            )
+            const decision = await evaluate({
+                state: context.state,
+                questions: context.questions,
+                signal: itemSignal,
+            })
+            itemSignal.throwIfAborted()
+            const prepared = await prepareItem(
+                context,
+                readClassification(context, decision),
+                admin,
+                itemSignal,
+            )
+            const details = Object.keys(prepared.questions).length
+                ? await evaluate({
+                      state: prepared.state,
+                      questions: prepared.questions,
+                      signal: itemSignal,
+                  })
+                : undefined
+            itemSignal.throwIfAborted()
+            return { ...item, plan: finishItem(prepared, details) }
+        } catch (error) {
+            return failedItem(item, error, itemSignal)
+        }
+    }
+    if (input.items) {
+        const items = await parallel(input.items, (item) =>
+            resolveItem(item, input.items!.length === 1 ? singleSignal : signal),
+        )
+        signal.throwIfAborted()
+        return { requestId: input.requestId, items }
+    }
+    const context = await createContext(input, admin, singleSignal, now, true)
+    const decision = await evaluate({
+        state: context.state,
+        questions: context.questions,
+        signal: singleSignal,
+    })
+    singleSignal.throwIfAborted()
+    const count = decision.answers.itemCount?.choice ?? 'one'
+    if (count !== 'one') return splitItems(input, count, context, admin, evaluate, signal, now)
+    const prepared = await prepareItem(
+        context,
+        readClassification(context, decision),
+        admin,
+        singleSignal,
+    )
+    const details = Object.keys(prepared.questions).length
+        ? await evaluate({
+              state: prepared.state,
+              questions: prepared.questions,
+              signal: singleSignal,
+          })
+        : undefined
+    singleSignal.throwIfAborted()
+    return {
+        requestId: input.requestId,
+        items: [
+            {
+                id: input.requestId + '.0',
+                source: { start: 0, end: input.prompt.length },
+                plan: finishItem(prepared, details),
+            },
+        ],
+    }
 }

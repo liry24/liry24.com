@@ -1,7 +1,11 @@
+import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 import { afterEach, expect, test, vi } from 'vitest'
-import { computed, effectScope, onScopeDispose, reactive, ref, shallowRef, watch } from 'vue'
+import { effectScope, reactive, ref, watch } from 'vue'
 
-import { usePostProofreading } from '../app/composables/usePostProofreading'
+import { usePostProofreading } from '../../app/composables/usePostProofreading'
+
+const { aiBoundary } = vi.hoisted(() => ({ aiBoundary: vi.fn() }))
+mockNuxtImport('useAi', () => aiBoundary)
 
 const scopes: ReturnType<typeof effectScope>[] = []
 afterEach(() => {
@@ -9,8 +13,6 @@ afterEach(() => {
     vi.unstubAllGlobals()
 })
 function setup() {
-    for (const [name, value] of Object.entries({ computed, onScopeDispose, shallowRef, watch }))
-        vi.stubGlobal(name, value)
     const values = reactive({ title: '', content: 'Original', tags: [] as string[] })
     const identity = ref(['new', 'ja']),
         blocked = ref(false)
@@ -30,8 +32,7 @@ function setup() {
         status.value = 'success'
     })
     const action = { data, status, error, clear, execute }
-    const useAi = vi.fn(() => action)
-    vi.stubGlobal('useAi', useAi)
+    const useAi = aiBoundary.mockReset().mockReturnValue(action)
     const form = {
         state: { values },
         atom: {

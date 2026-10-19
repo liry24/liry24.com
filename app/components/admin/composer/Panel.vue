@@ -1,34 +1,18 @@
 <script setup lang="ts">
-const { locale } = useI18n()
-const route = useRoute()
-const { prompt, scope, busy: writing, requestId, result, saved, setBusy } = useAdminComposer()
-
-const composing = ref(false)
-const selection = ref<ComposerItemInput[]>()
-const timeZone = ref('UTC')
-
-const input = (): ComposerRequest | null => {
-    if (!import.meta.client || !prompt.value.trim()) return null
-
-    const model = composerModels.find((name) => route.path.split('/')[2] === name)
-
-    const entryId =
-        'id' in route.params && typeof route.params.id === 'string' ? route.params.id : undefined
-
-    return {
-        prompt: prompt.value.trim(),
-        batch: true,
-        requestId: requestId.value,
-
-        locale: locale.value === 'ja' ? 'ja' : 'en',
-        timeZone: timeZone.value,
-
-        context: model ? { model, entryId } : undefined,
-        items: selection.value,
-    }
-}
-
-const { running, error, run, cancel } = useAdminComposerRequest(input, composing, result)
+const {
+    prompt,
+    scope,
+    busy: writing,
+    composing,
+    pending: running,
+    requestId,
+    result,
+    saved,
+    setBusy,
+    error,
+    retry,
+    selectItem,
+} = useAdminComposer()
 
 const forms = shallowReactive<Record<string, (() => Promise<void>) | undefined>>({})
 const eligible = computed(
@@ -46,10 +30,6 @@ const saveable = computed(
     () => eligible.value.length > 0 && eligible.value.every((item) => forms[item.id]),
 )
 
-const select = (item: ComposerItem, model?: ComposerModel, entryId?: string) => {
-    selection.value = [{ id: item.id, source: item.source, model, entryId }]
-}
-
 const saveAll = async () => {
     if (!saveable.value || writing.value || running.value) return
 
@@ -62,20 +42,9 @@ const saveAll = async () => {
     }
 }
 
-const removeNavigationGuard = useRouter().beforeEach(() => !writing.value)
-
-onScopeDispose(removeNavigationGuard)
-
-onMounted(() => {
-    timeZone.value = Intl.DateTimeFormat().resolvedOptions().timeZone
-})
 watch(
-    [scope, requestId],
+    requestId,
     () => {
-        cancel()
-
-        selection.value = undefined
-
         for (const key of Object.keys(forms)) delete forms[key]
     },
     { flush: 'sync' },
@@ -123,7 +92,7 @@ watch(
                         label="Retry"
                         variant="outline"
                         :disabled="running || writing"
-                        @click="run"
+                        @click="retry"
                     />
                 </template>
             </UAlert>
@@ -162,7 +131,7 @@ watch(
                     <AdminComposerItem
                         :item
                         :pending="running || writing"
-                        @select="(model, entryId) => select(item, model, entryId)"
+                        @select="(model, entryId) => selectItem(item, model, entryId)"
                         @ready="(submit) => (forms[item.id] = submit)"
                     />
                 </div>

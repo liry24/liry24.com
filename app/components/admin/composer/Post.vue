@@ -6,7 +6,7 @@ interface Props {
 }
 const { plan, pending, itemId } = defineProps<Props>()
 
-const { preparePost, preparation } = useAdminComposer()
+const { openPost, preparation } = useAdminComposer()
 const { values, publishAt, baseline } = toRefs(preparation(itemId))
 
 watch(
@@ -61,7 +61,7 @@ watch(
                     size="lg"
                     block
                     :disabled="pending"
-                    @click="preparePost(itemId, values, publishAt)"
+                    @click="openPost(itemId, values, publishAt)"
                 />
             </template>
         </AdminComposerSurface>

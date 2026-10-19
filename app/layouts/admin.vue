@@ -12,6 +12,45 @@ const auth = useSiteAdminAuthScope(undefined, connection)
 const models = useSiteAdminModels(connection, auth, false)
 
 const sidebarCollapsed = ref(false)
+const navigation = [
+    [
+        {
+            label: 'Dashboard',
+            icon: 'mingcute:chart-bar-fill',
+            to: '/admin',
+        },
+        {
+            label: 'Data',
+            icon: 'mingcute:storage-fill',
+            to: '/admin/data',
+        },
+    ],
+    [
+        {
+            label: 'Users',
+            icon: 'mingcute:group-2-fill',
+            to: '/admin/users',
+        },
+        {
+            label: 'Settings',
+            icon: 'mingcute:settings-1-fill',
+            to: '/admin/settings',
+        },
+    ],
+    [
+        {
+            label: 'GitHub',
+            icon: 'mingcute:github-fill',
+            to: 'https://github.com/Liry24/liry24.com',
+            target: '_blank',
+        },
+        {
+            label: 'Back to site',
+            icon: 'mingcute:arrow-left-line',
+            to: '/',
+        },
+    ],
+]
 
 onMounted(() => {
     if (!models.data.value) void models.execute({ dedupe: 'defer' })
@@ -81,48 +120,10 @@ useHead({ titleTemplate: '%s | Liry24 Admin' })
                     </div>
                 </template>
 
-                <template #default="{ collapsed }">
+                <template #default="sidebar">
                     <UNavigationMenu
-                        :collapsed
-                        :items="[
-                            [
-                                {
-                                    label: 'Dashboard',
-                                    icon: 'mingcute:chart-bar-fill',
-                                    to: '/admin',
-                                },
-                                {
-                                    label: 'Data',
-                                    icon: 'mingcute:storage-fill',
-                                    to: '/admin/data',
-                                },
-                            ],
-                            [
-                                {
-                                    label: 'Users',
-                                    icon: 'mingcute:group-2-fill',
-                                    to: '/admin/users',
-                                },
-                                {
-                                    label: 'Settings',
-                                    icon: 'mingcute:settings-1-fill',
-                                    to: '/admin/settings',
-                                },
-                            ],
-                            [
-                                {
-                                    label: 'GitHub',
-                                    icon: 'mingcute:github-fill',
-                                    to: 'https://github.com/Liry24/liry24.com',
-                                    target: '_blank',
-                                },
-                                {
-                                    label: 'Back to site',
-                                    icon: 'mingcute:arrow-left-line',
-                                    to: '/',
-                                },
-                            ],
-                        ]"
+                        :collapsed="sidebar.collapsed"
+                        :items="navigation"
                         orientation="vertical"
                         tooltip
                         popover

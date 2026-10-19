@@ -1,71 +1,186 @@
+import type { InjectionKey } from 'vue'
+
+const composerKey: InjectionKey<ReturnType<typeof createAdminComposer>> = Symbol('admin-composer')
+
 export function useAdminComposer() {
+    const shared = inject(composerKey, null)
+    if (shared) return shared
+    const composer = createAdminComposer()
+    provide(composerKey, composer)
+    return composer
+}
+
+function createAdminComposer() {
     const { user } = useUserSession()
     const { locale } = useI18n()
+    const route = useRoute()
     const scope = computed(() => `${user.value?.id ?? ''}:${locale.value}`)
-    const open = useState('admin-composer-open', () => false)
-    const busy = useState('admin-composer-busy', () => false)
-    const operations = useState<Record<string, boolean>>('admin-composer-operations', () => ({}))
-    const prompt = useState('admin-composer-prompt', () => '')
-    const requestText = useState('admin-composer-text', () => '')
-    const requestId = useState('admin-composer-request', () => '')
-    const result = useState<ComposerBatch | null>('admin-composer-result', () => null)
-    const saved = useState<Record<string, boolean>>('admin-composer-saved', () => ({}))
-    const post = useState<{
-        scope: string
-        itemId: string
-        values: ComposerPlan['values']
-        publishAt: string
-    } | null>('admin-composer-post', () => null)
-    const preparations = useState<
-        Record<
+    const state = useState('admin-composer', () => ({
+        owner: '',
+        open: false,
+        prompt: '',
+        text: '',
+        key: '',
+        requestId: '',
+        result: null as ComposerBatch | null,
+        saved: {} as Record<string, boolean>,
+        post: null as {
+            scope: string
+            itemId: string
+            values: ComposerPlan['values']
+            publishAt: string
+        } | null,
+        preparations: {} as Record<
             string,
-            {
-                values: ComposerPlan['values']
-                publishAt: string
-                baseline: Record<string, unknown>
-            }
-        >
-    >('admin-composer-preparations', () => ({}))
-    const owner = useState('admin-composer-owner', () => '')
+            { values: ComposerPlan['values']; publishAt: string; baseline: Record<string, unknown> }
+        >,
+    }))
+    const { open, prompt, requestId, result, saved, post, preparations } = toRefs(state.value)
+    const composing = ref(false)
+    const pending = ref(false)
+    const error = ref('')
+    const operations = reactive<Record<string, boolean>>({})
+    const busy = computed(() => Object.keys(operations).length > 0)
+    let selection: ComposerItemInput[] | undefined
+    const timeZone = import.meta.client ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC'
+    const mounted = ref(false)
+    const active = computed(
+        () => mounted.value && (open.value || route.path.replace(/\/$/, '') === '/admin/data'),
+    )
+    const context = computed(() => {
+        const model = composerModels.find((name) => route.path.split('/')[2] === name)
+        const entryId =
+            'id' in route.params && typeof route.params.id === 'string' && route.params.id !== 'new'
+                ? route.params.id
+                : undefined
+        return model ? { model, entryId } : undefined
+    })
+    const identity = computed(() =>
+        JSON.stringify([scope.value, prompt.value.trim(), timeZone, context.value]),
+    )
+    let controller: AbortController | undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let generation = 0
+
     watch(
         scope,
         (value) => {
-            if (owner.value === value) return
-            owner.value = value
+            if (state.value.owner === value) return
+            state.value.owner = value
             open.value = false
-            operations.value = {}
-            busy.value = false
             prompt.value = ''
             post.value = null
+            composing.value = false
+            for (const id of Object.keys(operations)) delete operations[id]
         },
         { flush: 'sync', immediate: true },
     )
-    watch(
-        () => prompt.value.trim(),
-        (value) => {
-            if (requestText.value === value) return
-            requestText.value = value
-            requestId.value = value ? crypto.randomUUID() : ''
-            result.value = null
-            saved.value = {}
-            preparations.value = {}
-        },
-        { flush: 'sync', immediate: true },
-    )
-    function setBusy(id: string, value: boolean) {
-        if (value) operations.value[id] = true
-        else delete operations.value[id]
-        busy.value = Object.values(operations.value).some(Boolean)
+
+    function cancel() {
+        generation++
+        clearTimeout(timer)
+        controller?.abort()
+        pending.value = false
     }
-    function preparation(id: string) {
+    async function retry() {
+        cancel()
+        if (!active.value || composing.value || busy.value || !prompt.value.trim()) return
+        const request: ComposerRequest = {
+            prompt: prompt.value.trim(),
+            requestId: requestId.value,
+            locale: locale.value === 'ja' ? 'ja' : 'en',
+            timeZone: timeZone,
+            context: context.value,
+            items: selection,
+        }
+        const ownGeneration = generation
+        controller = new AbortController()
+        pending.value = true
+        error.value = ''
+        try {
+            const batch = await $fetch<ComposerBatch>('/api/admin/compose', {
+                method: 'POST',
+                body: request,
+                signal: controller.signal,
+                retry: 0,
+            })
+            if (ownGeneration !== generation) return
+            if (batch.requestId !== request.requestId)
+                throw new Error('The response belongs to another request.')
+            result.value =
+                request.items && result.value?.requestId === batch.requestId
+                    ? {
+                          ...result.value,
+                          items: result.value.items.map(
+                              (item) => batch.items.find((next) => next.id === item.id) ?? item,
+                          ),
+                      }
+                    : batch
+            selection = undefined
+        } catch (cause) {
+            if (ownGeneration !== generation) return
+            const failure = cause as {
+                statusCode?: number
+                data?: { message?: string }
+                message?: string
+            }
+            error.value =
+                failure.statusCode === 401 || failure.statusCode === 403
+                    ? 'Your session cannot access this content. Sign in again.'
+                    : failure.data?.message || failure.message || 'Could not prepare the form.'
+        } finally {
+            if (ownGeneration === generation) pending.value = false
+        }
+    }
+    function schedule() {
+        cancel()
+        if (state.value.key !== identity.value) {
+            state.value.key = identity.value
+            const text = prompt.value.trim()
+            if (state.value.text !== text) {
+                state.value.text = text
+                requestId.value = text ? crypto.randomUUID() : ''
+                saved.value = {}
+                preparations.value = {}
+            }
+            result.value = null
+            selection = undefined
+        }
+        error.value = ''
+        if (!active.value || composing.value || !prompt.value.trim()) return
+        if (!selection && result.value?.requestId === requestId.value) return
+        pending.value = true
+        timer = setTimeout(() => void retry(), 300)
+    }
+    watch([active, identity, composing], schedule, { flush: 'sync', immediate: true })
+    onMounted(() => {
+        mounted.value = true
+    })
+    onScopeDispose(cancel)
+    const removeNavigationGuard = useRouter().beforeEach(() => !busy.value)
+    onScopeDispose(removeNavigationGuard)
+
+    function selectItem(item: ComposerItem, model?: ComposerModel, entryId?: string) {
+        if (busy.value) return
+        selection = [{ id: item.id, source: item.source, model, entryId }]
+        schedule()
+    }
+    function setBusy(id: string, value: boolean) {
+        if (value) operations[id] = true
+        else delete operations[id]
+    }
+    function preparation(
+        id: string,
+        baseline: Record<string, unknown> = { title: '', tags: [], publishAt: '' },
+    ) {
         preparations.value[id] ??= {
             values: { title: '', tags: [] },
             publishAt: '',
-            baseline: { title: '', tags: [], publishAt: '' },
+            baseline: structuredClone(toRaw(baseline)),
         }
         return preparations.value[id]!
     }
-    function preparePost(itemId: string, values: ComposerPlan['values'], publishAt: string) {
+    function openPost(itemId: string, values: ComposerPlan['values'], publishAt: string) {
         post.value = {
             scope: scope.value,
             itemId,
@@ -77,14 +192,19 @@ export function useAdminComposer() {
     }
     return {
         open,
-        busy,
         prompt,
+        composing,
+        pending,
+        busy,
+        error,
+        result,
+        retry,
+        selectItem,
+        openPost,
         post,
         preparation,
         scope,
-        preparePost,
         requestId,
-        result,
         saved,
         setBusy,
     }

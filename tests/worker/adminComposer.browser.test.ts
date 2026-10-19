@@ -122,6 +122,24 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             )
             const page = await context.newPage()
             page.on('pageerror', (error) => errors.push(error.message))
+            const navigate = (path: string) =>
+                page.evaluate(
+                    (path) =>
+                        (
+                            document.querySelector('#__nuxt') as any
+                        ).__vue_app__.config.globalProperties.$nuxt.$router.push(path),
+                    path,
+                )
+            await page.goto(new URL('/admin/@test', url).href, { waitUntil: 'domcontentloaded' })
+            await page.waitForFunction(
+                () =>
+                    (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
+                        .$nuxt?.isHydrating === false,
+            )
+            await page.waitForFunction(() => document.title === 'test | Liry24 Admin')
+            await navigate('/admin/@another')
+            await page.waitForFunction(() => document.title === 'another | Liry24 Admin')
+            assert(!errors.some((message) => message.includes('Invalid linked format')))
             let calls = 0,
                 writes = 0
             page.on('request', (request) => {
@@ -202,19 +220,15 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                                     makePlan('posts', { title: 'Second article' }),
                                 ]
                     await route.fulfill({
-                        contentType: 'application/x-ndjson',
-                        body:
-                            JSON.stringify({
-                                type: 'batch',
-                                batch: {
-                                    requestId: request.requestId,
-                                    items: plans.map((plan, i) => ({
-                                        id: request.requestId + '.' + i,
-                                        source: { start: 0, end: request.prompt.length },
-                                        plan,
-                                    })),
-                                },
-                            }) + '\n',
+                        contentType: 'application/json',
+                        body: JSON.stringify({
+                            requestId: request.requestId,
+                            items: plans.map((plan, i) => ({
+                                id: request.requestId + '.' + i,
+                                source: { start: 0, end: request.prompt.length },
+                                plan,
+                            })),
+                        }),
                     })
                     return
                 }
@@ -229,17 +243,20 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                           },
                 )
                 await route.fulfill({
-                    contentType: 'application/x-ndjson',
-                    body:
-                        JSON.stringify({ type: 'plan', plan }) +
-                        '\n' +
-                        JSON.stringify({
-                            type: 'complete',
-                        }) +
-                        '\n',
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        requestId: request.requestId,
+                        items: [
+                            {
+                                id: request.requestId + '.0',
+                                source: { start: 0, end: request.prompt.length },
+                                plan,
+                            },
+                        ],
+                    }),
                 })
             })
-            const html = await (await server.fetch('/admin', { headers: { cookie } })).text()
+            const html = await (await server.fetch('/admin/data', { headers: { cookie } })).text()
             assert.match(
                 html,
                 /<input[^>]*id="admin-compose-input"/,
@@ -248,7 +265,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             const noJsContext = await browser.newContext({ javaScriptEnabled: false })
             await noJsContext.addCookies(await context.cookies())
             const noJsPage = await noJsContext.newPage()
-            await noJsPage.goto(new URL('/admin', url).href)
+            await noJsPage.goto(new URL('/admin/data', url).href)
             assert(await noJsPage.getByRole('textbox', { name: 'Content request' }).isVisible())
             await noJsContext.close()
             let releaseModels!: () => void
@@ -261,7 +278,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 await modelsGate
                 await route.continue()
             })
-            await page.goto(new URL('/admin', url).href, { waitUntil: 'domcontentloaded' })
+            await page.goto(new URL('/admin/data', url).href, { waitUntil: 'domcontentloaded' })
             assert(
                 await page.getByRole('textbox', { name: 'Content request' }).isVisible(),
                 'Input does not wait for models',
@@ -279,6 +296,17 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.getByLabel('Content request').fill('new social')
             await page.getByRole('button', { name: 'Save', exact: true }).waitFor()
             await page.getByLabel('Label', { exact: true }).fill('My GitHub')
+            const beforeToggle = calls
+            await page.keyboard.press('Control+k')
+            await page.getByRole('dialog').getByLabel('Label', { exact: true }).waitFor()
+            assert.equal(
+                await page.getByRole('dialog').getByLabel('Label', { exact: true }).inputValue(),
+                'My GitHub',
+            )
+            await page.keyboard.press('Escape')
+            await page.getByRole('dialog').waitFor({ state: 'hidden' })
+            assert.equal(await page.getByLabel('Label', { exact: true }).inputValue(), 'My GitHub')
+            assert.equal(calls, beforeToggle, 'Switching surfaces reuses the result')
             await page.getByLabel('Content request').fill('second')
             await page.getByText('Preparing…', { exact: true }).waitFor({ state: 'hidden' })
             assert.equal(
@@ -301,14 +329,17 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.getByRole('button', { name: 'Save', exact: true }).click()
             await page.waitForFunction(
                 () =>
-                    (document.querySelector('#__nuxt') as any).__vue_app__.config.globalProperties
-                        .$nuxt.payload.state['$sadmin-composer-busy'] === true,
+                    (document.querySelector('#admin-compose-input') as HTMLInputElement)?.disabled,
             )
             assert(await page.getByLabel('Content request').isDisabled())
             await page.keyboard.press('Control+k')
             assert.equal(await page.getByRole('dialog').count(), 0, 'Saving keeps its form mounted')
-            await page.getByRole('link', { name: 'Works', exact: true }).click()
-            assert.equal(new URL(page.url()).pathname, '/admin', 'Navigation waits for the save')
+            await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
+            assert.equal(
+                new URL(page.url()).pathname,
+                '/admin/data',
+                'Navigation waits for the save',
+            )
             releaseSave()
             await page.getByText('Saved', { exact: true }).waitFor()
             assert.equal(writes, 1, 'Saving is explicit')
@@ -339,7 +370,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                     (draft: any) => draft.value.title === 'Existing unsaved title',
                 )
             })
-            await page.getByRole('link', { name: 'Admin home', exact: true }).click()
+            await page.getByRole('link', { name: 'Data', exact: true }).click()
             await page.getByLabel('Content request').fill('new post with schedule')
             await page.getByRole('button', { name: 'Continue in Post Editor' }).click()
             await page.waitForURL('**/admin/posts/new?composer=*', { timeout: 10000 })
@@ -356,7 +387,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 await page.getByLabel('Publish at', { exact: true }).inputValue(),
                 '2027-01-20T18:00',
             )
-            await page.getByRole('button', { name: 'Compose content', exact: true }).click()
+            await page.keyboard.press('Control+k')
             await page.getByRole('dialog').waitFor()
             await page.keyboard.press('Escape')
             await page.getByRole('dialog').waitFor({ state: 'hidden' })
@@ -366,7 +397,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             assert.equal(await page.locator('#admin-compose-input').count(), 1)
             await page.keyboard.press('Escape')
             await page.getByRole('dialog').waitFor({ state: 'hidden' })
-            await page.getByRole('link', { name: 'Admin home', exact: true }).click()
+            await page.getByRole('link', { name: 'Data', exact: true }).click()
             await page.getByLabel('Content request').fill('unknown')
             await page.getByText('どの種類のデータを追加しますか？').waitFor()
             const beforeSelect = calls
@@ -401,7 +432,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.waitForURL('**/admin/posts/new?composer=*', { timeout: 10000 })
             await page.getByLabel('Title', { exact: true }).fill('First edited article')
             await page.getByLabel('Content', { exact: true }).fill('First article body')
-            await page.getByRole('button', { name: 'Compose content', exact: true }).click()
+            await page.keyboard.press('Control+k')
             await page
                 .getByRole('dialog')
                 .locator('[data-composer-item]')
@@ -416,7 +447,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             )
             assert.equal(await page.getByLabel('Content', { exact: true }).inputValue(), '')
             await page.getByLabel('Content', { exact: true }).fill('Second article body')
-            await page.getByRole('button', { name: 'Compose content', exact: true }).click()
+            await page.keyboard.press('Control+k')
             await page
                 .getByRole('dialog')
                 .locator('[data-composer-item]')
@@ -433,8 +464,8 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 await page.getByLabel('Content', { exact: true }).inputValue(),
                 'First article body',
             )
-            await page.getByRole('link', { name: 'Posts', exact: true }).click()
-            await page.getByRole('button', { name: /^New Post/ }).click()
+            await navigate('/admin/posts/new')
+            await page.getByLabel('Title', { exact: true }).waitFor()
             assert.equal(
                 await page.getByLabel('Title', { exact: true }).inputValue(),
                 'Existing unsaved title',
@@ -443,7 +474,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 await page.getByLabel('Content', { exact: true }).inputValue(),
                 'Existing unsaved body',
             )
-            await page.getByRole('link', { name: 'Admin home', exact: true }).click()
+            await page.getByRole('link', { name: 'Data', exact: true }).click()
             await page.getByLabel('Content request').fill('batch partial')
             await page
                 .locator('[data-composer-item]')
@@ -475,7 +506,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 .waitFor()
             assert.equal(writes, beforePartial + 3, 'Retry saves only the failed item')
             await page.setViewportSize({ width: 390, height: 844 })
-            await page.goto(new URL('/admin', url).href, { waitUntil: 'domcontentloaded' })
+            await page.goto(new URL('/admin/data', url).href, { waitUntil: 'domcontentloaded' })
             await page.getByLabel('Content request').waitFor()
             assert(
                 await page.evaluate(
