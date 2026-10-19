@@ -215,7 +215,7 @@ onBeforeRouteLeave(() => {
                                 <Markdown
                                     :value="values.content"
                                     :plugins="[postMarkdownSecurity]"
-                                    class="sentence wrap-break-word *:first:mt-0 *:last:mb-0"
+                                    class="wrap-break-word *:first:mt-0 *:last:mb-0"
                                 />
                             </Suspense>
                         </section>

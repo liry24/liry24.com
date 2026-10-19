@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import type { GameMetric, GameValue } from '~~/shared/utils/games'
-import { formatGameValue } from '~~/shared/utils/games'
-const props = defineProps<{
+interface Props {
     modelName: string
     values: Record<string, unknown>
     form: {
@@ -12,25 +10,29 @@ const props = defineProps<{
     }
     upload: ReturnType<typeof useAdminForm>['upload']
     disabled?: boolean
-}>()
-const games = useAdminEntries('games', { all: true, immediate: props.modelName === 'gameStats' })
-const metrics = computed(() => (props.values.metrics ?? []) as GameMetric[])
+}
+const { modelName, values, form, upload, disabled } = defineProps<Props>()
+
+const games = useAdminEntries('games', { all: true, immediate: modelName === 'gameStats' })
+const metrics = computed(() => (values.metrics ?? []) as GameMetric[])
 const selectedGame = computed(() =>
-    games.data.value?.items.find((entry) => entry.id === props.values.game),
+    games.data.value?.items.find((entry) => entry.id === values.game),
 )
 const definitions = computed(() => (selectedGame.value?.data.metrics ?? []) as GameMetric[])
-const statValues = computed(() => (props.values.values ?? []) as GameValue[])
-function changeValue(key: string, patch: Partial<GameValue> | null) {
+const statValues = computed(() => (values.values ?? []) as GameValue[])
+const imageDescriptor = { key: 'image', kind: 'image', label: 'Image' }
+
+const changeValue = (key: string, patch: Partial<GameValue> | null) => {
     const index = statValues.value.findIndex((item) => item.key === key)
     if (!patch) {
-        if (index >= 0) props.form.removeFieldValue('values', index)
-    } else if (index < 0) props.form.pushFieldValue('values', { key, value: 0, ...patch })
+        if (index >= 0) form.removeFieldValue('values', index)
+    } else if (index < 0) form.pushFieldValue('values', { key, value: 0, ...patch })
     else
         for (const [field, value] of Object.entries(patch))
-            props.form.setFieldValue(`values[${index}].${field}`, value)
+            form.setFieldValue(`values[${index}].${field}`, value)
 }
-const imageDescriptor = { key: 'image', kind: 'image', label: 'Image' }
 </script>
+
 <template>
     <fieldset
         :disabled="disabled || (modelName === 'gameStats' && games.status.value === 'pending')"

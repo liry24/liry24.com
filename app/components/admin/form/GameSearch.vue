@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import type { GameSearchResult } from '~~/shared/utils/igdb'
 const emit = defineEmits<{ select: [game: GameSearchResult] }>()
+
 const query = ref('')
 const { games, warning, importing, loading, importGame } = useGameSearch(() => query.value)
-async function select(game: GameSearchResult) {
+
+const select = async (game: GameSearchResult) => {
     const saved = await importGame(game)
     if (saved) emit('select', saved)
 }
 </script>
+
 <template>
     <div class="grid gap-2">
         <UInput

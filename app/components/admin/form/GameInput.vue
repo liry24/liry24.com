@@ -1,38 +1,42 @@
 <script setup lang="ts">
-import { gameMentionQuery } from '~~/shared/utils/gameMentions'
-import type { GameSearchResult } from '~~/shared/utils/igdb'
-const props = defineProps<{
+interface Props {
     modelValue: string
     multiline?: boolean
     placeholder?: string
     disabled?: boolean
+}
+const { modelValue, multiline, placeholder, disabled } = defineProps<Props>()
+const emit = defineEmits<{
+    'update:modelValue': [value: string]
+    blur: []
 }>()
-const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: [] }>()
+
 const root = useTemplateRef('root'),
     popupId = useId(),
     active = ref(0)
 const query = ref<ReturnType<typeof gameMentionQuery>>(null)
 const { games, warning, importing, importGame } = useGameSearch(() => query.value?.query ?? null)
+
 const input = () =>
     root.value?.querySelector('input, textarea') as HTMLInputElement | HTMLTextAreaElement | null
-function inspect() {
+const inspect = () => {
     const element = input()
     query.value = element
         ? gameMentionQuery(element.value, element.selectionStart ?? element.value.length)
         : null
     active.value = 0
 }
-function close() {
+const close = () => {
     query.value = null
 }
-async function choose(game: GameSearchResult) {
+const choose = async (game: GameSearchResult) => {
     const range = query.value,
-        original = props.modelValue
+        original = modelValue
     if (!range || importing.value) return
     const saved = await importGame(game)
     if (!saved) return
     if (
-        original !== props.modelValue ||
+        original !== modelValue ||
         query.value?.start !== range.start ||
         query.value?.end !== range.end
     )
@@ -44,7 +48,7 @@ async function choose(game: GameSearchResult) {
     input()?.focus()
     input()?.setSelectionRange(range.start + mention.length, range.start + mention.length)
 }
-function keydown(event: KeyboardEvent) {
+const keydown = (event: KeyboardEvent) => {
     if (!query.value || event.isComposing || event.keyCode === 229) return
     if (event.key === 'Escape') {
         event.preventDefault()
@@ -59,11 +63,12 @@ function keydown(event: KeyboardEvent) {
         void choose(games.value[active.value]!)
     }
 }
-function blur() {
+const blur = () => {
     close()
     emit('blur')
 }
 </script>
+
 <template>
     <div
         ref="root"

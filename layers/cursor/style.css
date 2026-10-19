@@ -1,0 +1,19 @@
+@layer base {
+    :where(
+        button,
+        a[href],
+        select,
+        summary,
+        label[for],
+        [role='button'],
+        [role='link'],
+        [role='tab'],
+        [role='menuitem'],
+        [role='option'],
+        [role='checkbox'],
+        [role='radio'],
+        [role='switch'],
+    ):not(:disabled, [aria-disabled='true'], [data-disabled]) {
+        cursor: pointer;
+    }
+}

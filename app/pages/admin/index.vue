@@ -1,13 +1,19 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'admin', layout: 'admin' })
-const { open } = useAdminComposer()
-useHead({ title: 'Admin' })
+useHead({ title: 'Liry24 Admin', titleTemplate: '%s' })
 </script>
 
 <template>
-    <AdminResourcePage title="Home" icon="mingcute:sparkles-line">
-        <div class="flex min-h-[60svh] items-start py-8 sm:items-center sm:py-12">
-            <AdminComposerPanel v-if="!open" />
-        </div>
-    </AdminResourcePage>
+    <div class="h-full min-w-0">
+        <UDashboardPanel
+            id="home"
+            :ui="{
+                root: 'h-full min-h-0',
+                body: 'gap-4 p-4 sm:gap-4 sm:p-6 *:shrink-0',
+            }"
+        >
+            <template #body>
+                <div class="flex flex-col items-center gap-24"></div>
+            </template>
+        </UDashboardPanel>
+    </div>
 </template>

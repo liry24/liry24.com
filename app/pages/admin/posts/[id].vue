@@ -1,5 +1,6 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'admin', layout: 'admin', key: (route) => route.path })
+definePageMeta({ key: (route) => route.path })
+
 const id = String(useRoute().params.id)
 </script>
 

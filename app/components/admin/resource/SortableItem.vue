@@ -1,6 +1,6 @@
 <script setup lang="ts">
-defineProps<{ sortable?: boolean }>()
-defineEmits<{ up: []; down: [] }>()
+const { sortable } = defineProps<{ sortable?: boolean }>()
+const emit = defineEmits<{ up: []; down: [] }>()
 </script>
 
 <template>
@@ -12,8 +12,8 @@ defineEmits<{ up: []; down: [] }>()
             type="button"
             class="resource-drag-handle text-muted cursor-grab touch-none self-center"
             aria-label="Reorder (arrow keys move item)"
-            @keydown.up.prevent="$emit('up')"
-            @keydown.down.prevent="$emit('down')"
+            @keydown.up.prevent="emit('up')"
+            @keydown.down.prevent="emit('down')"
         >
             <UIcon name="mingcute:dot-grid-fill" class="size-5" />
         </button>

@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { entrySlugSuggestion } from '~/utils/entrySlug'
 const open = defineModel<boolean>('open', { default: false })
-const { modelName, id, categories } = defineProps<{
+
+interface Props {
     modelName: string
     id?: string
     categories?: string[]
+}
+const { modelName, id, categories } = defineProps<Props>()
+const emit = defineEmits<{
+    close: [saved: boolean]
+    'after:leave': []
 }>()
-const emit = defineEmits<{ close: [saved: boolean]; 'after:leave': [] }>()
 
 const { form, fields, upload, operation, meta, error, status, features, display } = useAdminForm(
     modelName,
@@ -21,7 +25,9 @@ const { form, fields, upload, operation, meta, error, status, features, display 
 const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
 const uploading = computed(() => operation.value === 'upload')
 const loading = computed(() => status.value === 'idle' || status.value === 'pending')
-function validationMessages(value: unknown): string[] {
+const editableFields = computed(() => fields.value.filter((field) => field.key !== 'slug'))
+
+const validationMessages = (value: unknown): string[] => {
     if (typeof value === 'string') return [value]
     if (Array.isArray(value)) return value.flatMap(validationMessages)
     if (!value || typeof value !== 'object') return []
@@ -30,7 +36,6 @@ function validationMessages(value: unknown): string[] {
         validationMessages(error).map((message) => `${key}: ${message}`),
     )
 }
-const editableFields = computed(() => fields.value.filter((field) => field.key !== 'slug'))
 </script>
 
 <template>

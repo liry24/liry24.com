@@ -15,7 +15,7 @@ const data = computed(() =>
         : null,
 )
 
-if (!data.value) throw createError({ statusCode: 404, statusMessage: 'Post not found' })
+if (!data.value) throw createError({ status: 404, statusText: 'Post not found' })
 
 const location = useBrowserLocation()
 
@@ -75,10 +75,7 @@ const { isSupported: isCopySupported, copy, copied } = useClipboard()
             <div class="flex max-w-4xl flex-col gap-6">
                 <USeparator decorative class="my-4" />
 
-                <MarkdownDocument
-                    :value="data.content"
-                    class="sentence px-1 *:first:mt-0 *:last:mb-0"
-                />
+                <MarkdownDocument :value="data.content" class="px-1 *:first:mt-0 *:last:mb-0" />
             </div>
         </UContainer>
     </UPage>

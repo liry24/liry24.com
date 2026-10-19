@@ -31,6 +31,8 @@ export default defineNuxtConfig({
         'motion-v/nuxt',
     ],
 
+    extends: ['~~/layers/cursor', '~~/layers/icons', '~~/layers/squircle', '~~/layers/sentence'],
+
     components: [
         { path: '~/components/public' },
         { path: '~/components/admin', prefix: 'Admin' },

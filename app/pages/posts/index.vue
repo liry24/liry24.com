@@ -46,7 +46,7 @@ const filtered = computed(() =>
             <MarkdownDocument
                 v-if="post.content.nodes.length"
                 :value="post.content"
-                class="sentence line-clamp-3 text-sm wrap-break-word *:first:mt-0 *:last:mb-0"
+                class="line-clamp-3 text-sm wrap-break-word *:first:mt-0 *:last:mb-0"
             />
 
             <div class="flex flex-wrap items-center gap-2">

@@ -4,7 +4,6 @@ import { crosshair } from '@tanstack/charts/crosshair'
 import { decorative } from '@tanstack/charts/mark/decorative'
 import { scaleLinear } from '@tanstack/charts/scales/linear'
 import { scalePoint } from '@tanstack/charts/scales/point'
-import type { GameMetric, GamePeriod, GameValue } from '~~/shared/utils/games'
 
 export type RankPoint = { x: string; value: number; record: GameValue; period: GamePeriod }
 // SVG object-bounding-box gradients have no paint on a perfectly horizontal path.

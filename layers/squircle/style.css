@@ -1,0 +1,14 @@
+:root {
+    --ui-radius: 0.75rem;
+}
+
+@layer base {
+    @supports (corner-shape: squircle) {
+        :root {
+            --ui-radius: calc(0.75rem * 1.5);
+        }
+        :where(*):not([class*='rounded-full'], [data-squircle='false']) {
+            corner-shape: squircle;
+        }
+    }
+}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ label: string; value?: unknown }>()
+const { label, value } = defineProps<{ label: string; value?: unknown }>()
 </script>
 
 <template>

@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { formatDate } from '@vueuse/core'
-import type { ComposerField } from '~~/shared/utils/adminComposer'
 
-import { adminAssetId } from '~/utils/adminPresentation'
+interface Props {
+    descriptor: ComposerField
+    modelValue: unknown
+    errors?: unknown[]
+    disabled?: boolean
+    uploading?: boolean
+    label?: string
+    categories?: string[]
+}
 const {
     descriptor,
     modelValue,
@@ -11,20 +18,14 @@ const {
     uploading = false,
     label = '',
     categories,
-} = defineProps<{
-    descriptor: ComposerField
-    modelValue: unknown
-    errors?: unknown[]
-    disabled?: boolean
-    uploading?: boolean
-    label?: string
-    categories?: string[]
-}>()
+} = defineProps<Props>()
+
 const emit = defineEmits<{
     'update:modelValue': [value: unknown]
     blur: []
     upload: [files: File | File[] | null | undefined]
 }>()
+
 const update = (value: unknown) => emit('update:modelValue', value)
 const dateInput = computed(() => {
     const date = new Date(String(modelValue ?? ''))
@@ -52,6 +53,7 @@ const references = (value: unknown) => (Array.isArray(value) ? value : value ? [
 const assetUrl = (value: unknown) =>
     value && typeof value === 'object' && 'url' in value ? String(value.url) : undefined
 </script>
+
 <template>
     <fieldset :disabled="disabled" class="min-w-0">
         <UFormField :label="descriptor.label" :required="descriptor.required" :error="error">

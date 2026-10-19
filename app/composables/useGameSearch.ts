@@ -1,6 +1,3 @@
-import { computed, onScopeDispose, ref, watch } from 'vue'
-import type { GameSearchResult } from '~~/shared/utils/igdb'
-
 export function useGameSearch(query: () => string | null) {
     const { user, session } = useUserSession()
     const scope = computed(() =>

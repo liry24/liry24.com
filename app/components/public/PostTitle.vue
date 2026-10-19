@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { gameTitleParts } from '~~/shared/utils/gameMentions'
-const props = defineProps<{ title: string; to?: string }>()
-const parts = computed(() => gameTitleParts(props.title))
+const { title, to } = defineProps<{ title: string; to?: string }>()
+
+const parts = computed(() => gameTitleParts(title))
 const onlyMentions = computed(() => parts.value.every((part) => part.slug || !part.text.trim()))
 </script>
+
 <template>
     <template v-for="(part, index) in parts" :key="index">
         <GameMention v-if="part.slug" :slug="part.slug" />

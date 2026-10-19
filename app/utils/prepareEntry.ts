@@ -1,7 +1,4 @@
 import { SiteAdminError, type EntryPrepareContext } from '@liria24/site-admin'
-import { postPublicationSettings } from '~~/shared/utils/postEditorial'
-
-import { entrySlugSuggestion } from './entrySlug'
 
 export async function prepareEntry(
     { model, operation, value, entry, resource, features, signal }: EntryPrepareContext,

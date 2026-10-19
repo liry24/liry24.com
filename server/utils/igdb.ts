@@ -1,8 +1,6 @@
 import { createError } from 'nuxt/server'
 import { z } from 'zod'
 
-import { gameSlugPattern } from '../../shared/utils/games'
-import type { GameSearchResult } from '../../shared/utils/igdb'
 const result = z.array(
     z.object({
         id: z.number().int().positive(),
@@ -11,17 +9,21 @@ const result = z.array(
         cover: z.object({ image_id: z.string().regex(/^[a-zA-Z0-9_]+$/) }).optional(),
     }),
 )
+
 let token: { client: string; value: string; until: number } | undefined
+
 export async function queryIgdb(
     query: { search: string } | { id: number },
 ): Promise<GameSearchResult[]> {
     const client = process.env.IGDB_CLIENT_ID,
         secret = process.env.IGDB_CLIENT_SECRET
+
     if (!client || !secret)
         throw createError({
             statusCode: 503,
             statusMessage: 'IGDB search is not configured. Saved games are still available.',
         })
+
     try {
         if (!token || token.client !== client || token.until < Date.now()) {
             const response = await fetch('https://id.twitch.tv/oauth2/token', {
@@ -66,8 +68,8 @@ export async function queryIgdb(
         }))
     } catch {
         throw createError({
-            statusCode: 502,
-            statusMessage: 'IGDB is unavailable. Continue writing or choose a saved game.',
+            status: 502,
+            statusText: 'IGDB is unavailable. Continue writing or choose a saved game.',
         })
     }
 }

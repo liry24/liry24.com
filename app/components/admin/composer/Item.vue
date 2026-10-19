@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import {
-    composerModels,
-    type ComposerItem,
-    type ComposerModel,
-} from '~~/shared/utils/adminComposer'
-
-const props = defineProps<{ item: ComposerItem; pending: boolean }>()
+interface Props {
+    item: ComposerItem
+    pending: boolean
+}
+const { item, pending } = defineProps<Props>()
 
 const emit = defineEmits<{
     select: [model?: ComposerModel, entryId?: string]
@@ -15,7 +13,7 @@ const emit = defineEmits<{
 
 const { open, saved } = useAdminComposer()
 
-const plan = computed(() => props.item.plan)
+const plan = computed(() => item.plan)
 
 const labels = {
     works: 'Works',
@@ -38,13 +36,11 @@ const target = computed(() =>
           },
 )
 
-function edit(model: ComposerModel, id: string) {
+const edit = (model: ComposerModel, id: string) => {
     if (model === 'posts') {
         open.value = false
-
         return navigateTo('/admin/posts/' + encodeURIComponent(id))
     }
-
     emit('select', model, id)
 }
 </script>

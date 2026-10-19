@@ -1,37 +1,32 @@
 <script setup lang="ts">
-import { cn } from 'cn'
-
 import {
     siteAdminManagementClientOptions,
     useSiteAdminAuthScope,
     useSiteAdminModels,
 } from '#build/site-admin/client'
-const { signOut, user } = useUserSession()
-const sidebarCollapsed = ref(false)
-useHead({ titleTemplate: '%s | Liry24 Admin' })
-const mounted = useMounted()
+
+const { user } = useUserSession()
+const { open, busy } = useAdminComposer()
 const connection = siteAdminManagementClientOptions()
 const auth = useSiteAdminAuthScope(undefined, connection)
 const models = useSiteAdminModels(connection, auth, false)
+
+const sidebarCollapsed = ref(false)
+
 onMounted(() => {
     if (!models.data.value) void models.execute({ dedupe: 'defer' })
 })
-const links = computed(() =>
-    Object.entries(mounted.value ? (models.data.value?.models ?? {}) : {}).map(([name, model]) => ({
-        label: model.meta?.plural ?? name,
-        icon: model.meta?.icon,
-        to: '/admin/' + name,
-    })),
-)
-const extraLinks = [
-    {
-        to: 'https://github.com/Liry24/liry24.com',
-        target: '_blank',
-        icon: 'mingcute:github-fill',
-        label: 'GitHub',
+
+defineShortcuts({
+    meta_k: {
+        usingInput: true,
+        handler: () => {
+            if (!busy.value) open.value = !open.value
+        },
     },
-    { to: '/', icon: 'mingcute:arrow-left-line', label: 'Back to site' },
-]
+})
+
+useHead({ titleTemplate: '%s | Liry24 Admin' })
 </script>
 
 <template>
@@ -85,65 +80,103 @@ const extraLinks = [
                         />
                     </div>
                 </template>
+
                 <template #default="{ collapsed }">
-                    <AdminComposerLauncher :collapsed />
-                    <AdminNav
-                        :links="links.filter((link) => link.to !== '/admin/posts')"
+                    <UNavigationMenu
                         :collapsed
-                    />
-                    <AdminNavSection title="Blogs" icon="mingcute:book-3-fill" :collapsed>
-                        <AdminNav
-                            :links="links.filter((link) => link.to === '/admin/posts')"
-                            :collapsed
-                        />
-                    </AdminNavSection>
-                    <AdminNav :links="extraLinks" :collapsed class="mt-auto" />
-                </template>
-                <template #footer="{ collapsed }">
-                    <UDropdownMenu
-                        :content="{ align: 'start', side: 'right' }"
                         :items="[
-                            {
-                                to: '/admin/settings',
-                                label: 'Settings',
-                                icon: 'mingcute:settings-1-fill',
-                            },
-                            {
-                                label: 'Logout',
-                                icon: 'mingcute:exit-fill',
-                                onClick: () => signOut(),
-                            },
+                            [
+                                {
+                                    label: 'Dashboard',
+                                    icon: 'mingcute:chart-bar-fill',
+                                    to: '/admin',
+                                },
+                                {
+                                    label: 'Data',
+                                    icon: 'mingcute:storage-fill',
+                                    to: '/admin/data',
+                                },
+                            ],
+                            [
+                                {
+                                    label: 'Users',
+                                    icon: 'mingcute:group-2-fill',
+                                    to: '/admin/users',
+                                },
+                                {
+                                    label: 'Settings',
+                                    icon: 'mingcute:settings-1-fill',
+                                    to: '/admin/settings',
+                                },
+                            ],
+                            [
+                                {
+                                    label: 'GitHub',
+                                    icon: 'mingcute:github-fill',
+                                    to: 'https://github.com/Liry24/liry24.com',
+                                    target: '_blank',
+                                },
+                                {
+                                    label: 'Back to site',
+                                    icon: 'mingcute:arrow-left-line',
+                                    to: '/',
+                                },
+                            ],
                         ]"
+                        orientation="vertical"
+                        tooltip
+                        popover
+                        color="neutral"
+                        :ui="{
+                            link: 'gap-2.5',
+                            linkLeadingIcon: 'text-dimmed group-hover:text-dimmed',
+                        }"
+                    />
+                </template>
+
+                <template #footer="{ collapsed }">
+                    <div
+                        aria-label="Account menu"
+                        class="hover:bg-muted w-full cursor-pointer rounded-lg p-2"
                     >
-                        <button
-                            type="button"
-                            aria-label="Account menu"
-                            class="hover:bg-muted w-full cursor-pointer rounded-lg p-2"
-                        >
-                            <UAvatar
-                                v-if="collapsed"
-                                :src="user?.image || undefined"
-                                :alt="user?.name"
-                                icon="mingcute:user-3-fill"
-                                size="sm"
-                            />
-                            <UUser
-                                v-else
-                                :name="user?.name"
-                                :description="user?.email"
-                                :avatar="{
-                                    src: user?.image || undefined,
-                                    alt: user?.name,
-                                    icon: 'mingcute:user-3-fill',
-                                }"
-                                size="sm"
-                                class="text-left"
-                            />
-                        </button>
-                    </UDropdownMenu>
+                        <UAvatar
+                            v-if="collapsed"
+                            :src="user?.image || undefined"
+                            :alt="user?.name"
+                            icon="mingcute:user-3-fill"
+                            size="sm"
+                        />
+                        <UUser
+                            v-else
+                            :name="user?.name"
+                            :description="user?.email"
+                            :avatar="{
+                                src: user?.image || undefined,
+                                alt: user?.name,
+                                icon: 'mingcute:user-3-fill',
+                            }"
+                            size="sm"
+                            class="text-left"
+                        />
+                    </div>
                 </template>
             </UDashboardSidebar>
-            <main class="h-full min-w-0 flex-1 overflow-hidden"><slot /></main>
+
+            <main class="h-full min-w-0 flex-1 overflow-hidden">
+                <slot />
+            </main>
         </UDashboardGroup>
+
+        <UModal
+            v-model:open="open"
+            :dismissible="!busy"
+            :close="!busy"
+            title="Compose content"
+            :ui="{ content: 'sm:max-w-3xl', body: 'bg-elevated/40' }"
+        >
+            <template #content>
+                <div class="p-6"><AdminComposerPanel v-if="open" /></div>
+            </template>
+        </UModal>
     </div>
 </template>

@@ -2,26 +2,27 @@
 import { updateConfig } from '@formkit/drag-and-drop'
 import { dragAndDrop } from '@formkit/drag-and-drop/vue'
 
-const props = defineProps<{ items: T[]; disabled?: boolean }>()
-const values = shallowRef<T[]>([...props.items])
+const { items, disabled } = defineProps<{ items: T[]; disabled?: boolean }>()
+const values = shallowRef<T[]>([...items])
+
+const emit = defineEmits<{ reorder: [items: T[]] }>()
+const parent = ref<HTMLElement>()
+
 watch(
-    () => props.items,
+    () => items,
     (items) => {
         values.value = [...items]
     },
 )
-const emit = defineEmits<{ reorder: [items: T[]] }>()
-const parent = ref<HTMLElement>()
-
 dragAndDrop({
     parent,
     values,
     dragHandle: '.resource-drag-handle',
-    disabled: props.disabled,
+    disabled: disabled,
     onDragend: () => emit('reorder', values.value),
 })
 watch(
-    () => props.disabled,
+    () => disabled,
     (disabled) => {
         if (parent.value) updateConfig(parent.value, { disabled })
     },

@@ -14,6 +14,7 @@
         "@internationalized/date": "3.12.4",
         "@json-render/core": "0.21.1",
         "@liria24/site-admin": "https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@ae6ad1c",
+        "@lucasmarkes/hairline": "^0.5.1",
         "@nuxt/image": "^2.1.0",
         "@nuxt/ui": "^4.12.0",
         "@nuxtjs/better-auth": "0.3.10",
@@ -437,6 +438,8 @@
     "@levischuck/tiny-cbor": ["@levischuck/tiny-cbor@0.2.11", "", {}, "sha512-llBRm4dT4Z89aRsm6u2oEZ8tfwL/2l6BwpZ7JcyieouniDECM5AqNgr/y08zalEIvW3RSK4upYyybDcmjXqAow=="],
 
     "@liria24/site-admin": ["@liria24/site-admin@https://pkg.pr.new/liria24/site-admin/@liria24/site-admin@ae6ad1c", { "dependencies": { "@better-auth/drizzle-adapter": "1.7.10", "@nuxt/devtools-kit": "4.0.0-beta.5", "@nuxt/kit": "^4.6.1", "@nuxt/schema": "^4.6.1", "@standard-schema/spec": "^1.1.0", "@tanstack/vue-form": "2.0.0-alpha.2", "auth": "^1.7.10", "comark-content": "^0.4.1", "devframe": "1.2.5", "drizzle-orm": "0.45.4", "h3": "^1.15.11", "jiti": "^2.7.0", "nitropack": "2.13.4", "nypm": "^0.6.10", "pathe": "^2.0.3", "rou3": "^1.0.0", "void": "1.1.11" }, "peerDependencies": { "@nuxtjs/better-auth": "^0.3.9", "@nuxtjs/i18n": "^10.6.0", "@nuxtjs/robots": "^7.0.2", "@nuxtjs/sitemap": "^9.1.0", "@takumi-rs/core": "^2.16.2", "@takumi-rs/wasm": "^2.16.2", "ai": "^7.0.141", "better-auth": "^1.7.9", "comark": "^0.7.0", "files-sdk": "^3.1.1", "nuxt": "^4.6.1", "nuxt-files-sdk": "^0.3.1", "nuxt-llms": "^0.2.0", "nuxt-og-image": "^7.0.7", "nuxt-schema-org": "^7.0.1", "nuxt-seo-utils": "^9.0.1", "nuxt-site-config": "^5.0.3", "vue": "^3.6.0-rc.2" }, "optionalPeers": ["@nuxtjs/better-auth", "@nuxtjs/i18n", "@nuxtjs/robots", "@nuxtjs/sitemap", "@takumi-rs/core", "@takumi-rs/wasm", "ai", "better-auth", "comark", "files-sdk", "nuxt", "nuxt-files-sdk", "nuxt-llms", "nuxt-og-image", "nuxt-schema-org", "nuxt-seo-utils", "nuxt-site-config", "vue"], "bin": { "site-admin": "./dist/cli.js" } }, "sha512-nIh7sMse4SP3YntHBe8r96mfq3ZRU7nV5vIowmxQ1L1dQJclMXjPAPVmu2DaNzvvslOEhHtdnxhHrhuwySXCZA=="],
+
+    "@lucasmarkes/hairline": ["@lucasmarkes/hairline@0.5.1", "", { "peerDependencies": { "react": ">=18" }, "optionalPeers": ["react"] }, "sha512-zjY3bdMC3As/+enKitZ1X+D1HjpesQiAKzG1sbCFsOrb5xIuJEoepkJTBIO4jmFh6JXOQlGGylhV71nr9ipNpQ=="],
 
     "@mapbox/node-pre-gyp": ["@mapbox/node-pre-gyp@2.0.3", "", { "dependencies": { "consola": "^3.2.3", "detect-libc": "^2.0.0", "https-proxy-agent": "^7.0.5", "node-fetch": "^2.6.7", "nopt": "^8.0.0", "semver": "^7.5.3", "tar": "^7.4.0" }, "bin": { "node-pre-gyp": "bin/node-pre-gyp" } }, "sha512-uwPAhccfFJlsfCxMYTwOdVfOz3xqyj8xYL3zJj8f0pb30tLohnnFPhLuqp4/qoEz8sNxe4SESZedcBojRefIzg=="],
 

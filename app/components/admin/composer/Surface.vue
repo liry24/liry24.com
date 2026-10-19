@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import type { ComposerPlan } from '~~/shared/utils/adminComposer'
-defineProps<{ plan: ComposerPlan }>()
+const { plan } = defineProps<{ plan: ComposerPlan }>()
 </script>
 
 <template>

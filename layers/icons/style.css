@@ -1,0 +1,8 @@
+@layer theme, base, components, utilities;
+
+@layer utilities {
+    .icon.ui-icon-ic:not([data-icon-ic='false']) {
+        width: 1em;
+        height: 1em;
+    }
+}

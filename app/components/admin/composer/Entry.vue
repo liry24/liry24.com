@@ -1,35 +1,58 @@
 <script setup lang="ts">
-import type { ComposerPlan } from '~~/shared/utils/adminComposer'
+interface Props {
+    plan: ComposerPlan
+    pending: boolean
+    itemId: string
+}
+const { plan, pending, itemId } = defineProps<Props>()
+const emit = defineEmits<{
+    saved: []
+    ready: [submit: (() => Promise<void>) | undefined]
+}>()
 
-const props = defineProps<{ plan: ComposerPlan; pending: boolean; itemId: string }>()
-const emit = defineEmits<{ saved: []; ready: [submit: (() => Promise<void>) | undefined] }>()
-const full = ref(false)
 const { open, busy: writing, setBusy } = useAdminComposer()
 const { form, fields, upload, operation, error, status, features } = await useAdminForm(
-    String(props.plan.model),
+    String(plan.model),
     {
-        instance: 'composer:' + props.itemId,
-        id: props.plan.entryId,
-        defaultValues: props.plan.values,
+        instance: 'composer:' + itemId,
+        id: plan.entryId,
+        defaultValues: plan.values,
         onSuccess: () => emit('saved'),
     },
 )
+
+const baseline: Record<string, unknown> = structuredClone(toRaw(form.state.values))
+const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
+const busy = computed(() => pending || writing.value || status.value === 'pending')
+
+const submit = async () => {
+    if (!operation.value && status.value !== 'pending' && !conflict.value) await form.handleSubmit()
+}
+
+const full = ref(false)
+const descriptors = computed(() =>
+    Object.fromEntries(fields.value.map((field) => [field.key, field])),
+)
+const visiblePlan = computed(() =>
+    full.value ? { ...plan, visibleFields: plan.fields.map((field) => field.key) } : plan,
+)
+
+const removeNavigationGuard = useRouter().beforeEach(() => operation.value === null)
+onScopeDispose(removeNavigationGuard)
+
 watch(
     operation,
     (value) => {
-        setBusy(props.itemId, value !== null)
+        setBusy(itemId, value !== null)
     },
     { flush: 'sync', immediate: true },
 )
 onScopeDispose(() => {
-    setBusy(props.itemId, false)
+    setBusy(itemId, false)
     emit('ready', undefined)
 })
-const removeNavigationGuard = useRouter().beforeEach(() => operation.value === null)
-onScopeDispose(removeNavigationGuard)
-const baseline: Record<string, unknown> = structuredClone(toRaw(form.state.values))
 watch(
-    () => props.plan.values,
+    () => plan.values,
     (values) => {
         if (operation.value) return
         for (const [key, value] of Object.entries(
@@ -42,23 +65,7 @@ watch(
     },
     { immediate: true },
 )
-const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
-const busy = computed(() => props.pending || writing.value || status.value === 'pending')
-async function submit() {
-    if (!operation.value && status.value !== 'pending' && !conflict.value) await form.handleSubmit()
-}
 onMounted(() => emit('ready', submit))
-const descriptors = computed(() =>
-    Object.fromEntries(fields.value.map((field) => [field.key, field])),
-)
-const visiblePlan = computed(() =>
-    full.value
-        ? {
-              ...props.plan,
-              visibleFields: props.plan.fields.map((field) => field.key),
-          }
-        : props.plan,
-)
 </script>
 
 <template>

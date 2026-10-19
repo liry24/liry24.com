@@ -6,6 +6,7 @@ import { LazyAdminFormEntryModal } from '#components'
 definePageMeta({
     key: (route) => ('model' in route.params ? String(route.params.model) : route.path),
 })
+
 const route = useRoute('admin-model')
 const modelName = String(route.params.model)
 const resource = await useAdminEntries(modelName, {
@@ -22,10 +23,11 @@ const modal = useOverlay().create(LazyAdminFormEntryModal)
 const schedule = ref<Record<string, string>>({})
 const revisions = ref<Record<string, Revision[]>>({})
 const selectedRevision = ref<Record<string, string>>({})
-async function history(entry: Entry) {
+
+const history = async (entry: Entry) => {
     revisions.value[entry.id] = (await resource.revisions(entry)) ?? []
 }
-async function edit(data?: Entry) {
+const edit = async (data?: Entry) => {
     if (modelName === 'posts') {
         await navigateTo(data ? `/admin/posts/${encodeURIComponent(data.id)}` : '/admin/posts/new')
         return
@@ -45,8 +47,7 @@ async function edit(data?: Entry) {
     }).result
     if (changed) await resource.refresh()
 }
-defineShortcuts({ n: () => edit() })
-function move(index: number, offset: number) {
+const move = (index: number, offset: number) => {
     const target = index + offset
     if (busy.value || target < 0 || target >= items.value.length) return
     const order = [...items.value]
@@ -55,6 +56,8 @@ function move(index: number, offset: number) {
 }
 const imageUrl = (entry: Entry) => resource.display(entry.data).image
 const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, field)
+
+defineShortcuts({ n: () => edit() })
 </script>
 
 <template>
@@ -77,7 +80,6 @@ const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, fiel
                 icon="mingcute:add-line"
                 variant="outline"
                 color="neutral"
-                :ui="{ leadingIcon: 'size-4.5' }"
                 @click="edit()"
             >
                 <template #trailing><UKbd value="n" class="hidden sm:inline-flex" /></template>
@@ -86,8 +88,24 @@ const fieldValue = (entry: Entry, field: string) => Reflect.get(entry.data, fiel
 
         <UAlert v-if="error" :title="error.message" color="error" />
 
+        <div v-else-if="!items.length" class="flex size-full flex-col items-center justify-center">
+            <HairlineDrawer class="max-w-sm" />
+            <p class="text-muted text-center text-sm">
+                No {{ presentation.plural.toLowerCase() }} found
+            </p>
+            <UButton
+                :label="`New ${presentation.label}`"
+                icon="mingcute:add-line"
+                variant="ghost"
+                color="neutral"
+                class="mt-5 pr-3"
+                @click="edit()"
+            />
+        </div>
+
         <AdminResourceSortableList
-            :items="items"
+            v-else
+            :items
             :disabled="!features.sortable || busy"
             @reorder="resource.reorder"
         >

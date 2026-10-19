@@ -1,11 +1,10 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'admin', layout: 'admin' })
+const { signOut, user } = useUserSession()
 
-const { user } = useUserSession()
 const isPreview = String(useRuntimeConfig().public.preview) === 'true'
 const failure = ref('')
 
-async function revokeOthers() {
+const revokeOthers = async () => {
     const client = useAuthClient()
     if (!client) return
     const result = await client.revokeOtherSessions()
@@ -15,6 +14,16 @@ async function revokeOthers() {
 
 <template>
     <AdminResourcePage title="Settings" icon="mingcute:settings-1-fill">
+        <template #actions>
+            <UButton
+                label="Logout"
+                icon="mingcute:exit-line"
+                variant="outline"
+                color="neutral"
+                @click="signOut()"
+            />
+        </template>
+
         <UCard>
             <template #header>
                 <div class="flex flex-wrap items-center justify-between gap-2">

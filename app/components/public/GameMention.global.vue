@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { gameImageUrl } from '~~/shared/utils/games'
-const props = defineProps<{ slug: string }>()
-const fallback = computed(() => '<game:' + props.slug + '>')
+const { slug } = defineProps<{ slug: string }>()
+
+const fallback = computed(() => '<game:' + slug + '>')
 const { data } = await useContent('games')
-const game = computed(() => data.value?.find((entry) => entry.data.slug === props.slug)?.data)
+const game = computed(() => data.value?.find((entry) => entry.data.slug === slug)?.data)
 </script>
+
 <template>
     <NuxtLink
         v-if="game"
@@ -19,5 +20,6 @@ const game = computed(() => data.value?.find((entry) => entry.data.slug === prop
         />
         <span>{{ game.name }}</span>
     </NuxtLink>
+
     <span v-else>{{ fallback }}</span>
 </template>

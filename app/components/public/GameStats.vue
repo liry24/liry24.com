@@ -1,27 +1,24 @@
 <script setup lang="ts">
-import {
-    formatGameValue,
-    gameImageUrl,
-    type GameData,
-    type GamePeriod,
-} from '~~/shared/utils/games'
+interface Props {
+    game: GameData
+    periods: GamePeriod[]
+}
+const { game, periods } = defineProps<Props>()
 
-import { gameChart, type RankPoint } from '~/utils/gameChart'
-const props = defineProps<{ game: GameData; periods: GamePeriod[] }>()
 const gradientId = useId().replaceAll(':', '')
-const periods = computed(() => [...props.periods].sort((a, b) => a.order - b.order))
-const latest = computed(() => periods.value.at(-1))
-const metric = computed(() =>
-    props.game.metrics?.find((metric) => metric.key === props.game.primaryMetric),
-)
+const sortedPeriods = computed(() => [...periods].sort((a, b) => a.order - b.order))
+const latest = computed(() => sortedPeriods.value.at(-1))
+const metric = computed(() => game.metrics?.find((metric) => metric.key === game.primaryMetric))
 const representative = computed(() =>
     latest.value?.values.find((value) => value.key === metric.value?.key),
 )
 const definition = computed(() =>
-    metric.value ? gameChart(periods.value, metric.value, gradientId) : undefined,
+    metric.value ? gameChart(sortedPeriods.value, metric.value, gradientId) : undefined,
 )
+
 const point = (value: unknown) => value as RankPoint
 </script>
+
 <template>
     <UModal
         :title="game.name"
@@ -97,7 +94,7 @@ const point = (value: unknown) => value as RankPoint
                     </thead>
                     <tbody>
                         <tr
-                            v-for="period in [...periods].reverse()"
+                            v-for="period in [...sortedPeriods].reverse()"
                             :key="period.periodKey"
                             class="border-default border-t"
                         >

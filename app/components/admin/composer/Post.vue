@@ -1,18 +1,21 @@
 <script setup lang="ts">
-import type { ComposerPlan } from '~~/shared/utils/adminComposer'
-const props = defineProps<{ plan: ComposerPlan; pending: boolean; itemId: string }>()
+interface Props {
+    plan: ComposerPlan
+    pending: boolean
+    itemId: string
+}
+const { plan, pending, itemId } = defineProps<Props>()
+
 const { preparePost, preparation } = useAdminComposer()
-const { values, publishAt, baseline } = toRefs(preparation(props.itemId))
+const { values, publishAt, baseline } = toRefs(preparation(itemId))
+
 watch(
-    () => props.plan,
+    () => plan,
     (plan) => {
         const changes = composerValueUpdates(
             { ...values.value, publishAt: publishAt.value },
             baseline.value,
-            {
-                ...plan.values,
-                publishAt: plan.publishAt,
-            },
+            { ...plan.values, publishAt: plan.publishAt },
         )
         for (const [key, value] of Object.entries(changes)) {
             if (key === 'publishAt') publishAt.value = String(value)
