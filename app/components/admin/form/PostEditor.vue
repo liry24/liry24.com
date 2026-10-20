@@ -4,17 +4,24 @@ import { postMarkdownSecurity } from '~~/shared/utils/postMarkdown'
 const { id, composerId } = defineProps<{ id?: string; composerId?: string }>()
 const publishAt = ref('')
 const uploadedName = ref('')
+const newPostInstance = useState('new-post-instance', () => crypto.randomUUID())
 const { post: composerProposal, scope: composerScope, saved } = useAdminComposer()
 
 const resource = useLitiForm('posts', {
     id: () => id,
-    instance: composerId ? 'composer-editor:' + composerId : 'post-editor',
+    instance: composerId
+        ? 'composer-editor:' + composerId
+        : id
+          ? 'post-editor'
+          : newPostInstance.value,
     defaultValues: { publication: { slug: !id ? 'auto' : undefined } },
     onUpload: ({ files }) => {
         uploadedName.value = files[0]?.name ?? ''
     },
     onSuccess: async () => {
         if (composerId) saved.value[composerId] = true
+        if (!id && !composerId && !resource.draft.isDirty.value)
+            newPostInstance.value = crypto.randomUUID()
         await navigateTo('/admin/data?model=posts')
     },
 })
