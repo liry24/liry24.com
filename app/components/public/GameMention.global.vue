@@ -2,7 +2,7 @@
 const { slug } = defineProps<{ slug: string }>()
 
 const fallback = computed(() => '<game:' + slug + '>')
-const { data } = await useContent('games')
+const { data } = await useLitiQuery('games')
 const game = computed(() => data.value?.find((entry) => entry.data.slug === slug)?.data)
 </script>
 

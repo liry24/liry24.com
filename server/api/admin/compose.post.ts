@@ -1,4 +1,4 @@
-import { useAdmin } from '@liria24/site-admin/server'
+import { useAdmin } from 'liti/nuxt/server'
 import { defineEventHandler, createError, readBody } from 'nuxt/server'
 import { UsageLimit } from 'void/limits'
 

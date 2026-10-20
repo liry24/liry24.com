@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { MasonryWall } from '@yeger/vue-masonry-wall'
 
-const { data } = await useContent('works', {
+const { data } = await useLitiQuery('works', {
     transform: (entries) =>
         entries.map((entry) => ({
             ...entry.data,

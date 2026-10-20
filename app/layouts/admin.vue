@@ -1,16 +1,7 @@
 <script setup lang="ts">
-import {
-    siteAdminManagementClientOptions,
-    useSiteAdminAuthScope,
-    useSiteAdminModels,
-} from '#build/site-admin/client'
-
 const { user } = useUserSession()
 const { data: permissions } = await useAdminPermissions()
 const { open, busy } = useAdminComposer()
-const connection = siteAdminManagementClientOptions()
-const auth = useSiteAdminAuthScope(undefined, connection)
-const models = useSiteAdminModels(connection, auth, false)
 
 const sidebarCollapsed = ref(false)
 const navigation = computed(() => [
@@ -56,10 +47,6 @@ const navigation = computed(() => [
         },
     ],
 ])
-
-onMounted(() => {
-    if (!models.data.value) void models.execute({ dedupe: 'defer' })
-})
 
 defineShortcuts({
     meta_k: {

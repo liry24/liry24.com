@@ -1,7 +1,8 @@
 <script setup lang="ts">
 const route = useRoute()
 
-const { data: entry, error } = await useContent('posts', {
+const { data: entry, error } = await useLitiQuery('posts', {
+    mode: 'one',
     path: () => route.path,
 })
 if (error.value) throw error.value
@@ -10,7 +11,7 @@ const data = computed(() =>
         ? {
               ...entry.value.data,
               slug: entry.value.data.slug,
-              createdAt: entry.value.data.createdAt || entry.value.publishedAt,
+              createdAt: entry.value.meta.blog.date,
           }
         : null,
 )
@@ -36,6 +37,7 @@ const { isSupported: isCopySupported, copy, copied } = useClipboard()
 
             <div class="flex items-center gap-1">
                 <NuxtTime
+                    v-if="data.createdAt"
                     :datetime="data.createdAt"
                     date-style="short"
                     time-style="short"

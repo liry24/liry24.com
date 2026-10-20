@@ -1,4 +1,4 @@
-import { getNitroRequest } from '@liria24/site-admin/internal/runtime/nitro2'
+import { getNitroRequest } from 'liti/nuxt/server'
 import { createError, defineEventHandler, getQuery } from 'nuxt/server'
 import { db, and, or, eq, lt, desc } from 'void/db'
 import { z } from 'zod'

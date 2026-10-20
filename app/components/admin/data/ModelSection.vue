@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { Entry } from '@liria24/site-admin'
 import type { TableColumn, TableRow } from '@nuxt/ui'
+import type { Entry } from 'liti'
+import { createLitiClient, type RegisteredLitiSchema } from 'liti/client'
 
 import { LazyAdminFormEntryModal } from '#components'
 
@@ -11,10 +12,62 @@ const section = useTemplateRef('section')
 const query = computed(() =>
     String(route.query.model ?? 'posts') === modelName ? String(route.query.q ?? '') : '',
 )
-const resource = useAdminEntries(modelName, { all: modelName !== 'posts', q: query, pageSize: 20 })
-const { data, status, error, features, page, meta } = resource
-const items = computed(() => data.value?.items ?? [])
-const busy = computed(() => status.value === 'pending')
+const page = ref(1)
+const resource = useLitiQuery(modelName as keyof RegisteredLitiSchema['managementModels'], {
+    view: 'current',
+    q: query,
+    ...(modelName === 'posts'
+        ? { page: () => ({ limit: 20, offset: (page.value - 1) * 20 }) }
+        : {}),
+})
+const { data, status, error, total } = resource
+const items: Readonly<Ref<Entry[]>> = data
+const { data: models } = useLitiModels()
+const model = computed(() => models.value[modelName as keyof typeof models.value])
+const features = computed(
+    () =>
+        model.value?.features ?? {
+            publishing: false,
+            scheduling: false,
+            revisions: false,
+            sortable: false,
+        },
+)
+const meta = computed(
+    () => model.value?.meta ?? { label: modelName, plural: modelName, fields: [] },
+)
+const client = createLitiClient()
+const moving = ref(false)
+const mutationError = ref('')
+const busy = computed(() => status.value === 'pending' || moving.value)
+const display = (data: Record<string, unknown>) => {
+    const fields = model.value?.displayFields
+    const image = data[fields?.image ?? 'image']
+    return {
+        title: String(data[fields?.title ?? 'title'] ?? ''),
+        image: image && typeof image === 'object' && 'url' in image ? String(image.url) : undefined,
+    }
+}
+async function reorder(entries: Entry[]) {
+    if (busy.value) return
+    moving.value = true
+    mutationError.value = ''
+    try {
+        await client.setSortOrders(
+            modelName as keyof RegisteredLitiSchema['managementModels'],
+            entries.map((entry, sortOrder) => ({
+                id: entry.id,
+                sortOrder,
+                expectedVersion: entry.version,
+            })),
+        )
+        await resource.refresh()
+    } catch (cause) {
+        mutationError.value = cause instanceof Error ? cause.message : 'Could not reorder entries.'
+    } finally {
+        moving.value = false
+    }
+}
 const sortable = computed(() => features.value.sortable && !busy.value && !query.value)
 const modal = useOverlay().create(LazyAdminFormEntryModal)
 const columns: TableColumn<Entry>[] = [
@@ -56,7 +109,7 @@ function move(index: number, offset: number) {
     if (!sortable.value || target < 0 || target >= items.value.length) return
     const order = [...items.value]
     ;[order[index], order[target]] = [order[target]!, order[index]!]
-    void resource.reorder(order)
+    void reorder(order)
 }
 const search = useDebounceFn((value: string) => {
     void router.replace({ query: { ...route.query, model: modelName, q: value || undefined } })
@@ -89,7 +142,7 @@ const publication = (entry: Entry) =>
     >
         <div class="flex flex-wrap items-center gap-2">
             <h2 class="mr-auto text-sm">
-                {{ meta.plural }} <span class="text-dimmed ml-1">{{ data?.total ?? 0 }}</span>
+                {{ meta.plural }} <span class="text-dimmed ml-1">{{ total }}</span>
             </h2>
             <UInput
                 v-if="modelName === 'posts'"
@@ -124,8 +177,15 @@ const publication = (entry: Entry) =>
                 @click="edit()"
             />
         </div>
-        <UAlert v-if="error" :title="error.message" color="error" />
-        <USkeleton v-if="!data && (busy || status === 'idle')" class="h-32 w-full rounded-xl" />
+        <UAlert
+            v-if="error || mutationError"
+            :title="error?.message || mutationError"
+            color="error"
+        />
+        <USkeleton
+            v-if="!items.length && (busy || status === 'idle')"
+            class="h-32 w-full rounded-xl"
+        />
         <template v-else>
             <UTable
                 v-if="modelName === 'posts'"
@@ -139,9 +199,7 @@ const publication = (entry: Entry) =>
                     <NuxtLink
                         :to="`/admin/posts/${encodeURIComponent(row.original.id)}`"
                         class="text-highlighted block max-w-md truncate font-medium hover:underline"
-                        >{{
-                            resource.display(row.original.data).title || row.original.id
-                        }}</NuxtLink
+                        >{{ display(row.original.data).title || row.original.id }}</NuxtLink
                     >
                 </template>
                 <template #status-cell="{ row }">
@@ -162,7 +220,10 @@ const publication = (entry: Entry) =>
                 <template #actions-cell="{ row }"
                     ><AdminDataEntryActions
                         :entry="row.original"
-                        :resource
+                        :features
+                        :busy
+                        :title="display(row.original.data).title"
+                        @changed="resource.refresh()"
                         posts
                         @edit="edit(row.original)"
                 /></template>
@@ -173,7 +234,7 @@ const publication = (entry: Entry) =>
                     :items
                     :disabled="!sortable"
                     class="flex w-max shrink-0 gap-2"
-                    @reorder="resource.reorder"
+                    @reorder="reorder"
                 >
                     <template #default="{ item }">
                         <article
@@ -194,8 +255,8 @@ const publication = (entry: Entry) =>
                                     <UIcon name="mingcute:dot-grid-fill" class="size-4" />
                                 </button>
                                 <img
-                                    v-if="resource.display(item.data).image"
-                                    :src="resource.display(item.data).image"
+                                    v-if="display(item.data).image"
+                                    :src="display(item.data).image"
                                     alt=""
                                     class="size-8 rounded-lg object-cover"
                                 />
@@ -209,7 +270,7 @@ const publication = (entry: Entry) =>
                                     class="min-w-0 flex-1 truncate text-left hover:underline"
                                     @click="edit(item)"
                                 >
-                                    {{ resource.display(item.data).title || item.id }}
+                                    {{ display(item.data).title || item.id }}
                                 </button>
                             </div>
                             <p class="text-dimmed truncate text-xs">
@@ -245,7 +306,10 @@ const publication = (entry: Entry) =>
                                 />
                                 <AdminDataEntryActions
                                     :entry="item"
-                                    :resource
+                                    :features
+                                    :busy
+                                    :title="display(item.data).title"
+                                    @changed="resource.refresh()"
                                     class="ml-auto"
                                     @edit="edit(item)"
                                 />
@@ -266,9 +330,9 @@ const publication = (entry: Entry) =>
                 No {{ meta.plural.toLowerCase() }} found.
             </p>
             <UPagination
-                v-if="modelName === 'posts' && (data?.total ?? 0) > 20"
+                v-if="modelName === 'posts' && total > 20"
                 v-model:page="page"
-                :total="data?.total"
+                :total
                 :items-per-page="20"
                 :disabled="busy"
                 aria-label="Post pages"

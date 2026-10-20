@@ -1,4 +1,4 @@
-import { createAuthDatabase } from '@liria24/site-admin/internal/runtime/database'
+import { createAuthDatabase } from '@litijs/void/session'
 import { betterAuth } from 'better-auth'
 import { createAuthEndpoint } from 'better-auth/api'
 import { expect, test } from 'vitest'

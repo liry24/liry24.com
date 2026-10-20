@@ -12,19 +12,20 @@ const emit = defineEmits<{
     'after:leave': []
 }>()
 
-const { form, fields, upload, operation, meta, error, status, features, display } = useAdminForm(
+const { form, fields, upload, operation, meta, error, state, features, display } = useLitiForm(
     modelName,
     {
         id: () => id,
+        instance: 'entry-modal',
         onSuccess: () => {
             emit('close', true)
         },
     },
 )
 
-const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
+const conflict = computed(() => state.value.conflict)
 const uploading = computed(() => operation.value === 'upload')
-const loading = computed(() => status.value === 'idle' || status.value === 'pending')
+const loading = computed(() => !state.value.ready)
 const editableFields = computed(() => fields.value.filter((field) => field.key !== 'slug'))
 
 const validationMessages = (value: unknown): string[] => {
@@ -86,7 +87,7 @@ const validationMessages = (value: unknown): string[] => {
                 <form
                     id="admin-entry-form"
                     class="grid gap-4"
-                    @submit.prevent="!loading && !operation && !conflict && form.handleSubmit()"
+                    @submit.prevent="state.can.save && form.handleSubmit()"
                 >
                     <AdminFormGameSearch
                         v-if="modelName === 'games' && !id"

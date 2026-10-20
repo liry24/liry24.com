@@ -1,4 +1,4 @@
-import type { AssetInput } from '@liria24/site-admin'
+import type { AssetInput } from 'liti'
 export type GamePosition = {
     value: number
     label: string

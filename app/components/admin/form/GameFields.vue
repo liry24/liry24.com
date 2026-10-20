@@ -8,16 +8,14 @@ interface Props {
         removeFieldValue(name: string, index: number): void
         moveFieldValue(name: string, from: number, to: number): void
     }
-    upload: ReturnType<typeof useAdminForm>['upload']
+    upload: ReturnType<typeof useLitiForm>['upload']
     disabled?: boolean
 }
 const { modelName, values, form, upload, disabled } = defineProps<Props>()
 
-const games = useAdminEntries('games', { all: true, immediate: modelName === 'gameStats' })
+const games = useLitiQuery('games', { view: 'current', immediate: modelName === 'gameStats' })
 const metrics = computed(() => (values.metrics ?? []) as GameMetric[])
-const selectedGame = computed(() =>
-    games.data.value?.items.find((entry) => entry.id === values.game),
-)
+const selectedGame = computed(() => games.data.value.find((entry) => entry.id === values.game))
 const definitions = computed(() => (selectedGame.value?.data.metrics ?? []) as GameMetric[])
 const statValues = computed(() => (values.values ?? []) as GameValue[])
 const imageDescriptor = { key: 'image', kind: 'image', label: 'Image' }
@@ -201,7 +199,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                 ><USelect
                     :model-value="String(values.game ?? '')"
                     :items="
-                        games.data.value?.items.map((game) => ({
+                        games.data.value.map((game) => ({
                             label: game.data.name,
                             value: game.id,
                         })) ?? []

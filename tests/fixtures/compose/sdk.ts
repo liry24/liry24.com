@@ -1,7 +1,7 @@
 import type { RequestEvent } from 'nuxt/schema'
 
 import { composerModels } from '../../../shared/utils/adminComposer'
-import { configureGameFixture, createGame, game } from './games'
+import { configureGameFixture, createGame, game, savedGame } from './games'
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 export const getNitroRequest = (event: RequestEvent) => event.req
 export function useAdmin(event: RequestEvent) {
@@ -30,6 +30,14 @@ export function useAdmin(event: RequestEvent) {
                 return { items: [], total: 0 }
             },
             async get(_model: string, id: string) {
+                if (_model === 'games') {
+                    const found = await savedGame()
+                    if (!found)
+                        throw Object.assign(new Error('Not found'), {
+                            code: 'LITI_ENTRY_NOT_FOUND',
+                        })
+                    return found
+                }
                 await delay(30)
                 return { id, data: { title: 'Old' } }
             },

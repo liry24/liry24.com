@@ -6,7 +6,7 @@ import { ArtViewer } from '#components'
 const route = useRoute()
 const overlay = useOverlay()
 
-const { data } = await useContent('arts', { default: () => [] })
+const { data } = await useLitiQuery('arts', { default: () => [] })
 
 const modalArtViewer = overlay.create(ArtViewer)
 

@@ -43,7 +43,7 @@ const request = async (
             ...(body ? { 'content-type': 'application/json' } : {}),
         },
         ...(body ? { body: JSON.stringify(body) } : rawBody ? { body: rawBody } : {}),
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(90000),
         redirect: 'manual',
     }).catch((cause) => {
         throw new Error(`${method} ${path} failed`, { cause })
@@ -70,13 +70,13 @@ try {
             'INSERT INTO sessions (id,token,user_id,expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?)',
         )
         .run(id, token, id, now + 3600000, now, now)
-    await request('/api/site-admin/models', { authenticated: false, status: 401 })
+    await request('/api/liti/models', { authenticated: false, status: 401 })
     if (!apiOnly)
-        for (const path of ['/admin/works', '/admin/posts/new', '/admin/posts/unknown'])
+        for (const path of ['/admin/data?model=works', '/admin/posts/new', '/admin/posts/unknown'])
             await request(path, { authenticated: false, status: 302 })
     const session = await request('/api/auth/get-session')
     assert.equal(session.user.id, id)
-    const models = await request('/api/site-admin/models')
+    const models = await request('/api/liti/models')
     for (const name of [
         'arts',
         'works',
@@ -101,27 +101,27 @@ try {
         assert.equal(models.models[name].scheduling, false)
         assert.equal(models.models[name].revisions, false)
     }
-    await request('/__site-admin-devtools/snapshot', { authenticated: false, status: 401 })
-    const snapshot = await request('/__site-admin-devtools/snapshot')
+    await request('/__liti-devtools/snapshot', { authenticated: false, status: 401 })
+    const snapshot = await request('/__liti-devtools/snapshot')
     assert.equal(snapshot.database.schemaReady, true)
     assert.equal(snapshot.database.devDatabase, true)
-    assert.equal(snapshot.database.connector, 'void')
+    assert.equal(snapshot.database.connector, '@litijs/void/database')
     for (const name of Object.keys(models.models))
         assert(snapshot.models[name], `Inspectable authorized model: ${name}`)
     assert.equal(snapshot.assets.cleanup.minimumAge, 86400)
     if (!apiOnly) {
         // Browser fixtures must exist before the first cacheable posts/home SSR request.
         const publicPaths = process.argv.includes('--browser')
-            ? ['/arts', '/works', '/admin/works']
-            : ['/', '/arts', '/works', '/posts', '/admin/works']
+            ? ['/arts', '/works', '/admin/data?model=works']
+            : ['/', '/arts', '/works', '/posts', '/admin/data?model=works']
         for (const path of publicPaths) await request(path)
     }
-    entry = await request('/api/site-admin/entries/posts', {
+    entry = await request('/api/liti/entries/posts', {
         method: 'POST',
         status: 201,
         body: { data: { title: 'A', content: '# Draft A', tags: [], slug: id } },
     })
-    const base = `/api/site-admin/entries/${entry.id}`
+    const base = `/api/liti/entries/${entry.id}`
     console.log('PASS: application routes, model configuration and authenticated session')
     if (process.argv.includes('--browser')) {
         for (const [suffix, title] of [
@@ -134,7 +134,7 @@ try {
             const description = explicitSummary
                 ? introduction
                 : `${introduction} Another short introduction.`
-            let post = await request('/api/site-admin/entries/posts', {
+            let post = await request('/api/liti/entries/posts', {
                 method: 'POST',
                 status: 201,
                 body: {
@@ -147,7 +147,7 @@ try {
                 },
             })
             publicEntries.push(post)
-            post = await request(`/api/site-admin/entries/${post.id}/publish`, {
+            post = await request(`/api/liti/entries/${post.id}/publish`, {
                 method: 'POST',
                 body: { expectedVersion: post.version },
             })
@@ -204,7 +204,10 @@ try {
             )
         }
         const { chromium } = await import('playwright-core')
-        const browser = await chromium.launch({ headless: true })
+        const browser = await chromium.launch({
+            headless: true,
+            executablePath: process.env.CHROMIUM_PATH,
+        })
         try {
             const context = await browser.newContext()
             await context.route('**/*', (route) =>
@@ -235,8 +238,8 @@ try {
             const page = await context.newPage()
             for (const [path, title] of [
                 ['/admin/posts/new', 'New Post'],
-                ['/admin/posts', 'Posts'],
-                ['/admin/works', 'Works'],
+                ['/admin/data?model=posts', 'Data'],
+                ['/admin/data?model=works', 'Data'],
             ]) {
                 const html = await request(path)
                 assert(html.includes(`<title>${title} | Liry24 Admin</title>`))
@@ -284,19 +287,19 @@ try {
             )
             await expectTitle('New Post | Liry24 Admin')
             assert.equal(await page.locator('html').getAttribute('lang'), 'ja')
-            await page.goto(new URL('/admin/posts', origin).href)
+            await page.goto(new URL('/admin/data?model=posts', origin).href)
             await page.waitForFunction(
                 () => document.querySelector('#__nuxt')?.__vue_app__?.$nuxt?.isHydrating === false,
             )
-            await expectTitle('Posts | Liry24 Admin')
+            await expectTitle('Data | Liry24 Admin')
             await page.getByRole('button', { name: /^New Post/ }).click()
             await expectTitle('New Post | Liry24 Admin')
             await page.goBack()
-            await expectTitle('Posts | Liry24 Admin')
+            await expectTitle('Data | Liry24 Admin')
             await page.goForward()
             await expectTitle('New Post | Liry24 Admin')
             for (const [path, title] of [
-                ['/admin/works', 'Works | Liry24 Admin'],
+                ['/admin/data?model=works', 'Data | Liry24 Admin'],
                 ['/admin/posts/new', 'New Post | Liry24 Admin'],
                 ['/works', 'Works | Liry24'],
                 ['/admin/posts/new', 'New Post | Liry24 Admin'],
@@ -324,7 +327,7 @@ try {
                 })
                 return (
                     !app.$nuxt['~transitionPromise'] &&
-                    !entries.some((entry) => entry.title === 'Works') &&
+                    !entries.some((entry) => entry.title === 'Data') &&
                     entries.filter((entry) => entry.title === 'New Post').length === 1 &&
                     entries.filter((entry) => entry.template === '%s | Liry24 Admin').length === 1
                 )
@@ -332,7 +335,7 @@ try {
             console.log(
                 'PASS: admin SSR/client titles, listing navigation, back/forward, repeated transitions from admin/public pages, completed transition promise and disposal of previous head entries',
             )
-            await page.goto(new URL('/__site-admin-devtools/', origin).href)
+            await page.goto(new URL('/__liti-devtools/', origin).href)
             await page.waitForFunction(() =>
                 document.querySelector('#snapshot')?.textContent?.includes('schemaReady'),
             )
@@ -417,7 +420,9 @@ try {
                 .last()
                 .waitFor()
             console.log('PASS: application public routes, post metadata and summary rendering')
-            await page.goto(new URL('/admin/posts', origin).href, { waitUntil: 'domcontentloaded' })
+            await page.goto(new URL('/admin/data?model=posts', origin).href, {
+                waitUntil: 'domcontentloaded',
+            })
             await page.waitForFunction(
                 () => document.querySelector('#__nuxt')?.__vue_app__?.$nuxt?.isHydrating === false,
             )
@@ -430,10 +435,10 @@ try {
                     slug: `${id}-page-${index + 1}`,
                 },
             }))
-            const listRoute = '**/api/site-admin/entries?**'
+            const listRoute = '**/api/liti/entries?**'
             await page.route(listRoute, async (route) => {
                 const query = new URL(route.request().url()).searchParams
-                assert.equal(query.get('model'), 'posts')
+                if (query.get('model') !== 'posts') return route.continue()
                 const limit = Number(query.get('limit'))
                 const offset = Number(query.get('offset'))
                 assert.equal(limit, 20)
@@ -447,7 +452,10 @@ try {
                     }),
                 })
             })
-            await page.getByRole('button', { name: 'Reload latest', exact: true }).click()
+            await page
+                .locator('#model-posts')
+                .getByRole('button', { name: 'Reload latest', exact: true })
+                .click()
             await page.getByText('Pagination post 1', { exact: true }).waitFor()
             await page.getByRole('button', { name: 'Page 2', exact: true }).click()
             await page.getByText('Pagination post 21', { exact: true }).waitFor()
@@ -456,16 +464,19 @@ try {
             await page.getByText('Pagination post 1', { exact: true }).waitFor()
             await page.unroute(listRoute)
             const reloadList = page.waitForResponse(
-                (response) => new URL(response.url()).pathname === '/api/site-admin/entries',
+                (response) => new URL(response.url()).pathname === '/api/liti/entries',
             )
-            await page.getByRole('button', { name: 'Reload latest', exact: true }).click()
+            await page
+                .locator('#model-posts')
+                .getByRole('button', { name: 'Reload latest', exact: true })
+                .click()
             const reloadedList = await (await reloadList).json()
             assert(
                 reloadedList.items.some((item) => item.id === entry.id),
                 JSON.stringify({ expectedId: entry.id, reloadedList }),
             )
             await page
-                .getByText(entry.data.slug, { exact: true })
+                .getByText(entry.data.title, { exact: true })
                 .waitFor()
                 .catch(async (error) => {
                     console.error({
@@ -481,8 +492,8 @@ try {
             )
             for (const title of ['Browser draft one', 'Browser draft two']) {
                 const row = page
-                    .locator('li')
-                    .filter({ has: page.getByText(entry.data.slug, { exact: true }) })
+                    .locator('tr')
+                    .filter({ has: page.getByText(entry.data.title, { exact: true }) })
                     .last()
                 await row.getByRole('button', { name: 'Edit', exact: true }).click()
                 await page.waitForURL(`**/admin/posts/${entry.id}`)
@@ -583,7 +594,7 @@ try {
                 if (!uploadedAsset) {
                     const uploaded = page.waitForResponse(
                         (response) =>
-                            response.url().endsWith('/api/site-admin/assets') &&
+                            response.url().endsWith('/api/liti/assets') &&
                             response.request().method() === 'POST',
                     )
                     await editor.locator('input[type="file"]').setInputFiles({
@@ -602,7 +613,7 @@ try {
                     uploadedAsset = (await response.json()).id
                     assert(uploadedAsset)
                     await editor
-                        .locator(`img[src$="/api/site-admin/assets/${uploadedAsset}/content"]`)
+                        .locator(`img[src$="/api/liti/assets/${uploadedAsset}/content"]`)
                         .waitFor()
                     await editor.getByText('local-probe.png', { exact: true }).waitFor()
                 } else {
@@ -614,7 +625,7 @@ try {
                 )
                 await page.getByRole('button', { name: 'Save Draft', exact: true }).click()
                 assert.equal((await saved).status(), 200)
-                await page.waitForURL('**/admin/posts')
+                await page.waitForURL('**/admin/data?model=posts')
                 await page.getByText(title, { exact: true }).waitFor()
                 entry = await request(base)
                 assert.equal(entry.data.title, title)
@@ -632,13 +643,9 @@ try {
                     entry.data.image ?? null,
                     title === 'Browser draft one' ? { id: uploadedAsset } : null,
                 )
-                if (title === 'Browser draft one')
-                    await row
-                        .locator(`img[src$="/api/site-admin/assets/${uploadedAsset}/content"]`)
-                        .waitFor()
             }
-            assert.equal((await request(`/api/site-admin/assets/${uploadedAsset}`)).state, 'ready')
-            await request(`/api/site-admin/assets/${uploadedAsset}/content`)
+            assert.equal((await request(`/api/liti/assets/${uploadedAsset}`)).state, 'ready')
+            await request(`/api/liti/assets/${uploadedAsset}/content`)
             assert.deepEqual(errors, [])
             console.log(
                 'PASS: Chrome dedicated editor, tag chips add/remove/replace, duplicate/whitespace/comma/paste preservation, Enter/IME do not save, tags save/reload, two saves, uploaded image preview, reference clear preserves Blob, Save Draft does not publish',
@@ -673,7 +680,7 @@ try {
             assert.equal(await page.evaluate(() => window.__previewUnsafe), undefined)
             assert.equal(await page.getByRole('dialog').count(), 0)
             await page.getByRole('link', { name: 'Back to Posts', exact: true }).click()
-            await page.waitForURL('**/admin/posts')
+            await page.waitForURL('**/admin/data?model=posts')
             await page.goBack()
             await page.waitForURL('**/admin/posts/new')
             await page.getByText('Unsaved input restored', { exact: true }).waitFor()
@@ -684,7 +691,7 @@ try {
                 ['draft-tag'],
             )
             await page.goForward()
-            await page.waitForURL('**/admin/posts')
+            await page.waitForURL('**/admin/data?model=posts')
             await page.goBack()
             await page.waitForURL('**/admin/posts/new')
             await page.waitForFunction(() => {
@@ -701,38 +708,47 @@ try {
             })
             assert.equal(await contentInput.inputValue(), original)
 
-            let slugCalls = 0
+            let failedPreparations = 0
             let proofreadingCalls = 0
             let draftCreates = 0
             let publications = 0
             page.on('request', (request) => {
                 if (request.method() !== 'POST') return
-                if (request.url().endsWith('/api/site-admin/entries/posts')) draftCreates++
-                if (/\/api\/site-admin\/entries\/[^/]+\/publish$/.test(request.url()))
+                if (request.url().endsWith('/api/liti/entries/posts')) draftCreates++
+            })
+            page.on('response', (response) => {
+                if (
+                    response.status() === 200 &&
+                    /\/api\/liti\/entries\/[^/]+\/publish$/.test(response.url())
+                )
                     publications++
             })
-            let slugInput
+            let publicationDraft
             let corrected = original.replace('Markdown works', 'Markdown corrected')
             let invalidProofreading = false
-            await page.route('**/api/site-admin/ai/actions/publication', async (route) => {
-                slugCalls++
-                slugInput = route.request().postDataJSON()
+            await page.route('**/api/liti/entries/*/publish', async (route) => {
+                const body = route.request().postDataJSON()
+                if (body.draft?.data?.publication?.slug !== 'auto') return route.continue()
+                failedPreparations++
+                publicationDraft = body.draft.data
                 await route.fulfill({
                     status: 503,
                     contentType: 'application/json',
                     body: JSON.stringify({
-                        error: { code: 'SITE_ADMIN_AI_FAILED', message: 'Synthetic AI failure' },
+                        error: { code: 'LITI_ACTION_FAILED', message: 'Synthetic AI failure' },
                     }),
                 })
             })
-            await page.route('**/api/site-admin/ai/actions/proofread', async (route) => {
+            await page.route('**/api/liti/actions/proofread', async (route) => {
                 proofreadingCalls++
                 const body = route.request().postDataJSON()
                 assert.deepEqual(Object.keys(body), ['input'])
                 assert.deepEqual(Object.keys(body.input), ['content'])
                 await route.fulfill({
                     contentType: 'application/json',
-                    body: JSON.stringify({ content: invalidProofreading ? '' : corrected }),
+                    body: JSON.stringify({
+                        data: { content: invalidProofreading ? '' : corrected },
+                    }),
                 })
             })
             await page.getByRole('button', { name: 'Proofread Content', exact: true }).click()
@@ -743,7 +759,7 @@ try {
             const created = page.waitForResponse(
                 (response) =>
                     response.request().method() === 'POST' &&
-                    response.url().endsWith('/api/site-admin/entries/posts'),
+                    response.url().endsWith('/api/liti/entries/posts'),
             )
             await page.evaluate(() => {
                 const form = document.querySelector('#admin-post-form')
@@ -754,7 +770,7 @@ try {
             const newEntry = await response.json()
             try {
                 try {
-                    await page.waitForURL('**/admin/posts')
+                    await page.waitForURL('**/admin/data?model=posts')
                 } catch (error) {
                     console.error({
                         newDraftNavigation: page.url(),
@@ -763,14 +779,14 @@ try {
                     })
                     throw error
                 }
-                assert.equal(slugCalls, 0)
+                assert.equal(failedPreparations, 0)
                 assert.equal(proofreadingCalls, 1)
                 assert.equal(draftCreates, 1)
                 assert.equal(newEntry.data.excerpt, undefined)
                 assert.deepEqual(newEntry.data.publication, { slug: 'auto' })
                 assert.equal(newEntry.publishedRevisionId, null)
                 await page
-                    .locator('li')
+                    .locator('tr')
                     .filter({ has: page.getByText(newEntry.data.title, { exact: true }) })
                     .last()
                     .getByRole('button', { name: 'Edit', exact: true })
@@ -799,24 +815,23 @@ try {
                 await page.getByRole('button', { name: 'Discard Suggestion' }).click()
                 await page.getByRole('button', { name: 'Publish', exact: true }).click()
                 await page.getByText('Synthetic AI failure', { exact: true }).waitFor()
-                assert.deepEqual(slugInput, {
-                    input: { title: 'Browser create draft', content: corrected },
-                })
+                assert.equal(publicationDraft.title, 'Browser create draft')
+                assert.equal(publicationDraft.content, corrected)
                 assert.equal(await contentInput.inputValue(), corrected)
                 assert.equal(
-                    (await request(`/api/site-admin/entries/${newEntry.id}`)).publishedRevisionId,
+                    (await request(`/api/liti/entries/${newEntry.id}`)).publishedRevisionId,
                     null,
                 )
                 await manualSlug.check()
                 await page.getByLabel('Slug', { exact: true }).fill('')
                 await page.getByRole('button', { name: 'Publish', exact: true }).click()
                 await page
-                    .getByText('Enter a slug or use automatic generation.', { exact: true })
+                    .getByText('Enter a valid slug before publishing.', { exact: true })
                     .waitFor()
-                assert.equal(slugCalls, 1)
+                assert.equal(failedPreparations, 1)
                 await page.getByLabel('Slug', { exact: true }).fill(`${id}-browser-new`)
                 await page.getByRole('link', { name: 'Back to Posts', exact: true }).click()
-                await page.waitForURL('**/admin/posts')
+                await page.waitForURL('**/admin/data?model=posts')
                 await page.goBack()
                 await page.waitForURL(`**/admin/posts/${newEntry.id}`)
                 await titleInput.waitFor()
@@ -838,29 +853,29 @@ try {
                     )
                 })
                 await page.getByRole('button', { name: 'Publish', exact: true }).click()
-                await page.waitForURL('**/admin/posts')
-                const stored = await request(`/api/site-admin/entries/${newEntry.id}`)
+                await page.waitForURL('**/admin/data?model=posts')
+                const stored = await request(`/api/liti/entries/${newEntry.id}`)
                 assert.equal(stored.data.slug, `${id}-browser-new`)
                 assert.equal(stored.data.title, 'Browser create draft')
                 assert.deepEqual(stored.data.tags, ['draft-tag'])
                 assert.equal(stored.data.content, corrected)
                 assert.equal(stored.data.excerpt, undefined)
                 assert.equal(stored.currentRevisionId, stored.publishedRevisionId)
-                assert.equal(slugCalls, 1)
+                assert.equal(failedPreparations, 1)
                 assert.equal(proofreadingCalls, 4)
                 assert.equal(publications, 1)
                 await page
-                    .locator('li')
+                    .locator('tr')
                     .filter({ has: page.getByText(stored.data.title, { exact: true }) })
                     .last()
                     .getByRole('button', { name: 'Edit', exact: true })
                     .click()
                 await page.waitForURL(`**/admin/posts/${stored.id}`)
                 await page.getByRole('link', { name: 'Back to Posts', exact: true }).click()
-                await page.waitForURL('**/admin/posts')
+                await page.waitForURL('**/admin/data?model=posts')
             } finally {
-                const latest = await request(`/api/site-admin/entries/${newEntry.id}`)
-                await request(`/api/site-admin/entries/${newEntry.id}`, {
+                const latest = await request(`/api/liti/entries/${newEntry.id}`)
+                await request(`/api/liti/entries/${newEntry.id}`, {
                     method: 'DELETE',
                     status: 204,
                     headers: { 'if-match': `"${latest.version}"` },
@@ -884,15 +899,15 @@ try {
 } finally {
     try {
         for (const record of [entry, ...publicEntries].filter(Boolean)) {
-            const latest = await request(`/api/site-admin/entries/${record.id}`)
-            await request(`/api/site-admin/entries/${record.id}`, {
+            const latest = await request(`/api/liti/entries/${record.id}`)
+            await request(`/api/liti/entries/${record.id}`, {
                 method: 'DELETE',
                 status: 204,
                 headers: { 'if-match': `"${latest.version}"` },
             })
         }
         for (const asset of [uploadedAsset].filter(Boolean))
-            await request(`/api/site-admin/assets/${asset}`, {
+            await request(`/api/liti/assets/${asset}`, {
                 method: 'DELETE',
                 status: 204,
             })

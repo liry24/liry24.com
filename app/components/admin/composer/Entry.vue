@@ -11,7 +11,7 @@ const emit = defineEmits<{
 }>()
 
 const { open, busy: writing, setBusy, preparation } = useAdminComposer()
-const { form, fields, upload, operation, error, status, features } = await useAdminForm(
+const { form, fields, upload, operation, error, state, features } = await useLitiForm(
     String(plan.model),
     {
         instance: 'composer:' + itemId,
@@ -25,11 +25,11 @@ const { baseline } = preparation(
     itemId + ':' + plan.model + ':' + (plan.entryId ?? 'new'),
     form.state.values,
 )
-const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
-const busy = computed(() => pending || writing.value || status.value === 'pending')
+const conflict = computed(() => state.value.conflict)
+const busy = computed(() => pending || writing.value || !state.value.ready || state.value.busy)
 
 const submit = async () => {
-    if (!operation.value && status.value !== 'pending' && !conflict.value) await form.handleSubmit()
+    if (state.value.can.save) await form.handleSubmit()
 }
 
 const full = ref(false)
@@ -40,13 +40,13 @@ const visiblePlan = computed(() =>
     full.value ? { ...plan, visibleFields: plan.fields.map((field) => field.key) } : plan,
 )
 
-const removeNavigationGuard = useRouter().beforeEach(() => operation.value === null)
+const removeNavigationGuard = useRouter().beforeEach(() => state.value.canLeave)
 onScopeDispose(removeNavigationGuard)
 
 watch(
-    operation,
+    () => state.value.busy,
     (value) => {
-        setBusy(itemId, value !== null)
+        setBusy(itemId, value)
     },
     { flush: 'sync', immediate: true },
 )

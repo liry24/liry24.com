@@ -1,6 +1,6 @@
 export type PostSlugMode = 'auto' | 'manual'
 
-export type PostPublicationSettings = { slug: PostSlugMode; publishedSlug?: string }
+export type PostPublicationSettings = { slug: PostSlugMode }
 
 export function postPublicationSettings(data: Record<string, unknown>): PostPublicationSettings {
     const settings =
@@ -9,8 +9,5 @@ export function postPublicationSettings(data: Record<string, unknown>): PostPubl
             : {}
     return {
         slug: settings.slug === 'auto' ? 'auto' : 'manual',
-        ...(typeof settings.publishedSlug === 'string' && settings.publishedSlug
-            ? { publishedSlug: settings.publishedSlug }
-            : {}),
     }
 }

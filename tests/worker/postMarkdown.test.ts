@@ -1,11 +1,12 @@
-import { createSiteAdminClient } from '@liria24/site-admin/internal/client'
-import { createSiteAdmin, handlePublicRequest } from '@liria24/site-admin/internal/server'
 import type { Node } from 'comark'
 import { parseMarkdown } from 'comark/parse'
+import { resolveLitiConfig } from 'liti'
+import { createLitiClient } from 'liti/client'
+import { createRuntime, handlePublicRequest } from 'liti/server'
 import { expect, test } from 'vitest'
 
+import config from '../../liti.config'
 import { postMarkdownSecurity } from '../../shared/utils/postMarkdown'
-import config from '../../site-admin.config'
 import { openTestDatabase } from '../helpers/database'
 
 const content = [
@@ -119,22 +120,29 @@ function assertSafe(nodes: Node[]) {
 
 test('post preview and native public detail/summary apply the same Markdown policy without rewriting stored content', async () => {
     const local = openTestDatabase()
-    const admin = createSiteAdmin({
+    const admin = createRuntime({
         locales: { defaultLocale: 'ja', supported: ['ja'] },
-        config,
+        config: resolveLitiConfig(config, []),
         database: local.database,
     })
-    const client = createSiteAdminClient({
+    const client = createLitiClient({
         origin: 'http://synthetic.invalid',
+        publicBaseURL: '/api/content',
         fetch: (input, init) => handlePublicRequest(admin, new Request(String(input), init)),
     })
     try {
-        let entry = await admin.createEntry('posts', {
-            data: { title: 'Safe Markdown', content, tags: [], slug: 'safe-markdown' },
+        let entry = await admin.createEntry(
+            'posts',
+            {
+                data: { title: 'Safe Markdown', content, tags: [], slug: 'safe-markdown' },
+            },
+            { actor: { id: 'synthetic-admin', roles: ['admin'] } },
+        )
+        entry = await admin.publishEntry(entry.id, { expectedVersion: entry.version }, undefined, {
+            actor: { id: 'synthetic-admin', roles: ['admin'] },
         })
-        entry = await admin.publishEntry(entry.id, { expectedVersion: entry.version })
-        const detail = await client.get('posts', entry.id)
-        const summary = (await client.list('posts', { markdown: 'summary' }))[0]!
+        const detail = await client.query('posts', { mode: 'one', id: entry.id })
+        const summary = (await client.query('posts', { markdown: 'summary' }))[0]!
         const preview = await parseMarkdown(content, { plugins: [postMarkdownSecurity] })
         for (const nodes of [preview.nodes, detail!.data.content.nodes, summary.data.content.nodes])
             assertSafe(nodes)

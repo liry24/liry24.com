@@ -9,38 +9,37 @@ const overlay = useOverlay()
 const modalStacks = overlay.create(LazyStacksModal)
 const MotionUSeparator = motion.create('hr')
 
-const { data: batch } = await useContent({
-    arts: { list: 'arts' },
-    socials: { list: 'socials' },
-    careers: { list: 'careers' },
-    ranks: { list: 'ranks' },
-    games: { list: 'games' },
-    gameStats: { list: 'gameStats' },
-    posts: { list: 'posts', markdown: 'summary' },
-})
+const arts = useLitiQuery('arts')
+const socials = useLitiQuery('socials')
+const careers = useLitiQuery('careers')
+const ranks = useLitiQuery('ranks')
+const games = useLitiQuery('games')
+const gameStats = useLitiQuery('gameStats')
+const posts = useLitiQuery('posts', { markdown: 'summary' })
+await Promise.all([arts, socials, careers, ranks, games, gameStats, posts])
 const data = computed(() => ({
-    arts: batch.value?.arts.data || [],
-    socials: batch.value?.socials.data?.map((entry) => entry.data) || [],
-    careers: batch.value?.careers.data?.map((entry) => entry.data) || [],
+    arts: arts.data.value || [],
+    socials: socials.data.value?.map((entry) => entry.data) || [],
+    careers: careers.data.value?.map((entry) => entry.data) || [],
     ranks:
-        batch.value?.ranks.data?.map((entry) => ({
+        ranks.data.value?.map((entry) => ({
             ...entry.data,
             entryId: entry.id,
             imageUrl: entry.data.image?.url,
         })) || [],
     posts:
-        batch.value?.posts.data?.map((entry) => ({
+        posts.data.value?.map((entry) => ({
             ...entry.data,
             slug: entry.data.slug,
-            createdAt: entry.data.createdAt || entry.publishedAt,
+            createdAt: entry.meta.blog.date,
         })) || [],
 }))
 
 const statGames = computed(() =>
-    (batch.value?.games.data ?? [])
+    (games.data.value ?? [])
         .map((game) => ({
             ...game,
-            periods: (batch.value?.gameStats.data ?? [])
+            periods: (gameStats.data.value ?? [])
                 .filter((period) => period.data.game?.id === game.id)
                 .map((period) => period.data),
         }))
@@ -51,9 +50,7 @@ const statGames = computed(() =>
 const legacyRanks = computed(() =>
     data.value.ranks.filter(
         (rank) =>
-            !batch.value?.gameStats.data?.some(
-                (period) => period.id === `legacy-${rank.entryId}`,
-            ) &&
+            !gameStats.data.value?.some((period) => period.id === `legacy-${rank.entryId}`) &&
             !statGames.value.some(
                 (game) => game.data.name.toLowerCase() === rank.game.toLowerCase(),
             ),
@@ -297,6 +294,7 @@ useKeyCommand(modalStacks.open)
 
                         <div class="flex flex-wrap items-center gap-2">
                             <NuxtTime
+                                v-if="post.createdAt"
                                 :datetime="post.createdAt"
                                 date-style="short"
                                 time-style="short"

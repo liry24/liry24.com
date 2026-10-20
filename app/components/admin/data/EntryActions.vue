@@ -1,26 +1,45 @@
 <script setup lang="ts">
-import type { Entry, Revision } from '@liria24/site-admin'
-
-import type { useAdminEntries } from '#build/site-admin/client'
+import type { Entry, Revision, EntryFeatures } from 'liti'
+import { createLitiClient } from 'liti/client'
 
 const {
     entry,
-    resource,
+    features,
+    title,
+    busy: loading = false,
     posts = false,
 } = defineProps<{
     entry: Entry
-    resource: ReturnType<typeof useAdminEntries<string>>
+    features: EntryFeatures
+    title: string
+    busy?: boolean
     posts?: boolean
 }>()
-const emit = defineEmits<{ edit: [] }>()
-const { features, status } = resource
-const busy = computed(() => status.value === 'pending')
+const emit = defineEmits<{ edit: []; changed: [] }>()
+const client = createLitiClient()
+const running = ref(false)
+const error = ref('')
+const busy = computed(() => loading || running.value)
 const schedule = ref('')
-const revisions = ref<Revision[]>()
+const revisions = ref<Array<Pick<Revision, 'id' | 'createdAt'>>>()
 const selectedRevision = ref<string>()
-const history = async () => {
-    revisions.value = (await resource.revisions(entry)) ?? []
+async function run(operation: () => Promise<unknown>, changed = true) {
+    if (busy.value) return
+    running.value = true
+    error.value = ''
+    try {
+        await operation()
+        if (changed) emit('changed')
+    } catch (cause) {
+        error.value = cause instanceof Error ? cause.message : 'The operation failed.'
+    } finally {
+        running.value = false
+    }
 }
+const history = () =>
+    run(async () => {
+        revisions.value = await client.listRevisions(entry.id)
+    }, false)
 </script>
 
 <template>
@@ -45,15 +64,24 @@ const history = async () => {
             <template #content>
                 <div class="flex w-80 flex-col gap-3 p-4">
                     <p class="truncate text-sm font-medium">
-                        {{ resource.display(entry.data).title }}
+                        {{ title }}
                     </p>
+                    <UAlert v-if="error" :title="error" color="error" />
                     <template v-if="features.publishing">
                         <UButton
                             :label="posts ? 'Edit & Publish' : 'Publish'"
                             variant="soft"
                             color="neutral"
                             :disabled="busy"
-                            @click="posts ? emit('edit') : resource.publish(entry)"
+                            @click="
+                                posts
+                                    ? emit('edit')
+                                    : run(() =>
+                                          client.publishEntry(entry.id, {
+                                              expectedVersion: entry.version,
+                                          }),
+                                      )
+                            "
                         />
                         <UButton
                             v-if="entry.publishedRevisionId"
@@ -61,7 +89,13 @@ const history = async () => {
                             variant="ghost"
                             color="neutral"
                             :disabled="busy"
-                            @click="resource.unpublish(entry)"
+                            @click="
+                                run(() =>
+                                    client.unpublishEntry(entry.id, {
+                                        expectedVersion: entry.version,
+                                    }),
+                                )
+                            "
                         />
                     </template>
                     <template v-if="features.scheduling && !posts">
@@ -75,7 +109,14 @@ const history = async () => {
                             variant="soft"
                             color="neutral"
                             :disabled="busy || !schedule"
-                            @click="resource.schedule(entry, schedule)"
+                            @click="
+                                run(() =>
+                                    client.schedulePublish(entry.id, {
+                                        at: new Date(schedule).toISOString(),
+                                        expectedVersion: entry.version,
+                                    }),
+                                )
+                            "
                         />
                     </template>
                     <UButton
@@ -84,7 +125,13 @@ const history = async () => {
                         variant="ghost"
                         color="neutral"
                         :disabled="busy"
-                        @click="resource.cancelSchedule(entry)"
+                        @click="
+                            run(() =>
+                                client.cancelScheduledPublish(entry.id, {
+                                    expectedVersion: entry.version,
+                                }),
+                            )
+                        "
                     />
                     <template v-if="features.revisions">
                         <UButton
@@ -112,7 +159,13 @@ const history = async () => {
                                 variant="soft"
                                 color="neutral"
                                 :disabled="busy || !selectedRevision"
-                                @click="resource.restore(entry, selectedRevision!)"
+                                @click="
+                                    run(() =>
+                                        client.restoreRevision(entry.id, selectedRevision!, {
+                                            expectedVersion: entry.version,
+                                        }),
+                                    )
+                                "
                             />
                         </template>
                     </template>
@@ -123,7 +176,11 @@ const history = async () => {
                         variant="ghost"
                         color="error"
                         :disabled="busy"
-                        @click="resource.remove(entry)"
+                        @click="
+                            run(() =>
+                                client.deleteEntry(entry.id, { expectedVersion: entry.version }),
+                            )
+                        "
                     />
                 </div>
             </template>

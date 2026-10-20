@@ -62,7 +62,7 @@ test('slug generation validates exact fields and shape', async () => {
 test('proofreading rejects changes to code, links, and assets without changing the draft', async () => {
     const input = {
         ...draft,
-        content: 'Example `one()`\n\n[link](/posts/a)\n\n![image](site-admin:asset-one)',
+        content: 'Example `one()`\n\n[link](/posts/a)\n\n![image](liti:asset-one)',
     }
     const original = structuredClone(input)
     for (const content of [
@@ -102,7 +102,7 @@ test.each([
 
 test('proofreading can edit prose around protected Markdown without changing its source', async () => {
     const content =
-        'This are an example `one()\nnext()` with [a link](/posts/a(foo).png).\n\n    one()\n\n![image](site-admin:asset-one)\n\n[unused]: /posts/a(foo).png'
+        'This are an example `one()\nnext()` with [a link](/posts/a(foo).png).\n\n    one()\n\n![image](liti:asset-one)\n\n[unused]: /posts/a(foo).png'
     const corrected = content.replace('This are', 'This is')
     const input = { ...draft, content }
     const run = vi.fn(async () => postActionResponse({ content: corrected }))

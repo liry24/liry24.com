@@ -11,11 +11,8 @@ test('defaults missing or malformed publication settings to manual', () => {
         expect(postPublicationSettings({ publication })).toEqual({ slug: 'manual' })
 })
 
-test('keeps the confirmed URL marker after unpublishing', () => {
+test('does not retain a second publication URL marker', () => {
     expect(
-        postPublicationSettings({ publication: { slug: 'auto', publishedSlug: 'confirmed-url' } }),
-    ).toEqual({
-        slug: 'auto',
-        publishedSlug: 'confirmed-url',
-    })
+        postPublicationSettings({ publication: { slug: 'auto', publishedSlug: 'old' } }),
+    ).toEqual({ slug: 'auto' })
 })

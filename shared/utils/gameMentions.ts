@@ -1,14 +1,14 @@
-import type { ComarkPlugin, MarkdownExitPlugin, Node } from 'comark'
+import type { ComarkPlugin, MarkdownItPlugin, Node } from 'comark'
 import { parseMarkdown } from 'comark/parse'
 
 import { gameSlugPattern } from './games.js'
-export const gameMentionRule: MarkdownExitPlugin = (parser) => {
+export const gameMentionRule: MarkdownItPlugin = (parser) => {
     parser.inline.ruler.before('autolink', 'game-mention', (state, silent) => {
         if (state.src[state.pos] !== '<') return false
         const match = /^<game:([^>\n]*)>/.exec(state.src.slice(state.pos))
         if (!match) return false
         if (!silent) {
-            if (gameSlugPattern.test(match[1]!) && state.linkLevel === 0)
+            if (gameSlugPattern.test(match[1]!) && 'linkLevel' in state && state.linkLevel === 0)
                 state.push('mdc_inline_component', 'game-mention', 0).attrSet('slug', match[1]!)
             else state.push('text', '', 0).content = match[0]
         }

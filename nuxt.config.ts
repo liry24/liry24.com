@@ -27,7 +27,19 @@ export default defineNuxtConfig({
         '@vueuse/nuxt',
         '@nuxt/hints',
         '@nuxt/a11y',
-        '@liria24/site-admin/nuxt',
+        'liti/nuxt',
+        [
+            'nuxt-llms',
+            {
+                domain: baseURL,
+                description: 'Liry24 portfolio, artwork, and posts.',
+                full: {
+                    description: 'All published Liry24 content.',
+                    title: 'Liry24 full content',
+                },
+                title,
+            },
+        ],
         'motion-v/nuxt',
     ],
 
@@ -150,13 +162,6 @@ export default defineNuxtConfig({
         name: title,
     },
 
-    llms: {
-        domain: baseURL,
-        description: 'Liry24 portfolio, artwork, and posts.',
-        full: { description: 'All published Liry24 content.', title: 'Liry24 full content' },
-        title,
-    },
-
     ui: { experimental: { componentDetection: true } },
 
     icon: {
@@ -176,8 +181,15 @@ export default defineNuxtConfig({
         },
     },
 
-    siteAdmin: {
-        ai: true,
+    liti: {
+        auth: true,
+        i18n: true,
+        llms: true,
+        ogImage: true,
+        robots: true,
+        schemaOrg: true,
+        seo: true,
+        sitemap: true,
     },
 
     auth: {
@@ -196,7 +208,7 @@ export default defineNuxtConfig({
     },
 
     robots: {
-        disallow: ['/admin', '/api/site-admin', '/login'],
+        disallow: ['/admin', '/api/liti', '/login'],
     },
 
     $development: {

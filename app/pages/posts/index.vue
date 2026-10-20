@@ -1,12 +1,12 @@
 <script setup lang="ts">
 const route = useRoute()
-const { data } = await useContent('posts', {
+const { data } = await useLitiQuery('posts', {
     markdown: 'summary',
     transform: (entries) =>
         entries.map((entry) => ({
             ...entry.data,
             slug: entry.data.slug,
-            createdAt: entry.data.createdAt || entry.publishedAt,
+            createdAt: entry.meta.blog.date,
         })),
 })
 const filtered = computed(() =>
@@ -51,6 +51,7 @@ const filtered = computed(() =>
 
             <div class="flex flex-wrap items-center gap-2">
                 <NuxtTime
+                    v-if="post.createdAt"
                     :datetime="post.createdAt"
                     date-style="short"
                     time-style="short"

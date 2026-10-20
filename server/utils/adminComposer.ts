@@ -3,7 +3,7 @@ import type {
     Experimental_CompositionEvaluator,
     Experimental_ChoiceQuestion,
 } from '@json-render/core'
-import type { ServerAdmin } from '@liria24/site-admin/server'
+import type { ServerAdmin } from 'liti/nuxt/server'
 import { UsageLimit } from 'void/limits'
 
 import type {

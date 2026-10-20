@@ -2,8 +2,8 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
-import type { SiteAdminDatabase } from '@liria24/site-admin/internal/adapter'
-import { useVoidDatabase } from '@liria24/site-admin/internal/runtime/database'
+import { useVoidDatabase } from '@litijs/void/session'
+import type { LitiDatabase } from 'liti/adapter'
 import { withRuntimeEnv } from 'void/_env'
 
 import * as schema from '../../db/schema'
@@ -29,7 +29,7 @@ export function openTestDatabase() {
     return { sqlite, env, database: bindTestDatabase(env), close: () => sqlite.close() }
 }
 
-export function bindTestDatabase(env: { DB: unknown }): SiteAdminDatabase {
+export function bindTestDatabase(env: { DB: unknown }): LitiDatabase {
     return {
         bind(config) {
             const storage = withRuntimeEnv(env, () => useVoidDatabase(schema).bind(config))
