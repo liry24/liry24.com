@@ -1,5 +1,11 @@
 <script setup lang="ts">
 const route = useRoute()
+const location = useBrowserLocation()
+const { isSupported: isShareSupported, share } = useShare(() => ({
+    title: data.value?.plainTitle || data.value?.title,
+    url: location.value.href,
+}))
+const { isSupported: isCopySupported, copy, copied } = useClipboard()
 
 const { data: entry, error } = await useLitiQuery('posts', {
     mode: 'one',
@@ -17,21 +23,12 @@ const data = computed(() =>
 )
 
 if (!data.value) throw createError({ status: 404, statusText: 'Post not found' })
-
-const location = useBrowserLocation()
-
-const { isSupported: isShareSupported, share } = useShare(() => ({
-    title: data.value?.plainTitle || data.value?.title,
-    url: location.value.href,
-}))
-
-const { isSupported: isCopySupported, copy, copied } = useClipboard()
 </script>
 
 <template>
     <UPage v-if="data" :ui="{ center: 'flex flex-col gap-6 items-center' }">
         <UContainer class="flex max-w-4xl flex-col items-center gap-6">
-            <h1 class="text-center text-4xl font-bold">
+            <h1 class="text-heading text-center">
                 <PostTitle :title="data.title" />
             </h1>
 
@@ -74,7 +71,7 @@ const { isSupported: isCopySupported, copy, copied } = useClipboard()
                 </ClientOnly>
             </div>
 
-            <div class="flex max-w-4xl flex-col gap-6">
+            <div class="flex w-full max-w-[65ch] flex-col gap-6">
                 <USeparator decorative class="my-4" />
 
                 <MarkdownDocument :value="data.content" class="px-1 *:first:mt-0 *:last:mb-0" />

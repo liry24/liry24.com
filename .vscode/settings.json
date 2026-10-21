@@ -10,5 +10,6 @@
     "tailwindCSS.experimental.classRegex": [
         ["ui:\\s*{([^)]*)\\s*}", "(?:'|\"|`)([^']*)(?:'|\"|`)", "class:\\s*?[\"'`]([^\"'`]*).*?,"]
     ],
-    "typescript.tsdk": "node_modules\\typescript\\lib"
+    "js/ts.tsdk.path": "node_modules/typescript/lib",
+    "js/ts.tsdk.promptToUseWorkspaceVersion": true
 }

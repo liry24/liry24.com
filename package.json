@@ -17,7 +17,7 @@
         "content:generate": "liti generate && oxfmt db/schema.ts --write"
     },
     "dependencies": {
-        "@ai-sdk/openai": "^4.0.97",
+        "@ai-sdk/openai": "^4.0.99",
         "@better-auth/passkey": "1.7.11",
         "@comark/nuxt": "0.7.0",
         "@formkit/drag-and-drop": "^0.6.1",
@@ -35,16 +35,15 @@
         "@nuxtjs/i18n": "10.6.0",
         "@nuxtjs/robots": "7.0.2",
         "@nuxtjs/sitemap": "9.1.0",
-        "@takumi-rs/core": "2.17.0",
-        "@takumi-rs/wasm": "2.17.0",
+        "@takumi-rs/core": "2.17.1",
+        "@takumi-rs/wasm": "2.17.1",
         "@tanstack/charts": "^1.1.0",
         "@vueuse/nuxt": "^15.0.0",
         "@yeger/vue-masonry-wall": "^6.1.4",
-        "ai": "7.0.145",
+        "ai": "7.0.148",
         "better-auth": "1.7.11",
         "cn": "^0.5.0",
         "comark": "0.7.0",
-        "files-sdk": "3.1.1",
         "liti": "https://pkg.pr.new/liry24/liti@c4c3958",
         "motion-v": "^2.8.0",
         "nuxt": "^4.6.2",
@@ -60,23 +59,24 @@
         "zod": "4.6.7"
     },
     "devDependencies": {
-        "@cloudflare/workers-types": "^5.20261019.1",
+        "@cloudflare/workers-types": "^5.20261021.1",
         "@nuxt/a11y": "^1.0.0-alpha.1",
         "@nuxt/fonts": "1.0.1",
         "@nuxt/hints": "^1.1.5",
         "@nuxt/test-utils": "4.3.4",
         "@types/node": "^26.6.5",
         "@vue/test-utils": "^2.5.1",
-        "happy-dom": "^21.0.3",
+        "happy-dom": "^21.0.4",
         "oxfmt": "^0.74.0",
         "oxlint": "^1.89.0",
         "oxlint-tsgolint": "^7.0.2004",
         "playwright-core": "^1.64.1",
         "taze": "^21.3.0",
-        "typescript": "^6.0.3",
+        "tsrs": "^0.18.0-ts7.1.0-dev.20260929",
+        "typescript": "npm:typescript-native-bridge@6.0.3-bridge.18.tsgo.7.0.2",
         "vitest": "^5.0.5",
         "vue-tsc": "^3.3.13",
-        "wrangler": "^4.151.2"
+        "wrangler": "^4.151.3"
     },
     "overrides": {
         "@litijs/sqlite": "https://pkg.pr.new/liry24/liti/@litijs/sqlite@c4c3958",
@@ -84,7 +84,8 @@
         "auth": "1.7.11",
         "better-auth": "1.7.11",
         "liti": "https://pkg.pr.new/liry24/liti@c4c3958",
-        "vue": "3.6.0-rc.12"
+        "vue": "3.6.0-rc.12",
+        "typescript": "$typescript"
     },
     "packageManager": "bun@1.4.3",
     "patchedDependencies": {

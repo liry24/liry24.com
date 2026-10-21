@@ -3,6 +3,7 @@ import { ai } from '@litijs/ai'
 import { aiSdk } from '@litijs/ai/ai-sdk'
 import { blog } from '@litijs/blog'
 import { voidAdapter } from '@litijs/void'
+import breaks from 'comark/plugins/breaks'
 import {
     array,
     datetime,
@@ -277,7 +278,10 @@ export default defineLitiConfig({
         },
     },
 
-    markdown: { plugins: [postMarkdownSecurity], summary: { inlineTags: ['game-mention'] } },
+    markdown: {
+        plugins: [postMarkdownSecurity, breaks()],
+        summary: { inlineTags: ['game-mention'] },
+    },
 
     assets: {
         storage: 'content',

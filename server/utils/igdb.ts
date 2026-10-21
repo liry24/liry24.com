@@ -63,7 +63,7 @@ export async function queryIgdb(
             slug: game.slug,
             name: game.name,
             cover: game.cover
-                ? `https://images.igdb.com/igdb/image/upload/t_cover_small/${game.cover.image_id}.jpg`
+                ? `https://images.igdb.com/igdb/image/upload/t_thumb/${game.cover.image_id}.jpg`
                 : null,
         }))
     } catch {

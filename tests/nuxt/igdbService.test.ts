@@ -29,7 +29,7 @@ test('IGDB keeps exact identity, validates images and caches OAuth credentials w
             igdbId: 1,
             slug: 'exact-igdb-slug',
             name: 'Exact Game',
-            cover: 'https://images.igdb.com/igdb/image/upload/t_cover_small/co123.jpg',
+            cover: 'https://images.igdb.com/igdb/image/upload/t_thumb/co123.jpg',
         },
     ])
     await queryIgdb({ id: 1 })
