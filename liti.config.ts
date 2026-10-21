@@ -1,11 +1,15 @@
 import { openai } from '@ai-sdk/openai'
+import { ai } from '@litijs/ai'
+import { aiSdk } from '@litijs/ai/ai-sdk'
+import { blog } from '@litijs/blog'
+import { voidAdapter } from '@litijs/void'
+import breaks from 'comark/plugins/breaks'
 import {
     array,
     datetime,
-    defineSiteAdminConfig,
+    defineLitiConfig,
     image,
     images,
-    markdown,
     object,
     number,
     relation,
@@ -13,24 +17,55 @@ import {
     text,
     textarea,
     url,
-} from '@liria24/site-admin'
+} from 'liti'
 
+import { prepareEntrySlug } from './server/utils/entryPreparation.ts'
 import {
     validateGame,
     validateGameStats,
-    validatePostGames,
+    preparePostGames,
+    prepareGame,
+    prepareGameStats,
 } from './server/utils/gameValidation.ts'
 import { postAiActions } from './server/utils/posts.ts'
 import { gameColorPattern, metricKeyPattern, gameSlugPattern } from './shared/utils/games.ts'
 import { postMarkdownSecurity } from './shared/utils/postMarkdown.ts'
 
-export default defineSiteAdminConfig({
+export default defineLitiConfig({
+    adapter: voidAdapter(),
+    plugins: [
+        ai({ provider: aiSdk({ text: openai('gpt-6-luna') }), actions: postAiActions }),
+        blog({
+            models: {
+                posts: {
+                    meta: {
+                        label: 'Post',
+                        plural: 'Posts',
+                        icon: 'mingcute:book-3-fill',
+                        fields: ['slug'],
+                    },
+                    i18n: true,
+                    mapping: { cover: 'image', authoredAt: 'createdAt' },
+                    slug: { mode: 'auto', action: 'publication' },
+                    proofreading: { action: 'proofread', guard: 'pending' },
+                    seo: (entry) => ({ title: String(entry.data.plainTitle || entry.data.title) }),
+                    prepare: preparePostGames,
+                    fields: {
+                        plainTitle: text({ i18n: true }),
+                        gameMentions: array(relation('games'), { default: [], i18n: true }),
+                        authorUserId: text(),
+                    },
+                },
+            },
+        }),
+    ],
     tasks: {
         publishDue: process.env.APP_ENV === 'production' ? '* * * * *' : true,
         rebuildSearch: true,
     },
     models: {
         works: {
+            preparePublication: prepareEntrySlug('title'),
             meta: {
                 label: 'Work',
                 plural: 'Works',
@@ -53,6 +88,7 @@ export default defineSiteAdminConfig({
             },
         },
         arts: {
+            preparePublication: prepareEntrySlug('title'),
             meta: {
                 label: 'Art',
                 plural: 'Arts',
@@ -71,6 +107,7 @@ export default defineSiteAdminConfig({
             },
         },
         careers: {
+            preparePublication: prepareEntrySlug('company'),
             meta: {
                 label: 'Career',
                 plural: 'Careers',
@@ -87,6 +124,7 @@ export default defineSiteAdminConfig({
             },
         },
         ranks: {
+            prepare: prepareEntrySlug('game'),
             meta: {
                 label: 'Rank',
                 plural: 'Legacy Ranks',
@@ -109,6 +147,7 @@ export default defineSiteAdminConfig({
         },
 
         games: {
+            unique: [['igdbId'], ['slug']],
             meta: {
                 label: 'Game',
                 plural: 'Games',
@@ -122,6 +161,7 @@ export default defineSiteAdminConfig({
             route: false,
             displayFields: { title: 'name', image: 'icon' },
             validate: validateGame,
+            prepare: prepareGame,
             fields: {
                 slug: text({ required: true, pattern: gameSlugPattern.source }),
                 igdbId: number({ required: true, integer: true, min: 1 }),
@@ -156,6 +196,7 @@ export default defineSiteAdminConfig({
             },
         },
         gameStats: {
+            unique: [['game', 'periodKey']],
             meta: {
                 label: 'Game Stats',
                 plural: 'Game Stats',
@@ -169,6 +210,10 @@ export default defineSiteAdminConfig({
             route: false,
             displayFields: { title: 'period' },
             validate: validateGameStats,
+            prepare: async (context) => {
+                await prepareGameStats(context)
+                prepareEntrySlug('period')(context)
+            },
             fields: {
                 slug: text({ default: '' }),
                 game: relation('games', { required: true }),
@@ -194,6 +239,7 @@ export default defineSiteAdminConfig({
             },
         },
         skills: {
+            preparePublication: prepareEntrySlug('name'),
             meta: {
                 label: 'Skill',
                 plural: 'Skills',
@@ -210,6 +256,7 @@ export default defineSiteAdminConfig({
             },
         },
         socials: {
+            prepare: prepareEntrySlug('label'),
             meta: {
                 label: 'Social',
                 plural: 'Socials',
@@ -229,52 +276,17 @@ export default defineSiteAdminConfig({
                 icon: text({ required: true }),
             },
         },
-        posts: {
-            meta: {
-                label: 'Post',
-                plural: 'Posts',
-                icon: 'mingcute:book-3-fill',
-                fields: ['slug'],
-            },
-            route: '/posts/:slug',
-            seo: (entry) => ({
-                type: 'article',
-                title: String(entry.data.plainTitle || entry.data.title),
-            }),
-            validate: validatePostGames,
-            displayFields: { title: 'title', description: 'content', image: 'image' },
-            fields: {
-                slug: text({ default: '', i18n: true }),
-                title: text({ required: true, i18n: true }),
-                plainTitle: text({ i18n: true }),
-                gameMentions: array(relation('games'), { default: [], i18n: true }),
-                content: markdown({ required: true, i18n: true }),
-                publication: object(
-                    {
-                        slug: select(['auto', 'manual']),
-                        publishedSlug: text(),
-                    },
-                    { i18n: true },
-                ),
-                tags: array(text(), { required: true, default: [] }),
-                image: image(),
-                authorUserId: text(),
-                createdAt: datetime(),
-            },
-        },
     },
 
-    markdown: { plugins: [postMarkdownSecurity], summary: { inlineTags: ['game-mention'] } },
+    markdown: {
+        plugins: [postMarkdownSecurity, breaks()],
+        summary: { inlineTags: ['game-mention'] },
+    },
 
     assets: {
         storage: 'content',
         separateDrafts: false,
         cleanup: { minimumAge: 60 * 60 * 24 },
-    },
-
-    ai: {
-        model: openai('gpt-6-luna'),
-        actions: postAiActions,
     },
 
     seo: {

@@ -2,11 +2,9 @@ import { betterAuth } from 'better-auth'
 import { admin, createAccessControl } from 'better-auth/plugins'
 import { createError } from 'nuxt/server'
 
-import { adminAccess, adminRoles } from '../../../../../shared/auth/access'
-
 const fixtureAccess = createAccessControl({
     ...adminAccess.statements,
-    'siteAdmin:model:games': ['readDraft', 'create'],
+    'liti:model:games': ['readDraft', 'create'],
 } as const)
 const auth = betterAuth({
     baseURL: 'http://localhost',
@@ -18,10 +16,10 @@ const auth = betterAuth({
                 ...adminRoles,
                 admin: fixtureAccess.newRole({
                     ...adminRoles.admin.statements,
-                    'siteAdmin:model:games': ['readDraft', 'create'],
+                    'liti:model:games': ['readDraft', 'create'],
                 }),
-                gameReader: fixtureAccess.newRole({ 'siteAdmin:model:games': ['readDraft'] }),
-                gameImporter: fixtureAccess.newRole({ 'siteAdmin:model:games': ['create'] }),
+                gameReader: fixtureAccess.newRole({ 'liti:model:games': ['readDraft'] }),
+                gameImporter: fixtureAccess.newRole({ 'liti:model:games': ['create'] }),
             },
         }),
     ],

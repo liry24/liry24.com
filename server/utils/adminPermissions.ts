@@ -1,4 +1,4 @@
-import { getNitroRequest } from '@liria24/site-admin/internal/runtime/nitro2'
+import { getNitroRequest } from 'liti/nuxt/server'
 import { createError, type RequestEvent } from 'nuxt/server'
 
 export async function requireAdminPermission(

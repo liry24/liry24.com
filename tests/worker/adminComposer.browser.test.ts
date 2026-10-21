@@ -8,7 +8,7 @@ import { chromium } from 'playwright-core'
 import { test } from 'vitest'
 import { createTestHarness } from 'wrangler'
 
-import type { ComposerPlan } from '../../shared/utils/adminComposer'
+import type { ComposerPlan } from '../../shared/types/adminComposer'
 import { baselineStatements } from '../helpers/database'
 
 test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
@@ -22,6 +22,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
         config.vars = {
             ...config.vars,
             APP_ENV: 'test',
+            OPENAI_BASE_URL: 'http://127.0.0.1:1/v1',
             NUXT_PUBLIC_PREVIEW: 'false',
             NUXT_PUBLIC_SITE_URL: '',
         }
@@ -122,6 +123,14 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             )
             const page = await context.newPage()
             page.on('pageerror', (error) => errors.push(error.message))
+            const goto = async (...args: Parameters<typeof page.goto>) => {
+                await page.goto(...args)
+                await page.waitForFunction(
+                    () =>
+                        (document.querySelector('#__nuxt') as any)?.__vue_app__?.config
+                            .globalProperties.$nuxt?.isHydrating === false,
+                )
+            }
             const navigate = (path: string) =>
                 page.evaluate(
                     (path) =>
@@ -130,7 +139,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                         ).__vue_app__.config.globalProperties.$nuxt.$router.push(path),
                     path,
                 )
-            await page.goto(new URL('/admin/@test', url).href, { waitUntil: 'domcontentloaded' })
+            await goto(new URL('/admin/@test', url).href, { waitUntil: 'domcontentloaded' })
             await page.waitForFunction(
                 () =>
                     (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
@@ -143,8 +152,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             let calls = 0,
                 writes = 0
             page.on('request', (request) => {
-                if (request.method() !== 'GET' && request.url().includes('/api/site-admin/'))
-                    writes++
+                if (request.method() !== 'GET' && request.url().includes('/api/liti/')) writes++
             })
             await page.route('**/api/admin/compose', async (route) => {
                 calls++
@@ -273,12 +281,12 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 releaseModels = resolve
             })
             let modelRequests = 0
-            await page.route('**/api/site-admin/models**', async (route) => {
+            await page.route('**/api/liti/models**', async (route) => {
                 modelRequests++
                 await modelsGate
                 await route.continue()
             })
-            await page.goto(new URL('/admin/data', url).href, { waitUntil: 'domcontentloaded' })
+            await navigate('/admin/data')
             assert(
                 await page.getByRole('textbox', { name: 'Content request' }).isVisible(),
                 'Input does not wait for models',
@@ -322,7 +330,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             const saveGate = new Promise<void>((resolve) => {
                 releaseSave = resolve
             })
-            await page.route('**/api/site-admin/entries/socials', async (route) => {
+            await page.route('**/api/liti/entries/socials', async (route) => {
                 await saveGate
                 await route.continue()
             })
@@ -348,12 +356,12 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             assert.equal(await page.getByLabel('Title', { exact: true }).count(), 1)
             assert.equal(await page.getByText('Publication schedule', { exact: true }).count(), 0)
             assert.equal(await page.getByLabel('Tags', { exact: true }).count(), 0)
-            const entries = await server.fetch('/api/site-admin/entries?model=socials&locale=ja', {
+            const entries = await server.fetch('/api/liti/entries?model=socials&locale=ja', {
                 headers: { cookie },
             })
             assert.equal(entries.status, 200)
             assert.equal(((await entries.json()) as any).items[0].data.label, 'My GitHub')
-            await page.goto(new URL('/admin/posts/new', url).href, {
+            await goto(new URL('/admin/posts/new', url).href, {
                 waitUntil: 'domcontentloaded',
             })
             await page.waitForFunction(
@@ -366,7 +374,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.waitForFunction(() => {
                 const state = (document.querySelector('#__nuxt') as any).__vue_app__.config
                     .globalProperties.$nuxt.payload.state
-                return Object.values(state['$ssite-admin:form-drafts'] ?? {}).some(
+                return Object.values(state['$sliti:form-drafts'] ?? {}).some(
                     (draft: any) => draft.value.title === 'Existing unsaved title',
                 )
             })
@@ -419,7 +427,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await cards.nth(1).getByText('Saved', { exact: true }).waitFor()
             assert.equal(writes, beforeAll + 2, 'Save all excludes posts')
             const savedSocials = (await (
-                await server.fetch('/api/site-admin/entries?model=socials&locale=ja', {
+                await server.fetch('/api/liti/entries?model=socials&locale=ja', {
                     headers: { cookie },
                 })
             ).json()) as any
@@ -482,7 +490,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 .getByRole('button', { name: 'Save', exact: true })
                 .waitFor()
             let attempts = 0
-            await page.route('**/api/site-admin/entries/socials', async (route) => {
+            await page.route('**/api/liti/entries/socials', async (route) => {
                 if (++attempts === 2)
                     await route.fulfill({
                         status: 500,
@@ -506,7 +514,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 .waitFor()
             assert.equal(writes, beforePartial + 3, 'Retry saves only the failed item')
             await page.setViewportSize({ width: 390, height: 844 })
-            await page.goto(new URL('/admin/data', url).href, { waitUntil: 'domcontentloaded' })
+            await goto(new URL('/admin/data', url).href, { waitUntil: 'domcontentloaded' })
             await page.getByLabel('Content request').waitFor()
             assert(
                 await page.evaluate(
@@ -537,7 +545,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 .bind('synthetic-admin', 'Synthetic-Admin', 'composer-admin')
                 .run()
             await page.setViewportSize({ width: 1280, height: 900 })
-            await page.goto(new URL('/admin/users', url).href)
+            await goto(new URL('/admin/users', url).href)
             const userLink = page.getByRole('link', { name: 'Synthetic admin', exact: true })
             await userLink.waitFor()
             assert.equal(await userLink.getAttribute('href'), '/admin/@synthetic-admin')
@@ -568,7 +576,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                         '192.0.2.1',
                     )
                     .run()
-            await page.goto(new URL('/admin/settings', url).href)
+            await goto(new URL('/admin/settings', url).href)
             await page.getByText('Current session', { exact: true }).waitFor()
             await page.getByRole('button', { name: 'Revoke', exact: true }).first().click()
             await page.waitForFunction(
@@ -590,7 +598,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 )?.count,
                 1,
             )
-            await page.goto(new URL('/admin/users', url).href)
+            await goto(new URL('/admin/users', url).href)
             const userRow = page.getByRole('row').filter({ hasText: 'composer@example.invalid' })
             await page.waitForFunction(
                 () =>
@@ -604,7 +612,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.getByText('Revoked a session', { exact: true }).first().waitFor()
             // Game fixtures and all browser traffic stay inside synthetic Worker bindings.
             async function create(model: string, data: Record<string, unknown>, id?: string) {
-                const response = await server.fetch(`/api/site-admin/entries/${model}`, {
+                const response = await server.fetch(`/api/liti/entries/${model}`, {
                     method: 'POST',
                     headers: { cookie, 'content-type': 'application/json' },
                     body: JSON.stringify({ id, data }),
@@ -624,7 +632,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                     tags: [],
                     slug: `page-probe-${index}`,
                 })
-            await page.goto(new URL('/admin/@synthetic-admin', url).href)
+            await goto(new URL('/admin/@synthetic-admin', url).href)
             const timeline = page.getByRole('region', { name: 'Activity', exact: true })
             await page.waitForFunction(
                 () =>
@@ -635,13 +643,18 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.waitForFunction(
                 () => document.querySelectorAll('[aria-label="Activity"] ol li').length > 20,
             )
-            await page.goto(new URL('/admin/posts?q=Page%20Probe', url).href)
+            await goto(new URL('/admin/posts?q=Page%20Probe', url).href)
             const postsSection = page.locator('[data-model="posts"]')
             await postsSection.getByRole('link', { name: 'Page Probe 20', exact: true }).waitFor()
             assert.equal(new URL(page.url()).pathname, '/admin/data')
             assert.equal(new URL(page.url()).searchParams.get('model'), 'posts')
             assert.equal(new URL(page.url()).searchParams.get('q'), 'Page Probe')
             assert.equal(await postsSection.locator('tbody tr').count(), 20)
+            await page.waitForFunction(
+                () =>
+                    (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
+                        .$nuxt?.isHydrating === false,
+            )
             await postsSection.locator('[data-slot="next"]').click()
             await page.waitForFunction(
                 () => document.querySelectorAll('[data-model="posts"] tbody tr').length === 1,
@@ -657,14 +670,14 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 await page.getByLabel('Title', { exact: true }).inputValue(),
                 'Page Probe 20',
             )
-            await page.goto(new URL('/admin/posts?q=Page%20Probe%2020', url).href)
+            await goto(new URL('/admin/posts?q=Page%20Probe%2020', url).href)
             await postsSection.getByRole('button', { name: 'Entry actions', exact: true }).click()
             await page.getByRole('button', { name: 'Delete', exact: true }).click()
             await postsSection.getByText('No posts found.', { exact: true }).waitFor()
             await page.keyboard.press('Escape')
             await create('skills', { name: 'Sort first', icon: 'mingcute:check-line' })
             await create('skills', { name: 'Sort second', icon: 'mingcute:check-line' })
-            await page.goto(new URL('/admin/skills', url).href)
+            await goto(new URL('/admin/skills', url).href)
             const skillSection = page.locator('[data-model="skills"]')
             const reorder = skillSection
                 .getByRole('button', { name: 'Reorder (arrow keys move item)', exact: true })
@@ -676,7 +689,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 .innerText()
             const sorted = page.waitForResponse(
                 (response) =>
-                    response.url().includes('/api/site-admin/entries/skills/reorder') &&
+                    response.url().includes('/api/liti/entries/skills/reorder') &&
                     response.request().method() === 'POST',
             )
             await reorder.press('ArrowRight')
@@ -740,7 +753,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 tags: [],
                 slug: 'synthetic-game-mention',
             })
-            const published = await server.fetch(`/api/site-admin/entries/${post.id}/publish`, {
+            const published = await server.fetch(`/api/liti/entries/${post.id}/publish`, {
                 method: 'POST',
                 headers: { cookie, 'content-type': 'application/json' },
                 body: JSON.stringify({ expectedVersion: post.version }),
@@ -781,7 +794,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                     }),
                 })
             })
-            await page.goto(new URL('/admin/posts/new', url).href, {
+            await goto(new URL('/admin/posts/new', url).href, {
                 waitUntil: 'domcontentloaded',
             })
             await page.waitForFunction(
@@ -817,7 +830,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await title.press('Escape')
             assert.equal(await page.getByRole('listbox', { name: 'Games' }).count(), 0)
             await page.setViewportSize({ width: 1280, height: 900 })
-            await page.goto(new URL('/posts/synthetic-game-mention', url).href)
+            await goto(new URL('/posts/synthetic-game-mention', url).href)
             await page
                 .getByRole('heading', { level: 1 })
                 .getByRole('link', { name: 'VALORANT', exact: true })
@@ -840,7 +853,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 0,
                 'Article and game links are siblings',
             )
-            await page.goto(new URL('/', url).href)
+            await goto(new URL('/', url).href)
             await page.waitForFunction(
                 () =>
                     (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
@@ -888,7 +901,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 .getByRole('button', { name: 'Close', exact: true })
                 .click()
             await page.setViewportSize({ width: 1280, height: 900 })
-            await page.goto(new URL('/admin/gameStats', url).href)
+            await goto(new URL('/admin/gameStats', url).href)
             await page.waitForFunction(
                 () =>
                     (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
@@ -930,7 +943,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             let uploadedImageId = ''
             const uploadReceived = Promise.withResolvers<void>()
             const releaseUpload = Promise.withResolvers<void>()
-            await page.route('**/api/site-admin/assets', async (route) => {
+            await page.route('**/api/liti/assets', async (route) => {
                 const response = await route.fetch()
                 const body = (await response.json()) as { id: string }
                 uploadedImageId = body.id
@@ -977,7 +990,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await editor.getByRole('button', { name: 'Save', exact: true }).click()
             await editor.waitFor({ state: 'hidden' })
 
-            const statsResponse = await server.fetch('/api/site-admin/entries?model=gameStats', {
+            const statsResponse = await server.fetch('/api/liti/entries?model=gameStats', {
                 headers: { cookie },
             })
             const stats = (await statsResponse.json()) as {
@@ -999,7 +1012,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 typeof savedPoint.image === 'string' ? savedPoint.image : savedPoint.image.id,
                 uploadedImageId,
             )
-            await page.goto(new URL('/admin/games', url).href)
+            await goto(new URL('/admin/games', url).href)
             await page.waitForFunction(
                 () =>
                     (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
@@ -1053,7 +1066,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 },
                 `legacy-${legacy.id}`,
             )
-            await page.goto(new URL('/?migration-view=' + Date.now(), url).href)
+            await goto(new URL('/?migration-view=' + Date.now(), url).href)
             assert.equal(
                 await page.getByText('Legacy game alias', { exact: true }).count(),
                 0,

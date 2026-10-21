@@ -1,8 +1,8 @@
-import { useAdmin } from '@liria24/site-admin/server'
+import { useAdmin } from 'liti/nuxt/server'
 import { defineEventHandler, getQuery, createError } from 'nuxt/server'
 
 export default defineEventHandler(async (event) => {
-    await requireAdminPermission(event, { 'siteAdmin:model:games': ['readDraft'] })
+    await requireAdminPermission(event, { 'liti:model:games': ['readDraft'] })
     const admin = useAdmin(event)
     const query = String(getQuery(event).q ?? '').trim()
     if (query.length > 100)

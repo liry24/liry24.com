@@ -4,7 +4,6 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin, username } from 'better-auth/plugins'
 
 import * as schema from '../../../db/schema'
-import { adminAccess, adminRoles } from '../../../shared/auth/access'
 import { db } from './database'
 
 export const auth = betterAuth({

@@ -12,7 +12,7 @@ export default defineConfig({
                 resolve: { dedupe: ['vue', '@tanstack/vue-form'], alias: { '~~': root } },
                 test: {
                     name: 'node',
-                    server: { deps: { inline: [/site-admin/] } },
+                    server: { deps: { inline: [/liti/] } },
                     include: ['tests/**/*.test.ts'],
                     exclude: ['tests/nuxt/**', 'tests/fixtures/**'],
                 },

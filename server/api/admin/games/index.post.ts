@@ -1,9 +1,9 @@
-import { useAdmin } from '@liria24/site-admin/server'
+import { useAdmin } from 'liti/nuxt/server'
 import { defineEventHandler, readBody, createError } from 'nuxt/server'
 import { z } from 'zod'
 
 export default defineEventHandler(async (event) => {
-    await requireAdminPermission(event, { 'siteAdmin:model:games': ['create'] })
+    await requireAdminPermission(event, { 'liti:model:games': ['create'] })
     if (!event.req.headers.get('content-type')?.startsWith('application/json'))
         throw createError({ statusCode: 415, statusMessage: 'JSON required' })
     const admin = useAdmin(event)
@@ -11,19 +11,33 @@ export default defineEventHandler(async (event) => {
     const input = z.object({ igdbId: z.number().int().positive() }).safeParse(await readBody(event))
     if (!input.success) throw createError({ statusCode: 400, statusMessage: 'Choose an IGDB game' })
     event.res.headers.set('Cache-Control', 'private, no-store')
-    const existing = (await savedGames()).find((game) => game.igdbId === input.data.igdbId)
-    if (existing) return { ...existing, metrics: undefined }
+    const id = `igdb-${input.data.igdbId}`
+    const saved = async () => {
+        try {
+            return await admin.entries.get('games', id)
+        } catch (error) {
+            if (
+                error &&
+                typeof error === 'object' &&
+                'code' in error &&
+                error.code === 'LITI_ENTRY_NOT_FOUND'
+            )
+                return null
+            throw error
+        }
+    }
+    const existing = await saved()
+    if (existing) return { ...existing.data, id: existing.id, metrics: undefined }
     const game = (await queryIgdb({ id: input.data.igdbId })).find(
         (game) => game.igdbId === input.data.igdbId,
     )
     if (!game) throw createError({ statusCode: 404, statusMessage: 'Game not found in IGDB' })
-    const id = `igdb-${game.igdbId}`
     try {
         await admin.entries.create('games', { id, data: { ...game, metrics: [] } })
     } catch (error) {
         // Deterministic entry IDs make simultaneous imports idempotent.
-        if (!(await savedGames()).some((entry) => entry.id === id && entry.igdbId === game.igdbId))
-            throw error
+        const existing = await saved()
+        if (existing?.data.igdbId !== game.igdbId) throw error
     }
     return { ...game, id }
 })

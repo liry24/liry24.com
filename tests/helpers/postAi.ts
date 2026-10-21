@@ -1,22 +1,27 @@
 import { createOpenAI } from '@ai-sdk/openai'
-import { executeSiteAdminAiAction } from '@liria24/site-admin/internal/ai'
+import { ai } from '@litijs/ai'
+import { aiSdk } from '@litijs/ai/ai-sdk'
+import { executeAction } from 'liti/server'
 
-import config from '../../site-admin.config'
+import { postAiActions } from '../../server/utils/posts'
 
 // Always use an explicit synthetic key and a supplied fetch. These tests never
 // read credentials or contact OpenAI, Workers AI, or an AI Gateway.
 export function mockPostActions(fetch: typeof globalThis.fetch) {
     const model = createOpenAI({ apiKey: 'synthetic-test-only', fetch })('gpt-6-luna')
-    const execute = (name: string, props: Record<string, unknown>) =>
-        executeSiteAdminAiAction(
-            { ...config, ai: { ...config.ai, model } },
-            name,
-            { input: props },
-            { actor: { id: 'synthetic-action-admin', roles: ['admin'] } },
-        )
+    const plugin = ai({ provider: aiSdk({ text: model }), actions: postAiActions })
+    const execute = async (name: keyof typeof postAiActions, input: Record<string, unknown>) =>
+        (
+            await executeAction(plugin, name, input as never, {
+                actor: { id: 'synthetic-action-admin', roles: ['admin'] },
+            })
+        ).data
     return {
         async publication(props: { title: string; content: string }) {
-            return (await execute('publication', props)) as { slug: string }
+            return (await execute('publication', {
+                title: props.title,
+                context: props.content,
+            })) as { slug: string }
         },
         async proofread(props: { content: string }) {
             return (await execute('proofread', props)) as { content: string }

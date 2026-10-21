@@ -23,19 +23,24 @@ test('IGDB keeps exact identity, validates images and caches OAuth credentials w
             ]),
         )
     vi.stubGlobal('fetch', fetch)
-    const { queryIgdb } = await import('../server/utils/igdb')
+    const { queryIgdb } = await import('../../server/utils/igdb')
     expect(await queryIgdb({ search: 'a"; where id = 2;' })).toEqual([
         {
             igdbId: 1,
             slug: 'exact-igdb-slug',
             name: 'Exact Game',
-            cover: 'https://images.igdb.com/igdb/image/upload/t_cover_small/co123.jpg',
+            cover: 'https://images.igdb.com/igdb/image/upload/t_thumb/co123.jpg',
         },
     ])
     await queryIgdb({ id: 1 })
     expect(fetch).toHaveBeenCalledTimes(3)
     expect(fetch.mock.calls[1]![1].body).toContain('search "a\\"; where id = 2;";')
-    expect(fetch.mock.calls[2]![1].body).toContain('where id = 1;')
+    expect(fetch.mock.calls[1]![1]).toMatchObject({
+        method: 'POST',
+        headers: { 'Client-ID': 'synthetic-client', Authorization: 'Bearer synthetic-token' },
+        body: expect.stringContaining('limit 10;'),
+    })
+    expect(fetch.mock.calls[2]![1].body).toContain('where id = 1; limit 1;')
 })
 test('unavailable credentials, malformed results and network failures return safe errors', async () => {
     const fetch = vi
@@ -44,7 +49,7 @@ test('unavailable credentials, malformed results and network failures return saf
         .mockResolvedValueOnce(Response.json([{ id: 1, slug: '../bad', name: 'Unsafe' }]))
         .mockRejectedValue(Error('SENSITIVE_REMOTE_DETAIL'))
     vi.stubGlobal('fetch', fetch)
-    const { queryIgdb } = await import('../server/utils/igdb')
+    const { queryIgdb } = await import('../../server/utils/igdb')
     await expect(queryIgdb({ search: 'game' })).rejects.toMatchObject({
         statusCode: 502,
         message: expect.not.stringContaining('SENSITIVE_REMOTE_DETAIL'),
@@ -55,4 +60,21 @@ test('unavailable credentials, malformed results and network failures return saf
     })
     vi.stubEnv('IGDB_CLIENT_SECRET', '')
     await expect(queryIgdb({ search: 'game' })).rejects.toMatchObject({ statusCode: 503 })
+})
+
+test('credential rotation recreates the IGDB client instead of reusing its cached token', async () => {
+    const fetch = vi.fn(async (url: string) =>
+        url === 'https://id.twitch.tv/oauth2/token'
+            ? Response.json({ access_token: 'synthetic-token', expires_in: 3600 })
+            : Response.json([]),
+    )
+    vi.stubGlobal('fetch', fetch)
+    const { queryIgdb } = await import('../../server/utils/igdb')
+    await queryIgdb({ search: 'first' })
+    vi.stubEnv('IGDB_CLIENT_SECRET', 'synthetic-rotated-secret')
+    await queryIgdb({ search: 'second' })
+    expect(fetch).toHaveBeenCalledTimes(4)
+    expect(
+        fetch.mock.calls.filter(([url]) => url === 'https://id.twitch.tv/oauth2/token'),
+    ).toHaveLength(2)
 })

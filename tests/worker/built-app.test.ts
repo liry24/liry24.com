@@ -5,12 +5,13 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types'
-import { createSiteAdminManagementClient } from '@liria24/site-admin/internal/client'
-import { createSiteAdmin } from '@liria24/site-admin/internal/server'
+import { resolveLitiConfig } from 'liti'
+import { createLitiClient } from 'liti/client'
+import { createRuntime } from 'liti/server'
 import { expect, test } from 'vitest'
 import { createTestHarness, type Unstable_RawConfig } from 'wrangler'
 
-import siteAdminConfig from '../../site-admin.config'
+import litiConfig from '../../liti.config'
 import { baselineStatements, bindTestDatabase } from '../helpers/database'
 
 test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
@@ -60,6 +61,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             name: 'liry24-built-worker-test',
             main: resolve('.output/server/index.mjs'),
             assets: { binding: 'ASSETS', directory: resolve('.output/public') },
+            vars: { ...generated.vars, OPENAI_BASE_URL: 'http://127.0.0.1:1/v1' },
             routes: [],
             triggers: { crons: [] },
             d1_databases: [
@@ -109,10 +111,10 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             const env = await worker.getEnv()
             await env.DB.batch(baselineStatements().map((sql) => env.DB.prepare(sql)))
             const preparedAt = Date.now() - 120_000
-            const admin = createSiteAdmin({
+            const admin = createRuntime({
                 now: () => new Date(preparedAt),
                 locales: { defaultLocale: 'ja', supported: ['ja'] },
-                config: siteAdminConfig,
+                config: resolveLitiConfig(litiConfig, []),
                 database: bindTestDatabase(env),
             })
             await env.STORAGE.put('runtime-binding-probe', 'local-only')
@@ -123,7 +125,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 ['/api/auth/get-session', 200],
                 ['/', 200],
                 ['/works', 200],
-                ['/api/site-admin/models', 401],
+                ['/api/liti/models', 401],
                 ['/admin/works', 302],
                 ['/favicon.ico', 200],
                 ['/login', 200],
@@ -192,7 +194,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             await env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(userId).run()
             const session = await server.fetch('/api/auth/get-session', { headers: authenticated })
             expect(await session.json()).toMatchObject({ user: { id: userId } })
-            const models = await server.fetch('/api/site-admin/models', { headers: authenticated })
+            const models = await server.fetch('/api/liti/models', { headers: authenticated })
             // Login already checked GitHub; this session needs no linked account or lookup.
             expect(models.status).toBe(200)
             expect(Object.keys((await models.json<{ models: object }>()).models)).toHaveLength(9)
@@ -202,7 +204,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 body: JSON.stringify({ prompt: '' }),
             })
             expect(invalidCompose.status, await invalidCompose.text()).toBe(400)
-            const client = createSiteAdminManagementClient({
+            const client = createLitiClient({
                 fetch: (input, init) =>
                     server.fetch(String(input), {
                         ...init,
@@ -212,6 +214,25 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                         },
                     }),
             })
+
+            // AI requests stay on an unavailable loopback endpoint, so no external inference can run.
+            for (const [title, expected] of [
+                ['これはexample title', /^example-title$/],
+                ['これはexample title', /^example-title-[a-z0-9]{6}$/],
+                ['日本語の記事', /^[a-z0-9]{6}$/],
+            ] as const) {
+                const draft = await client.createEntry('posts', {
+                    data: { title, content: 'Original body.', tags: [] },
+                })
+                const published = await client.publishEntry(draft.id, {
+                    expectedVersion: draft.version,
+                    draft: { data: {} },
+                })
+                expect(published.data.slug).toMatch(expected)
+                expect(published.data.title).toBe(title)
+                expect(published.data.content).toBe('Original body.')
+                expect(published.currentRevisionId).toBe(published.publishedRevisionId)
+            }
             let logged = await client.createEntry('posts', {
                 data: {
                     title: 'Activity snapshot',
@@ -327,7 +348,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                         user: ['list', 'get'],
                         activity: ['readOwn', 'readAny'],
                         adminPanel: ['access', 'compose'],
-                        'siteAdmin:model:games': ['readDraft', 'create'],
+                        'liti:model:games': ['readDraft', 'create'],
                     },
                 }),
             })
@@ -386,24 +407,53 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 .run()
             const expired = await composeRequest(authenticated)
             expect(expired.status, await expired.text()).toBe(401)
-            let entry = await admin.createEntry('posts', {
-                data: { title: 'A', content: '# A', tags: [], slug: 'emitted-scheduled-handler' },
-            })
-            entry = await admin.publishEntry(entry.id, { expectedVersion: entry.version })
-            entry = await admin.updateEntry(entry.id, {
-                expectedVersion: entry.version,
-                data: { slug: entry.data.slug, title: 'B', content: '# B', tags: [] },
-            })
+            let entry = await admin.createEntry(
+                'posts',
+                {
+                    data: {
+                        title: 'A',
+                        content: '# A',
+                        tags: [],
+                        slug: 'emitted-scheduled-handler',
+                    },
+                },
+                { actor: { id: 'synthetic-admin', roles: ['admin'] } },
+            )
+            entry = await admin.publishEntry(
+                entry.id,
+                { expectedVersion: entry.version },
+                undefined,
+                { actor: { id: 'synthetic-admin', roles: ['admin'] } },
+            )
+            entry = await admin.updateEntry(
+                entry.id,
+                {
+                    expectedVersion: entry.version,
+                    data: { slug: entry.data.slug, title: 'B', content: '# B', tags: [] },
+                },
+                undefined,
+                { actor: { id: 'synthetic-admin', roles: ['admin'] } },
+            )
             const at = new Date(preparedAt + 60_000)
-            entry = await admin.schedulePublish(entry.id, {
-                expectedVersion: entry.version,
-                at: at.toISOString(),
-            })
+            entry = await admin.schedulePublish(
+                entry.id,
+                {
+                    expectedVersion: entry.version,
+                    at: at.toISOString(),
+                },
+                undefined,
+                { actor: { id: 'synthetic-admin', roles: ['admin'] } },
+            )
             const scheduledRevision = entry.scheduledRevisionId
-            entry = await admin.updateEntry(entry.id, {
-                expectedVersion: entry.version,
-                data: { slug: entry.data.slug, title: 'C', content: '# C', tags: [] },
-            })
+            entry = await admin.updateEntry(
+                entry.id,
+                {
+                    expectedVersion: entry.version,
+                    data: { slug: entry.data.slug, title: 'C', content: '# C', tags: [] },
+                },
+                undefined,
+                { actor: { id: 'synthetic-admin', roles: ['admin'] } },
+            )
             const currentRevision = entry.currentRevisionId
             // Dispatch through the actual emitted Worker entry, not admin.publishDue().
             expect((await worker.scheduled({ scheduledTime: at, cron: '* * * * *' })).outcome).toBe(

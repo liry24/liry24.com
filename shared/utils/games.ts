@@ -1,40 +1,5 @@
-import type { AssetInput } from '@liria24/site-admin'
-export type GamePosition = {
-    value: number
-    label: string
-    image?: AssetInput | null
-    color?: string | null
-}
-export type GameMetric = {
-    key: string
-    label: string
-    format: 'integer' | 'decimal' | 'percent'
-    unit?: string | null
-    positions?: GamePosition[] | null
-}
-export type GameValue = {
-    key: string
-    value: number
-    label?: string | null
-    image?: AssetInput | null
-    color?: string | null
-}
-export type GameData = {
-    slug: string
-    igdbId: number
-    name: string
-    cover?: string | null
-    icon?: AssetInput | null
-    primaryMetric?: string | null
-    metrics?: GameMetric[] | null
-}
-export type GamePeriod = {
-    period: string
-    periodKey: string
-    order: number
-    values: GameValue[]
-    href?: string | null
-}
+import type { GameMetric, GameValue } from '../types/games'
+
 export const gameSlugPattern = /^[a-z0-9][a-z0-9-]*$/
 export const gameColorPattern = /^#[0-9a-fA-F]{6}$/
 export const metricKeyPattern = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/

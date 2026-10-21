@@ -1,11 +1,19 @@
-import { createAdminClient } from '@liria24/site-admin/internal/admin-client'
-import { createSiteAdminManagementClient } from '@liria24/site-admin/internal/client'
-import { createSiteAdminDescriptor } from '@liria24/site-admin/internal/descriptor'
+import { resolveLitiConfig } from 'liti'
+import { createLitiDescriptor } from 'liti/adapter'
 
-import config from '../../site-admin.config'
+import config from '../../liti.config'
 
-export const adminModels = await createAdminClient(
-    createSiteAdminManagementClient({
-        fetch: async () => Response.json(createSiteAdminDescriptor(config)),
-    }),
-).models()
+export const adminModels = Object.entries(
+    createLitiDescriptor(resolveLitiConfig(config, [])).models,
+).map(([name, model]) => ({
+    name,
+    meta: model.meta ?? { label: name, plural: name },
+    fields: model.fields,
+    displayFields: model.displayFields,
+    features: {
+        publishing: model.publishing,
+        scheduling: model.scheduling,
+        revisions: model.revisions,
+        sortable: model.sortable,
+    },
+}))

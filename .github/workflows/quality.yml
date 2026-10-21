@@ -45,6 +45,7 @@ jobs:
       - name: Check local Void development
         env:
           LIRY24_TEST_LOCAL: 'true'
+          OPENAI_BASE_URL: http://127.0.0.1:1/v1
           BETTER_AUTH_SECRET: test-only-local-ci-secret-0123456789abcdef
           NUXT_APP_SECRET: test-only-local-ci-app-secret-0123456789abcdef
         run: |
@@ -53,7 +54,7 @@ jobs:
           trap 'kill "$dev_pid" 2>/dev/null || true; wait "$dev_pid" 2>/dev/null || true; cat "$RUNNER_TEMP/nuxt-local.log"' EXIT
           ready=false
           for attempt in $(seq 1 90); do
-            if curl --fail --silent http://127.0.0.1:3101/api/auth/get-session > /dev/null; then
+            if test "$(curl --max-time 5 --silent --output /dev/null --write-out '%{http_code}' 'http://127.0.0.1:3101/admin/data?model=posts')" = 302; then
               ready=true
               break
             fi
@@ -62,4 +63,4 @@ jobs:
           done
           test "$ready" = true
           export LIRY24_TEST_DB_PATH="$(find .wrangler/state/v3/d1 -name '*.sqlite' ! -name 'metadata.sqlite' -print -quit)"
-          node scripts/test-site-admin-local.mjs http://127.0.0.1:3101 --browser
+          node scripts/test-liti-local.mjs http://127.0.0.1:3101 --browser

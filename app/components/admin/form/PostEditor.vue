@@ -1,33 +1,32 @@
 <script setup lang="ts">
-import { postPublicationSettings } from '~~/shared/utils/postEditorial'
-import { postMarkdownSecurity } from '~~/shared/utils/postMarkdown'
 const { id, composerId } = defineProps<{ id?: string; composerId?: string }>()
-const { locale } = useI18n()
 const publishAt = ref('')
 const uploadedName = ref('')
+const newPostInstance = useState('new-post-instance', () => crypto.randomUUID())
 const { post: composerProposal, scope: composerScope, saved } = useAdminComposer()
 
-const resource = useAdminForm('posts', {
+const resource = useLitiForm('posts', {
     id: () => id,
-    instance: composerId ? 'composer-editor:' + composerId : undefined,
-    beforeUnload: (): boolean => busy.value,
+    instance: composerId
+        ? 'composer-editor:' + composerId
+        : id
+          ? 'post-editor'
+          : newPostInstance.value,
     defaultValues: { publication: { slug: !id ? 'auto' : undefined } },
-    onBeforeSubmit: ({ operation }) => {
-        if (operation !== 'save' && proposal.value)
-            throw new Error('Apply or discard the proofreading suggestion before publishing.')
-    },
     onUpload: ({ files }) => {
         uploadedName.value = files[0]?.name ?? ''
     },
     onSuccess: async () => {
         if (composerId) saved.value[composerId] = true
+        if (!id && !composerId && !resource.draft.isDirty.value)
+            newPostInstance.value = crypto.randomUUID()
         await navigateTo('/admin/data?model=posts')
     },
 })
-const { form, draft, publish, schedule, upload, operation, status, error } = await resource
+const { form, state, publish, schedule, upload, operation } = await resource
 
-const conflict = computed(() => error.value?.data?.code === 'SITE_ADMIN_CONFLICT')
-const restored = ref(draft.isDirty.value)
+const conflict = computed(() => state.value.conflict)
+const restored = computed(() => state.value.restored)
 const pendingComposer = computed(() =>
     !id &&
     composerProposal.value?.scope === composerScope.value &&
@@ -46,38 +45,37 @@ function applyComposer() {
 }
 if (!restored.value) applyComposer()
 const {
-    error: editorialError,
-    proposal,
-    originalContent,
-    running: proofreading,
-    stale: proposalStale,
-    invalid: invalidProposal,
-    discard: discardSuggestion,
-    run: proofread,
-    apply: applyProofreading,
-} = usePostProofreading(form, {
-    identity: () => [id, locale.value],
-    blocked: () => operation.value !== null || status.value === 'pending' || conflict.value,
-})
-const busy = computed(
-    () => operation.value !== null || proofreading.value || status.value === 'pending',
+    review,
+    proofread,
+    applyProofreading,
+    discardProofreading: discardSuggestion,
+} = resource.blog
+const proofreading = computed(() => review.value.status === 'pending')
+const proposal = computed(() => review.value.proposal)
+const originalContent = computed(() => review.value.original)
+const proposalStale = computed(() => review.value.stale)
+const invalidProposal = computed(() => review.value.invalid)
+const busy = computed(() => state.value.busy)
+const awaitingProofreading = computed(
+    () => review.value.proposal !== null && !review.value.applied && !review.value.discarded,
 )
-const awaitingProofreading = computed(() => Boolean(proposal.value))
-const errorMessage = computed(() => (error.value || editorialError.value)?.message)
+const errorMessage = computed(() => {
+    const cause = state.value.error
+    return cause instanceof Error ? cause.message : undefined
+})
 
 const setManualSlug = (manual: boolean) => {
     const settings = postPublicationSettings(form.state.values)
     form.setFieldValue('publication', { ...settings, slug: manual ? 'manual' : 'auto' })
-    if (!manual && settings.publishedSlug) form.setFieldValue('slug', settings.publishedSlug)
 }
 
 const submit = () => {
-    if (!busy.value && !conflict.value && !document.activeElement?.matches('[data-post-tags]'))
+    if (state.value.can.save && !document.activeElement?.matches('[data-post-tags]'))
         void form.handleSubmit()
 }
 
 onBeforeRouteLeave(() => {
-    if (busy.value) return false
+    return state.value.canLeave
 })
 </script>
 
@@ -102,14 +100,14 @@ onBeforeRouteLeave(() => {
                     icon="mingcute:save-line"
                     color="neutral"
                     :loading="saving"
-                    :disabled="busy || conflict"
+                    :disabled="!state.can.save"
                 />
                 <UButton
                     label="Publish"
                     icon="mingcute:upload-3-fill"
                     color="neutral"
                     :loading="operation === 'publish'"
-                    :disabled="busy || conflict || awaitingProofreading"
+                    :disabled="!state.can.publish"
                     @click="publish()"
                 />
             </template>
@@ -227,7 +225,7 @@ onBeforeRouteLeave(() => {
                             variant="outline"
                             color="neutral"
                             :loading="proofreading"
-                            :disabled="busy || !values.content.trim()"
+                            :disabled="!state.can.proofread"
                             @click="proofread"
                         />
                         <p class="text-muted text-sm">Review the suggestion before applying it.</p>
@@ -261,14 +259,14 @@ onBeforeRouteLeave(() => {
                                 <h3 class="text-muted mb-2 text-sm">Suggested</h3>
                                 <pre
                                     class="bg-muted max-h-80 overflow-auto rounded-lg p-3 text-sm wrap-break-word whitespace-pre-wrap"
-                                    >{{ proposal?.content }}</pre>
+                                    >{{ proposal }}</pre>
                             </div>
                         </div>
                         <div class="flex gap-2">
                             <UButton
                                 label="Apply Suggestion"
                                 color="neutral"
-                                :disabled="busy || proposalStale || invalidProposal"
+                                :disabled="!review.canApply"
                                 @click="applyProofreading"
                             />
                             <UButton
@@ -285,21 +283,38 @@ onBeforeRouteLeave(() => {
                             @update:model-value="(value) => setManualSlug(value === true)"
                             label="Enter slug manually"
                         />
-                        <UFormField
+                        <form.Field
                             v-if="postPublicationSettings(values).slug === 'manual'"
-                            label="Slug"
-                            required
-                            description="Used in the post URL."
-                            ><UInput
-                                :model-value="values.slug ?? undefined"
-                                @update:model-value="(value) => form.setFieldValue('slug', value)"
-                                variant="soft"
-                                class="w-full"
-                                placeholder="post-slug"
-                        /></UFormField>
+                            name="slug"
+                            v-slot="{ field }"
+                        >
+                            <UFormField
+                                label="Slug"
+                                required
+                                description="Used in the post URL."
+                                :error="
+                                    field.errors
+                                        .map((error) =>
+                                            typeof error === 'string' ? error : error.message,
+                                        )
+                                        .join(', ') || undefined
+                                "
+                            >
+                                <UInput
+                                    :model-value="field.value ?? undefined"
+                                    @update:model-value="
+                                        (value) => form.setFieldValue('slug', value)
+                                    "
+                                    @blur="field.handleBlur"
+                                    variant="soft"
+                                    class="w-full"
+                                    placeholder="post-slug"
+                                />
+                            </UFormField>
+                        </form.Field>
                         <p v-else class="text-muted text-sm">
-                            AI generates the slug when you publish or schedule. Published URLs are
-                            kept.
+                            Slugs are generated automatically when you publish or schedule. AI is
+                            optional, and published URLs are kept.
                         </p>
                     </div>
                     <UFormField
@@ -341,7 +356,7 @@ onBeforeRouteLeave(() => {
                             variant="outline"
                             color="neutral"
                             :loading="operation === 'schedule'"
-                            :disabled="busy || conflict || !publishAt || awaitingProofreading"
+                            :disabled="!state.can.schedule || !publishAt"
                             @click="schedule(publishAt)"
                         />
                     </div>

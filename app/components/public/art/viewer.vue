@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Content } from '@liria24/site-admin/client'
+import type { Content } from 'liti/client'
 
 const open = defineModel<boolean>('open', { default: false })
 

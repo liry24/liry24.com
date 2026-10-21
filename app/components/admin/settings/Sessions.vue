@@ -7,20 +7,19 @@ const devices = computed(() =>
 </script>
 
 <template>
-    <UCard>
-        <template #header>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <h2 class="my-2 text-xl leading-none font-semibold">Sessions</h2>
-                <UButton
-                    icon="mingcute:refresh-2-line"
-                    aria-label="Refresh sessions"
-                    color="neutral"
-                    variant="ghost"
-                    :loading="busy"
-                    @click="refresh"
-                />
-            </div>
-        </template>
+    <UCard :ui="{ body: 'flex flex-col items-start gap-3' }" class="divide-none">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="text-title">Sessions</h2>
+            <UButton
+                icon="mingcute:refresh-2-line"
+                aria-label="Refresh sessions"
+                color="neutral"
+                variant="ghost"
+                :loading="busy"
+                @click="refresh"
+            />
+        </div>
+
         <UAlert v-if="failure" :title="failure" color="error" class="mb-4" />
         <p class="text-muted mb-5 text-sm">
             Updated shows when the session was renewed, not your last activity.
@@ -29,6 +28,7 @@ const devices = computed(() =>
         <p v-else-if="!sessions.length && !failure" class="text-muted text-sm">
             No active sessions.
         </p>
+
         <ul class="divide-muted divide-y">
             <li
                 v-for="item in devices"
@@ -100,14 +100,13 @@ const devices = computed(() =>
                 />
             </li>
         </ul>
-        <template #footer>
-            <UButton
-                label="Logout Other Sessions"
-                variant="subtle"
-                color="neutral"
-                :disabled="busy || !sessions.some((item) => item.id !== current?.id)"
-                @click="revokeOthers"
-            />
-        </template>
+
+        <UButton
+            label="Logout Other Sessions"
+            variant="subtle"
+            color="neutral"
+            :disabled="busy || !sessions.some((item) => item.id !== current?.id)"
+            @click="revokeOthers"
+        />
     </UCard>
 </template>

@@ -1,15 +1,7 @@
 <script setup lang="ts">
-import {
-    siteAdminManagementClientOptions,
-    useSiteAdminAuthScope,
-    useSiteAdminModels,
-} from '#build/site-admin/client'
-
 const { open } = useAdminComposer()
 const { data: permissions } = await useAdminPermissions()
-const connection = siteAdminManagementClientOptions()
-const auth = useSiteAdminAuthScope(undefined, connection)
-const { data: models, status, error, refresh } = useSiteAdminModels(connection, auth, false)
+const { data: models, status, error, refresh } = useLitiModels()
 useHead({ title: 'Data' })
 </script>
 
@@ -38,7 +30,7 @@ useHead({ title: 'Data' })
                             Loading models…
                         </p>
                         <AdminDataModelSection
-                            v-for="name in Object.keys(models?.models ?? {})"
+                            v-for="name in Object.keys(models ?? {})"
                             :key="name"
                             :model-name="name"
                         />

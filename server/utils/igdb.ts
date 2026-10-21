@@ -1,8 +1,6 @@
+import { createIgdbClient, eq, type IgdbClient } from '@liry24/igdb'
 import { createError } from 'nuxt/server'
 import { z } from 'zod'
-
-import { gameSlugPattern } from '../../shared/utils/games'
-import type { GameSearchResult } from '../../shared/utils/igdb'
 
 const result = z.array(
     z.object({
@@ -13,7 +11,7 @@ const result = z.array(
     }),
 )
 
-let token: { client: string; value: string; until: number } | undefined
+let cached: { clientId: string; clientSecret: string; client: IgdbClient } | undefined
 
 export async function queryIgdb(
     query: { search: string } | { id: number },
@@ -28,45 +26,27 @@ export async function queryIgdb(
         })
 
     try {
-        if (!token || token.client !== client || token.until < Date.now()) {
-            const response = await fetch('https://id.twitch.tv/oauth2/token', {
-                method: 'POST',
-                body: new URLSearchParams({
-                    client_id: client,
-                    client_secret: secret,
-                    grant_type: 'client_credentials',
+        if (!cached || cached.clientId !== client || cached.clientSecret !== secret) {
+            cached = {
+                clientId: client,
+                clientSecret: secret,
+                client: createIgdbClient({
+                    clientId: client,
+                    clientSecret: secret,
+                    timeoutMs: 5000,
                 }),
-                signal: AbortSignal.timeout(5000),
-            })
-            if (!response.ok) throw Error('IGDB authorization unavailable')
-            const credentials = z
-                .object({ access_token: z.string(), expires_in: z.number().positive() })
-                .parse(await response.json())
-            token = {
-                client,
-                value: credentials.access_token,
-                until: Date.now() + (credentials.expires_in - 60) * 1000,
             }
         }
-        const condition =
-            'id' in query ? `where id = ${query.id};` : `search ${JSON.stringify(query.search)};`
-        const response = await fetch('https://api.igdb.com/v4/games', {
-            method: 'POST',
-            headers: {
-                'Client-ID': client,
-                Authorization: `Bearer ${token.value}`,
-                'Content-Type': 'text/plain',
-            },
-            body: `fields id,slug,name,cover.image_id; ${condition} limit 10;`,
-            signal: AbortSignal.timeout(5000),
-        })
-        if (!response.ok) throw Error('IGDB search unavailable')
-        return result.parse(await response.json()).map((game) => ({
+        const games = cached.client.query('games').fields('id', 'slug', 'name', 'cover.image_id')
+        const response = await ('id' in query
+            ? games.where((game) => eq(game.id, query.id)).limit(1)
+            : games.search(query.search).limit(10))
+        return result.parse(response).map((game) => ({
             igdbId: game.id,
             slug: game.slug,
             name: game.name,
             cover: game.cover
-                ? `https://images.igdb.com/igdb/image/upload/t_cover_small/${game.cover.image_id}.jpg`
+                ? `https://images.igdb.com/igdb/image/upload/t_thumb/${game.cover.image_id}.jpg`
                 : null,
         }))
     } catch {

@@ -7,50 +7,49 @@ import { scalePoint } from '@tanstack/charts/scales/point'
 
 export type RankPoint = { x: string; value: number; record: GameValue; period: GamePeriod }
 // SVG object-bounding-box gradients have no paint on a perfectly horizontal path.
-function horizontalGradient(mark: ChartMark): ChartMark {
-    return {
-        ...mark,
-        initialize(context) {
-            const initialized = mark.initialize(context)
-            return {
-                ...initialized,
-                render(context) {
-                    const scene = initialized.render(context)
-                    const paint = (node: SceneNode): SceneNode => {
-                        if (node.kind === 'group')
-                            return { ...node, children: node.children.map(paint) }
-                        if (
-                            node.kind !== 'polyline' ||
-                            node.points.length < 2 ||
-                            !node.points.every((point) => point[1] === node.points[0]![1])
-                        )
-                            return node
-                        const first = node.points[0]!,
-                            last = node.points.at(-1)!
-                        return {
-                            kind: 'group',
-                            key: `${node.key}-flat`,
-                            children: [
-                                {
-                                    kind: 'rect',
-                                    key: `${node.key}-paint`,
-                                    x: first[0],
-                                    y: first[1] - 1,
-                                    width: last[0] - first[0],
-                                    height: 2,
-                                    radius: 1,
-                                    style: { fill: node.style?.stroke },
-                                },
-                                { ...node, style: { ...node.style, strokeOpacity: 0 } },
-                            ],
-                        }
+const horizontalGradient = (mark: ChartMark): ChartMark => ({
+    ...mark,
+    initialize(context) {
+        const initialized = mark.initialize(context)
+        return {
+            ...initialized,
+            render(context) {
+                const scene = initialized.render(context)
+                const paint = (node: SceneNode): SceneNode => {
+                    if (node.kind === 'group')
+                        return { ...node, children: node.children.map(paint) }
+                    if (
+                        node.kind !== 'polyline' ||
+                        node.points.length < 2 ||
+                        !node.points.every((point) => point[1] === node.points[0]![1])
+                    )
+                        return node
+                    const first = node.points[0]!,
+                        last = node.points.at(-1)!
+                    return {
+                        kind: 'group',
+                        key: `${node.key}-flat`,
+                        children: [
+                            {
+                                kind: 'rect',
+                                key: `${node.key}-paint`,
+                                x: first[0],
+                                y: first[1] - 1,
+                                width: last[0] - first[0],
+                                height: 2,
+                                radius: 1,
+                                style: { fill: node.style?.stroke },
+                            },
+                            { ...node, style: { ...node.style, strokeOpacity: 0 } },
+                        ],
                     }
-                    return { ...scene, nodes: scene.nodes.map(paint) }
-                },
-            }
-        },
-    }
-}
+                }
+                return { ...scene, nodes: scene.nodes.map(paint) }
+            },
+        }
+    },
+})
+
 export function gameChart(periods: GamePeriod[], metric: GameMetric, id: string) {
     const ordered = [...periods].sort((a, b) => a.order - b.order)
     const runs: RankPoint[][] = []

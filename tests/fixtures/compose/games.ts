@@ -7,11 +7,11 @@ export function configureGameFixture(value: string | null) {
     scenario = value
     reads = 0
 }
-export async function savedGames() {
+export async function savedGame() {
     reads++
     return scenario === 'existing' || (scenario === 'simultaneous' && reads > 1)
-        ? [{ ...game, id: 'igdb-1', metrics: '[]' }]
-        : []
+        ? { id: 'igdb-1', data: { ...game, metrics: [] } }
+        : null
 }
 export async function queryIgdb() {
     console.info('fixture-igdb-query')

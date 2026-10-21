@@ -1,11 +1,14 @@
+import { resolveLitiConfig } from 'liti'
 import { useServerHooks } from 'nuxt/server'
 
-import config from '../../site-admin.config'
+import config from '../../liti.config'
+
+const models = resolveLitiConfig(config, []).models
 
 export default defineNitroPlugin(() => {
-    useServerHooks().hook('site-admin:entry:committed', async (event) => {
+    useServerHooks().hook('liti:entry:committed', async (event) => {
         if (!event.actorId) return
-        const title = config.models[event.model as keyof typeof config.models]?.displayFields?.title
+        const title = models[event.model as keyof typeof models]?.displayFields?.title
         const label = title ? event.data?.[title] : undefined
         await recordAdminActivity({
             actorId: event.actorId,

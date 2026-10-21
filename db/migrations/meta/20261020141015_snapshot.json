@@ -1,8 +1,8 @@
 {
     "version": "6",
     "dialect": "sqlite",
-    "id": "fea42de7-fdf8-4889-85f6-b068c4fd5d24",
-    "prevId": "4f35d094-fe3a-42a3-b71b-39caf1fc3ea9",
+    "id": "23252522-29cb-4811-8a69-b01849fa151b",
+    "prevId": "00000000-0000-0000-0000-000000000000",
     "tables": {
         "accounts": {
             "name": "accounts",
@@ -194,8 +194,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_asset_refs": {
-            "name": "site_admin_asset_refs",
+        "liti_asset_refs": {
+            "name": "liti_asset_refs",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
@@ -235,26 +235,26 @@
                 }
             },
             "indexes": {
-                "site_admin_asset_refs_asset": {
-                    "name": "site_admin_asset_refs_asset",
+                "liti_asset_refs_asset": {
+                    "name": "liti_asset_refs_asset",
                     "columns": ["asset_id"],
                     "isUnique": false
                 }
             },
             "foreignKeys": {
-                "site_admin_asset_refs_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_asset_refs_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_asset_refs",
-                    "tableTo": "site_admin_revisions",
+                "liti_asset_refs_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_asset_refs_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_asset_refs",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
                     "onUpdate": "no action"
                 },
-                "site_admin_asset_refs_asset_id_site_admin_assets_id_fk": {
-                    "name": "site_admin_asset_refs_asset_id_site_admin_assets_id_fk",
-                    "tableFrom": "site_admin_asset_refs",
-                    "tableTo": "site_admin_assets",
+                "liti_asset_refs_asset_id_liti_assets_id_fk": {
+                    "name": "liti_asset_refs_asset_id_liti_assets_id_fk",
+                    "tableFrom": "liti_asset_refs",
+                    "tableTo": "liti_assets",
                     "columnsFrom": ["asset_id"],
                     "columnsTo": ["id"],
                     "onDelete": "restrict",
@@ -262,16 +262,16 @@
                 }
             },
             "compositePrimaryKeys": {
-                "site_admin_asset_refs_revision_id_locale_field_path_position_pk": {
+                "liti_asset_refs_revision_id_locale_field_path_position_pk": {
                     "columns": ["revision_id", "locale", "field_path", "position"],
-                    "name": "site_admin_asset_refs_revision_id_locale_field_path_position_pk"
+                    "name": "liti_asset_refs_revision_id_locale_field_path_position_pk"
                 }
             },
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_assets": {
-            "name": "site_admin_assets",
+        "liti_assets": {
+            "name": "liti_assets",
             "columns": {
                 "id": {
                     "name": "id",
@@ -360,13 +360,13 @@
                 }
             },
             "indexes": {
-                "site_admin_assets_key": {
-                    "name": "site_admin_assets_key",
+                "liti_assets_key": {
+                    "name": "liti_assets_key",
                     "columns": ["storage", "key"],
                     "isUnique": true
                 },
-                "site_admin_assets_gc": {
-                    "name": "site_admin_assets_gc",
+                "liti_assets_gc": {
+                    "name": "liti_assets_gc",
                     "columns": ["state", "created_at"],
                     "isUnique": false
                 }
@@ -376,8 +376,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_content_arts": {
-            "name": "site_admin_content_arts",
+        "liti_content_arts": {
+            "name": "liti_content_arts",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
@@ -386,18 +386,25 @@
                     "notNull": true,
                     "autoincrement": false
                 },
-                "field_slug": {
-                    "name": "field_slug",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": false,
-                    "autoincrement": false
-                },
                 "field_title": {
                     "name": "field_title",
                     "type": "text",
                     "primaryKey": false,
                     "notNull": true,
+                    "autoincrement": false
+                },
+                "field_images": {
+                    "name": "field_images",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "field_slug": {
+                    "name": "field_slug",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
                     "autoincrement": false
                 },
                 "field_description": {
@@ -414,13 +421,6 @@
                     "notNull": false,
                     "autoincrement": false
                 },
-                "field_images": {
-                    "name": "field_images",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
                 "field_createdAt": {
                     "name": "field_createdAt",
                     "type": "text",
@@ -431,10 +431,10 @@
             },
             "indexes": {},
             "foreignKeys": {
-                "site_admin_content_arts_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_content_arts_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_content_arts",
-                    "tableTo": "site_admin_revisions",
+                "liti_content_arts_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_content_arts_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_content_arts",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -445,13 +445,20 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_content_careers": {
-            "name": "site_admin_content_careers",
+        "liti_content_careers": {
+            "name": "liti_content_careers",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
                     "type": "text",
                     "primaryKey": true,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "field_company": {
+                    "name": "field_company",
+                    "type": "text",
+                    "primaryKey": false,
                     "notNull": true,
                     "autoincrement": false
                 },
@@ -475,21 +482,14 @@
                     "primaryKey": false,
                     "notNull": true,
                     "autoincrement": false
-                },
-                "field_company": {
-                    "name": "field_company",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
                 }
             },
             "indexes": {},
             "foreignKeys": {
-                "site_admin_content_careers_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_content_careers_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_content_careers",
-                    "tableTo": "site_admin_revisions",
+                "liti_content_careers_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_content_careers_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_content_careers",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -500,8 +500,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_content_gameStats": {
-            "name": "site_admin_content_gameStats",
+        "liti_content_gameStats": {
+            "name": "liti_content_gameStats",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
@@ -576,10 +576,10 @@
             },
             "indexes": {},
             "foreignKeys": {
-                "site_admin_content_gameStats_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_content_gameStats_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_content_gameStats",
-                    "tableTo": "site_admin_revisions",
+                "liti_content_gameStats_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_content_gameStats_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_content_gameStats",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -590,8 +590,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_content_games": {
-            "name": "site_admin_content_games",
+        "liti_content_games": {
+            "name": "liti_content_games",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
@@ -652,10 +652,10 @@
             },
             "indexes": {},
             "foreignKeys": {
-                "site_admin_content_games_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_content_games_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_content_games",
-                    "tableTo": "site_admin_revisions",
+                "liti_content_games_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_content_games_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_content_games",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -666,21 +666,14 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_content_posts": {
-            "name": "site_admin_content_posts",
+        "liti_content_posts": {
+            "name": "liti_content_posts",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
                     "type": "text",
                     "primaryKey": true,
                     "notNull": true,
-                    "autoincrement": false
-                },
-                "field_slug": {
-                    "name": "field_slug",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": false,
                     "autoincrement": false
                 },
                 "field_title": {
@@ -690,20 +683,6 @@
                     "notNull": true,
                     "autoincrement": false
                 },
-                "field_plainTitle": {
-                    "name": "field_plainTitle",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": false,
-                    "autoincrement": false
-                },
-                "field_gameMentions": {
-                    "name": "field_gameMentions",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": false,
-                    "autoincrement": false
-                },
                 "field_content": {
                     "name": "field_content",
                     "type": "text",
@@ -711,8 +690,8 @@
                     "notNull": true,
                     "autoincrement": false
                 },
-                "field_publication": {
-                    "name": "field_publication",
+                "field_slug": {
+                    "name": "field_slug",
                     "type": "text",
                     "primaryKey": false,
                     "notNull": false,
@@ -732,15 +711,43 @@
                     "notNull": false,
                     "autoincrement": false
                 },
-                "field_authorUserId": {
-                    "name": "field_authorUserId",
+                "field_createdAt": {
+                    "name": "field_createdAt",
                     "type": "text",
                     "primaryKey": false,
                     "notNull": false,
                     "autoincrement": false
                 },
-                "field_createdAt": {
-                    "name": "field_createdAt",
+                "field_byline": {
+                    "name": "field_byline",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "field_publication": {
+                    "name": "field_publication",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "field_plainTitle": {
+                    "name": "field_plainTitle",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "field_gameMentions": {
+                    "name": "field_gameMentions",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "field_authorUserId": {
+                    "name": "field_authorUserId",
                     "type": "text",
                     "primaryKey": false,
                     "notNull": false,
@@ -749,10 +756,10 @@
             },
             "indexes": {},
             "foreignKeys": {
-                "site_admin_content_posts_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_content_posts_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_content_posts",
-                    "tableTo": "site_admin_revisions",
+                "liti_content_posts_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_content_posts_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_content_posts",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -763,8 +770,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_content_ranks": {
-            "name": "site_admin_content_ranks",
+        "liti_content_ranks": {
+            "name": "liti_content_ranks",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
@@ -773,18 +780,25 @@
                     "notNull": true,
                     "autoincrement": false
                 },
-                "field_slug": {
-                    "name": "field_slug",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": false,
-                    "autoincrement": false
-                },
                 "field_game": {
                     "name": "field_game",
                     "type": "text",
                     "primaryKey": false,
                     "notNull": true,
+                    "autoincrement": false
+                },
+                "field_image": {
+                    "name": "field_image",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "field_slug": {
+                    "name": "field_slug",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
                     "autoincrement": false
                 },
                 "field_season": {
@@ -801,13 +815,6 @@
                     "notNull": true,
                     "autoincrement": false
                 },
-                "field_image": {
-                    "name": "field_image",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
-                },
                 "field_href": {
                     "name": "field_href",
                     "type": "text",
@@ -818,10 +825,10 @@
             },
             "indexes": {},
             "foreignKeys": {
-                "site_admin_content_ranks_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_content_ranks_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_content_ranks",
-                    "tableTo": "site_admin_revisions",
+                "liti_content_ranks_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_content_ranks_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_content_ranks",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -832,8 +839,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_content_skills": {
-            "name": "site_admin_content_skills",
+        "liti_content_skills": {
+            "name": "liti_content_skills",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
@@ -842,18 +849,18 @@
                     "notNull": true,
                     "autoincrement": false
                 },
-                "field_slug": {
-                    "name": "field_slug",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": false,
-                    "autoincrement": false
-                },
                 "field_name": {
                     "name": "field_name",
                     "type": "text",
                     "primaryKey": false,
                     "notNull": true,
+                    "autoincrement": false
+                },
+                "field_slug": {
+                    "name": "field_slug",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
                     "autoincrement": false
                 },
                 "field_icon": {
@@ -873,10 +880,10 @@
             },
             "indexes": {},
             "foreignKeys": {
-                "site_admin_content_skills_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_content_skills_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_content_skills",
-                    "tableTo": "site_admin_revisions",
+                "liti_content_skills_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_content_skills_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_content_skills",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -887,13 +894,20 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_content_socials": {
-            "name": "site_admin_content_socials",
+        "liti_content_socials": {
+            "name": "liti_content_socials",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
                     "type": "text",
                     "primaryKey": true,
+                    "notNull": true,
+                    "autoincrement": false
+                },
+                "field_label": {
+                    "name": "field_label",
+                    "type": "text",
+                    "primaryKey": false,
                     "notNull": true,
                     "autoincrement": false
                 },
@@ -917,21 +931,14 @@
                     "primaryKey": false,
                     "notNull": true,
                     "autoincrement": false
-                },
-                "field_label": {
-                    "name": "field_label",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "autoincrement": false
                 }
             },
             "indexes": {},
             "foreignKeys": {
-                "site_admin_content_socials_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_content_socials_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_content_socials",
-                    "tableTo": "site_admin_revisions",
+                "liti_content_socials_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_content_socials_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_content_socials",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -942,8 +949,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_content_works": {
-            "name": "site_admin_content_works",
+        "liti_content_works": {
+            "name": "liti_content_works",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
@@ -952,18 +959,25 @@
                     "notNull": true,
                     "autoincrement": false
                 },
-                "field_slug": {
-                    "name": "field_slug",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": false,
-                    "autoincrement": false
-                },
                 "field_title": {
                     "name": "field_title",
                     "type": "text",
                     "primaryKey": false,
                     "notNull": true,
+                    "autoincrement": false
+                },
+                "field_image": {
+                    "name": "field_image",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "field_slug": {
+                    "name": "field_slug",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
                     "autoincrement": false
                 },
                 "field_description": {
@@ -975,13 +989,6 @@
                 },
                 "field_category": {
                     "name": "field_category",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": false,
-                    "autoincrement": false
-                },
-                "field_image": {
-                    "name": "field_image",
                     "type": "text",
                     "primaryKey": false,
                     "notNull": false,
@@ -1025,10 +1032,10 @@
             },
             "indexes": {},
             "foreignKeys": {
-                "site_admin_content_works_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_content_works_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_content_works",
-                    "tableTo": "site_admin_revisions",
+                "liti_content_works_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_content_works_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_content_works",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -1039,8 +1046,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_entries": {
-            "name": "site_admin_entries",
+        "liti_entries": {
+            "name": "liti_entries",
             "columns": {
                 "id": {
                     "name": "id",
@@ -1127,19 +1134,26 @@
                     "primaryKey": false,
                     "notNull": false,
                     "autoincrement": false
+                },
+                "first_published_at": {
+                    "name": "first_published_at",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
                 }
             },
             "indexes": {
-                "site_admin_entries_model": {
-                    "name": "site_admin_entries_model",
+                "liti_entries_model": {
+                    "name": "liti_entries_model",
                     "columns": ["model"],
                     "isUnique": false
                 },
-                "site_admin_entries_schedule": {
-                    "name": "site_admin_entries_schedule",
+                "liti_entries_schedule": {
+                    "name": "liti_entries_schedule",
                     "columns": ["scheduled_at"],
                     "isUnique": false,
-                    "where": "\"site_admin_entries\".\"scheduled_revision_id\" IS NOT NULL"
+                    "where": "scheduled_revision_id IS NOT NULL"
                 }
             },
             "foreignKeys": {},
@@ -1206,8 +1220,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_meta": {
-            "name": "site_admin_meta",
+        "liti_meta": {
+            "name": "liti_meta",
             "columns": {
                 "key": {
                     "name": "key",
@@ -1382,8 +1396,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_relations": {
-            "name": "site_admin_relations",
+        "liti_relations": {
+            "name": "liti_relations",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
@@ -1430,26 +1444,26 @@
                 }
             },
             "indexes": {
-                "site_admin_relations_target": {
-                    "name": "site_admin_relations_target",
+                "liti_relations_target": {
+                    "name": "liti_relations_target",
                     "columns": ["target_entry_id"],
                     "isUnique": false
                 }
             },
             "foreignKeys": {
-                "site_admin_relations_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_relations_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_relations",
-                    "tableTo": "site_admin_revisions",
+                "liti_relations_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_relations_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_relations",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
                     "onUpdate": "no action"
                 },
-                "site_admin_relations_target_entry_id_site_admin_entries_id_fk": {
-                    "name": "site_admin_relations_target_entry_id_site_admin_entries_id_fk",
-                    "tableFrom": "site_admin_relations",
-                    "tableTo": "site_admin_entries",
+                "liti_relations_target_entry_id_liti_entries_id_fk": {
+                    "name": "liti_relations_target_entry_id_liti_entries_id_fk",
+                    "tableFrom": "liti_relations",
+                    "tableTo": "liti_entries",
                     "columnsFrom": ["target_entry_id"],
                     "columnsTo": ["id"],
                     "onDelete": "restrict",
@@ -1457,16 +1471,16 @@
                 }
             },
             "compositePrimaryKeys": {
-                "site_admin_relations_revision_id_locale_field_path_position_pk": {
+                "liti_relations_revision_id_locale_field_path_position_pk": {
                     "columns": ["revision_id", "locale", "field_path", "position"],
-                    "name": "site_admin_relations_revision_id_locale_field_path_position_pk"
+                    "name": "liti_relations_revision_id_locale_field_path_position_pk"
                 }
             },
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_revisions": {
-            "name": "site_admin_revisions",
+        "liti_revisions": {
+            "name": "liti_revisions",
             "columns": {
                 "id": {
                     "name": "id",
@@ -1498,17 +1512,17 @@
                 }
             },
             "indexes": {
-                "site_admin_revisions_entry": {
-                    "name": "site_admin_revisions_entry",
+                "liti_revisions_entry": {
+                    "name": "liti_revisions_entry",
                     "columns": ["entry_id", "created_at"],
                     "isUnique": false
                 }
             },
             "foreignKeys": {
-                "site_admin_revisions_entry_id_site_admin_entries_id_fk": {
-                    "name": "site_admin_revisions_entry_id_site_admin_entries_id_fk",
-                    "tableFrom": "site_admin_revisions",
-                    "tableTo": "site_admin_entries",
+                "liti_revisions_entry_id_liti_entries_id_fk": {
+                    "name": "liti_revisions_entry_id_liti_entries_id_fk",
+                    "tableFrom": "liti_revisions",
+                    "tableTo": "liti_entries",
                     "columnsFrom": ["entry_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -1519,8 +1533,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_routes": {
-            "name": "site_admin_routes",
+        "liti_routes": {
+            "name": "liti_routes",
             "columns": {
                 "path": {
                     "name": "path",
@@ -1581,26 +1595,26 @@
                 }
             },
             "indexes": {
-                "site_admin_routes_entry": {
-                    "name": "site_admin_routes_entry",
+                "liti_routes_entry": {
+                    "name": "liti_routes_entry",
                     "columns": ["entry_id"],
                     "isUnique": false
                 }
             },
             "foreignKeys": {
-                "site_admin_routes_entry_id_site_admin_entries_id_fk": {
-                    "name": "site_admin_routes_entry_id_site_admin_entries_id_fk",
-                    "tableFrom": "site_admin_routes",
-                    "tableTo": "site_admin_entries",
+                "liti_routes_entry_id_liti_entries_id_fk": {
+                    "name": "liti_routes_entry_id_liti_entries_id_fk",
+                    "tableFrom": "liti_routes",
+                    "tableTo": "liti_entries",
                     "columnsFrom": ["entry_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
                     "onUpdate": "no action"
                 },
-                "site_admin_routes_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_routes_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_routes",
-                    "tableTo": "site_admin_revisions",
+                "liti_routes_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_routes_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_routes",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -1608,16 +1622,16 @@
                 }
             },
             "compositePrimaryKeys": {
-                "site_admin_routes_locale_path_pk": {
+                "liti_routes_locale_path_pk": {
                     "columns": ["locale", "path"],
-                    "name": "site_admin_routes_locale_path_pk"
+                    "name": "liti_routes_locale_path_pk"
                 }
             },
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_search": {
-            "name": "site_admin_search",
+        "liti_search": {
+            "name": "liti_search",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
@@ -1650,10 +1664,10 @@
             },
             "indexes": {},
             "foreignKeys": {
-                "site_admin_search_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_search_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_search",
-                    "tableTo": "site_admin_revisions",
+                "liti_search_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_search_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_search",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -1661,9 +1675,9 @@
                 }
             },
             "compositePrimaryKeys": {
-                "site_admin_search_revision_id_locale_part_pk": {
+                "liti_search_revision_id_locale_part_pk": {
                     "columns": ["revision_id", "locale", "part"],
-                    "name": "site_admin_search_revision_id_locale_part_pk"
+                    "name": "liti_search_revision_id_locale_part_pk"
                 }
             },
             "uniqueConstraints": {},
@@ -1764,8 +1778,8 @@
             "uniqueConstraints": {},
             "checkConstraints": {}
         },
-        "site_admin_translations": {
-            "name": "site_admin_translations",
+        "liti_translations": {
+            "name": "liti_translations",
             "columns": {
                 "revision_id": {
                     "name": "revision_id",
@@ -1791,10 +1805,10 @@
             },
             "indexes": {},
             "foreignKeys": {
-                "site_admin_translations_revision_id_site_admin_revisions_id_fk": {
-                    "name": "site_admin_translations_revision_id_site_admin_revisions_id_fk",
-                    "tableFrom": "site_admin_translations",
-                    "tableTo": "site_admin_revisions",
+                "liti_translations_revision_id_liti_revisions_id_fk": {
+                    "name": "liti_translations_revision_id_liti_revisions_id_fk",
+                    "tableFrom": "liti_translations",
+                    "tableTo": "liti_revisions",
                     "columnsFrom": ["revision_id"],
                     "columnsTo": ["id"],
                     "onDelete": "cascade",
@@ -1802,9 +1816,9 @@
                 }
             },
             "compositePrimaryKeys": {
-                "site_admin_translations_revision_id_locale_pk": {
+                "liti_translations_revision_id_locale_pk": {
                     "columns": ["revision_id", "locale"],
-                    "name": "site_admin_translations_revision_id_locale_pk"
+                    "name": "liti_translations_revision_id_locale_pk"
                 }
             },
             "uniqueConstraints": {},
@@ -1865,20 +1879,6 @@
                     "autoincrement": false,
                     "default": "(cast(unixepoch('subsecond') * 1000 as integer))"
                 },
-                "username": {
-                    "name": "username",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": false,
-                    "autoincrement": false
-                },
-                "display_username": {
-                    "name": "display_username",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": false,
-                    "autoincrement": false
-                },
                 "role": {
                     "name": "role",
                     "type": "text",
@@ -1904,6 +1904,20 @@
                 "ban_expires": {
                     "name": "ban_expires",
                     "type": "integer",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "username": {
+                    "name": "username",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false,
+                    "autoincrement": false
+                },
+                "display_username": {
+                    "name": "display_username",
+                    "type": "text",
                     "primaryKey": false,
                     "notNull": false,
                     "autoincrement": false

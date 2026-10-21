@@ -9,6 +9,21 @@ export default defineAppConfig({
         },
     },
     ui: {
+        prose: {
+            h2: {
+                slots: {
+                    base: 'tracking-tighter',
+                },
+            },
+            h3: {
+                slots: {
+                    base: 'tracking-tight',
+                },
+            },
+            p: {
+                base: 'text-base text-toned leading-6.5',
+            },
+        },
         colors: {
             neutral: 'zinc',
         },

@@ -16,25 +16,28 @@ const isPreview = String(useRuntimeConfig().public.preview) === 'true'
             />
         </template>
 
-        <UCard>
-            <template #header>
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <h2 class="my-2 text-xl leading-none font-semibold">Account</h2>
+        <UCard :ui="{ body: 'flex flex-col gap-6 items-start' }" class="divide-none">
+            <h2 class="text-title">Account</h2>
+
+            <UUser
+                :name="user?.name"
+                :avatar="{ src: user?.image || undefined, icon: 'mingcute:user-3-fill' }"
+                :ui="{ description: 'flex items-center gap-1' }"
+            >
+                <template #description>
+                    <p>{{ user?.email }}</p>
                     <UBadge
                         v-if="user?.emailVerified"
-                        label="Email verified"
+                        label="Verified"
                         icon="mingcute:check-line"
                         variant="soft"
                         color="success"
+                        size="sm"
                     />
-                </div>
-            </template>
-            <UUser
-                :name="user?.name"
-                :description="user?.email"
-                :avatar="{ src: user?.image || undefined, icon: 'mingcute:user-3-fill' }"
-            />
+                </template>
+            </UUser>
         </UCard>
+
         <section v-if="!isPreview" id="passkeys"><AdminSettingsPasskeys /></section>
         <section id="accounts"><AdminSettingsAccounts /></section>
         <section id="sessions"><AdminSettingsSessions /></section>

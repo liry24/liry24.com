@@ -54,12 +54,10 @@ onMounted(async () => {
 </script>
 
 <template>
-    <UCard>
-        <template #header>
-            <h2 class="my-2 text-xl leading-none font-semibold text-nowrap">Social Accounts</h2>
-        </template>
+    <UCard class="divide-none">
+        <div class="flex flex-col gap-6">
+            <h2 class="text-title">Social Accounts</h2>
 
-        <div class="mx-auto flex w-fit flex-col gap-6">
             <UPageCard
                 v-for="item in list.filter((item) => !isPreview || item.providerId === 'github')"
                 :key="item.providerId"

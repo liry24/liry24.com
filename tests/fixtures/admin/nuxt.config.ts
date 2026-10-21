@@ -19,10 +19,16 @@ export default defineNuxtConfig({
     devtools: { enabled: false },
     nitro: {
         preset: 'node-server',
-        imports: { dirs: [path('../../../server/utils'), path('../../../shared/utils')] },
+        imports: {
+            dirs: [
+                path('../../../server/utils'),
+                path('../../../shared/utils'),
+                path('../../../shared/types'),
+            ],
+        },
         alias: {
             'void/db': path('./database.ts'),
-            '@liria24/site-admin/internal/runtime/nitro2': path('../compose/sdk.ts'),
+            'liti/nuxt/server': path('../compose/sdk.ts'),
         },
         virtual: { '#fixture/migrations': `export default ${JSON.stringify(migrations)}` },
     },
