@@ -13,6 +13,7 @@
         "@iconify-json/simple-icons": "^1.2.100",
         "@internationalized/date": "3.12.4",
         "@json-render/core": "0.21.1",
+        "@liry24/igdb": "~4.0.0",
         "@litijs/ai": "https://pkg.pr.new/liry24/liti/@litijs/ai@c4c3958",
         "@litijs/blog": "https://pkg.pr.new/liry24/liti/@litijs/blog@c4c3958",
         "@litijs/void": "https://pkg.pr.new/liry24/liti/@litijs/void@c4c3958",
@@ -446,6 +447,8 @@
     "@json-render/core": ["@json-render/core@0.21.1", "", { "dependencies": { "zod": "^4.3.6" } }, "sha512-5hUxJTOnNlBhLuSzS/Vs46jjAqQ2TnkGz9n/0RW2djYwxANZKhOTc1QOuL1Cgu+HxtfTPdJjzUs5dOei/Y+aag=="],
 
     "@levischuck/tiny-cbor": ["@levischuck/tiny-cbor@0.2.11", "", {}, "sha512-llBRm4dT4Z89aRsm6u2oEZ8tfwL/2l6BwpZ7JcyieouniDECM5AqNgr/y08zalEIvW3RSK4upYyybDcmjXqAow=="],
+
+    "@liry24/igdb": ["@liry24/igdb@4.0.0", "", {}, "sha512-5cV6yRkZ0t4WaQyt6PCKpxZudCNVlVVe7RqODPCu88TnqZcVyDWZHLTmrqIFu//ck+KZg0B+PomCRAlicyDH1A=="],
 
     "@litijs/ai": ["@litijs/ai@https://pkg.pr.new/liry24/liti/@litijs/ai@c4c3958", { "dependencies": { "@standard-schema/spec": "^1.1.0" }, "peerDependencies": { "ai": "7.0.145", "liti": "0.0.0-preview-c4c3958", "void": "1.1.12" }, "optionalPeers": ["ai", "void"] }, "sha512-W6UFsq09jeXvYKGLCxtBqIzMIdnei3C7Q14EU1iodIzf/7el60Pc1qdS2/VPcmBuCi2+q7kqmSCFcn/q+Ue2Xg=="],
 

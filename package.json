@@ -25,6 +25,7 @@
         "@iconify-json/simple-icons": "^1.2.100",
         "@internationalized/date": "3.12.4",
         "@json-render/core": "0.21.1",
+        "@liry24/igdb": "~4.0.0",
         "@litijs/ai": "https://pkg.pr.new/liry24/liti/@litijs/ai@c4c3958",
         "@litijs/blog": "https://pkg.pr.new/liry24/liti/@litijs/blog@c4c3958",
         "@litijs/void": "https://pkg.pr.new/liry24/liti/@litijs/void@c4c3958",
@@ -84,8 +85,8 @@
         "auth": "1.7.11",
         "better-auth": "1.7.11",
         "liti": "https://pkg.pr.new/liry24/liti@c4c3958",
-        "vue": "3.6.0-rc.12",
-        "typescript": "$typescript"
+        "typescript": "$typescript",
+        "vue": "3.6.0-rc.12"
     },
     "packageManager": "bun@1.4.3",
     "patchedDependencies": {
