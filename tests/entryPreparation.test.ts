@@ -1,4 +1,4 @@
-import { resolveLitiConfig, type ModelPreparationContext } from 'liti'
+import { LitiError, resolveLitiConfig, type ModelPreparationContext } from 'liti'
 import { expect, test, vi } from 'vitest'
 
 import config from '../liti.config'
@@ -16,7 +16,9 @@ const context = (
     data,
     previous,
     issues: [],
-    read: {} as ModelPreparationContext['read'],
+    read: {
+        published: { routeAvailable: vi.fn(async () => true) },
+    } as unknown as ModelPreparationContext['read'],
     executeAction: vi.fn(async () => ({ data: { slug: 'generated-post' } })),
 })
 
@@ -56,4 +58,26 @@ test('the app blog model uses shared publication generation and preserves title/
         slug: 'generated-post',
     })
     expect(posts.editor?.blog).toMatchObject({ proofreading: 'proofread', guard: 'pending' })
+})
+
+test('the configured post model publishes with a unique fallback slug after AI failure', async () => {
+    const posts = resolveLitiConfig(config, []).models.posts
+    const candidate = context({
+        title: 'これはexample title',
+        content: '# Original',
+        slug: '',
+        publication: { slug: 'auto' },
+    })
+    vi.mocked(candidate.executeAction).mockRejectedValueOnce(
+        new LitiError('LITI_ACTION_FAILED', 'Unavailable'),
+    )
+    vi.mocked(candidate.read.published.routeAvailable)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true)
+    await posts.preparePublication?.(candidate)
+    expect(candidate.data).toMatchObject({
+        title: 'これはexample title',
+        content: '# Original',
+        slug: expect.stringMatching(/^example-title-[a-z0-9]{6}$/),
+    })
 })

@@ -61,6 +61,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             name: 'liry24-built-worker-test',
             main: resolve('.output/server/index.mjs'),
             assets: { binding: 'ASSETS', directory: resolve('.output/public') },
+            vars: { ...generated.vars, OPENAI_BASE_URL: 'http://127.0.0.1:1/v1' },
             routes: [],
             triggers: { crons: [] },
             d1_databases: [
@@ -213,6 +214,25 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                         },
                     }),
             })
+
+            // AI requests stay on an unavailable loopback endpoint, so no external inference can run.
+            for (const [title, expected] of [
+                ['これはexample title', /^example-title$/],
+                ['これはexample title', /^example-title-[a-z0-9]{6}$/],
+                ['日本語の記事', /^[a-z0-9]{6}$/],
+            ] as const) {
+                const draft = await client.createEntry('posts', {
+                    data: { title, content: 'Original body.', tags: [] },
+                })
+                const published = await client.publishEntry(draft.id, {
+                    expectedVersion: draft.version,
+                    draft: { data: {} },
+                })
+                expect(published.data.slug).toMatch(expected)
+                expect(published.data.title).toBe(title)
+                expect(published.data.content).toBe('Original body.')
+                expect(published.currentRevisionId).toBe(published.publishedRevisionId)
+            }
             let logged = await client.createEntry('posts', {
                 data: {
                     title: 'Activity snapshot',

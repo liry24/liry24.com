@@ -315,8 +315,8 @@ onBeforeRouteLeave(() => {
                             </UFormField>
                         </form.Field>
                         <p v-else class="text-muted text-sm">
-                            AI generates the slug when you publish or schedule. Published URLs are
-                            kept.
+                            Slugs are generated automatically when you publish or schedule. AI is
+                            optional, and published URLs are kept.
                         </p>
                     </div>
                     <UFormField

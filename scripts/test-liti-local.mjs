@@ -22,6 +22,12 @@ assert(
 )
 const databasePath = resolve(process.env.LIRY24_TEST_DB_PATH)
 const apiOnly = process.argv.includes('--api-only')
+if (process.argv.includes('--browser'))
+    assert.equal(
+        process.env.OPENAI_BASE_URL,
+        'http://127.0.0.1:1/v1',
+        'Use the same local AI failure endpoint for the server and probe',
+    )
 assert(existsSync(databasePath), 'Start Nuxt dev and let its startup migrations finish first')
 const database = new DatabaseSync(databasePath)
 database.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;')
@@ -708,13 +714,18 @@ try {
             })
             assert.equal(await contentInput.inputValue(), original)
 
-            let failedPreparations = 0
+            let automaticPublications = 0
             let proofreadingCalls = 0
             let draftCreates = 0
             let publications = 0
             page.on('request', (request) => {
                 if (request.method() !== 'POST') return
                 if (request.url().endsWith('/api/liti/entries/posts')) draftCreates++
+                if (
+                    /\/api\/liti\/entries\/[^/]+\/publish$/.test(request.url()) &&
+                    request.postDataJSON().draft?.data?.publication?.slug === 'auto'
+                )
+                    automaticPublications++
             })
             page.on('response', (response) => {
                 if (
@@ -723,22 +734,8 @@ try {
                 )
                     publications++
             })
-            let publicationDraft
             let corrected = original.replace('Markdown works', 'Markdown corrected')
             let invalidProofreading = false
-            await page.route('**/api/liti/entries/*/publish', async (route) => {
-                const body = route.request().postDataJSON()
-                if (body.draft?.data?.publication?.slug !== 'auto') return route.continue()
-                failedPreparations++
-                publicationDraft = body.draft.data
-                await route.fulfill({
-                    status: 503,
-                    contentType: 'application/json',
-                    body: JSON.stringify({
-                        error: { code: 'LITI_ACTION_FAILED', message: 'Synthetic AI failure' },
-                    }),
-                })
-            })
             await page.route('**/api/liti/actions/proofread', async (route) => {
                 proofreadingCalls++
                 const body = route.request().postDataJSON()
@@ -779,7 +776,7 @@ try {
                     })
                     throw error
                 }
-                assert.equal(failedPreparations, 0)
+                assert.equal(automaticPublications, 0)
                 assert.equal(proofreadingCalls, 1)
                 assert.equal(draftCreates, 1)
                 assert.equal(newEntry.data.excerpt, undefined)
@@ -813,10 +810,6 @@ try {
                 )
                 assert.equal(await contentInput.inputValue(), corrected)
                 await page.getByRole('button', { name: 'Discard Suggestion' }).click()
-                await page.getByRole('button', { name: 'Publish', exact: true }).click()
-                await page.getByText('Synthetic AI failure', { exact: true }).waitFor()
-                assert.equal(publicationDraft.title, 'Browser create draft')
-                assert.equal(publicationDraft.content, corrected)
                 assert.equal(await contentInput.inputValue(), corrected)
                 assert.equal(
                     (await request(`/api/liti/entries/${newEntry.id}`)).publishedRevisionId,
@@ -828,7 +821,7 @@ try {
                 await page
                     .getByText('Enter a valid slug before publishing.', { exact: true })
                     .waitFor()
-                assert.equal(failedPreparations, 1)
+                assert.equal(automaticPublications, 0)
                 await page.getByLabel('Slug', { exact: true }).fill(`${id}-browser-new`)
                 await page.getByRole('link', { name: 'Back to Posts', exact: true }).click()
                 await page.waitForURL('**/admin/data?model=posts')
@@ -861,7 +854,7 @@ try {
                 assert.equal(stored.data.content, corrected)
                 assert.equal(stored.data.excerpt, undefined)
                 assert.equal(stored.currentRevisionId, stored.publishedRevisionId)
-                assert.equal(failedPreparations, 1)
+                assert.equal(automaticPublications, 0)
                 assert.equal(proofreadingCalls, 4)
                 assert.equal(publications, 1)
                 await page
@@ -888,9 +881,34 @@ try {
             assert.equal(await titleInput.inputValue(), '')
             assert.equal(await contentInput.inputValue(), '')
             assert.equal(await page.getByLabel('Slug', { exact: true }).count(), 0)
+            for (let index = 0; index < 2; index++) {
+                if (index) {
+                    await page.getByRole('button', { name: /^New Post/ }).click()
+                    await page.waitForURL('**/admin/posts/new')
+                }
+                await titleInput.fill('これはexample title')
+                await contentInput.fill('Original fallback body.')
+                const publishing = page.waitForResponse((response) =>
+                    /\/api\/liti\/entries\/[^/]+\/publish$/.test(response.url()),
+                )
+                await page.getByRole('button', { name: 'Publish', exact: true }).click()
+                const response = await publishing
+                assert.equal(response.status(), 200, await response.text())
+                const published = await response.json()
+                publicEntries.push(published)
+                await page.waitForURL('**/admin/data?model=posts')
+                assert.match(
+                    published.data.slug,
+                    index ? /^example-title-[a-z0-9]{6}$/ : /^example-title$/,
+                )
+                assert.equal(published.data.title, 'これはexample title')
+                assert.equal(published.data.content, 'Original fallback body.')
+                assert.equal(published.currentRevisionId, published.publishedRevisionId)
+            }
+            assert.equal(automaticPublications, 2)
             assert.deepEqual(errors, [])
             console.log(
-                'PASS: creation page, safe Comark preview, native back/forward draft recovery, AI-free draft and manual publication, slug failure preserves input, empty slug validation, native proofreading review/apply/discard and invalid/stale guards, consecutive new posts reset manual slug mode and input',
+                'PASS: creation page, safe Comark preview, native back/forward draft recovery, AI-free draft, manual publication and automatic publication with unavailable AI, duplicate slug suffixes, validation preserves input, empty slug validation, native proofreading review/apply/discard and invalid/stale guards, consecutive new posts reset manual slug mode and input',
             )
         } finally {
             await browser.close()

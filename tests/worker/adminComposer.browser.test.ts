@@ -22,6 +22,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
         config.vars = {
             ...config.vars,
             APP_ENV: 'test',
+            OPENAI_BASE_URL: 'http://127.0.0.1:1/v1',
             NUXT_PUBLIC_PREVIEW: 'false',
             NUXT_PUBLIC_SITE_URL: '',
         }
