@@ -6,7 +6,8 @@ import { expect, test } from 'vitest'
 import { withRuntimeEnv } from 'void/_env'
 
 import config from '../liti.config'
-import { gameValueIssues, formatGameValue, type GameMetric } from '../shared/utils/games'
+import type { GameMetric } from '../shared/types/games'
+import { gameValueIssues, formatGameValue } from '../shared/utils/games'
 import { openTestDatabase } from './helpers/database'
 const metrics: GameMetric[] = [
     {

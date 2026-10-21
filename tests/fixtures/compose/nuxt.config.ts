@@ -14,7 +14,11 @@ export default defineNuxtConfig({
     nitro: {
         preset: 'node-server',
         imports: {
-            dirs: [path('../../../server/utils')],
+            dirs: [
+                path('../../../server/utils'),
+                path('../../../shared/utils'),
+                path('../../../shared/types'),
+            ],
             imports: [{ name: 'queryIgdb', from: path('./games.ts'), priority: 10 }],
         },
         alias: {

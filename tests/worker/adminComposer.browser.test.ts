@@ -8,7 +8,7 @@ import { chromium } from 'playwright-core'
 import { test } from 'vitest'
 import { createTestHarness } from 'wrangler'
 
-import type { ComposerPlan } from '../../shared/utils/adminComposer'
+import type { ComposerPlan } from '../../shared/types/adminComposer'
 import { baselineStatements } from '../helpers/database'
 
 test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(

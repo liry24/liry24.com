@@ -1,6 +1,7 @@
 import type { ComarkPlugin, MarkdownItPlugin, Node } from 'comark'
 import { parseMarkdown } from 'comark/parse'
 
+import type { TitlePart } from '../types/gameMentions'
 import { gameSlugPattern } from './games.js'
 export const gameMentionRule: MarkdownItPlugin = (parser) => {
     parser.inline.ruler.before('autolink', 'game-mention', (state, silent) => {
@@ -20,7 +21,7 @@ export const gameMentionPlugin: ComarkPlugin = {
     name: 'game-mentions',
     markdownItPlugins: [gameMentionRule],
 }
-export type TitlePart = { text: string; slug?: string }
+
 export function gameTitleParts(title: string): TitlePart[] {
     const parts: TitlePart[] = []
     let text = '',

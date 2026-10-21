@@ -19,13 +19,3 @@ export const adminActivityLabels = {
     'passkey.update': 'Renamed passkey',
     'passkey.delete': 'Removed passkey',
 } as const
-
-export type AdminActivityAction = keyof typeof adminActivityLabels
-
-export interface AdminActivityInput {
-    actorId: string
-    action: AdminActivityAction
-    targetId: string
-    model?: string
-    label?: string
-}

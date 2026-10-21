@@ -1,20 +1,14 @@
 import type { Experimental_CompositionEvaluator } from '@json-render/core'
 import { expect, test, vi } from 'vitest'
 
-import { composerValueUpdates } from '../app/utils/composerValues'
+import { composerValueUpdates } from '../../app/utils/composerValues'
 import {
     composeAdminRequest,
     composerModelInfo,
     type ComposerAdmin,
     type ComposerModelInfo,
-} from '../server/utils/adminComposer'
-import {
-    composerModels,
-    composerRequest,
-    type ComposerBatch,
-    type ComposerRequest,
-} from '../shared/utils/adminComposer'
-import { adminModels } from './helpers/adminModels'
+} from '../../server/utils/adminComposer'
+import { adminModels } from '../helpers/adminModels'
 
 const models = composerModelInfo(adminModels)
 const input: ComposerRequest = {
@@ -49,7 +43,10 @@ function evaluator(overrides: Record<string, string> | Record<string, string>[] 
                               ? value
                               : (Object.entries(question.criteria).find(
                                     ([id, description]) =>
-                                        description === value || state.values?.[id] === value,
+                                        description === value ||
+                                        (state.values as Record<string, string> | undefined)?.[
+                                            id
+                                        ] === value,
                                 )?.[0] ?? ('fill' in question.criteria ? 'fill' : undefined))
                     if (!choice) throw Error('Unoffered test choice: ' + key + '=' + value)
                     return [key, { choice }]
@@ -92,7 +89,7 @@ test('active models are available and input boundaries validate selection and co
 test('facts preserve quotes, whole prose, URL components and account alternatives', async () => {
     const evaluate = evaluator({ model: 'posts' })
     await collect({ ...input, prompt: '作品「春の庭」を https://x.com/Liry24g に追加' }, evaluate)
-    const values = evaluate.mock.calls[0]![0].state.inputCandidates
+    const values = evaluate.mock.calls[0]![0].state.inputCandidates as string[]
     for (const value of ['春の庭', 'https://x.com/Liry24g', 'x', 'Liry24g', '@Liry24g'])
         expect(values).toContain(value)
     expect(values.length).toBeLessThanOrEqual(40)
@@ -129,7 +126,9 @@ test.each(composerModels)(
         ).toBe(false)
         expect(admin.list).not.toHaveBeenCalled()
         expect(
-            evaluate.mock.calls[0]![0].state.models.map((item: ComposerModelInfo) => item.name),
+            (evaluate.mock.calls[0]![0].state.models as ComposerModelInfo[]).map(
+                (item) => item.name,
+            ),
         ).toEqual(composerModels)
         expect(
             Object.keys(evaluate.mock.calls[0]![0].questions).some((key) =>
@@ -475,7 +474,9 @@ test.each([
         expect(plan.visibleFields).toContain(key)
         expect(plan.values[key]).toEqual(model === 'posts' ? [value] : value)
         const refined = evaluate.mock.calls[1]![0]
-        expect(refined.state.models.map((item: ComposerModelInfo) => item.name)).toEqual([model])
+        expect((refined.state.models as ComposerModelInfo[]).map((item) => item.name)).toEqual([
+            model,
+        ])
         expect(
             Object.keys(refined.questions)
                 .filter((name) => name.startsWith('field.'))
@@ -602,8 +603,12 @@ test('mixed records share routing/refinement and keep each source and values sep
         'スキル「Blender」を追加',
     )
     expect(admin.list).toHaveBeenCalledTimes(2)
-    expect(evaluate.mock.calls[2]![0].state.items.i0.request).toBe('https://x.com/alice')
-    expect(evaluate.mock.calls[2]![0].state.items.i1.request).toBe('スキル「Blender」を追加')
+    expect(
+        (evaluate.mock.calls[2]![0].state.items as Record<string, { request: string }>).i0?.request,
+    ).toBe('https://x.com/alice')
+    expect(
+        (evaluate.mock.calls[2]![0].state.items as Record<string, { request: string }>).i1?.request,
+    ).toBe('スキル「Blender」を追加')
 })
 
 test('ten detailed records split refinement into bounded groups with at most two concurrent evaluations', async () => {

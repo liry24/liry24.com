@@ -2,8 +2,6 @@ import { betterAuth } from 'better-auth'
 import { admin, createAccessControl } from 'better-auth/plugins'
 import { createError } from 'nuxt/server'
 
-import { adminAccess, adminRoles } from '../../../../../shared/auth/access'
-
 const fixtureAccess = createAccessControl({
     ...adminAccess.statements,
     'liti:model:games': ['readDraft', 'create'],

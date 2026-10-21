@@ -23,7 +23,7 @@ test('IGDB keeps exact identity, validates images and caches OAuth credentials w
             ]),
         )
     vi.stubGlobal('fetch', fetch)
-    const { queryIgdb } = await import('../server/utils/igdb')
+    const { queryIgdb } = await import('../../server/utils/igdb')
     expect(await queryIgdb({ search: 'a"; where id = 2;' })).toEqual([
         {
             igdbId: 1,
@@ -44,7 +44,7 @@ test('unavailable credentials, malformed results and network failures return saf
         .mockResolvedValueOnce(Response.json([{ id: 1, slug: '../bad', name: 'Unsafe' }]))
         .mockRejectedValue(Error('SENSITIVE_REMOTE_DETAIL'))
     vi.stubGlobal('fetch', fetch)
-    const { queryIgdb } = await import('../server/utils/igdb')
+    const { queryIgdb } = await import('../../server/utils/igdb')
     await expect(queryIgdb({ search: 'game' })).rejects.toMatchObject({
         statusCode: 502,
         message: expect.not.stringContaining('SENSITIVE_REMOTE_DETAIL'),

@@ -3,7 +3,6 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { effectScope, ref } from 'vue'
 
 import { useGameSearch } from '../../app/composables/useGameSearch'
-import type { GameSearchResult } from '../../shared/utils/igdb'
 
 const { sessionBoundary } = vi.hoisted(() => ({ sessionBoundary: vi.fn() }))
 mockNuxtImport('useUserSession', () => sessionBoundary)

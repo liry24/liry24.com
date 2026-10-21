@@ -2,7 +2,7 @@ import { passkey } from '@better-auth/passkey'
 import { defineServerAuth } from '@nuxtjs/better-auth/config'
 import { admin, jwt, lastLoginMethod, username } from 'better-auth/plugins'
 
-import { adminAccess, adminRoles } from '../shared/auth/access.js'
+import { adminAccess, adminRoles } from '../shared/utils/authAccess.js'
 import { authActivity } from './utils/authActivity.js'
 import {
     isPreviewGitHubAccountAdmin,

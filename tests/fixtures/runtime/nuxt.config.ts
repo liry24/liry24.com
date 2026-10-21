@@ -12,7 +12,12 @@ export default defineNuxtConfig({
     pages: false,
     alias: { '~~': root, '~': root + 'app' },
     imports: {
-        dirs: [root + 'app/composables', root + 'app/utils', root + 'shared/utils'],
+        dirs: [
+            root + 'app/composables',
+            root + 'app/utils',
+            root + 'shared/utils',
+            root + 'shared/types',
+        ],
         presets: [
             {
                 from: root + 'tests/fixtures/runtime/boundaries.ts',

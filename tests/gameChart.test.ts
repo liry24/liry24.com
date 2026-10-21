@@ -2,7 +2,7 @@ import { createChartScene, renderChartSvg, type SceneNode } from '@tanstack/char
 import { expect, test } from 'vitest'
 
 import { gameChart } from '../app/utils/gameChart'
-import type { GameMetric, GamePeriod } from '../shared/utils/games'
+import type { GameMetric, GamePeriod } from '../shared/types/games'
 const metric: GameMetric = {
     key: 'peakRank',
     label: 'Highest rank',

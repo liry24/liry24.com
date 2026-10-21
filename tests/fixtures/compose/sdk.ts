@@ -1,6 +1,5 @@
 import type { RequestEvent } from 'nuxt/schema'
 
-import { composerModels } from '../../../shared/utils/adminComposer'
 import { configureGameFixture, createGame, game, savedGame } from './games'
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 export const getNitroRequest = (event: RequestEvent) => event.req

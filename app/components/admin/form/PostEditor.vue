@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { postPublicationSettings } from '~~/shared/utils/postEditorial'
-import { postMarkdownSecurity } from '~~/shared/utils/postMarkdown'
 const { id, composerId } = defineProps<{ id?: string; composerId?: string }>()
 const publishAt = ref('')
 const uploadedName = ref('')

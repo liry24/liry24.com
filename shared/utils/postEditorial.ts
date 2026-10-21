@@ -1,6 +1,4 @@
-export type PostSlugMode = 'auto' | 'manual'
-
-export type PostPublicationSettings = { slug: PostSlugMode }
+import type { PostPublicationSettings } from '../types/postEditorial'
 
 export function postPublicationSettings(data: Record<string, unknown>): PostPublicationSettings {
     const settings =
