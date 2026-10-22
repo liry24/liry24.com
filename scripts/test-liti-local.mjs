@@ -864,6 +864,30 @@ try {
                     .getByRole('button', { name: 'Edit', exact: true })
                     .click()
                 await page.waitForURL(`**/admin/posts/${stored.id}`)
+                await titleInput.fill('Local edit after publication')
+                await request(`/api/liti/entries/${stored.id}`, {
+                    method: 'PATCH',
+                    headers: { 'if-match': `"${stored.version}"` },
+                    body: {
+                        expectedVersion: stored.version,
+                        data: { ...stored.data, title: 'Concurrent edit' },
+                    },
+                })
+                const conflict = page.waitForResponse(
+                    (response) =>
+                        response.request().method() === 'PATCH' &&
+                        response.url().endsWith(`/api/liti/entries/${stored.id}`),
+                )
+                await page.getByRole('button', { name: 'Save Draft', exact: true }).click()
+                assert.equal((await conflict).status(), 409)
+                await page.getByText('Conflict detected', { exact: true }).waitFor()
+                assert.equal(await titleInput.inputValue(), 'Local edit after publication')
+                assert.equal(
+                    await page
+                        .getByRole('button', { name: 'Save Draft', exact: true })
+                        .isDisabled(),
+                    true,
+                )
                 await page.getByRole('link', { name: 'Back to Posts', exact: true }).click()
                 await page.waitForURL('**/admin/data?model=posts')
             } finally {
@@ -908,7 +932,7 @@ try {
             assert.equal(automaticPublications, 2)
             assert.deepEqual(errors, [])
             console.log(
-                'PASS: creation page, safe Comark preview, native back/forward draft recovery, AI-free draft, manual publication and automatic publication with unavailable AI, duplicate slug suffixes, validation preserves input, empty slug validation, native proofreading review/apply/discard and invalid/stale guards, consecutive new posts reset manual slug mode and input',
+                'PASS: creation page, safe Comark preview, native back/forward draft recovery, AI-free draft, manual publication and automatic publication with unavailable AI, duplicate slug suffixes, validation preserves input, empty slug validation, native proofreading review/apply/discard and invalid/stale guards, reactive conflict display preserves input, consecutive new posts reset manual slug mode and input',
             )
         } finally {
             await browser.close()

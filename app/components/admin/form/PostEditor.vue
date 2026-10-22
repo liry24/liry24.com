@@ -5,7 +5,15 @@ const uploadedName = ref('')
 const newPostInstance = useState('new-post-instance', () => crypto.randomUUID())
 const { post: composerProposal, scope: composerScope, saved } = useAdminComposer()
 
-const resource = useLitiForm('posts', {
+const {
+    form,
+    state,
+    publish,
+    schedule,
+    upload,
+    operation,
+    blog: { review, proofread, applyProofreading, discardProofreading },
+} = await useLitiForm('posts', {
     id: () => id,
     instance: composerId
         ? 'composer-editor:' + composerId
@@ -16,17 +24,12 @@ const resource = useLitiForm('posts', {
     onUpload: ({ files }) => {
         uploadedName.value = files[0]?.name ?? ''
     },
-    onSuccess: async () => {
+    onSuccess: async (_entry, { hasUnsavedChanges }) => {
         if (composerId) saved.value[composerId] = true
-        if (!id && !composerId && !resource.draft.isDirty.value)
-            newPostInstance.value = crypto.randomUUID()
+        if (!id && !composerId && !hasUnsavedChanges) newPostInstance.value = crypto.randomUUID()
         await navigateTo('/admin/data?model=posts')
     },
 })
-const { form, state, publish, schedule, upload, operation } = await resource
-
-const conflict = computed(() => state.value.conflict)
-const restored = computed(() => state.value.restored)
 const pendingComposer = computed(() =>
     !id &&
     composerProposal.value?.scope === composerScope.value &&
@@ -43,19 +46,7 @@ function applyComposer() {
     publishAt.value = proposal.publishAt
     composerProposal.value = null
 }
-if (!restored.value) applyComposer()
-const {
-    review,
-    proofread,
-    applyProofreading,
-    discardProofreading: discardSuggestion,
-} = resource.blog
-const proofreading = computed(() => review.value.status === 'pending')
-const proposal = computed(() => review.value.proposal)
-const originalContent = computed(() => review.value.original)
-const proposalStale = computed(() => review.value.stale)
-const invalidProposal = computed(() => review.value.invalid)
-const busy = computed(() => state.value.busy)
+if (!state.value.restored) applyComposer()
 const awaitingProofreading = computed(
     () => review.value.proposal !== null && !review.value.applied && !review.value.discarded,
 )
@@ -91,7 +82,7 @@ onBeforeRouteLeave(() => {
                     label="Back to Posts"
                     variant="ghost"
                     color="neutral"
-                    :disabled="busy"
+                    :disabled="state.busy"
                 />
                 <UButton
                     type="submit"
@@ -125,7 +116,7 @@ onBeforeRouteLeave(() => {
                 <template #actions>
                     <UButton
                         label="Apply prepared values"
-                        :disabled="busy"
+                        :disabled="state.busy"
                         @click="applyComposer"
                     />
                     <UButton
@@ -136,20 +127,20 @@ onBeforeRouteLeave(() => {
                 </template>
             </UAlert>
             <UAlert
-                v-if="restored"
+                v-if="state.restored"
                 title="Unsaved input restored"
                 description="Input is kept while you move between pages in this session. Save your draft before closing or reloading this tab."
                 color="neutral"
             />
             <UAlert
-                v-if="conflict"
+                v-if="state.conflict"
                 title="Conflict detected"
                 description="Your input is kept. Open the latest entry in another tab and compare your changes before saving."
                 color="warning"
             />
             <UAlert v-if="errorMessage" :title="errorMessage" color="error" />
             <form id="admin-post-form" class="grid gap-6" @submit.prevent="submit">
-                <fieldset :disabled="busy" class="grid min-w-0 gap-6">
+                <fieldset :disabled="state.busy" class="grid min-w-0 gap-6">
                     <form.Field name="title">
                         <template #default="{ field }">
                             <UFormField
@@ -224,7 +215,7 @@ onBeforeRouteLeave(() => {
                             icon="mingcute:edit-3-ai-line"
                             variant="outline"
                             color="neutral"
-                            :loading="proofreading"
+                            :loading="review.status === 'pending'"
                             :disabled="!state.can.proofread"
                             @click="proofread"
                         />
@@ -237,13 +228,13 @@ onBeforeRouteLeave(() => {
                     >
                         <h2 class="font-medium">Proofreading suggestion</h2>
                         <UAlert
-                            v-if="proposalStale"
+                            v-if="review.stale"
                             title="Content has changed"
                             description="Run proofreading again before applying a suggestion to this content."
                             color="warning"
                         />
                         <UAlert
-                            v-if="invalidProposal"
+                            v-if="review.invalid"
                             title="Invalid proofreading suggestion"
                             description="Your content is kept. Run proofreading again to get a complete suggestion."
                             color="error"
@@ -253,13 +244,13 @@ onBeforeRouteLeave(() => {
                                 <h3 class="text-muted mb-2 text-sm">Original</h3>
                                 <pre
                                     class="bg-muted max-h-80 overflow-auto rounded-lg p-3 text-sm wrap-break-word whitespace-pre-wrap"
-                                    >{{ originalContent }}</pre>
+                                    >{{ review.original }}</pre>
                             </div>
                             <div>
                                 <h3 class="text-muted mb-2 text-sm">Suggested</h3>
                                 <pre
                                     class="bg-muted max-h-80 overflow-auto rounded-lg p-3 text-sm wrap-break-word whitespace-pre-wrap"
-                                    >{{ proposal }}</pre>
+                                    >{{ review.proposal }}</pre>
                             </div>
                         </div>
                         <div class="flex gap-2">
@@ -273,7 +264,7 @@ onBeforeRouteLeave(() => {
                                 label="Discard Suggestion"
                                 variant="ghost"
                                 color="neutral"
-                                @click="discardSuggestion"
+                                @click="discardProofreading"
                             />
                         </div>
                     </section>
@@ -368,7 +359,7 @@ onBeforeRouteLeave(() => {
                             accept="image/*"
                             label="Upload Image"
                             icon="mingcute:upload-3-fill"
-                            :disabled="busy"
+                            :disabled="state.busy"
                             class="min-h-32 w-full"
                             @update:model-value="(files) => upload('image', files)"
                         />
