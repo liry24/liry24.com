@@ -33,6 +33,10 @@ export type GameData = {
     metrics?: GameMetric[] | null
 }
 
+export type GameSearchResult = Pick<GameData, 'igdbId' | 'slug' | 'name' | 'cover'> & {
+    id?: string
+}
+
 export type GamePeriod = {
     period: string
     periodKey: string
