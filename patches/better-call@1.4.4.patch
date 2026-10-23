@@ -1,5 +1,5 @@
 diff --git a/dist/router.d.mts b/dist/router.d.mts
-index ac5d18d3b091369455cc3a15da0a9335a71dca37..151d45ed46e8155d5677fa3f8a8eb8fd01dea756 100644
+index ac5d18d3b091369455cc3a15da0a9335a71dca37..a8a1879922263633c8d8e4e479b15f3a90aad03e 100644
 --- a/dist/router.d.mts
 +++ b/dist/router.d.mts
 @@ -93,6 +93,7 @@ interface RouterConfig {
@@ -11,7 +11,7 @@ index ac5d18d3b091369455cc3a15da0a9335a71dca37..151d45ed46e8155d5677fa3f8a8eb8fd
    endpoints: E;
  };
 diff --git a/dist/router.mjs b/dist/router.mjs
-index a03d364e3b0df5a9031d4b7821a67b16a15106c8..c66e1de344852b290a42028db1fefc7cd5847df3 100644
+index a03d364e3b0df5a9031d4b7821a67b16a15106c8..25d594862fd9809e131a054650d5ba02ce6fb54c 100644
 --- a/dist/router.mjs
 +++ b/dist/router.mjs
 @@ -25,30 +25,27 @@ const createRouter$1 = (endpoints, config) => {

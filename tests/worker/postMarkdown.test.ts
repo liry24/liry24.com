@@ -105,7 +105,7 @@ function assertSafe(nodes: Node[]) {
     })
     expect(elements).toContainEqual({
         tag: 'details',
-        props: expect.objectContaining({ ':open': 'true' }),
+        props: expect.objectContaining({ open: true }),
     })
     expect(elements).toContainEqual({ tag: 'ol', props: expect.objectContaining({ start: '3' }) })
     expect(elements).toContainEqual({

@@ -1,8 +1,8 @@
-diff --git a/dist/cf-build-output-ChEKWan2.mjs b/dist/cf-build-output-ChEKWan2.mjs
-index 457b10e8fc808fc4c67a34596eadf11b677dd3f0..5e547f5463dc1b78d76e29a2832921550c776282 100644
---- a/dist/cf-build-output-ChEKWan2.mjs
-+++ b/dist/cf-build-output-ChEKWan2.mjs
-@@ -538,6 +538,17 @@ async function prepareBundledBuildOutput(options) {
+diff --git a/dist/cf-build-output-BhVxldCw.mjs b/dist/cf-build-output-BhVxldCw.mjs
+index 930690e7335a5542eb00feb1418ce076f990f3ec..ca50bdecbfec979785e24d09df8de627ef39b3d6 100644
+--- a/dist/cf-build-output-BhVxldCw.mjs
++++ b/dist/cf-build-output-BhVxldCw.mjs
+@@ -539,6 +539,17 @@ async function prepareBundledBuildOutput(options) {
  			root: options.projectRoot,
  			publicDir: false,
  			logLevel: "error",
