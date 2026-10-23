@@ -2,6 +2,7 @@
 const { open } = useAdminComposer()
 const { data: permissions } = await useAdminPermissions()
 const { data: models, status, error, refresh } = useLitiModels()
+
 useHead({ title: 'Data' })
 </script>
 
@@ -12,7 +13,7 @@ useHead({ title: 'Data' })
             :ui="{ root: 'h-full min-h-0', body: 'gap-4 p-4 sm:gap-4 sm:p-6 *:shrink-0' }"
         >
             <template #body>
-                <div class="flex flex-col items-center gap-24 pt-[calc(50vh-6rem)]">
+                <div class="flex flex-col items-center gap-24 pt-[calc(30vh)]">
                     <div class="flex w-full flex-col items-center gap-8">
                         <AdminComposerPanel
                             v-if="permissions?.compose && !open"
@@ -34,6 +35,8 @@ useHead({ title: 'Data' })
                             :key="name"
                             :model-name="name"
                         />
+
+                        <AdminDataPosts />
                     </UContainer>
                 </div>
             </template>

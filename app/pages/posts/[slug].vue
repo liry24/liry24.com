@@ -32,13 +32,13 @@ if (!data.value) throw createError({ status: 404, statusText: 'Post not found' }
                 <PostTitle :title="data.title" />
             </h1>
 
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-3">
                 <NuxtTime
                     v-if="data.createdAt"
                     :datetime="data.createdAt"
                     date-style="short"
                     time-style="short"
-                    class="text-muted text-sm"
+                    class="text-muted font-mono font-features-['calt'] text-sm tracking-wide"
                 />
                 <UBadge
                     v-for="(tag, index) in data.tags.filter((tag) => tag !== null)"
@@ -49,25 +49,44 @@ if (!data.value) throw createError({ status: 404, statusText: 'Post not found' }
                     class="ml-1"
                 />
                 <ClientOnly>
-                    <UButton
-                        v-if="isShareSupported"
-                        aria-label="Share post"
-                        icon="mingcute:share-2-fill"
-                        variant="ghost"
-                        size="sm"
-                        class="ml-1"
-                        @click="share()"
-                    />
-                    <UButton
-                        v-if="isCopySupported && location.href"
-                        aria-label="Copy post URL"
-                        :icon="copied ? 'mingcute:check-fill' : 'mingcute:link-3-fill'"
-                        :label="copied ? 'URL Copied' : undefined"
-                        variant="ghost"
-                        size="sm"
-                        class="transition-all"
-                        @click="copy(location.href)"
-                    />
+                    <div class="flex items-center gap-1">
+                        <UTooltip v-if="isShareSupported" text="Share post">
+                            <UButton
+                                aria-label="Share post"
+                                icon="mingcute:share-2-fill"
+                                variant="ghost"
+                                size="sm"
+                                @click="share()"
+                            />
+                        </UTooltip>
+                        <UTooltip v-if="isCopySupported && location.href" text="Copy post URL">
+                            <UButton
+                                aria-label="Copy post URL"
+                                variant="ghost"
+                                size="sm"
+                                square
+                                @click="copy(location.href)"
+                            >
+                                <Transition
+                                    mode="out-in"
+                                    enter-active-class="transition-[opacity,filter,transform] duration-70 ease-out motion-reduce:transition-none"
+                                    enter-from-class="opacity-0 blur-md scale-95"
+                                    enter-to-class="opacity-100 blur-none scale-100"
+                                    leave-active-class="transition-[opacity,filter,transform] duration-70 ease-in motion-reduce:transition-none"
+                                    leave-from-class="opacity-100 blur-none scale-100"
+                                    leave-to-class="opacity-0 blur-md scale-95"
+                                >
+                                    <Icon
+                                        :key="copied ? 'copied' : 'copy'"
+                                        :name="
+                                            copied ? 'mingcute:check-fill' : 'mingcute:link-3-fill'
+                                        "
+                                        class="size-4"
+                                    />
+                                </Transition>
+                            </UButton>
+                        </UTooltip>
+                    </div>
                 </ClientOnly>
             </div>
 
