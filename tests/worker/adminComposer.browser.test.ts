@@ -646,6 +646,12 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await goto(new URL('/admin/posts?q=Page%20Probe', url).href)
             const postsSection = page.locator('[data-model="posts"]')
             await postsSection.getByRole('link', { name: 'Page Probe 20', exact: true }).waitFor()
+            assert.equal(await postsSection.count(), 1)
+            assert.equal(await page.locator('#model-posts').count(), 1)
+            assert.equal(
+                await page.locator('[data-model="games"], [data-model="ranks"]').count(),
+                0,
+            )
             assert.equal(new URL(page.url()).pathname, '/admin/data')
             assert.equal(new URL(page.url()).searchParams.get('model'), 'posts')
             assert.equal(new URL(page.url()).searchParams.get('q'), 'Page Probe')
@@ -687,6 +693,23 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 .locator('article button.truncate')
                 .nth(1)
                 .innerText()
+            await page.route(
+                '**/api/liti/entries/skills/reorder',
+                (route) =>
+                    route.fulfill({
+                        status: 409,
+                        json: {
+                            error: { code: 'LITI_CONFLICT', message: 'Reorder conflict' },
+                        },
+                    }),
+                { times: 1 },
+            )
+            await reorder.press('ArrowRight')
+            await skillSection.getByText('Reorder conflict', { exact: true }).waitFor()
+            assert.notEqual(
+                await skillSection.locator('article button.truncate').first().innerText(),
+                nextTitle,
+            )
             const sorted = page.waitForResponse(
                 (response) =>
                     response.url().includes('/api/liti/entries/skills/reorder') &&
@@ -694,6 +717,10 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             )
             await reorder.press('ArrowRight')
             assert.equal((await sorted).status(), 200)
+            assert.equal(
+                await skillSection.getByText('Reorder conflict', { exact: true }).count(),
+                0,
+            )
             await page.waitForFunction(
                 (expected) =>
                     document
@@ -701,6 +728,25 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                         ?.textContent?.trim() === expected,
                 nextTitle,
             )
+            await skillSection.getByRole('button', { name: 'Add new Skill', exact: true }).click()
+            const skillEditor = page.getByRole('dialog')
+            await skillEditor.getByLabel('Name', { exact: true }).fill('Created in data page')
+            await skillEditor.getByLabel('Icon', { exact: true }).fill('mingcute:check-line')
+            await skillEditor.getByRole('button', { name: 'Save Draft', exact: true }).click()
+            await skillEditor.waitFor({ state: 'hidden' })
+            await skillSection
+                .getByRole('button', { name: 'Created in data page', exact: true })
+                .click()
+            await skillEditor.getByLabel('Name', { exact: true }).fill('Edited in data page')
+            await skillEditor.getByRole('button', { name: 'Save Draft', exact: true }).click()
+            await skillEditor.waitFor({ state: 'hidden' })
+            const editedSkill = skillSection
+                .locator('article')
+                .filter({ hasText: 'Edited in data page' })
+            await editedSkill.getByRole('button', { name: 'Entry actions', exact: true }).click()
+            await page.getByRole('button', { name: 'Delete', exact: true }).click()
+            await editedSkill.waitFor({ state: 'hidden' })
+            await page.keyboard.press('Escape')
             await page.screenshot({ path: '.tmp/admin-data-desktop.png', fullPage: true })
             await page.setViewportSize({ width: 390, height: 844 })
             assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
@@ -907,7 +953,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                     (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
                         .$nuxt?.isHydrating === false,
             )
-            await page.getByRole('button', { name: /^New Game Stats/ }).click()
+            await page.getByRole('button', { name: 'Add new Game Stats', exact: true }).click()
             const editor = page.getByRole('dialog')
             await editor.getByRole('button', { name: 'Save', exact: true }).click()
             await editor.getByText('Check the fields before saving', { exact: true }).waitFor()
@@ -1018,10 +1064,41 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                     (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
                         .$nuxt?.isHydrating === false,
             )
+            assert.equal(await page.locator('[data-model="games"]').count(), 0)
+            await page.route('**/api/admin/compose', async (route) => {
+                const request = route.request().postDataJSON()
+                await route.fulfill({
+                    json: {
+                        requestId: request.requestId,
+                        items: [
+                            {
+                                id: request.requestId + '.0',
+                                source: { start: 0, end: request.prompt.length },
+                                plan: {
+                                    model: 'games',
+                                    intent: 'manage',
+                                    entryId: game.id,
+                                    fields: [],
+                                    visibleFields: [],
+                                    values: {},
+                                    publishAt: '',
+                                    timeZone: request.timeZone,
+                                    datePurpose: 'none',
+                                    dateIncomplete: false,
+                                    query: '',
+                                    results: [],
+                                    total: 0,
+                                },
+                            },
+                        ],
+                    },
+                })
+            })
             await page
-                .locator('[data-model="games"]')
-                .getByRole('button', { name: 'Edit', exact: true })
-                .click()
+                .getByRole('textbox', { name: 'Content request', exact: true })
+                .fill('Edit game metrics')
+            const gameEditor = page.locator('[data-composer-item]')
+            await gameEditor.getByRole('button', { name: 'Open editor', exact: true }).click()
             await page
                 .getByRole('dialog')
                 .getByLabel('Label', { exact: true })

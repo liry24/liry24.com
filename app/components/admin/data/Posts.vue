@@ -18,7 +18,6 @@ const { data, status, error, total, refresh } = useLitiQuery('posts', {
     page: () => ({ limit: 20, offset: (page.value - 1) * 20 }),
 })
 
-const items: Readonly<Ref<Entry[]>> = data
 const model = computed(() => models.value['posts'])
 const features = computed(
     () =>
@@ -30,19 +29,8 @@ const features = computed(
         },
 )
 const meta = computed(() => model.value?.meta ?? { label: 'post', plural: 'posts', fields: [] })
-const moving = ref(false)
-const mutationError = ref('')
-const busy = computed(() => status.value === 'pending' || moving.value)
-
-const display = (data: Record<string, unknown>) => {
-    const fields = model.value?.displayFields
-    const image = data[fields?.image ?? 'image']
-    return {
-        title: String(data[fields?.title ?? 'title'] ?? ''),
-        image: image && typeof image === 'object' && 'url' in image ? String(image.url) : undefined,
-    }
-}
-const columns: TableColumn<Entry>[] = [
+const busy = computed(() => status.value === 'pending')
+const columns: TableColumn<Entry<'posts'>>[] = [
     { id: 'title', header: 'Title' },
     { id: 'status', header: 'Status' },
     {
@@ -53,10 +41,10 @@ const columns: TableColumn<Entry>[] = [
     { id: 'actions', header: 'Actions' },
 ]
 
-const edit = async (entry?: Entry) =>
+const edit = async (entry?: Entry<'posts'>) =>
     navigateTo(entry ? `/admin/posts/${encodeURIComponent(entry.id)}` : '/admin/posts/new')
 
-function select(_event: Event, row: TableRow<Entry>) {
+function select(_event: Event, row: TableRow<Entry<'posts'>>) {
     void edit(row.original)
 }
 const search = useDebounceFn((value: string) => {
@@ -84,7 +72,7 @@ watch(
 
 <template>
     <section
-        id="`model-posts"
+        id="model-posts"
         ref="section"
         class="flex min-w-0 scroll-mt-6 flex-col gap-4"
         :aria-label="meta.plural"
@@ -101,29 +89,27 @@ watch(
                 icon="mingcute:search-line"
                 @update:model-value="search(String($event))"
             />
+            <UButton label="New Post" icon="mingcute:add-line" @click="edit()" />
+            <UButton
+                label="Reload latest"
+                variant="ghost"
+                color="neutral"
+                :disabled="busy"
+                @click="refresh()"
+            />
         </div>
-        <UAlert
-            v-if="error || mutationError"
-            :title="error?.message || mutationError"
-            color="error"
-        />
+        <UAlert v-if="error" :title="error.message" color="error" />
         <USkeleton
-            v-if="!items.length && (busy || status === 'idle')"
+            v-if="!data.length && (busy || status === 'idle')"
             class="h-32 w-full rounded-xl"
         />
         <template v-else>
-            <UTable
-                :data="items"
-                :columns="columns"
-                :loading="busy"
-                class="w-full"
-                @select="select"
-            >
+            <UTable :data :columns="columns" :loading="busy" class="w-full" @select="select">
                 <template #title-cell="{ row }">
                     <NuxtLink
                         :to="`/admin/posts/${encodeURIComponent(row.original.id)}`"
                         class="text-highlighted block max-w-md truncate font-medium hover:underline"
-                        >{{ display(row.original.data).title || row.original.id }}</NuxtLink
+                        >{{ row.original.data.title || row.original.id }}</NuxtLink
                     >
                 </template>
 
@@ -148,7 +134,7 @@ watch(
                         :entry="row.original"
                         :features
                         :busy
-                        :title="display(row.original.data).title"
+                        :title="row.original.data.title"
                         @changed="refresh()"
                         posts
                         @edit="edit(row.original)"
