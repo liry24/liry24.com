@@ -91,7 +91,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
         )
         // Exercise Void's actual deploy rebundling, including the native OG renderer WASM.
         const { n: prepare } = await import(
-            pathToFileURL(resolve('node_modules/void/dist/cf-build-output-ChEKWan2.mjs')).href
+            pathToFileURL(resolve('node_modules/void/dist/cf-build-output-BhVxldCw.mjs')).href
         )
         const prepared = await prepare({
             projectRoot: process.cwd(),
