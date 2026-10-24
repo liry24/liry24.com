@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { LazyAdminFormEntryModal } from '#components'
+
 interface Props {
     item: ComposerItem
     pending: boolean
@@ -12,6 +14,7 @@ const emit = defineEmits<{
 }>()
 
 const { open, saved } = useAdminComposer()
+const modal = useOverlay().create(LazyAdminFormEntryModal)
 
 const plan = computed(() => item.plan)
 
@@ -42,6 +45,11 @@ const edit = (model: ComposerModel, id: string) => {
         return navigateTo('/admin/posts/' + encodeURIComponent(id))
     }
     emit('select', model, id)
+}
+
+function editGame() {
+    open.value = false
+    modal.open({ modelName: 'games', id: plan.value?.entryId })
 }
 </script>
 
@@ -130,6 +138,13 @@ const edit = (model: ComposerModel, id: string) => {
 
                 <template #action
                     ><UButton
+                        v-if="plan.model === 'games'"
+                        label="Open editor"
+                        color="neutral"
+                        block
+                        :disabled="pending"
+                        @click="editGame" /><UButton
+                        v-else
                         :to="target"
                         :label="plan.intent === 'settings' ? 'Open Settings' : 'Open full screen'"
                         color="neutral"
