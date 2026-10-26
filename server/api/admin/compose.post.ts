@@ -6,21 +6,20 @@ export default defineEventHandler(async (event) => {
     const started = performance.now()
     await requireAdminPermission(event, { adminPanel: ['compose'] })
     if (!event.req.headers.get('content-type')?.startsWith('application/json'))
-        throw createError({ statusCode: 415, statusMessage: 'JSON required' })
+        throw createError({ status: 415, statusText: 'JSON required' })
     const admin = useAdmin(event)
     const allowed = await admin.models()
     const authorizationMs = performance.now() - started
     const input = composerRequest.safeParse(await readBody(event))
-    if (!input.success)
-        throw createError({ statusCode: 400, statusMessage: 'Invalid composer input' })
+    if (!input.success) throw createError({ status: 400, statusText: 'Invalid composer input' })
     const models = composerModelInfo(allowed)
-    if (!models.length) throw createError({ statusCode: 403, statusMessage: 'No models available' })
+    if (!models.length) throw createError({ status: 403, statusText: 'No models available' })
     const allowedModels = new Set(models.map((model) => model.name))
     const requestedModels = [...(input.data.items ?? []), input.data.context]
     if (
         requestedModels.some((selection) => selection?.model && !allowedModels.has(selection.model))
     )
-        throw createError({ statusCode: 403, statusMessage: 'Model unavailable' })
+        throw createError({ status: 403, statusText: 'Model unavailable' })
     const inferences: { durationMs: number; questionCount: number; payloadBytes: number }[] = []
     let lookupMs = 0,
         activeLookups = 0,
@@ -79,8 +78,8 @@ export default defineEventHandler(async (event) => {
         const limited = error instanceof UsageLimit
         const timedOut = error instanceof Error && error.name === 'TimeoutError'
         throw createError({
-            statusCode: limited ? 429 : timedOut ? 504 : 502,
-            message: limited
+            status: limited ? 429 : timedOut ? 504 : 502,
+            statusText: limited
                 ? 'AI usage limit reached. You can continue with the regular form.'
                 : timedOut
                   ? 'The request timed out. You can continue with the regular form.'

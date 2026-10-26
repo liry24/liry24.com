@@ -7,6 +7,7 @@ const { data, status, error, refresh } = await useFetch('/api/admin/users', {
     key: computed(() => `admin-users:${scope.value}:list`),
     query: { limit: 20, offset: computed(() => (page.value - 1) * 20) },
 })
+
 type User = NonNullable<typeof data.value>['items'][number]
 const columns: TableColumn<User>[] = [
     { accessorKey: 'name', header: 'Name' },
@@ -22,9 +23,14 @@ const columns: TableColumn<User>[] = [
         header: 'Joined',
     },
 ]
+
+const adminUserPath = (user: { id: string; username?: string | null }) =>
+    `/admin/@${encodeURIComponent(user.username || `~${user.id}`)}`
+
 function select(_event: Event, row: TableRow<User>) {
     void navigateTo(adminUserPath(row.original))
 }
+
 useHead({ title: 'Users' })
 </script>
 

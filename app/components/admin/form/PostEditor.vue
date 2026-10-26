@@ -55,6 +55,14 @@ const errorMessage = computed(() => {
     return cause instanceof Error ? cause.message : undefined
 })
 
+function postPublicationSettings(data: Record<string, unknown>) {
+    const settings =
+        data.publication && typeof data.publication === 'object' && !Array.isArray(data.publication)
+            ? (data.publication as Record<string, unknown>)
+            : {}
+    return { slug: settings.slug === 'auto' ? 'auto' : 'manual' }
+}
+
 const setManualSlug = (manual: boolean) => {
     const settings = postPublicationSettings(form.state.values)
     form.setFieldValue('publication', { ...settings, slug: manual ? 'manual' : 'auto' })

@@ -123,5 +123,5 @@ export default defineEventHandler(async (event) => {
             cookies: response.headers.getSetCookie(),
         }
     }
-    throw createError({ statusCode: 400 })
+    throw createError({ status: 400 })
 })

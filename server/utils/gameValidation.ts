@@ -1,10 +1,6 @@
 import type { ModelPreparationContext } from 'liti'
 import { z } from 'zod'
 
-import type { GameMetric, GameValue } from '../../shared/types/games.js'
-import { gameTitleParts, postGameSlugs } from '../../shared/utils/gameMentions.js'
-import { gameValueIssues } from '../../shared/utils/games.js'
-
 export async function preparePostGames(context: ModelPreparationContext) {
     const data = context.data as {
         title: string

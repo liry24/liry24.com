@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
             offset: z.coerce.number().int().nonnegative().max(1_000_000).default(0),
         })
         .safeParse(getQuery(event))
-    if (!result.success) throw createError({ statusCode: 400, statusMessage: 'Invalid pagination' })
+    if (!result.success) throw createError({ status: 400, statusText: 'Invalid pagination' })
     const { limit, offset } = result.data
     const [items, totals] = await Promise.all([
         db

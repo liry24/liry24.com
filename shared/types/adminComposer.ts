@@ -1,7 +1,5 @@
 import type { z } from 'zod'
 
-import type { composerModels, composerItemInput, composerRequest } from '../utils/adminComposer'
-
 export type ComposerModel = (typeof composerModels)[number]
 
 export type ComposerItemInput = z.infer<typeof composerItemInput>

@@ -12,6 +12,6 @@ export async function requireAdminPermission(
         headers: request.headers,
         body: { permissions },
     })
-    if (!result.success) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
+    if (!result.success) throw createError({ status: 403, statusText: 'Access denied' })
     return session
 }

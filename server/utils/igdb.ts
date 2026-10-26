@@ -21,8 +21,8 @@ export async function queryIgdb(
 
     if (!client || !secret)
         throw createError({
-            statusCode: 503,
-            statusMessage: 'IGDB search is not configured. Saved games are still available.',
+            status: 503,
+            statusText: 'IGDB search is not configured. Saved games are still available.',
         })
 
     try {

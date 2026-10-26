@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
             cursor: z.string().max(512).optional(),
         })
         .safeParse(getQuery(event))
-    if (!parsed.success) throw createError({ statusCode: 400, statusMessage: 'Invalid pagination' })
+    if (!parsed.success) throw createError({ status: 400, statusText: 'Invalid pagination' })
     const { limit, cursor } = parsed.data
     let boundary: { at: number; id: string } | undefined
     if (cursor) {
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
                 })
                 .parse(JSON.parse(atob(cursor)))
         } catch {
-            throw createError({ statusCode: 400, statusMessage: 'Invalid activity cursor' })
+            throw createError({ status: 400, statusText: 'Invalid activity cursor' })
         }
     }
     const rows = await db

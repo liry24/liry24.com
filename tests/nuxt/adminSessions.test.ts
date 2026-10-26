@@ -2,7 +2,7 @@ import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 
-import { adminSessionDevice, adminUserPath, useAdminSessions } from '#imports'
+import { adminSessionDevice, useAdminSessions } from '#imports'
 
 const { boundary } = vi.hoisted(() => ({ boundary: {} as Record<string, any> }))
 mockNuxtImport('useAuthClient', () => () => boundary.client)
@@ -87,7 +87,3 @@ test.each([
 ])('user agent %s', (ua, browser, os, device) =>
     expect(adminSessionDevice(ua)).toMatchObject({ browser, os, device }),
 )
-test('temporary user IDs cannot collide with usernames', () => {
-    expect(adminUserPath({ id: 'alice' })).toBe('/admin/@~alice')
-    expect(adminUserPath({ id: 'id', username: 'alice' })).toBe('/admin/@alice')
-})

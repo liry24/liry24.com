@@ -2,9 +2,10 @@ import type { GameMetric, GameValue } from '../types/games'
 
 export const gameSlugPattern = /^[a-z0-9][a-z0-9-]*$/
 export const gameColorPattern = /^#[0-9a-fA-F]{6}$/
-export const metricKeyPattern = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/
+
 export const gameImageUrl = (image: unknown): string | undefined =>
     image && typeof image === 'object' && 'url' in image ? String(image.url) : undefined
+
 export function formatGameValue(value: GameValue | undefined, metric?: GameMetric): string {
     if (!value) return '—'
     if (value.label) return value.label
@@ -15,6 +16,7 @@ export function formatGameValue(value: GameValue | undefined, metric?: GameMetri
         (metric?.format === 'percent' ? '%' : metric?.unit ? ` ${metric.unit}` : '')
     )
 }
+
 export function gameValueIssues(metrics: GameMetric[], values: GameValue[]): string[] {
     const issues: string[] = [],
         seen = new Set<string>()

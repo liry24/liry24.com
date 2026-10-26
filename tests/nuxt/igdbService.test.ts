@@ -51,15 +51,15 @@ test('unavailable credentials, malformed results and network failures return saf
     vi.stubGlobal('fetch', fetch)
     const { queryIgdb } = await import('../../server/utils/igdb')
     await expect(queryIgdb({ search: 'game' })).rejects.toMatchObject({
-        statusCode: 502,
+        status: 502,
         message: expect.not.stringContaining('SENSITIVE_REMOTE_DETAIL'),
     })
     await expect(queryIgdb({ search: 'game' })).rejects.toMatchObject({
-        statusCode: 502,
+        status: 502,
         message: expect.not.stringContaining('SENSITIVE_REMOTE_DETAIL'),
     })
     vi.stubEnv('IGDB_CLIENT_SECRET', '')
-    await expect(queryIgdb({ search: 'game' })).rejects.toMatchObject({ statusCode: 503 })
+    await expect(queryIgdb({ search: 'game' })).rejects.toMatchObject({ status: 503 })
 })
 
 test('credential rotation recreates the IGDB client instead of reusing its cached token', async () => {

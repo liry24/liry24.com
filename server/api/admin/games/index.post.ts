@@ -5,11 +5,11 @@ import { z } from 'zod'
 export default defineEventHandler(async (event) => {
     await requireAdminPermission(event, { 'liti:model:games': ['create'] })
     if (!event.req.headers.get('content-type')?.startsWith('application/json'))
-        throw createError({ statusCode: 415, statusMessage: 'JSON required' })
+        throw createError({ status: 415, statusText: 'JSON required' })
     const admin = useAdmin(event)
     await admin.models()
     const input = z.object({ igdbId: z.number().int().positive() }).safeParse(await readBody(event))
-    if (!input.success) throw createError({ statusCode: 400, statusMessage: 'Choose an IGDB game' })
+    if (!input.success) throw createError({ status: 400, statusText: 'Choose an IGDB game' })
     event.res.headers.set('Cache-Control', 'private, no-store')
     const id = `igdb-${input.data.igdbId}`
     const saved = async () => {
@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     const game = (await queryIgdb({ id: input.data.igdbId })).find(
         (game) => game.igdbId === input.data.igdbId,
     )
-    if (!game) throw createError({ statusCode: 404, statusMessage: 'Game not found in IGDB' })
+    if (!game) throw createError({ status: 404, statusText: 'Game not found in IGDB' })
     try {
         await admin.entries.create('games', { id, data: { ...game, metrics: [] } })
     } catch (error) {

@@ -1,4 +1,4 @@
-const repository = 'Liry24/liry24.com'
+const repository = 'liry24/liry24.com'
 
 const github = async (path: string) => {
     const token = process.env.PREVIEW_GITHUB_TOKEN

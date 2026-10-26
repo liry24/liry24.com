@@ -120,12 +120,12 @@ function createAdminComposer() {
         } catch (cause) {
             if (ownGeneration !== generation) return
             const failure = cause as {
-                statusCode?: number
+                status?: number
                 data?: { message?: string }
                 message?: string
             }
             error.value =
-                failure.statusCode === 401 || failure.statusCode === 403
+                failure.status === 401 || failure.status === 403
                     ? 'Your session cannot access this content. Sign in again.'
                     : failure.data?.message || failure.message || 'Could not prepare the form.'
         } finally {

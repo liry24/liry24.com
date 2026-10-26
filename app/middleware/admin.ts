@@ -5,5 +5,5 @@ export default defineNuxtRouteMiddleware(async (to) => {
         headers: import.meta.server ? { origin: useRequestURL().origin } : undefined,
         body: { permissions: { adminPanel: ['access'] } },
     })
-    if (!result.success) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
+    if (!result.success) throw createError({ status: 403, statusText: 'Access denied' })
 })

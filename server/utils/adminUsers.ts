@@ -20,7 +20,7 @@ export const adminUserFields = {
 export async function findAdminUser(event: RequestEvent) {
     const username = getRouterParam(event, 'username')
     if (!username || username.length > 128)
-        throw createError({ statusCode: 400, statusMessage: 'Invalid username' })
+        throw createError({ status: 400, statusText: 'Invalid username' })
     const [user] = await db
         .select(adminUserFields)
         .from(users)
@@ -33,6 +33,6 @@ export async function findAdminUser(event: RequestEvent) {
                 : eq(users.username, username.toLowerCase()),
         )
         .limit(1)
-    if (!user) throw createError({ statusCode: 404, statusMessage: 'User not found' })
+    if (!user) throw createError({ status: 404, statusText: 'User not found' })
     return user
 }

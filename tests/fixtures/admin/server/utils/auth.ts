@@ -4,9 +4,9 @@ import { auth } from '../../auth'
 
 export async function requireUserSession(request: Request, options?: { user?: { role: string } }) {
     const role = request.headers.get('x-fixture-role')
-    if (!role) throw createError({ statusCode: 401, message: 'Sign in' })
+    if (!role) throw createError({ status: 401, statusText: 'Sign in' })
     if (options?.user?.role && role !== options.user.role)
-        throw createError({ statusCode: 403, message: 'Admin required' })
+        throw createError({ status: 403, statusText: 'Admin required' })
     return { user: { id: request.headers.get('x-fixture-user') || 'synthetic-admin', role } }
 }
 

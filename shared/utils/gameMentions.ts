@@ -1,8 +1,10 @@
 import type { ComarkPlugin, MarkdownItPlugin, Node } from 'comark'
 import { parseMarkdown } from 'comark/parse'
 
-import type { TitlePart } from '../types/gameMentions'
 import { gameSlugPattern } from './games.js'
+
+type TitlePart = { text: string; slug?: string }
+
 export const gameMentionRule: MarkdownItPlugin = (parser) => {
     parser.inline.ruler.before('autolink', 'game-mention', (state, silent) => {
         if (state.src[state.pos] !== '<') return false
@@ -17,6 +19,7 @@ export const gameMentionRule: MarkdownItPlugin = (parser) => {
         return true
     })
 }
+
 export const gameMentionPlugin: ComarkPlugin = {
     name: 'game-mentions',
     markdownItPlugins: [gameMentionRule],
@@ -57,6 +60,7 @@ export function gameTitleParts(title: string): TitlePart[] {
     flush()
     return parts
 }
+
 export async function postGameSlugs(title: string, content: string): Promise<string[]> {
     const slugs = gameTitleParts(title).flatMap((part) => (part.slug ? [part.slug] : []))
     const document = await parseMarkdown(content, {
@@ -78,6 +82,7 @@ export async function postGameSlugs(title: string, content: string): Promise<str
     visit(document.nodes)
     return [...new Set(slugs)]
 }
+
 export function gameMentionQuery(value: string, caret: number) {
     const match = /<game:([a-zA-Z0-9 -]*)$/.exec(value.slice(0, caret))
     if (!match || (match.index > 0 && value.charCodeAt(match.index - 1) === 92)) return null

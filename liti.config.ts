@@ -1,7 +1,9 @@
 import { openai } from '@ai-sdk/openai'
 import { ai } from '@litijs/ai'
+import { createSlugGenerator } from '@litijs/ai'
 import { aiSdk } from '@litijs/ai/ai-sdk'
 import { blog } from '@litijs/blog'
+import { createProofreader } from '@litijs/blog'
 import { voidAdapter } from '@litijs/void'
 import breaks from 'comark/plugins/breaks'
 import {
@@ -17,9 +19,9 @@ import {
     text,
     textarea,
     url,
+    type ModelPreparationContext,
 } from 'liti'
 
-import { prepareEntrySlug } from './server/utils/entryPreparation.ts'
 import {
     validateGame,
     validateGameStats,
@@ -27,14 +29,39 @@ import {
     prepareGame,
     prepareGameStats,
 } from './server/utils/gameValidation.ts'
-import { postAiActions } from './server/utils/posts.ts'
-import { gameColorPattern, metricKeyPattern, gameSlugPattern } from './shared/utils/games.ts'
+import { entrySlugSuggestion } from './shared/utils/entrySlug.js'
+import { gameSlugPattern, gameColorPattern } from './shared/utils/games.ts'
 import { postMarkdownSecurity } from './shared/utils/postMarkdown.ts'
+
+const metricKeyPattern = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/
+
+const prepareEntrySlug = (title: string) => (context: ModelPreparationContext) => {
+    const slug = typeof context.data.slug === 'string' ? context.data.slug.trim() : ''
+    if (slug) {
+        context.data.slug = slug
+        return
+    }
+    if (context.previous?.firstPublishedAt) {
+        context.issues.push({ path: 'slug', message: 'An established slug cannot be empty.' })
+        return
+    }
+    context.data.slug = entrySlugSuggestion(String(context.data[title] ?? ''))
+    if (!context.data.slug)
+        context.issues.push({ path: 'slug', message: 'Enter a slug before publishing.' })
+}
 
 export default defineLitiConfig({
     adapter: voidAdapter(),
     plugins: [
-        ai({ provider: aiSdk({ text: openai('gpt-6-luna') }), actions: postAiActions }),
+        ai({
+            provider: aiSdk({ text: openai('gpt-6-luna') }),
+            actions: {
+                publication: createSlugGenerator(),
+                proofread: createProofreader({
+                    protect: (content) => content.match(/<game:[a-z0-9][a-z0-9-]*>/g) ?? [],
+                }),
+            },
+        }),
         blog({
             models: {
                 posts: {
