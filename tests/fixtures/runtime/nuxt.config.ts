@@ -17,6 +17,12 @@ export default defineNuxtConfig({
             root + 'app/utils',
             root + 'shared/utils',
             root + 'shared/types',
+            ...['admin-activity', 'admin-composer', 'game-mentions'].flatMap((name) => [
+                root + `packages/${name}/shared/utils`,
+                root + `packages/${name}/shared/types`,
+                root + `packages/${name}/app/composables`,
+                root + `packages/${name}/app/utils`,
+            ]),
         ],
         presets: [
             {

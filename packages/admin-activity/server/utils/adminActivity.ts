@@ -1,8 +1,10 @@
+import type { AdminActivityInput } from '../../shared/types/adminActivity.js'
+
 export async function recordAdminActivity(input: AdminActivityInput) {
     try {
         // Lazy imports keep auth schema generation independent of the previous generated schema.
         const { db } = await import('void/db')
-        const { adminEvents } = await import('../../db/schema')
+        const { adminEvents } = await import('../../../../db/schema.js')
         await db.insert(adminEvents).values({
             id: crypto.randomUUID(),
             actorId: input.actorId,

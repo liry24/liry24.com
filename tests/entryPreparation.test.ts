@@ -1,8 +1,16 @@
+import { litiFixture } from '@litijs/test-utils/vitest'
 import { LitiError, resolveLitiConfig, type ModelPreparationContext } from 'liti'
-import { expect, test, vi } from 'vitest'
+import { expect, test as base, vi } from 'vitest'
 
 import config from '../liti.config'
-import { prepareEntrySlug } from '../server/utils/entryPreparation'
+
+const actor = { id: 'test-admin', roles: ['admin'] }
+const test = base.extend({
+    liti: litiFixture(config, {
+        authenticate: () => actor,
+        locales: { defaultLocale: 'ja', supported: ['ja', 'en'] },
+    }),
+})
 
 const context = (
     data: Record<string, unknown>,
@@ -22,20 +30,37 @@ const context = (
     executeAction: vi.fn(async () => ({ data: { slug: 'generated-post' } })),
 })
 
-test('app labels prepare non-blog slugs and retain established URLs', () => {
-    const prepare = prepareEntrySlug('label')
-    const candidate = context({ label: 'Example Content' })
-    prepare(candidate)
-    expect(candidate.data.slug).toBe('example-content')
-    const manual = context({ label: 'Ignored', slug: ' manual-url ' })
-    prepare(manual)
-    expect(manual.data.slug).toBe('manual-url')
-    const established = context({ label: 'Do not replace' }, {
-        firstPublishedAt: '2026-10-01',
-    } as ModelPreparationContext['previous'])
-    prepare(established)
-    expect(established.data.slug).toBeUndefined()
-    expect(established.issues[0]?.message).toContain('established slug')
+test('configured models prepare slugs through the service and retain established URLs', async ({
+    liti,
+}) => {
+    const service = await liti.service({ actor })
+    const candidate = await service.createEntry('socials', {
+        data: {
+            label: 'Example Content',
+            href: 'https://example.invalid',
+            icon: 'mingcute:link-fill',
+        },
+    })
+    expect((await liti.client.getEntry(candidate.id)).data.slug).toBe('example-content')
+    const manual = await service.createEntry('socials', {
+        data: {
+            label: 'Ignored',
+            slug: ' manual-url ',
+            href: 'https://example.invalid',
+            icon: 'mingcute:link-fill',
+        },
+    })
+    expect((await liti.client.getEntry(manual.id)).data.slug).toBe('manual-url')
+    await expect(
+        service.updateEntry(candidate.id, {
+            expectedVersion: candidate.version,
+            data: { slug: '' },
+        }),
+    ).rejects.toMatchObject({
+        code: 'LITI_INVALID_INPUT',
+        issues: [{ path: 'slug', message: 'An established slug cannot be empty.' }],
+    })
+    expect((await liti.client.getEntry(candidate.id)).data.slug).toBe('example-content')
 })
 
 test('the app blog model uses shared publication generation and preserves title/content', async () => {

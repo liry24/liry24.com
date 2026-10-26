@@ -1,6 +1,9 @@
 {
     "name": "liry24-com",
     "private": true,
+    "workspaces": [
+        "packages/*"
+    ],
     "type": "module",
     "scripts": {
         "postinstall": "nuxt prepare",
@@ -9,7 +12,7 @@
         "preview": "void preview",
         "deploy": "void deploy --platform cloudflare",
         "typecheck": "nuxt typecheck",
-        "lint": "oxlint app server scripts tests",
+        "lint": "oxlint app server shared packages scripts tests",
         "format": "oxfmt . --write",
         "format:check": "oxfmt . --check",
         "test": "vitest run",
@@ -25,10 +28,13 @@
         "@iconify-json/simple-icons": "^1.2.100",
         "@internationalized/date": "3.12.4",
         "@json-render/core": "0.21.1",
+        "@liry24/admin-activity": "workspace:*",
+        "@liry24/admin-composer": "workspace:*",
+        "@liry24/game-mentions": "workspace:*",
         "@liry24/igdb": "~4.0.0",
-        "@litijs/ai": "https://pkg.pr.new/liry24/liti/@litijs/ai@cb9e902",
-        "@litijs/blog": "https://pkg.pr.new/liry24/liti/@litijs/blog@cb9e902",
-        "@litijs/void": "https://pkg.pr.new/liry24/liti/@litijs/void@cb9e902",
+        "@litijs/ai": "https://pkg.pr.new/liry24/liti/@litijs/ai@7715fdc",
+        "@litijs/blog": "https://pkg.pr.new/liry24/liti/@litijs/blog@7715fdc",
+        "@litijs/void": "https://pkg.pr.new/liry24/liti/@litijs/void@7715fdc",
         "@lucasmarkes/hairline": "^0.5.1",
         "@nuxt/image": "^2.2.0",
         "@nuxt/ui": "^4.12.0",
@@ -45,7 +51,7 @@
         "better-auth": "1.7.12",
         "cn": "^0.5.0",
         "comark": "0.8.1",
-        "liti": "https://pkg.pr.new/liry24/liti@cb9e902",
+        "liti": "https://pkg.pr.new/liry24/liti@7715fdc",
         "motion-v": "^2.8.0",
         "nuxt": "^4.6.2",
         "nuxt-files-sdk": "0.3.1",
@@ -61,6 +67,7 @@
     },
     "devDependencies": {
         "@cloudflare/workers-types": "^5.20261023.1",
+        "@litijs/test-utils": "https://pkg.pr.new/liry24/liti/@litijs/test-utils@7715fdc",
         "@nuxt/a11y": "^1.0.0-alpha.1",
         "@nuxt/fonts": "1.1.0",
         "@nuxt/hints": "^1.1.5",
@@ -80,11 +87,11 @@
         "wrangler": "^4.152.0"
     },
     "overrides": {
-        "@litijs/sqlite": "https://pkg.pr.new/liry24/liti/@litijs/sqlite@cb9e902",
+        "@litijs/sqlite": "https://pkg.pr.new/liry24/liti/@litijs/sqlite@7715fdc",
         "@vue/compiler-sfc": "3.6.0-rc.12",
         "auth": "1.7.12",
         "better-auth": "1.7.12",
-        "liti": "https://pkg.pr.new/liry24/liti@cb9e902",
+        "liti": "https://pkg.pr.new/liry24/liti@7715fdc",
         "typescript": "$typescript",
         "vue": "3.6.0-rc.12"
     },

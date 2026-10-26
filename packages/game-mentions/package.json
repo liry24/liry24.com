@@ -1,0 +1,16 @@
+{
+    "name": "@liry24/game-mentions",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": "./index.ts",
+        "./nuxt": "./nuxt.config.ts",
+        "./server": "./server/index.ts"
+    },
+    "peerDependencies": {
+        "comark": "0.8.1",
+        "liti": "^0.0.3",
+        "nuxt": "^4.6.2",
+        "vue": "3.6.0-rc.12"
+    }
+}

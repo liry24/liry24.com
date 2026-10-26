@@ -1,9 +1,9 @@
 import { passkey } from '@better-auth/passkey'
+import { authActivity } from '@liry24/admin-activity/server'
 import { defineServerAuth } from '@nuxtjs/better-auth/config'
 import { admin, jwt, lastLoginMethod, username } from 'better-auth/plugins'
 
 import { adminAccess, adminRoles } from '../shared/utils/authAccess.js'
-import { authActivity } from './utils/authActivity.js'
 import {
     isPreviewGitHubAccountAdmin,
     validatePreviewIdentity,

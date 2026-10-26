@@ -1,4 +1,6 @@
 import { openai } from '@ai-sdk/openai'
+import { postMarkdownSecurity, gameSlugPattern } from '@liry24/game-mentions'
+import { preparePostGames } from '@liry24/game-mentions/server'
 import { ai } from '@litijs/ai'
 import { createSlugGenerator } from '@litijs/ai'
 import { aiSdk } from '@litijs/ai/ai-sdk'
@@ -25,13 +27,11 @@ import {
 import {
     validateGame,
     validateGameStats,
-    preparePostGames,
     prepareGame,
     prepareGameStats,
 } from './server/utils/gameValidation.ts'
 import { entrySlugSuggestion } from './shared/utils/entrySlug.js'
-import { gameSlugPattern, gameColorPattern } from './shared/utils/games.ts'
-import { postMarkdownSecurity } from './shared/utils/postMarkdown.ts'
+import { gameColorPattern } from './shared/utils/games.ts'
 
 const metricKeyPattern = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/
 

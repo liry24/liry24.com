@@ -1,0 +1,20 @@
+{
+    "name": "@liry24/admin-composer",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": "./index.ts",
+        "./nuxt": "./nuxt.config.ts",
+        "./server": "./server/index.ts",
+        "./values": "./app/utils/composerValues.ts"
+    },
+    "peerDependencies": {
+        "@internationalized/date": "3.12.4",
+        "@json-render/core": "0.21.1",
+        "liti": "^0.0.3",
+        "nuxt": "^4.6.2",
+        "void": "1.2.1",
+        "vue": "3.6.0-rc.12",
+        "zod": "4.6.7"
+    }
+}

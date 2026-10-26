@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import type { ComposerModel } from '../types/adminComposer'
+import type { ComposerModel } from '../types/adminComposer.js'
 
 export const composerModels = [
     'works',

@@ -1,1 +1,1 @@
-export { default } from '../../../../../../server/api/admin/compose.post'
+export { default } from '../../../../../../packages/admin-composer/server/api/admin/compose.post'
