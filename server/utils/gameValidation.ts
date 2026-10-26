@@ -1,22 +1,8 @@
 import type { ModelPreparationContext } from 'liti'
 import { z } from 'zod'
 
-export async function preparePostGames(context: ModelPreparationContext) {
-    const data = context.data as {
-        title: string
-        content: string
-        plainTitle?: string
-        gameMentions?: string[]
-    }
-    const slugs = await postGameSlugs(data.title, data.content)
-    const games = slugs.length ? await context.read.current.listAllEntries('games') : []
-    data.plainTitle = gameTitleParts(data.title)
-        .map((part) => games.find((game) => game.data.slug === part.slug)?.data.name ?? part.text)
-        .join('')
-    data.gameMentions = games
-        .filter((game) => slugs.includes(String(game.data.slug)))
-        .map((game) => game.id)
-}
+import type { GameMetric, GameValue } from '../../shared/types/games'
+import { gameValueIssues } from '../../shared/utils/games'
 
 export const validateGame = z
     .looseObject({

@@ -10,7 +10,15 @@ export default defineConfig({
     },
     overrides: [
         {
-            files: ['app/**/*.ts', 'app/**/*.vue', 'server/**/*.ts', 'tests/nuxt/**/*.ts'],
+            files: [
+                'app/**/*.ts',
+                'app/**/*.vue',
+                'server/**/*.ts',
+                'tests/nuxt/**/*.ts',
+                'packages/*/app/**/*.{ts,vue}',
+                'packages/*/server/**/*.ts',
+                'packages/*/tests/nuxt/**/*.ts',
+            ],
             rules: {
                 'no-restricted-imports': [
                     'error',
@@ -30,8 +38,9 @@ export default defineConfig({
             files: [
                 'app/auth.config.ts',
                 'server/auth.config.ts',
-                'server/utils/entryPreparation.ts',
                 'server/utils/gameValidation.ts',
+                'packages/admin-activity/server/utils/adminActivity.ts',
+                'packages/game-mentions/server/index.ts',
             ],
             rules: { 'no-restricted-imports': 'off' },
         },

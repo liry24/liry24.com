@@ -2,8 +2,7 @@ import { getNitroRequest } from 'liti/nuxt/server'
 import { createError, defineEventHandler, getQuery } from 'nuxt/server'
 import { db, and, or, eq, lt, desc } from 'void/db'
 import { z } from 'zod'
-
-import { adminEvents } from '../../../../../db/schema'
+import { adminEvents } from '~~/db/schema'
 
 export default defineEventHandler(async (event) => {
     event.res.headers.set('Cache-Control', 'private, no-store')

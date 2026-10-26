@@ -1,3 +1,4 @@
+import { postMarkdownSecurity } from '@liry24/game-mentions'
 import type { Node } from 'comark'
 import { parseMarkdown } from 'comark/parse'
 import { resolveLitiConfig } from 'liti'
@@ -6,7 +7,6 @@ import { createRuntime, handlePublicRequest } from 'liti/server'
 import { expect, test } from 'vitest'
 
 import config from '../../liti.config'
-import { postMarkdownSecurity } from '../../shared/utils/postMarkdown'
 import { openTestDatabase } from '../helpers/database'
 
 const content = [

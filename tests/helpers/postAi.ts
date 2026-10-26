@@ -1,18 +1,31 @@
-import { createOpenAI } from '@ai-sdk/openai'
-import { ai } from '@litijs/ai'
-import { aiSdk } from '@litijs/ai/ai-sdk'
+import { resolveLitiConfig } from 'liti'
 import { executeAction } from 'liti/server'
+import { vi } from 'vitest'
 
-import { postAiActions } from '../../server/utils/posts'
+import config from '../../liti.config'
 
-// Always use an explicit synthetic key and a supplied fetch. These tests never
-// read credentials or contact OpenAI, Workers AI, or an AI Gateway.
+const boundary = vi.hoisted(() => ({ fetch: undefined as typeof globalThis.fetch | undefined }))
+vi.mock('@ai-sdk/openai', async (original) => {
+    const actual = await original<typeof import('@ai-sdk/openai')>()
+    return {
+        ...actual,
+        openai: actual.createOpenAI({
+            apiKey: 'synthetic-test-only',
+            fetch: (input, init) => {
+                if (!boundary.fetch) throw new Error('A synthetic provider response is required')
+                return boundary.fetch(input, init)
+            },
+        }),
+    }
+})
+
+// Execute the application's actual actions; every provider request stays in the fixture.
 export function mockPostActions(fetch: typeof globalThis.fetch) {
-    const model = createOpenAI({ apiKey: 'synthetic-test-only', fetch })('gpt-6-luna')
-    const plugin = ai({ provider: aiSdk({ text: model }), actions: postAiActions })
-    const execute = async (name: keyof typeof postAiActions, input: Record<string, unknown>) =>
+    boundary.fetch = fetch
+    const configured = resolveLitiConfig(config, [])
+    const execute = async (name: 'publication' | 'proofread', input: Record<string, unknown>) =>
         (
-            await executeAction(plugin, name, input as never, {
+            await executeAction(configured, name, input as never, {
                 actor: { id: 'synthetic-action-admin', roles: ['admin'] },
             })
         ).data

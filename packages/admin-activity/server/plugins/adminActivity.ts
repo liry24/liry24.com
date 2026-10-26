@@ -1,7 +1,6 @@
 import { resolveLitiConfig } from 'liti'
 import { useServerHooks } from 'nuxt/server'
-
-import config from '../../liti.config'
+import config from '~~/liti.config'
 
 const models = resolveLitiConfig(config, []).models
 

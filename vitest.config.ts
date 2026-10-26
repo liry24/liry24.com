@@ -13,8 +13,8 @@ export default defineConfig({
                 test: {
                     name: 'node',
                     server: { deps: { inline: [/liti/] } },
-                    include: ['tests/**/*.test.ts'],
-                    exclude: ['tests/nuxt/**', 'tests/fixtures/**'],
+                    include: ['tests/**/*.test.ts', 'packages/*/tests/**/*.test.ts'],
+                    exclude: ['tests/nuxt/**', 'tests/fixtures/**', 'packages/*/tests/nuxt/**'],
                 },
             },
             await defineVitestProject({
@@ -23,7 +23,7 @@ export default defineConfig({
                     name: 'nuxt',
                     // Vitest 5's disk cache loses the drive on Nuxt's virtual app entry on Windows.
                     fsModuleCache: process.platform !== 'win32',
-                    include: ['tests/nuxt/**/*.test.ts'],
+                    include: ['tests/nuxt/**/*.test.ts', 'packages/*/tests/nuxt/**/*.test.ts'],
                     environment: 'nuxt',
                     environmentOptions: {
                         nuxt: {

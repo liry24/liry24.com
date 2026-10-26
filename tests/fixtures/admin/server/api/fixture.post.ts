@@ -10,20 +10,19 @@ export default defineEventHandler(async (event) => {
         )
         for (let i = 0; i < 23; i++) {
             const id = `user-${String(i).padStart(2, '0')}`
-            sqlite
-                .prepare(
-                    'INSERT INTO users (id,name,email,email_verified,username,role,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
-                )
-                .run(
+            const { test } = await auth.$context
+            await test.saveUser(
+                test.createUser({
                     id,
-                    `User ${i}`,
-                    `${i}@example.invalid`,
-                    1,
-                    i === 22 ? null : `name-${i}`,
-                    'user',
-                    1700000000000,
-                    1700000000000,
-                )
+                    name: `User ${i}`,
+                    email: `${i}@example.invalid`,
+                    emailVerified: true,
+                    username: i === 22 ? null : `name-${i}`,
+                    role: 'user',
+                    createdAt: new Date(1700000000000),
+                    updatedAt: new Date(1700000000000),
+                }),
+            )
         }
         sqlite
             .prepare(
@@ -38,6 +37,7 @@ export default defineEventHandler(async (event) => {
                 1700000000000,
                 1700000000000,
             )
+        sqlite.exec('DELETE FROM admin_events')
         for (let i = 0; i < 23; i++)
             sqlite
                 .prepare(
@@ -76,6 +76,16 @@ export default defineEventHandler(async (event) => {
                     1700000000000,
                 )
         return { ok: true }
+    }
+    if (input.action === 'login') {
+        const context = await auth.$context
+        await context.internalAdapter.updateUser(input.userId, { role: input.role })
+        const login = await context.test.login({ userId: input.userId })
+        // Fixture setup must not add events to the fixed pagination dataset.
+        sqlite
+            .prepare('DELETE FROM admin_events WHERE target_id = ? AND action = ?')
+            .run(login.session.id, 'session.create')
+        return { cookie: login.headers.get('cookie') }
     }
     if (input.action === 'events') return db.select().from(schema.adminEvents)
     if (input.action === 'credentials') {

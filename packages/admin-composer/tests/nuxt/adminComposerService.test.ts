@@ -1,14 +1,14 @@
 import type { Experimental_CompositionEvaluator } from '@json-render/core'
-import { expect, test, vi } from 'vitest'
-
-import { composerValueUpdates } from '../../app/utils/composerValues'
 import {
     composeAdminRequest,
     composerModelInfo,
     type ComposerAdmin,
     type ComposerModelInfo,
-} from '../../server/utils/adminComposer'
-import { adminModels } from '../helpers/adminModels'
+} from '@liry24/admin-composer/server'
+import { composerValueUpdates } from '@liry24/admin-composer/values'
+import { expect, test, vi } from 'vitest'
+
+import { adminModels } from '../../../../tests/helpers/adminModels.js'
 
 const models = composerModelInfo(adminModels)
 const input: ComposerRequest = {

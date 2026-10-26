@@ -1,7 +1,7 @@
 import type { ComarkPlugin, MarkdownItPlugin, Node } from 'comark'
 import { parseMarkdown } from 'comark/parse'
 
-import { gameSlugPattern } from './games.js'
+export const gameSlugPattern = /^[a-z0-9][a-z0-9-]*$/
 
 type TitlePart = { text: string; slug?: string }
 

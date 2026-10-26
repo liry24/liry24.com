@@ -1,9 +1,8 @@
 import { fileURLToPath } from 'node:url'
 
+import type { ComposerBatch } from '@liry24/admin-composer'
 import { fetch, setup, getServerLogs, clearServerLogs } from '@nuxt/test-utils/e2e'
 import { expect, test } from 'vitest'
-
-import type { ComposerBatch } from '../shared/types/adminComposer'
 
 await setup({
     rootDir: fileURLToPath(new URL('./fixtures/compose', import.meta.url)),

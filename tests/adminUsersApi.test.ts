@@ -18,10 +18,10 @@ const fixture = async (body: unknown) =>
             body: JSON.stringify(body),
         })
     ).json()
-const read = (path: string, role = 'admin', userId = 'synthetic-admin') =>
-    fetch(`/api/admin/users${path}`, {
-        headers: { 'x-fixture-role': role, 'x-fixture-user': userId },
-    })
+const read = async (path: string, role = 'admin', userId = 'user-22') => {
+    const session = role ? await fixture({ action: 'login', role, userId }) : null
+    return fetch(`/api/admin/users${path}`, { headers: session ? { cookie: session.cookie } : {} })
+}
 
 test('admin-only projections paginate without returning account secrets', async () => {
     await fixture({ action: 'seed' })

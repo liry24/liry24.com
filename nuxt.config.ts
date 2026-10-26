@@ -43,7 +43,15 @@ export default defineNuxtConfig({
         'motion-v/nuxt',
     ],
 
-    extends: ['~~/layers/cursor', '~~/layers/icons', '~~/layers/squircle', '~~/layers/sentence'],
+    extends: [
+        '@liry24/admin-activity/nuxt',
+        '@liry24/admin-composer/nuxt',
+        '@liry24/game-mentions/nuxt',
+        '~~/layers/cursor',
+        '~~/layers/icons',
+        '~~/layers/squircle',
+        '~~/layers/sentence',
+    ],
 
     components: [
         { path: '~/components/public' },

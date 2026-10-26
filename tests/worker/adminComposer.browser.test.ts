@@ -4,11 +4,11 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 import type { D1Database } from '@cloudflare/workers-types'
+import type { ComposerPlan } from '@liry24/admin-composer'
 import { chromium } from 'playwright-core'
 import { test } from 'vitest'
 import { createTestHarness } from 'wrangler'
 
-import type { ComposerPlan } from '../../shared/types/adminComposer'
 import { baselineStatements } from '../helpers/database'
 
 test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(

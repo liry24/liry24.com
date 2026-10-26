@@ -11,6 +11,7 @@ export default defineNuxtConfig({
     ssr: false,
     devtools: { enabled: false },
     pages: false,
+    alias: { '~~': path('../../../') },
     nitro: {
         preset: 'node-server',
         imports: {
@@ -18,6 +19,11 @@ export default defineNuxtConfig({
                 path('../../../server/utils'),
                 path('../../../shared/utils'),
                 path('../../../shared/types'),
+                ...['admin-activity', 'admin-composer', 'game-mentions'].flatMap((name) => [
+                    path(`../../../packages/${name}/server/utils`),
+                    path(`../../../packages/${name}/shared/utils`),
+                    path(`../../../packages/${name}/shared/types`),
+                ]),
             ],
             imports: [{ name: 'queryIgdb', from: path('./games.ts'), priority: 10 }],
         },
