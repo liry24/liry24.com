@@ -313,6 +313,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.getByLabel('Content request').fill('new post with schedule')
             await page.getByRole('button', { name: 'Continue in Post Editor' }).click()
             await page.waitForURL('**/admin/posts/new?composer=*', { timeout: 10000 })
+            await page.getByRole('button', { name: 'Proofread Content', exact: true }).waitFor()
             assert.equal(
                 await page.getByLabel('Title', { exact: true }).inputValue(),
                 'Prepared post',
@@ -421,6 +422,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             assert.equal(modelRequests, 1, 'All composer forms share model metadata')
             await cards.nth(2).getByRole('button', { name: 'Continue in Post Editor' }).click()
             await page.waitForURL('**/admin/posts/new?composer=*', { timeout: 10000 })
+            await page.getByRole('button', { name: 'Proofread Content', exact: true }).waitFor()
             await page.getByLabel('Title', { exact: true }).fill('First edited article')
             await page.getByLabel('Content', { exact: true }).fill('First article body')
             await page.keyboard.press('Control+k')
