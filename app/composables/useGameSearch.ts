@@ -1,5 +1,5 @@
 export function useGameSearch(query: () => string | null) {
-    const { user, session } = useUserSession()
+    const { user, session } = useAppSession()
     const scope = computed(() =>
         JSON.stringify([user.value?.id, user.value?.role, session.value?.id]),
     )

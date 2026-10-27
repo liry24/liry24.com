@@ -20,8 +20,13 @@ jobs:
     environment: Preview
     env:
       APP_ENV: dev
-      NODE_OPTIONS: --max-old-space-size=4096
+      NODE_OPTIONS: --max-old-space-size=6144
       NUXT_TELEMETRY_DISABLED: '1'
+      LIRY24_WORKER_NAME: ${{ vars.VITEHUB_DEV_WORKER_NAME }}
+      LIRY24_DATABASE_ID: ${{ vars.VITEHUB_DEV_DATABASE_ID }}
+      LIRY24_DATABASE_NAME: ${{ vars.VITEHUB_DEV_DATABASE_NAME }}
+      LIRY24_MEDIA_BUCKET: ${{ vars.VITEHUB_DEV_MEDIA_BUCKET }}
+      LIRY24_CONTENT_BUCKET: ${{ vars.VITEHUB_DEV_CONTENT_BUCKET }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -32,7 +37,22 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version-file: package.json
-      - run: bun --no-env-file install --frozen-lockfile
+      - name: Verify the rehearsed native dev target
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          const keys = ['LIRY24_WORKER_NAME', 'LIRY24_DATABASE_ID', 'LIRY24_DATABASE_NAME', 'LIRY24_MEDIA_BUCKET', 'LIRY24_CONTENT_BUCKET']
+          for (const key of keys) assert.ok(process.env[key], 'Missing reviewed Preview variable: ' + key)
+          assert.equal(process.env.LIRY24_WORKER_NAME, 'liry24-com-dev')
+          assert.match(process.env.LIRY24_DATABASE_ID, /^[a-f0-9-]{36}$/i)
+          for (const source of ['3c7c6179-12d0-4108-9eea-b3e20d394cef', '227d818f-cd40-4fca-9710-b57273be94ca', '00000000-0000-4000-8000-000000000100'])
+            assert.notEqual(process.env.LIRY24_DATABASE_ID, source, 'Never connect the native runtime to a legacy or synthetic database')
+          assert.notEqual(process.env.LIRY24_MEDIA_BUCKET, 'liry24-com')
+          assert.notEqual(process.env.LIRY24_CONTENT_BUCKET, 'liry24-com')
+          assert.notEqual(process.env.LIRY24_MEDIA_BUCKET, process.env.LIRY24_CONTENT_BUCKET)
+          NODE
+      - run: bun --no-env-file install --frozen-lockfile --ignore-scripts
+      - run: bun run postinstall
       - run: |
           bun run format:check
           bun run lint
@@ -54,27 +74,23 @@ jobs:
           PREVIEW_GITHUB_TOKEN: ${{ secrets.PREVIEW_GITHUB_TOKEN }}
         run: |
           node --input-type=module <<'NODE'
-          import { mkdirSync, writeFileSync } from 'node:fs'
           import { execFileSync } from 'node:child_process'
           const keys = ['BETTER_AUTH_SECRET', 'NUXT_APP_SECRET', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'PREVIEW_GITHUB_TOKEN']
           for (const name of keys) if (!process.env[name]) throw new Error('Missing Preview secret: ' + name)
-          // The account is pinned in void.config.ts; CI does not need interactive account discovery.
-          mkdirSync('.void', { recursive: true })
-          writeFileSync('.void/project.json', JSON.stringify({ platform: 'cloudflare' }))
-          for (const name of keys) execFileSync('bun', ['x', 'void', 'secret', 'put', name], {
-            input: process.env[name], stdio: ['pipe', 'inherit', 'inherit'],
+          execFileSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'secret', 'bulk', '--config', '.output/server/wrangler.json'], {
+            input: JSON.stringify(Object.fromEntries(keys.map((name) => [name, process.env[name]]))),
+            stdio: ['pipe', 'inherit', 'inherit'],
           })
           NODE
-      - name: Deploy dev through Void
-        run: bun x void deploy --platform cloudflare
+      - name: Deploy native dev Worker
+        run: bun run deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_WORKERS_SUBDOMAIN: liry
-      - name: Preserve resolved resource IDs
+      - name: Preserve the native resource bindings
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: void-dev-lock
-          path: void.lock.json
+          name: vitehub-dev-bindings
+          path: .output/server/wrangler.json
           if-no-files-found: ignore

@@ -1,19 +1,15 @@
 <script setup lang="ts">
+import type { AnyVueFormApi } from '@tanstack/vue-form'
 interface Props {
     modelName: string
     values: Record<string, unknown>
-    form: {
-        setFieldValue(name: string, value: unknown): void
-        pushFieldValue(name: string, value: unknown): void
-        removeFieldValue(name: string, index: number): void
-        moveFieldValue(name: string, from: number, to: number): void
-    }
-    upload: ReturnType<typeof useLitiForm>['upload']
+    form: AnyVueFormApi
+    upload: ReturnType<typeof useImageUpload>['upload']
     disabled?: boolean
 }
 const { modelName, values, form, upload, disabled } = defineProps<Props>()
 
-const games = useLitiQuery('games', { view: 'current', immediate: modelName === 'gameStats' })
+const games = useLitiQuery('games', { immediate: modelName === 'gameStats', limit: 1000 })
 const metrics = computed(() => (values.metrics ?? []) as GameMetric[])
 const selectedGame = computed(() => games.data.value.find((entry) => entry.id === values.game))
 const definitions = computed(() => (selectedGame.value?.data.metrics ?? []) as GameMetric[])
@@ -23,11 +19,32 @@ const imageDescriptor = { key: 'image', kind: 'image', label: 'Image' }
 const changeValue = (key: string, patch: Partial<GameValue> | null) => {
     const index = statValues.value.findIndex((item) => item.key === key)
     if (!patch) {
-        if (index >= 0) form.removeFieldValue('values', index)
-    } else if (index < 0) form.pushFieldValue('values', { key, value: 0, ...patch })
+        if (index >= 0) remove('data.values', index)
+    } else if (index < 0) append('data.values', { key, value: 0, ...patch })
     else
         for (const [field, value] of Object.entries(patch))
-            form.setFieldValue(`values[${index}].${field}`, value)
+            form.setFieldValue(`data.values[${index}].${field}`, value)
+}
+function arrayValue(name: string): unknown[] {
+    const value = form.getFieldValue(name)
+    if (value === undefined) return []
+    if (!Array.isArray(value)) throw new Error('Load the game array before editing it.')
+    return value
+}
+function append(name: string, value: unknown) {
+    form.setFieldValue(name, [...arrayValue(name), value])
+}
+function remove(name: string, index: number) {
+    form.setFieldValue(
+        name,
+        arrayValue(name).filter((_, position) => position !== index),
+    )
+}
+function move(name: string, from: number, to: number) {
+    const values = [...arrayValue(name)],
+        [item] = values.splice(from, 1)
+    values.splice(to, 0, item)
+    form.setFieldValue(name, values)
 }
 </script>
 
@@ -50,7 +67,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                     :descriptor="imageDescriptor"
                     :disabled
                     :model-value="values.icon"
-                    @update:model-value="form.setFieldValue('icon', $event)"
+                    @update:model-value="form.setFieldValue('data.icon', $event)"
                     @upload="upload('icon', $event)"
                 />
                 <UFormField label="Representative metric"
@@ -60,7 +77,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                             metrics.map((metric) => ({ label: metric.label, value: metric.key }))
                         "
                         class="w-full"
-                        @update:model-value="form.setFieldValue('primaryMetric', $event)"
+                        @update:model-value="form.setFieldValue('data.primaryMetric', $event)"
                 /></UFormField>
                 <section
                     v-for="(metric, index) in metrics"
@@ -73,7 +90,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                                 :model-value="metric.key"
                                 class="w-full"
                                 @update:model-value="
-                                    form.setFieldValue(`metrics[${index}].key`, String($event))
+                                    form.setFieldValue(`data.metrics[${index}].key`, String($event))
                                 "
                         /></UFormField>
                         <UFormField label="Label"
@@ -81,7 +98,10 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                                 :model-value="metric.label"
                                 class="w-full"
                                 @update:model-value="
-                                    form.setFieldValue(`metrics[${index}].label`, String($event))
+                                    form.setFieldValue(
+                                        `data.metrics[${index}].label`,
+                                        String($event),
+                                    )
                                 "
                         /></UFormField>
                         <UFormField label="Number format"
@@ -89,14 +109,17 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                                 :model-value="metric.format"
                                 :items="['integer', 'decimal', 'percent']"
                                 @update:model-value="
-                                    form.setFieldValue(`metrics[${index}].format`, $event)
+                                    form.setFieldValue(`data.metrics[${index}].format`, $event)
                                 "
                         /></UFormField>
                         <UFormField label="Unit"
                             ><UInput
                                 :model-value="metric.unit ?? ''"
                                 @update:model-value="
-                                    form.setFieldValue(`metrics[${index}].unit`, String($event))
+                                    form.setFieldValue(
+                                        `data.metrics[${index}].unit`,
+                                        String($event),
+                                    )
                                 "
                         /></UFormField>
                     </div>
@@ -112,7 +135,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                                     :model-value="position.value"
                                     @update:model-value="
                                         form.setFieldValue(
-                                            `metrics[${index}].positions[${p}].value`,
+                                            `data.metrics[${index}].positions[${p}].value`,
                                             Number($event),
                                         )
                                     "
@@ -122,7 +145,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                                     :model-value="position.label"
                                     @update:model-value="
                                         form.setFieldValue(
-                                            `metrics[${index}].positions[${p}].label`,
+                                            `data.metrics[${index}].positions[${p}].label`,
                                             String($event),
                                         )
                                     "
@@ -132,8 +155,8 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                                     :model-value="position.color ?? ''"
                                     @update:model-value="
                                         form.setFieldValue(
-                                            `metrics[${index}].positions[${p}].color`,
-                                            $event ? String($event) : null,
+                                            `data.metrics[${index}].positions[${p}].color`,
+                                            $event ? String($event) : undefined,
                                         )
                                     "
                             /></UFormField>
@@ -144,7 +167,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                             :model-value="position.image"
                             @update:model-value="
                                 form.setFieldValue(
-                                    `metrics[${index}].positions[${p}].image`,
+                                    `data.metrics[${index}].positions[${p}].image`,
                                     $event,
                                 )
                             "
@@ -153,7 +176,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                         <UButton
                             label="Remove position"
                             variant="ghost"
-                            @click="form.removeFieldValue(`metrics[${index}].positions`, p)"
+                            @click="remove(`data.metrics[${index}].positions`, p)"
                         />
                     </div>
                     <div class="flex flex-wrap gap-2">
@@ -161,7 +184,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                             label="Add position"
                             variant="soft"
                             @click="
-                                form.pushFieldValue(`metrics[${index}].positions`, {
+                                append(`data.metrics[${index}].positions`, {
                                     value: 0,
                                     label: '',
                                 })
@@ -171,12 +194,12 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                             label="Move up"
                             variant="ghost"
                             :disabled="index === 0"
-                            @click="form.moveFieldValue('metrics', index, index - 1)"
+                            @click="move('data.metrics', index, index - 1)"
                         />
                         <UButton
                             label="Remove metric"
                             variant="ghost"
-                            @click="form.removeFieldValue('metrics', index)"
+                            @click="remove('data.metrics', index)"
                         />
                     </div>
                 </section>
@@ -184,7 +207,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                     label="Add metric"
                     variant="soft"
                     @click="
-                        form.pushFieldValue('metrics', {
+                        append('data.metrics', {
                             key: '',
                             label: '',
                             format: 'decimal',
@@ -206,31 +229,31 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                     "
                     :disabled="Boolean(values.game) && Boolean(statValues.length)"
                     class="w-full"
-                    @update:model-value="form.setFieldValue('game', $event)"
+                    @update:model-value="form.setFieldValue('data.game', $event)"
             /></UFormField>
             <div class="grid grid-cols-2 gap-3">
                 <UFormField label="Period key" required
                     ><UInput
                         :model-value="String(values.periodKey ?? '')"
                         placeholder="2026-act-6"
-                        @update:model-value="form.setFieldValue('periodKey', String($event))"
+                        @update:model-value="form.setFieldValue('data.periodKey', String($event))"
                 /></UFormField>
                 <UFormField label="Period name" required
                     ><UInput
                         :model-value="String(values.period ?? '')"
                         placeholder="Act 6"
-                        @update:model-value="form.setFieldValue('period', String($event))"
+                        @update:model-value="form.setFieldValue('data.period', String($event))"
                 /></UFormField>
                 <UFormField label="Period order" required
                     ><UInput
                         type="number"
                         :model-value="Number(values.order ?? 0)"
-                        @update:model-value="form.setFieldValue('order', Number($event))"
+                        @update:model-value="form.setFieldValue('data.order', Number($event))"
                 /></UFormField>
                 <UFormField label="External URL"
                     ><UInput
                         :model-value="String(values.href ?? '')"
-                        @update:model-value="form.setFieldValue('href', $event || null)"
+                        @update:model-value="form.setFieldValue('data.href', $event || undefined)"
                 /></UFormField>
                 <AdminFormField
                     v-for="key in ['start', 'end']"
@@ -238,7 +261,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                     :disabled
                     :descriptor="{ key, label: key, kind: 'datetime' }"
                     :model-value="values[key]"
-                    @update:model-value="form.setFieldValue(key, $event)"
+                    @update:model-value="form.setFieldValue(`data.${key}`, $event)"
                 />
             </div>
             <section
@@ -258,8 +281,8 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                         (index) =>
                             changeValue(metric.key, {
                                 ...metric.positions![Number(index)],
-                                image: metric.positions![Number(index)]!.image ?? null,
-                                color: metric.positions![Number(index)]!.color ?? null,
+                                image: metric.positions![Number(index)]!.image ?? undefined,
+                                color: metric.positions![Number(index)]!.color ?? undefined,
                             })
                     "
                 />
@@ -286,7 +309,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                             "
                             class="w-full"
                             @update:model-value="
-                                changeValue(metric.key, { label: $event || null })
+                                changeValue(metric.key, { label: $event || undefined })
                             "
                     /></UFormField>
                     <UFormField label="Recorded color (#RRGGBB)"
@@ -295,7 +318,7 @@ const changeValue = (key: string, patch: Partial<GameValue> | null) => {
                                 statValues.find((item) => item.key === metric.key)?.color ?? ''
                             "
                             @update:model-value="
-                                changeValue(metric.key, { color: $event || null })
+                                changeValue(metric.key, { color: $event || undefined })
                             "
                     /></UFormField>
                     <AdminFormField

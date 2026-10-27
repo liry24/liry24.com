@@ -1,152 +1,111 @@
 <script setup lang="ts">
+import type { ModelName } from 'liti/types'
 const open = defineModel<boolean>('open', { default: false })
-
-interface Props {
-    modelName: string
+const { modelName, id, categories } = defineProps<{
+    modelName: ModelName
     id?: string
     categories?: string[]
-}
-const { modelName, id, categories } = defineProps<Props>()
-const emit = defineEmits<{
-    close: [saved: boolean]
-    'after:leave': []
 }>()
-
-const { form, fields, upload, operation, meta, error, state, features, display } = useLitiForm(
-    modelName,
-    {
-        id: () => id,
-        instance: 'entry-modal',
-        onSuccess: () => {
-            emit('close', true)
-        },
+const emit = defineEmits<{ close: [saved: boolean]; 'after:leave': [] }>()
+const invalid = ref(false),
+    failure = ref('')
+const {
+    form,
+    id: entryId,
+    descriptor,
+    values,
+    save,
+    error,
+    warnings,
+    hasUnsavedChanges,
+} = await useLitiForm(modelName, {
+    id: () => id,
+    onSuccess: (_receipt, context) => {
+        if (!context.hasUnsavedChanges) emit('close', true)
     },
-)
-
-const conflict = computed(() => state.value.conflict)
-const uploading = computed(() => operation.value === 'upload')
-const loading = computed(() => !state.value.ready)
-const editableFields = computed(() => fields.value.filter((field) => field.key !== 'slug'))
-
-const validationMessages = (value: unknown): string[] => {
-    if (typeof value === 'string') return [value]
-    if (Array.isArray(value)) return value.flatMap(validationMessages)
-    if (!value || typeof value !== 'object') return []
-    if ('message' in value && typeof value.message === 'string') return [value.message]
-    return Object.entries(value).flatMap(([key, error]) =>
-        validationMessages(error).map((message) => `${key}: ${message}`),
-    )
+})
+const { upload, busy: uploading, error: uploadError } = useImageUpload(modelName, form, entryId)
+const fields = computed(() => (descriptor.value ? modelFields(descriptor.value) : []))
+const title = computed(() => descriptor.value?.label ?? modelName)
+async function submit() {
+    if (invalid.value || uploading.value) return
+    failure.value = ''
+    try {
+        await save()
+    } catch (cause) {
+        failure.value = adminErrorMessage(cause, 'Save failed.')
+    }
+}
+function close() {
+    if (!hasUnsavedChanges.value || window.confirm('Discard unsaved changes?')) emit('close', false)
 }
 </script>
-
 <template>
-    <form.Subscribe
-        :selector="
-            (state) => ({ values: state.values, saving: state.isSubmitting, errors: state.errors })
-        "
-        v-slot="{ values, saving, errors }"
-    >
+    <form.Subscribe :selector="(state) => state.isSubmitting" v-slot="saving">
         <UModal
             v-model:open="open"
-            @after:leave="emit('after:leave')"
-            :title="`${id ? 'Edit' : 'New'} ${meta.label}`"
-            :description="id ? `Editing #${id}` : `Add a new ${meta.label.toLowerCase()}`"
+            :title="`${id ? 'Edit' : 'New'} ${title}`"
+            :description="id ? `Editing #${id}` : `Add a new ${title}`"
             :dismissible="false"
             :ui="{
                 content: ['games', 'gameStats'].includes(modelName)
                     ? 'sm:max-w-4xl'
                     : 'sm:max-w-lg',
             }"
+            @after:leave="emit('after:leave')"
             @update:open="
                 (value) => {
-                    if (!value) emit('close', false)
+                    if (!value) close()
                 }
             "
         >
             <template #body>
-                <UProgress v-if="loading" aria-label="Loading editor" class="mb-4" />
                 <UAlert
-                    v-if="conflict"
-                    title="Conflict detected"
-                    description="Reload latest before saving again."
-                    color="warning"
-                    class="mb-4"
-                >
-                    <template #actions
-                        ><UButton label="Reload latest" @click="emit('close', true)"
-                    /></template>
-                </UAlert>
-                <UAlert v-if="error" :title="error?.message" color="error" class="mb-4" />
-                <UAlert
-                    v-if="['games', 'gameStats'].includes(modelName) && errors.length"
-                    title="Check the fields before saving"
-                    :description="validationMessages(errors).join('; ')"
+                    v-if="failure || error || uploadError"
+                    :title="failure || uploadError || String(error)"
                     color="error"
                     class="mb-4"
                 />
-                <form
-                    id="admin-entry-form"
-                    class="grid gap-4"
-                    @submit.prevent="state.can.save && form.handleSubmit()"
-                >
+                <UAlert
+                    v-for="warning in warnings"
+                    :key="warning.code"
+                    :title="warning.message"
+                    color="warning"
+                />
+                <form id="admin-entry-form" class="grid gap-4" @submit.prevent="submit">
                     <AdminFormGameSearch
                         v-if="modelName === 'games' && !id"
                         @select="emit('close', true)"
                     />
                     <AdminFormGameFields
                         v-else-if="['games', 'gameStats'].includes(modelName)"
-                        :model-name
-                        :values
+                        :model-name="modelName"
+                        :values="values.data"
                         :form
                         :upload
-                        :disabled="loading || uploading || saving"
+                        :disabled="uploading"
                     />
-                    <form.Field
-                        v-for="descriptor in ['games', 'gameStats'].includes(modelName)
-                            ? []
-                            : editableFields"
-                        :key="descriptor.key"
-                        :name="descriptor.name"
-                    >
-                        <template #default="{ field }">
-                            <AdminFormField
-                                :descriptor
-                                :model-value="field.value"
-                                :errors="field.errors"
-                                :disabled="loading || uploading || saving"
-                                :uploading
-                                :label="meta.label"
-                                :categories
-                                @update:model-value="field.handleChange"
-                                @blur="field.handleBlur"
-                                @upload="(files) => upload(descriptor.name, files)"
-                            />
-                        </template>
-                    </form.Field>
-                    <UFormField
-                        v-if="!['games', 'gameStats'].includes(modelName)"
-                        label="Slug"
-                        description="Leave empty to use the label when publishing."
-                        ><UInput
-                            :model-value="String(values.slug ?? '')"
-                            @update:model-value="(value) => form.setFieldValue('slug', value)"
-                            :disabled="loading || uploading || saving"
-                            :placeholder="entrySlugSuggestion(display(values).title)"
-                            variant="soft"
-                            class="w-full"
-                    /></UFormField>
+                    <AdminFormModelFields
+                        v-else
+                        :form
+                        :fields
+                        :categories
+                        :uploading
+                        @upload="upload"
+                        @invalid="invalid = $event"
+                    />
                 </form>
             </template>
-            <template v-if="modelName !== 'games' || id" #footer>
+            <template #footer>
+                <UButton label="Cancel" variant="ghost" color="neutral" @click="close" />
                 <UButton
+                    v-if="modelName !== 'games' || id"
                     type="submit"
                     form="admin-entry-form"
-                    :label="features.publishing ? 'Save Draft' : 'Save'"
-                    color="neutral"
-                    size="lg"
-                    block
+                    :label="descriptor?.storage === 'content' ? 'Save Draft' : 'Save'"
                     :loading="saving"
-                    :disabled="loading || saving || conflict || uploading"
+                    :disabled="invalid || uploading"
+                    color="neutral"
                 />
             </template>
         </UModal>

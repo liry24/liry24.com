@@ -10,7 +10,7 @@ import {
 } from '../../server/utils/adminComposer'
 import { adminModels } from '../helpers/adminModels'
 
-const models = composerModelInfo(adminModels)
+const models = await composerModelInfo(adminModels)
 const input: ComposerRequest = {
     prompt: '記事「テスト」を作成',
     requestId: 'request1',
@@ -318,8 +318,8 @@ test('creation date and lookup are resolved together without a third inference',
         'date.minute': '0',
     })
     const plan = getPlan(await collect(input, evaluate))
-    expect(plan.values.createdAt).toBe('2026-10-17T09:00:00.000Z')
-    expect(plan.visibleFields).toContain('createdAt')
+    expect(plan.values.authoredAt).toBe('2026-10-17T09:00:00.000Z')
+    expect(plan.visibleFields).toContain('authoredAt')
     expect(evaluate).toHaveBeenCalledTimes(2)
 })
 
@@ -372,7 +372,7 @@ test.each([
                 }),
             ),
         )
-        expect(purpose === 'publication' ? plan.publishAt : (plan.values.createdAt ?? '')).toBe(
+        expect(purpose === 'publication' ? plan.publishAt : (plan.values.authoredAt ?? '')).toBe(
             expected,
         )
         expect(plan.dateIncomplete).toBe(!expected)
@@ -550,7 +550,11 @@ test('an unknown profile service can supply an empty icon without schema changes
         label: '@alice',
         icon: '',
     })
-    expect(adminModels.find((model) => model.name === 'socials')!.fields.icon!.required).toBe(true)
+    expect(
+        models
+            .find((model) => model.name === 'socials')!
+            .fields.find((field) => field.key === 'icon')!.required,
+    ).toBe(true)
     const icons = Object.values(evaluate.mock.calls[1]![0].questions['field.icon']!.criteria)
     expect(evaluate.mock.calls[1]![0].questions['field.icon']!.criteria.empty).toContain('unknown')
     expect(icons).not.toContain('mingcute:link-fill')

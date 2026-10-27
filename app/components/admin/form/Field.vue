@@ -24,15 +24,33 @@ const emit = defineEmits<{
     'update:modelValue': [value: unknown]
     blur: []
     upload: [files: File | File[] | null | undefined]
+    invalid: [value: boolean]
 }>()
 
-const update = (value: unknown) => emit('update:modelValue', value)
+const update = (value: unknown) =>
+    emit(
+        'update:modelValue',
+        value === null || (descriptor.kind === 'url' && value === '') ? undefined : value,
+    )
+const jsonInput = ref<string>()
+const jsonError = ref('')
+function updateJson(value: string) {
+    jsonInput.value = value
+    try {
+        update(value ? JSON.parse(value) : undefined)
+        jsonError.value = ''
+        emit('invalid', false)
+    } catch {
+        jsonError.value = 'Enter valid JSON.'
+        emit('invalid', true)
+    }
+}
 const dateInput = computed(() => {
     const date = new Date(String(modelValue ?? ''))
     return Number.isNaN(date.getTime()) ? '' : formatDate(date, 'YYYY-MM-DDTHH:mm')
 })
 const updateDate = (value: string) => {
-    if (!value) return update(null)
+    if (!value) return update(undefined)
     const date = new Date(value)
     if (!Number.isNaN(date.getTime())) update(date.toISOString())
 }
@@ -51,12 +69,18 @@ const error = computed(
 )
 const references = (value: unknown) => (Array.isArray(value) ? value : value ? [value] : [])
 const assetUrl = (value: unknown) =>
-    value && typeof value === 'object' && 'url' in value ? String(value.url) : undefined
+    value && typeof value === 'object' && 'pathname' in value && typeof value.pathname === 'string'
+        ? mediaUrl({ pathname: value.pathname })
+        : undefined
 </script>
 
 <template>
     <fieldset :disabled="disabled" class="min-w-0">
-        <UFormField :label="descriptor.label" :required="descriptor.required" :error="error">
+        <UFormField
+            :label="descriptor.label"
+            :required="descriptor.required"
+            :error="jsonError || error"
+        >
             <USelect
                 v-if="descriptor.kind === 'select'"
                 :items="[...(descriptor.values || [])]"
@@ -87,12 +111,12 @@ const assetUrl = (value: unknown) =>
                 <UProgress v-if="uploading" :model-value="undefined" aria-label="Upload progress" />
                 <div
                     v-for="(reference, index) in references(modelValue)"
-                    :key="adminAssetId(reference)"
+                    :key="assetUrl(reference)"
                     class="flex min-w-0 items-center gap-2"
                 >
                     <img
                         v-if="descriptor.kind !== 'file'"
-                        :src="adminAssetId(reference) ? assetUrl(reference) : undefined"
+                        :src="assetUrl(reference)"
                         alt=""
                         class="size-10 shrink-0 rounded-md object-cover"
                     />
@@ -116,6 +140,25 @@ const assetUrl = (value: unknown) =>
                     />
                 </div>
             </div>
+            <UTextarea
+                v-else-if="descriptor.kind === 'json'"
+                :model-value="jsonInput ?? JSON.stringify(modelValue, null, 2) ?? ''"
+                class="w-full font-mono"
+                autoresize
+                @update:model-value="updateJson"
+            />
+            <UInput
+                v-else-if="descriptor.kind === 'number'"
+                :model-value="typeof modelValue === 'number' ? modelValue : undefined"
+                type="number"
+                class="w-full"
+                @update:model-value="update(Number.isFinite($event) ? $event : undefined)"
+            />
+            <UCheckbox
+                v-else-if="descriptor.kind === 'boolean'"
+                :model-value="Boolean(modelValue)"
+                @update:model-value="update"
+            />
             <UTextarea
                 v-else-if="descriptor.kind === 'array'"
                 :model-value="Array.isArray(modelValue) ? modelValue.join('\n') : ''"

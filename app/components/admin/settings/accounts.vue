@@ -2,8 +2,8 @@
 const accounts = ref<{ id: string; providerId: string }[]>([])
 
 const toast = useToast()
-const client = useAuthClient()
-const { fetchSession } = useUserSession()
+const client = authClient
+const { refresh } = useAppSession()
 const isPreview = String(useRuntimeConfig().public.preview) === 'true'
 
 const list = [
@@ -22,7 +22,7 @@ const list = [
 const unlink = async (providerId: string) => {
     try {
         if (!client) throw new Error('Authentication client is unavailable')
-        await fetchSession({ force: true })
+        await refresh()
         const account = accounts.value.find((item) => item.providerId === providerId)
         if (!account) throw new Error(`No linked ${providerId} account found`)
 

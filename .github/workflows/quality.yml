@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      NODE_OPTIONS: --max-old-space-size=4096
+      NODE_OPTIONS: --max-old-space-size=6144
       NUXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -37,30 +37,14 @@ jobs:
       - run: bun run typecheck
       - run: bun run test
       - run: bun run build
+        env:
+          LIRY24_TEST_LOCAL: 'true'
+          LIRY24_TEST_CRON: 'true'
+          APP_ENV: test
       - run: bun x playwright-core install --with-deps chromium
-      - run: bun x vitest run tests/worker/built-app.test.ts tests/worker/adminComposer.browser.test.ts
+      - run: bun x vitest run tests/worker/built-app.test.ts tests/worker/native-app.test.ts tests/worker/adminComposer.browser.test.ts tests/worker/passkey.browser.test.ts
         env:
           LIRY24_TEST_BUILT_WORKER: 'true'
           LIRY24_TEST_ADMIN_COMPOSER_BROWSER: 'true'
-      - name: Check local Void development
-        env:
-          LIRY24_TEST_LOCAL: 'true'
-          OPENAI_BASE_URL: http://127.0.0.1:1/v1
-          BETTER_AUTH_SECRET: test-only-local-ci-secret-0123456789abcdef
-          NUXT_APP_SECRET: test-only-local-ci-app-secret-0123456789abcdef
-        run: |
-          node node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port 3101 > "$RUNNER_TEMP/nuxt-local.log" 2>&1 &
-          dev_pid=$!
-          trap 'kill "$dev_pid" 2>/dev/null || true; wait "$dev_pid" 2>/dev/null || true; cat "$RUNNER_TEMP/nuxt-local.log"' EXIT
-          ready=false
-          for attempt in $(seq 1 90); do
-            if test "$(curl --max-time 5 --silent --output /dev/null --write-out '%{http_code}' 'http://127.0.0.1:3101/admin/data?model=posts')" = 302; then
-              ready=true
-              break
-            fi
-            kill -0 "$dev_pid" || exit 1
-            sleep 1
-          done
-          test "$ready" = true
-          export LIRY24_TEST_DB_PATH="$(find .wrangler/state/v3/d1 -name '*.sqlite' ! -name 'metadata.sqlite' -print -quit)"
-          node scripts/test-liti-local.mjs http://127.0.0.1:3101 --browser
+      - name: Check native ViteHub development
+        run: node scripts/test-liti-local.mjs

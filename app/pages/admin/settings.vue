@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { signOut, user } = useUserSession()
+const { signOut, user } = useAppSession()
 
 const isPreview = String(useRuntimeConfig().public.preview) === 'true'
 </script>
@@ -25,7 +25,7 @@ const isPreview = String(useRuntimeConfig().public.preview) === 'true'
                 :ui="{ description: 'flex items-center gap-1' }"
             >
                 <template #description>
-                    <p>{{ user?.email }}</p>
+                    <span>{{ user?.email }}</span>
                     <UBadge
                         v-if="user?.emailVerified"
                         label="Verified"

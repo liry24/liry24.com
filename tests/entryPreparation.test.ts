@@ -1,83 +1,54 @@
-import { LitiError, resolveLitiConfig, type ModelPreparationContext } from 'liti'
+import type { ModelValidationContext } from '@litijs/model'
 import { expect, test, vi } from 'vitest'
 
-import config from '../liti.config'
-import { prepareEntrySlug } from '../server/utils/entryPreparation'
+import { posts, works } from '../server/models/content'
 
-const context = (
-    data: Record<string, unknown>,
-    previous?: ModelPreparationContext['previous'],
-): ModelPreparationContext => ({
-    model: 'posts',
-    entryId: 'test',
+const context: ModelValidationContext = {
+    action: 'save',
+    id: 'stable-id',
     locale: 'ja',
-    defaultLocale: 'ja',
-    operation: 'publish',
-    data,
-    previous,
-    issues: [],
-    read: {
-        published: { routeAvailable: vi.fn(async () => true) },
-    } as unknown as ModelPreparationContext['read'],
-    executeAction: vi.fn(async () => ({ data: { slug: 'generated-post' } })),
+    actor: { id: 'editor', role: 'admin' },
+    previous: null,
+}
+
+test('article preparation is deterministic without AI, retains body and established slug', async () => {
+    const network = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+        throw Error('No external requests')
+    })
+    try {
+        const input = { data: { title: '日本語のタイトル', tags: [] }, body: '# Original body' }
+        const first = await posts.prepare!(input, context)
+        expect(first.body).toBe(input.body)
+        expect(first.data.title).toBe(input.data.title)
+        expect(first.data.slug).toBe((await posts.prepare!(input, context)).data.slug)
+        expect(first.data.gameMentions).toEqual([])
+        const retained = await posts.prepare!(
+            { data: { title: 'Changed title', tags: [] } },
+            {
+                ...context,
+                previous: { slug: 'established-url', authorUserId: 'original-author' },
+                body: '# Retained body',
+            },
+        )
+        expect(retained.data.slug).toBe('established-url')
+        expect(retained.data.authorUserId).toBe('original-author')
+        const manual = await posts.prepare!(
+            { data: { title: 'Title', tags: [], slug: ' manual-url ' } },
+            context,
+        )
+        expect(manual.data.slug).toBe('manual-url')
+        expect(network).not.toHaveBeenCalled()
+    } finally {
+        network.mockRestore()
+    }
 })
 
-test('app labels prepare non-blog slugs and retain established URLs', () => {
-    const prepare = prepareEntrySlug('label')
-    const candidate = context({ label: 'Example Content' })
-    prepare(candidate)
-    expect(candidate.data.slug).toBe('example-content')
-    const manual = context({ label: 'Ignored', slug: ' manual-url ' })
-    prepare(manual)
-    expect(manual.data.slug).toBe('manual-url')
-    const established = context({ label: 'Do not replace' }, {
-        firstPublishedAt: '2026-10-01',
-    } as ModelPreparationContext['previous'])
-    prepare(established)
-    expect(established.data.slug).toBeUndefined()
-    expect(established.issues[0]?.message).toContain('established slug')
-})
-
-test('the app blog model uses shared publication generation and preserves title/content', async () => {
-    const posts = resolveLitiConfig(config, []).models.posts
-    const candidate = context({
-        title: 'Original',
-        content: '# Body',
-        publication: { slug: 'auto' },
-        slug: '',
-    })
-    await posts.preparePublication?.(candidate)
-    expect(candidate.executeAction).toHaveBeenCalledExactlyOnceWith('publication', {
-        title: 'Original',
-        context: '# Body',
-    })
-    expect(candidate.data).toEqual({
-        title: 'Original',
-        content: '# Body',
-        publication: { slug: 'auto' },
-        slug: 'generated-post',
-    })
-    expect(posts.editor?.blog).toMatchObject({ proofreading: 'proofread', guard: 'pending' })
-})
-
-test('the configured post model publishes with a unique fallback slug after AI failure', async () => {
-    const posts = resolveLitiConfig(config, []).models.posts
-    const candidate = context({
-        title: 'これはexample title',
-        content: '# Original',
-        slug: '',
-        publication: { slug: 'auto' },
-    })
-    vi.mocked(candidate.executeAction).mockRejectedValueOnce(
-        new LitiError('LITI_ACTION_FAILED', 'Unavailable'),
+test('portfolio preparation keeps established identities and derives new slugs', async () => {
+    const first = await works.prepare!({ data: { title: 'Example work' } }, context)
+    expect(first.data.slug).toBe('example-work-stable-id')
+    const established = await works.prepare!(
+        { data: { title: 'Renamed' } },
+        { ...context, previous: { slug: 'old-url' } },
     )
-    vi.mocked(candidate.read.published.routeAvailable)
-        .mockResolvedValueOnce(false)
-        .mockResolvedValueOnce(true)
-    await posts.preparePublication?.(candidate)
-    expect(candidate.data).toMatchObject({
-        title: 'これはexample title',
-        content: '# Original',
-        slug: expect.stringMatching(/^example-title-[a-z0-9]{6}$/),
-    })
+    expect(established.data.slug).toBe('old-url')
 })

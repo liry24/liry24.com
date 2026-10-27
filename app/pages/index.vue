@@ -4,18 +4,24 @@ import { motion } from 'motion-v'
 import { LazyStacksModal } from '#components'
 
 const { app } = useAppConfig()
+useHead({ titleTemplate: null })
+useSeoMeta({ title: 'Liry24', description: 'Personal website of Liry24.' })
+defineOgImage('Home.takumi', { title: 'Liry24' }, [
+    { key: 'og' },
+    { key: 'whatsapp', width: 800, height: 800 },
+])
 const overlay = useOverlay()
 
 const modalStacks = overlay.create(LazyStacksModal)
 const MotionUSeparator = motion.create('hr')
 
-const arts = useLitiQuery('arts')
-const socials = useLitiQuery('socials')
-const careers = useLitiQuery('careers')
-const ranks = useLitiQuery('ranks')
-const games = useLitiQuery('games')
-const gameStats = useLitiQuery('gameStats')
-const posts = useLitiQuery('posts', { markdown: 'summary' })
+const arts = usePortfolioQuery('arts')
+const socials = usePortfolioQuery('socials')
+const careers = usePortfolioQuery('careers')
+const ranks = usePortfolioQuery('ranks')
+const games = usePortfolioQuery('games')
+const gameStats = usePortfolioQuery('gameStats')
+const posts = useFetch<PostCardsPage>('/api/posts/cards', { query: { limit: 10 } })
 await Promise.all([arts, socials, careers, ranks, games, gameStats, posts])
 const data = computed(() => ({
     arts: arts.data.value || [],
@@ -25,14 +31,9 @@ const data = computed(() => ({
         ranks.data.value?.map((entry) => ({
             ...entry.data,
             entryId: entry.id,
-            imageUrl: entry.data.image?.url,
+            imageUrl: mediaUrl(entry.data.image),
         })) || [],
-    posts:
-        posts.data.value?.map((entry) => ({
-            ...entry.data,
-            slug: entry.data.slug,
-            createdAt: entry.meta.blog.date,
-        })) || [],
+    posts: posts.data.value?.items ?? [],
 }))
 
 const statGames = computed(() =>
@@ -40,7 +41,7 @@ const statGames = computed(() =>
         .map((game) => ({
             ...game,
             periods: (gameStats.data.value ?? [])
-                .filter((period) => period.data.game?.id === game.id)
+                .filter((period) => period.data.game === game.id)
                 .map((period) => period.data),
         }))
         .filter((game) => game.periods.length),
@@ -85,7 +86,7 @@ useKeyCommand(modalStacks.open)
             >
                 <NuxtLink :to="`/arts?open=${art.data.slug}`">
                     <NuxtImg
-                        :src="art.data.images[0]?.url"
+                        :src="mediaUrl(art.data.images[0])"
                         :alt="art.data.title"
                         :height="320"
                         format="webp"
@@ -287,15 +288,15 @@ useKeyCommand(modalStacks.open)
                         </h2>
 
                         <MarkdownDocument
-                            v-if="post.content.nodes.length"
-                            :value="post.content"
+                            v-if="post.excerpt.nodes.length"
+                            :value="post.excerpt"
                             class="line-clamp-3 text-sm wrap-break-word *:first:mt-0 *:last:mb-0"
                         />
 
                         <div class="flex flex-wrap items-center gap-2">
                             <NuxtTime
-                                v-if="post.createdAt"
-                                :datetime="post.createdAt"
+                                v-if="post.date"
+                                :datetime="post.date"
                                 date-style="short"
                                 time-style="short"
                                 class="text-muted font-mono text-sm leading-none text-nowrap"

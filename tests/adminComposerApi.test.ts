@@ -182,6 +182,7 @@ test('game searches retain local candidates when IGDB is unavailable', async () 
     const remote = await fetch('/api/admin/games?q=game', {
         headers: { ...headers, 'x-fixture-case': 'offline' },
     })
+    expect(remote.status, `${await remote.clone().text()}\n${getServerLogs().join('\n')}`).toBe(200)
     expect(await remote.json()).toMatchObject({
         games: [{ id: 'igdb-1' }],
         warning: expect.stringContaining('unavailable'),
@@ -197,4 +198,54 @@ test('game searches retain local candidates when IGDB is unavailable', async () 
         (await fetch('/api/admin/games', { headers: { 'x-fixture-role': 'gameImporter' } })).status,
     ).toBe(403)
     expect((await importGame('', { igdbId: 1 }, 'gameImporter')).status).toBe(200)
+})
+test('post proofreading uses the native mock Agent behind authorization and protected-content validation', async () => {
+    const state = async () =>
+        (await (await fetch('/api/editorial-fixture')).json()) as {
+            calls: number
+            prompts: string[]
+            tools: unknown[][]
+        }
+    const input = { body: 'This are an article. `one()` <game:game-1>' }
+    const proofread = (
+        body: unknown = input,
+        role = 'admin',
+        headers: Record<string, string> = {},
+    ) =>
+        fetch('/api/admin/posts/proofread', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                ...(role ? { 'x-fixture-role': role } : {}),
+                ...headers,
+            },
+            body: JSON.stringify(body),
+        })
+    const initial = (await state()).calls
+    expect((await proofread(input, '')).status).toBe(401)
+    expect((await proofread(input, 'user')).status).toBe(403)
+    expect((await proofread(input, 'admin', { origin: 'https://hostile.invalid' })).status).toBe(
+        403,
+    )
+    expect((await proofread({ body: '', publish: true })).status).toBe(400)
+    expect((await state()).calls).toBe(initial)
+    const proposed = await proofread()
+    expect(proposed.status, await proposed.clone().text()).toBe(200)
+    expect(proposed.headers.get('cache-control')).toBe('private, no-store')
+    expect(await proposed.json()).toEqual({ body: 'This is an article. `one()` <game:game-1>' })
+    const completed = await state()
+    expect(completed.calls).toBe(initial + 1)
+    expect(completed.prompts.at(-1)).toContain('This are an article.')
+    expect(completed.tools.at(-1)).toEqual([])
+    for (const [body, status] of [
+        ['INVALID_OUTPUT', 502],
+        ['UPSTREAM_ERROR', 502],
+        ['PROTECTED_CHANGE `one()` <game:game-1>', 422],
+    ] as const) {
+        const before = (await state()).calls
+        const response = await proofread({ body })
+        expect(response.status, await response.clone().text()).toBe(status)
+        expect(await response.text()).not.toContain('PRIVATE_EDITORIAL_PROVIDER_ERROR')
+        expect((await state()).calls).toBe(before + 1)
+    }
 })

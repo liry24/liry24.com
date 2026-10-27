@@ -1,10 +1,9 @@
 import { expect, test, vi } from 'vitest'
-import { ai } from 'void/ai'
 
 import { evaluateClef } from '../server/utils/clef'
 
-vi.mock('void/ai', () => ({ ai: { run: vi.fn() } }))
-test('Void inference uses Clef-flash, passes cancellation and rejects missing or unoffered choices', async () => {
+test('The native Workers AI binding uses Clef-flash, passes cancellation and rejects missing or unoffered choices', async () => {
+    const ai = { run: vi.fn() }
     const signal = new AbortController().signal
     const request = {
         state: { input: 'test' },
@@ -21,7 +20,7 @@ test('Void inference uses Clef-flash, passes cancellation and rejects missing or
         answers: { task: { choice: 'create' } },
         usage: { input_tokens: 12 },
     })
-    expect(await evaluateClef(request)).toMatchObject({
+    expect(await evaluateClef(request, ai)).toMatchObject({
         answers: { task: { choice: 'create' } },
         usage: { inputTokens: 12 },
     })
@@ -32,6 +31,6 @@ test('Void inference uses Clef-flash, passes cancellation and rejects missing or
     )
     for (const answers of [{}, { task: { choice: 'delete' } }]) {
         vi.mocked(ai.run).mockResolvedValueOnce({ answers })
-        await expect(evaluateClef(request)).rejects.toThrow('Invalid decision')
+        await expect(evaluateClef(request, ai)).rejects.toThrow('Invalid decision')
     }
 })

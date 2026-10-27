@@ -1,5 +1,10 @@
+import { fileURLToPath } from 'node:url'
+
 import { defineNuxtConfig } from 'nuxt/config'
 import { parseURL } from 'ufo'
+import viteHub from 'vite-hub/nuxt'
+
+import { serverEnv } from './env.ts'
 
 const isPreview = process.env.APP_ENV !== 'production'
 const baseURL =
@@ -27,7 +32,63 @@ export default defineNuxtConfig({
         '@vueuse/nuxt',
         '@nuxt/hints',
         '@nuxt/a11y',
+        '@nuxtjs/i18n',
+        'nuxt-site-config',
+        '@nuxtjs/sitemap',
+        '@nuxtjs/robots',
+        'nuxt-schema-org',
+        'nuxt-og-image',
+        'nuxt-seo-utils',
+        [
+            viteHub,
+            {
+                preset: process.env.LIRY24_PRESET === 'node' ? 'node' : 'cloudflare',
+                name: process.env.LIRY24_WORKER_NAME || 'liry24-vitehub-synthetic',
+                auth: true,
+                env: { server: serverEnv },
+                schedule: {
+                    providerOutput:
+                        process.env.APP_ENV === 'production' ||
+                        process.env.LIRY24_TEST_CRON === 'true'
+                            ? 'nitro'
+                            : false,
+                },
+                publicUrl: baseURL,
+                console: {
+                    auth: 'app',
+                    authorize: fileURLToPath(
+                        new URL('./server/console-authorize.ts', import.meta.url),
+                    ),
+                },
+                database: {
+                    driver: 'd1',
+                    binding: 'DB',
+                    databaseName: process.env.LIRY24_DATABASE_NAME || 'liry24-vitehub-synthetic',
+                    databaseId:
+                        process.env.LIRY24_DATABASE_ID || '00000000-0000-4000-8000-000000000100',
+                },
+                blob: {
+                    stores: {
+                        default: {
+                            driver: 'cloudflare-r2',
+                            binding: 'MEDIA',
+                            bucketName:
+                                process.env.LIRY24_MEDIA_BUCKET || 'liry24-vitehub-synthetic-media',
+                        },
+                        content: {
+                            driver: 'cloudflare-r2',
+                            binding: 'CONTENT',
+                            bucketName:
+                                process.env.LIRY24_CONTENT_BUCKET ||
+                                'liry24-vitehub-synthetic-content',
+                        },
+                    },
+                    serve: { route: '/media', store: 'default' },
+                },
+            },
+        ],
         'liti/nuxt',
+        '@litijs/blog/nuxt',
         [
             'nuxt-llms',
             {
@@ -92,7 +153,6 @@ export default defineNuxtConfig({
         '/works/**': { swr: 300 },
         '/posts/**': { swr: 300 },
         '/admin/**': {
-            auth: true,
             appMiddleware: 'admin',
             appLayout: 'admin',
             headers: { 'cache-control': 'private, no-store' },
@@ -100,11 +160,17 @@ export default defineNuxtConfig({
     },
 
     nitro: {
-        preset: 'cloudflare_module',
         // Passkey certificate verification needs this polyfill before tsyringe initializes.
         moduleSideEffects: ['reflect-metadata'],
         compressPublicAssets: true,
         experimental: { asyncContext: true },
+        cloudflare: {
+            wrangler: {
+                vars: { APP_ENV: process.env.APP_ENV || 'dev' },
+                ...(process.env.LIRY24_TEST_LOCAL === 'true' ? {} : { ai: { binding: 'AI' } }),
+                triggers: { crons: process.env.APP_ENV === 'production' ? ['* * * * *'] : [] },
+            },
+        },
 
         prerender: {
             crawlLinks: false,
@@ -137,6 +203,7 @@ export default defineNuxtConfig({
         layoutTransition: { name: 'page', mode: 'out-in' },
         head: {
             title,
+            titleTemplate: '%s | Liry24',
             htmlAttrs: { prefix: 'og: https://ogp.me/ns#' },
             link: [{ rel: 'icon', href: '/favicon.ico' }],
         },
@@ -181,21 +248,7 @@ export default defineNuxtConfig({
         },
     },
 
-    liti: {
-        auth: true,
-        i18n: true,
-        llms: true,
-        ogImage: true,
-        robots: true,
-        schemaOrg: true,
-        seo: true,
-        sitemap: true,
-    },
-
-    auth: {
-        redirects: { authenticated: '/admin', logout: '/' },
-        schema: { usePlural: true, casing: 'snake_case' },
-    },
+    liti: { workspace: 'content' },
 
     i18n: {
         locales: ['ja'],
@@ -205,10 +258,11 @@ export default defineNuxtConfig({
 
     sitemap: {
         exclude: ['/admin', '/admin/**', '/login'],
+        sources: ['/api/sitemap/posts'],
     },
 
     robots: {
-        disallow: ['/admin', '/api/liti', '/login'],
+        disallow: ['/admin', '/api/admin', '/api/_liti/manage', '/_vitehub', '/login'],
     },
 
     $development: {

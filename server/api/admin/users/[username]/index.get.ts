@@ -1,7 +1,8 @@
+import { eq } from 'drizzle-orm'
 import { defineEventHandler } from 'nuxt/server'
-import { db, eq } from 'void/db'
+import { db } from 'vite-hub/database/drizzle'
 
-import { accounts } from '../../../../../db/schema'
+import { account as accounts } from '../../../../database/auth-schema'
 
 export default defineEventHandler(async (event) => {
     await requireAdminPermission(event, { user: ['get'] })

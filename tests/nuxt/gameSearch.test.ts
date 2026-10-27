@@ -5,7 +5,7 @@ import { effectScope, ref } from 'vue'
 import { useGameSearch } from '../../app/composables/useGameSearch'
 
 const { sessionBoundary } = vi.hoisted(() => ({ sessionBoundary: vi.fn() }))
-mockNuxtImport('useUserSession', () => sessionBoundary)
+mockNuxtImport('useAppSession', () => sessionBoundary)
 
 const { fetchBoundary } = vi.hoisted(() => ({ fetchBoundary: vi.fn() }))
 mockNuxtImport('$fetch', () => fetchBoundary)

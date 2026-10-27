@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { Content } from 'liti/client'
+import type { Entry } from 'liti/types'
 
 const open = defineModel<boolean>('open', { default: false })
 
 const { item } = defineProps<{
-    item: Content<'arts'>
+    item: Entry<'arts'>
 }>()
 
 const historyStateAdded = ref(false)

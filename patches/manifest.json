@@ -1,0 +1,92 @@
+{
+    "nativeManifest": "patches/vitehub-manifest.json",
+    "nativeCohort": "24ddab7ff9885d1b5ea176b8824f6e3f1a0e3ca9",
+    "requiredPatches": [
+        {
+            "target": "@nuxt/hints@1.1.5",
+            "file": "patches/@nuxt%2Fhints@1.1.5.patch",
+            "sha256": "0874e33d5abe380cbd1049f6b86d1b9ce615b38115bdef120abb27ad4bf3d203"
+        },
+        {
+            "target": "better-auth@1.7.12",
+            "file": "patches/better-auth@1.7.12.patch",
+            "sha256": "17f6c17933bb19d3cbd6b5e22fae81f85acb6605914519c3e54cf68976b05b2c"
+        },
+        {
+            "target": "better-call@1.4.4",
+            "file": "patches/better-call@1.4.4.patch",
+            "sha256": "6d6a596bba5a40391a42ceab07c1acfe62e494224a863e8c601bd620d907b19a"
+        },
+        {
+            "target": "nitropack@2.13.5",
+            "file": "patches/nitropack@2.13.5.patch",
+            "sha256": "38a0cdce6e5f90361d94372679039f4ea3a8f38ae70ca4cae1a4bcf0b2d6ee29"
+        },
+        {
+            "target": "@vite-hub/content@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@24ddab7ff9885d1b5ea176b8824f6e3f1a0e3ca9",
+            "file": "patches/vitehub-content-publication-24ddab7.patch",
+            "sha256": "b8a7189eb9dd8b59438d89c937ac74550e061123134f9f4c886668a9593e79fe"
+        },
+        {
+            "target": "@vite-hub/agent@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@24ddab7ff9885d1b5ea176b8824f6e3f1a0e3ca9",
+            "file": "patches/vitehub-agent-24ddab7.patch",
+            "sha256": "3a7d599ecb645cd1e72b1a2e1894ec2181afca60ed666b6b3e31818b7ceaa3b2"
+        },
+        {
+            "target": "vite-hub@https://pkg.pr.new/vite-hub/vitehub/vite-hub@24ddab7ff9885d1b5ea176b8824f6e3f1a0e3ca9",
+            "file": "patches/vitehub-nuxt-24ddab7.patch",
+            "sha256": "4feb1e206d4378d73473ca3c1e793ec7adc319ffd445bd95f8d2d7f920afd4d2"
+        },
+        {
+            "target": "@vite-hub/blob@https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@24ddab7ff9885d1b5ea176b8824f6e3f1a0e3ca9",
+            "file": "patches/vitehub-blob-h3-types-24ddab7.patch",
+            "sha256": "8626a550d0f44a85ac4ce6b9ec426bc62211549b5f1544c34f5fcb8c2a4355f0"
+        },
+        {
+            "target": "nuxt@4.6.2",
+            "file": "patches/nuxt@4.6.2-async-data.patch",
+            "sha256": "f08f2b7f01d093f032b66b7dc51eb37e429e9300dec2528ad9921a7b14cf4600"
+        }
+    ],
+    "applicationPatches": [
+        {
+            "targets": ["better-auth@1.7.12", "better-call@1.4.4"],
+            "symptom": "Unknown and dynamic auth paths allocate unbounded database rate-limit keys; ingress policy must still use the original requested path.",
+            "patches": ["patches/better-auth@1.7.12.patch", "patches/better-call@1.4.4.patch"],
+            "regression": "tests/worker/auth.test.ts",
+            "upstream": {
+                "status": "not-reported",
+                "issue": null,
+                "fixedVersion": null
+            },
+            "removalCondition": "Unpatched installed distributions pass the unknown-path, route-template, ingress rewrite, custom-rule and expiry regression with bounded counters."
+        },
+        {
+            "targets": ["@nuxt/hints@1.1.5"],
+            "symptom": "Notification reports wait for RPC acknowledgement when no DevTools panel is connected.",
+            "patches": ["patches/@nuxt%2Fhints@1.1.5.patch"],
+            "handling": "Use the provided event transport; retain errors for actual RPC failures.",
+            "regression": "scripts/test-liti-local.mjs (normal devtools/hints enabled)",
+            "upstream": {
+                "status": "not-reported",
+                "issue": null,
+                "fixedVersion": null
+            },
+            "removalCondition": "A clean unpatched development consumer starts and edits with no DevTools panel and no report acknowledgement timeouts."
+        }
+    ],
+    "removedPatches": [
+        {
+            "target": "void@1.2.1",
+            "patch": "patches/void@1.2.1.patch",
+            "reason": "Void is absent from the new dependency/runtime/build graph. Native Nuxt emits Takumi WASM and actual built-worker OG PNG requests succeed.",
+            "evidence": "tests/worker/built-app.test.ts; tests/worker/native-app.test.ts; successful synthetic emitted-Worker build and HTTP checks."
+        },
+        {
+            "target": "@nuxtjs/better-auth@0.3.11",
+            "patch": "patches/@nuxtjs%2Fbetter-auth@0.3.11.patch",
+            "reason": "The module is absent. Auth uses native ViteHub Definition, official Drizzle adapter and native passkey plugins.",
+            "evidence": "Nuxt generated typecheck, emitted-Worker auth POST/permissions, Chromium WebAuthn registration/login/rename/delete and standalone development authentication pass."
+        }
+    ]
+}

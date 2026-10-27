@@ -1,4 +1,3 @@
-import { getNitroRequest } from 'liti/nuxt/server'
 import { createError, type RequestEvent } from 'nuxt/server'
 
 export async function requireAdminPermission(
@@ -6,9 +5,9 @@ export async function requireAdminPermission(
     permissions: Record<string, string[]>,
 ) {
     event.res.headers.set('Cache-Control', 'private, no-store')
-    const request = getNitroRequest(event)
-    const session = await requireUserSession(request)
-    const result = await serverAuth(request).api.userHasPermission({
+    const request = event.req
+    const session = await requireAppSession(request)
+    const result = await getAppAuth(request).api.userHasPermission({
         headers: request.headers,
         body: { permissions },
     })

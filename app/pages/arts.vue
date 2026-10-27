@@ -3,10 +3,16 @@ import { MasonryWall } from '@yeger/vue-masonry-wall'
 
 import { ArtViewer } from '#components'
 
+useSeoMeta({ title: 'Arts', description: 'A collection of artworks by Liry24.' })
+defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'arts' }, [
+    { key: 'og' },
+    { key: 'whatsapp', width: 800, height: 800 },
+])
+
 const route = useRoute()
 const overlay = useOverlay()
 
-const { data } = await useLitiQuery('arts', { default: () => [] })
+const { data } = await usePortfolioQuery('arts')
 
 const modalArtViewer = overlay.create(ArtViewer)
 
@@ -37,7 +43,7 @@ onMounted(() => {
                     @click="modalArtViewer.open({ item })"
                 >
                     <NuxtImg
-                        :src="item.data.images[0]?.url"
+                        :src="mediaUrl(item.data.images[0])"
                         :alt="item.data.title"
                         :width="520"
                         format="webp"

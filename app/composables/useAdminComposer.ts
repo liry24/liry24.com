@@ -1,3 +1,4 @@
+import type { WriteReceipt } from 'liti/types'
 import type { InjectionKey } from 'vue'
 
 const composerKey: InjectionKey<ReturnType<typeof createAdminComposer>> = Symbol('admin-composer')
@@ -11,7 +12,7 @@ export function useAdminComposer() {
 }
 
 function createAdminComposer() {
-    const { user } = useUserSession()
+    const { user } = useAppSession()
     const { locale } = useI18n()
     const route = useRoute()
     const scope = computed(() => `${user.value?.id ?? ''}:${locale.value}`)
@@ -32,7 +33,12 @@ function createAdminComposer() {
         } | null,
         preparations: {} as Record<
             string,
-            { values: ComposerPlan['values']; publishAt: string; baseline: Record<string, unknown> }
+            {
+                values: ComposerPlan['values']
+                publishAt: string
+                baseline: Record<string, unknown>
+                draft?: { data: Record<string, unknown>; receipt: WriteReceipt | null }
+            }
         >,
     }))
     const { open, prompt, requestId, result, saved, post, preparations } = toRefs(state.value)
@@ -70,6 +76,9 @@ function createAdminComposer() {
             open.value = false
             prompt.value = ''
             post.value = null
+            saved.value = {}
+            preparations.value = {}
+            result.value = null
             composing.value = false
             for (const id of Object.keys(operations)) delete operations[id]
         },

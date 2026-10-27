@@ -1,13 +1,8 @@
 import type { Experimental_CompositionEvaluator } from '@json-render/core'
-import { UsageLimit } from 'void/limits'
 const evaluate: Experimental_CompositionEvaluator = async ({ questions, state }) => {
     const prompt = state.request ?? state.originalRequest
     if (prompt === 'usage-limit')
-        throw new UsageLimit({
-            resource: 'ai',
-            reason: 'rate_limit',
-            message: 'Synthetic AI limit',
-        })
+        throw Object.assign(new Error('Synthetic AI limit'), { name: 'UsageLimit' })
     if (prompt === 'upstream-error')
         throw Error('Synthetic upstream details that must stay private')
     if (prompt === 'timeout') throw new DOMException('Synthetic timeout', 'TimeoutError')

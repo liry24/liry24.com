@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { Passkey } from '@better-auth/passkey'
 
-const client = useAuthClient()
-const { fetchSession } = useUserSession()
+const client = authClient
+const { refresh } = useAppSession()
 const toast = useToast()
 
 const passkeys = ref<Passkey[]>([])
@@ -47,7 +47,7 @@ const addPasskey = async () => {
     addingPasskey.value = true
     try {
         if (!client) throw new Error('Authentication client is unavailable')
-        await fetchSession({ force: true })
+        await refresh()
         const { error } = await client.passkey.addPasskey({
             name: newPasskeyName.value.trim() || undefined,
         })

@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest'
 
-import createAuthConfig from '../server/auth.config'
+import { createAuthOptions } from '../server/utils/authOptions'
 import {
     isPreviewGitHubAccountAdmin,
     validatePreviewIdentity,
@@ -91,7 +91,7 @@ test('Preview sessions check GitHub at login and refuse missing accounts or fail
                     { status },
                 ),
         )
-    const config = createAuthConfig({} as never)
+    const config = createAuthOptions()
     const before = config.databaseHooks.session.create.before
     const findAccounts = vi.fn(async () => [{ providerId: 'github', accountId: '42' }])
     const context = { context: { internalAdapter: { findAccounts } } } as never
@@ -112,7 +112,7 @@ test('Preview sessions check GitHub at login and refuse missing accounts or fail
     expect(await before(session, context)).toBe(false)
     expect(fetcher).not.toHaveBeenCalled()
     vi.stubEnv('APP_ENV', 'production')
-    const production = createAuthConfig({} as never)
+    const production = createAuthOptions()
     expect(await production.databaseHooks.session.create.before(session, context)).toBeUndefined()
     expect(fetcher).not.toHaveBeenCalled()
 })

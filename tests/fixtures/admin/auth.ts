@@ -3,13 +3,13 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin, username } from 'better-auth/plugins'
 
-import * as schema from '../../../db/schema'
+import * as schema from '../../../server/database/auth-schema'
 import { db } from './database'
 
 export const auth = betterAuth({
     baseURL: 'http://localhost',
     secret: 'synthetic-auth-secret-0123456789abcdef',
-    database: drizzleAdapter(db, { provider: 'sqlite', schema, usePlural: true }),
+    database: drizzleAdapter(db, { provider: 'sqlite', schema }),
     emailAndPassword: { enabled: true },
     rateLimit: { enabled: false },
     plugins: [

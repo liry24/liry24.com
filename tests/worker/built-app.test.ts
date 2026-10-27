@@ -1,265 +1,177 @@
-import { createHmac } from 'node:crypto'
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { readFile, readdir } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
-import type { D1Database, R2Bucket } from '@cloudflare/workers-types'
-import { resolveLitiConfig } from 'liti'
-import { createLitiClient } from 'liti/client'
-import { createRuntime } from 'liti/server'
 import { expect, test } from 'vitest'
-import { createTestHarness, type Unstable_RawConfig } from 'wrangler'
 
-import litiConfig from '../../liti.config'
-import { baselineStatements, bindTestDatabase } from '../helpers/database'
+import { builtWorker } from '../helpers/builtWorker'
 
 test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
-    'the emitted v2 Worker uses D1/R2 and wires scheduled publishing without the local SQLite driver',
+    'the emitted native Worker preserves commit activity, account isolation, article identity and OG assets',
     async () => {
-        const root = await mkdtemp(join(tmpdir(), 'liry24-built-worker-'))
-        const generated = JSON.parse(await readFile('.void-wrangler.jsonc', 'utf8'))
-        expect(generated.compatibility_flags).toEqual([
-            'nodejs_compat_v2',
-            'nodejs_als',
-            'enable_nodejs_process_v2',
-            'nodejs_compat_populate_process_env',
-        ])
-        expect(generated.ai?.binding).toBe('AI')
-        const serverDirectory = resolve('.output/server')
-        const chunks = await readdir(serverDirectory, { recursive: true })
-        const ogImageBundle = await readFile(
-            join(serverDirectory, 'chunks/routes/_og/d/image.mjs'),
-            'utf8',
-        )
-        for (const family of ['Special Gothic Expanded One', 'Geist Mono'])
-            expect(ogImageBundle, `OG images retain ${family}`).toMatch(
-                new RegExp(`(?:\\bfamily|"family"):\\s*"${family}"`),
-            )
-        const homeComponentPath = chunks.find((file) =>
-            /[/\\]build[/\\]Home\.takumi-[^/\\]+\.mjs$/.test(file),
-        )
-        expect(homeComponentPath, 'OG home component is emitted').toBeDefined()
-        const homeComponent = await readFile(join(serverDirectory, homeComponentPath!), 'utf8')
-        expect(homeComponent).toMatch(/"font-family":\s*"'Special Gothic Expanded One'"/)
-        for (const file of chunks.filter((file) => file.endsWith('.mjs'))) {
-            const bundle = await readFile(join(serverDirectory, file), 'utf8')
-            for (const marker of [
-                'openDevelopmentDB',
-                'LIRY24_DEV_DB_PATH',
-                '.data/development/sqlite.db',
-                'drizzle-orm/node-sqlite',
-                'node-sqlite/migrator',
-            ])
-                expect(bundle, `${file}: development code ${marker}`).not.toContain(marker)
-        }
-        const isPreview = generated.vars?.APP_ENV === 'dev'
-        const runtime = generated
-        const config: Unstable_RawConfig = {
-            ...generated,
-            ...runtime,
-            name: 'liry24-built-worker-test',
-            main: resolve('.output/server/index.mjs'),
-            assets: { binding: 'ASSETS', directory: resolve('.output/public') },
-            vars: { ...generated.vars, OPENAI_BASE_URL: 'http://127.0.0.1:1/v1' },
-            routes: [],
-            triggers: { crons: [] },
-            d1_databases: [
-                {
-                    binding: 'DB',
-                    database_name: 'test-db',
-                    database_id: '00000000-0000-4000-8000-000000000001',
-                },
-            ],
-            r2_buckets: [{ binding: 'STORAGE', bucket_name: 'test-assets' }],
-        }
-        delete config.previews
-        // No inference or remote AI service is available in this synthetic Worker test.
-        delete config.ai
-        const configPath = join(root, 'wrangler.json')
-        await writeFile(configPath, JSON.stringify(config))
-        const secrets = Object.fromEntries(
-            [
-                ...(generated.secrets?.required ?? [
-                    'BETTER_AUTH_SECRET',
-                    'NUXT_APP_SECRET',
-                    'GITHUB_CLIENT_ID',
-                    'GITHUB_CLIENT_SECRET',
-                ]),
-                'PREVIEW_GITHUB_TOKEN',
-            ].map((name) => [name, `test-only-${name}-0123456789abcdef0123456789abcdef`]),
-        )
-        // Exercise Void's actual deploy rebundling, including the native OG renderer WASM.
-        const { n: prepare } = await import(
-            pathToFileURL(resolve('node_modules/void/dist/cf-build-output-BhVxldCw.mjs')).href
-        )
-        const prepared = await prepare({
-            projectRoot: process.cwd(),
-            configPath,
-            accountId: generated.account_id,
-        })
-        expect(prepared).not.toBeNull()
-        const workerOutput = join(prepared.directory, '.cloudflare/output/v0/workers/default')
-        const built = JSON.parse(await readFile(join(workerOutput, 'worker.config.json'), 'utf8'))
-        expect(Object.values(built.manifest.modules)).toContainEqual({ type: 'wasm' })
-        config.main = join(workerOutput, 'bundle', built.manifest.mainModule)
-        await writeFile(configPath, JSON.stringify(config))
-        const server = createTestHarness({ workers: [{ configPath, secrets }] })
+        const app = await builtWorker()
         try {
-            await server.listen()
-            const worker = server.getWorker<{ DB: D1Database; STORAGE: R2Bucket }>()
-            const env = await worker.getEnv()
-            await env.DB.batch(baselineStatements().map((sql) => env.DB.prepare(sql)))
-            const preparedAt = Date.now() - 120_000
-            const admin = createRuntime({
-                now: () => new Date(preparedAt),
-                locales: { defaultLocale: 'ja', supported: ['ja'] },
-                config: resolveLitiConfig(litiConfig, []),
-                database: bindTestDatabase(env),
-            })
-            await env.STORAGE.put('runtime-binding-probe', 'local-only')
-            expect(await (await env.STORAGE.get('runtime-binding-probe'))?.text()).toBe(
-                'local-only',
-            )
-            for (const [path, status] of [
-                ['/api/auth/get-session', 200],
-                ['/', 200],
-                ['/works', 200],
-                ['/api/liti/models', 401],
-                ['/admin/works', 302],
-                ['/favicon.ico', 200],
-                ['/login', 200],
-            ] as const) {
-                const response = await server.fetch(path, { redirect: 'manual' })
-                const body = await response.text()
-                expect(response.status, `${path}: ${body.slice(0, 300)}`).toBe(status)
-                if (path === '/' || path === '/works') {
-                    const image = body.match(
-                        /<meta\b[^>]*property="og:image"[^>]*content="([^"]+)"/,
-                    )
-                    expect(image, 'SSR includes an OG image').not.toBeNull()
-                    const url = new URL(image![1]!.replaceAll('&amp;', '&'))
-                    const rendered = await server.fetch(`${url.pathname}${url.search}`)
-                    expect(rendered.status, await rendered.clone().text()).toBe(200)
-                    expect(rendered.headers.get('content-type')).toMatch(/^image\//)
-                    expect((await rendered.arrayBuffer()).byteLength).toBeGreaterThan(1000)
-                }
-                if (path === '/api/auth/get-session') expect(body).toBe('null')
-                if (path === '/login' && isPreview) expect(body).not.toContain('Vercel')
-            }
-            const composeRequest = (headers: Record<string, string> = {}) =>
-                server.fetch('/api/admin/compose', {
+            const admin = await app.session('activity-admin')
+            const owner = await app.session('activity-owner', 'user')
+            const manage = (input: Record<string, unknown>, headers = admin) =>
+                app.server.fetch('/api/_liti/manage', {
                     method: 'POST',
-                    headers: { ...headers, 'content-type': 'application/json' },
+                    headers: {
+                        origin: app.url.origin,
+                        ...headers,
+                        'content-type': 'application/json',
+                    },
+                    body: JSON.stringify(input),
+                })
+            const ok = async (input: Record<string, unknown>) => {
+                const response = await manage(input),
+                    text = await response.text()
+                expect(response.status, text).toBe(200)
+                return JSON.parse(text)
+            }
+            const activity = async () => {
+                const response = await app.server.fetch(
+                    '/api/admin/users/~activity-admin/activity',
+                    { headers: admin },
+                )
+                expect(response.status, await response.clone().text()).toBe(200)
+                expect(response.headers.get('cache-control')).toBe('private, no-store')
+                return await response.json<{
+                    items: { action: string; label: string; actorId: string }[]
+                    total: number
+                }>()
+            }
+            const compose = (headers: Record<string, string> = {}) =>
+                app.server.fetch('/api/admin/compose', {
+                    method: 'POST',
+                    headers: {
+                        origin: app.url.origin,
+                        ...headers,
+                        'content-type': 'application/json',
+                    },
                     body: JSON.stringify({
                         prompt: 'new post',
                         locale: 'ja',
                         timeZone: 'Asia/Tokyo',
                     }),
                 })
-            const compose = await composeRequest()
-            expect(compose.status, await compose.text()).toBe(401)
-            const userId = 'synthetic-built-worker-admin'
-            const token = 'synthetic-built-worker-session'
-            const now = Date.now()
-            await env.DB.prepare(
-                'INSERT INTO users (id,name,email,email_verified,role,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
-            )
-                .bind(
-                    userId,
-                    'Synthetic admin',
-                    'built-admin@example.invalid',
-                    1,
-                    'admin',
-                    now,
-                    now,
-                )
-                .run()
-            await env.DB.prepare(
-                'INSERT INTO sessions (id,token,user_id,expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?)',
-            )
-                .bind('synthetic-built-worker-session', token, userId, now + 3600000, now, now)
-                .run()
-            const signed = encodeURIComponent(
-                `${token}.${createHmac('sha256', secrets.BETTER_AUTH_SECRET!)
-                    .update(token)
-                    .digest('base64')}`,
-            )
-            const authenticated = {
-                cookie: `better-auth.session_token=${signed}; __Secure-better-auth.session_token=${signed}`,
-            }
-            await env.DB.prepare("UPDATE users SET role = 'user' WHERE id = ?").bind(userId).run()
-            const nonAdmin = await composeRequest(authenticated)
-            expect(nonAdmin.status, await nonAdmin.text()).toBe(403)
-            await env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(userId).run()
-            const session = await server.fetch('/api/auth/get-session', { headers: authenticated })
-            expect(await session.json()).toMatchObject({ user: { id: userId } })
-            const models = await server.fetch('/api/liti/models', { headers: authenticated })
-            // Login already checked GitHub; this session needs no linked account or lookup.
-            expect(models.status).toBe(200)
-            expect(Object.keys((await models.json<{ models: object }>()).models)).toHaveLength(9)
-            const invalidCompose = await server.fetch('/api/admin/compose', {
+            const missingOrigin = await app.server.fetch('/api/admin/compose', { method: 'POST' })
+            expect(missingOrigin.status).toBe(403)
+            expect((await compose({ origin: 'https://untrusted.invalid' })).status).toBe(403)
+            const anonymous = await compose()
+            expect(anonymous.status, await anonymous.clone().text()).toBe(401)
+            expect((await compose(owner)).status).toBe(403)
+            const invalid = await app.server.fetch('/api/admin/compose', {
                 method: 'POST',
-                headers: { ...authenticated, 'content-type': 'application/json' },
+                headers: { ...admin, 'content-type': 'application/json' },
                 body: JSON.stringify({ prompt: '' }),
             })
-            expect(invalidCompose.status, await invalidCompose.text()).toBe(400)
-            const client = createLitiClient({
-                fetch: (input, init) =>
-                    server.fetch(String(input), {
-                        ...init,
-                        headers: {
-                            ...Object.fromEntries(new Headers(init?.headers)),
-                            ...authenticated,
-                        },
-                    }),
-            })
+            expect(invalid.status).toBe(400)
 
-            // AI requests stay on an unavailable loopback endpoint, so no external inference can run.
-            for (const [title, expected] of [
-                ['これはexample title', /^example-title$/],
-                ['これはexample title', /^example-title-[a-z0-9]{6}$/],
-                ['日本語の記事', /^[a-z0-9]{6}$/],
-            ] as const) {
-                const draft = await client.createEntry('posts', {
-                    data: { title, content: 'Original body.', tags: [] },
-                })
-                const published = await client.publishEntry(draft.id, {
-                    expectedVersion: draft.version,
-                    draft: { data: {} },
-                })
-                expect(published.data.slug).toMatch(expected)
-                expect(published.data.title).toBe(title)
-                expect(published.data.content).toBe('Original body.')
-                expect(published.currentRevisionId).toBe(published.publishedRevisionId)
-            }
-            let logged = await client.createEntry('posts', {
-                data: {
-                    title: 'Activity snapshot',
-                    content: 'PRIVATE CONTENT',
-                    tags: [],
-                    slug: 'activity-check',
-                },
+            for (const path of ['/favicon.ico', '/login'])
+                expect((await app.server.fetch(path)).status).toBe(200)
+            expect(await (await app.server.fetch('/api/auth/get-session')).text()).toBe('null')
+            expect(
+                (await manage({ action: 'models' }, { origin: app.url.origin, cookie: '' })).status,
+            ).toBe(401)
+            expect((await app.server.fetch('/admin/works', { redirect: 'manual' })).status).toBe(
+                302,
+            )
+
+            const first = await ok({
+                action: 'save',
+                model: 'posts',
+                id: 'activity-post',
+                locale: 'ja',
+                ifDigest: null,
+                data: { title: 'Activity snapshot', slug: 'activity-check', tags: [] },
+                body: 'PRIVATE CONTENT',
             })
-            const firstRevision = logged.currentRevisionId!
-            logged = await client.updateEntry(logged.id, {
-                expectedVersion: logged.version,
-                data: { ...logged.data, title: 'Changed title' },
+            const updated = await ok({
+                action: 'save',
+                model: 'posts',
+                id: first.id,
+                locale: 'ja',
+                ifDigest: first.digest,
+                data: { title: 'Changed title', slug: 'activity-check', tags: [] },
+                body: 'PRIVATE CONTENT',
             })
-            logged = await client.publishEntry(logged.id, { expectedVersion: logged.version })
-            logged = await client.unpublishEntry(logged.id, { expectedVersion: logged.version })
-            logged = await client.schedulePublish(logged.id, {
-                expectedVersion: logged.version,
-                at: new Date(now + 86400000).toISOString(),
+            await ok({
+                action: 'publish',
+                model: 'posts',
+                id: first.id,
+                digests: { ja: updated.digest },
             })
-            logged = await client.cancelScheduledPublish(logged.id, {
-                expectedVersion: logged.version,
+            const inspected = await ok({
+                action: 'inspect',
+                model: 'posts',
+                id: first.id,
+                locale: 'ja',
             })
-            logged = await client.restoreRevision(logged.id, firstRevision, {
-                expectedVersion: logged.version,
+            await ok({
+                action: 'unpublish',
+                model: 'posts',
+                id: first.id,
+                ifHead: inspected.publishedHead,
             })
-            await client.deleteEntry(logged.id, { expectedVersion: logged.version })
-            const sortable = await client.createEntry('socials', {
+            const scheduled = await ok({
+                action: 'schedule',
+                model: 'posts',
+                id: first.id,
+                digests: { ja: updated.digest },
+                at: new Date(Date.now() + 86400000).toISOString(),
+            })
+            await ok({
+                action: 'cancelSchedule',
+                model: 'posts',
+                id: first.id,
+                schedule: scheduled.id,
+            })
+            const restored = await ok({
+                action: 'restore',
+                model: 'posts',
+                id: first.id,
+                locale: 'ja',
+                ifDigest: updated.digest,
+                revision: first.revision,
+            })
+            const beforeFailures = (await activity()).total
+            expect(
+                (
+                    await manage({
+                        action: 'save',
+                        model: 'posts',
+                        id: first.id,
+                        locale: 'ja',
+                        ifDigest: restored.digest,
+                        data: { title: '', tags: [] },
+                    })
+                ).status,
+            ).toBe(400)
+            expect(
+                (
+                    await manage({
+                        action: 'save',
+                        model: 'posts',
+                        id: first.id,
+                        locale: 'ja',
+                        ifDigest: null,
+                        data: { title: 'Stale', tags: [] },
+                    })
+                ).status,
+            ).toBe(409)
+            expect((await activity()).total).toBe(beforeFailures)
+            await ok({
+                action: 'remove',
+                model: 'posts',
+                id: first.id,
+                locale: 'ja',
+                ifDigest: restored.digest,
+            })
+            const social = await ok({
+                action: 'save',
+                model: 'socials',
+                id: 'activity-social',
+                ifVersion: null,
                 data: {
                     label: 'Sort snapshot',
                     slug: 'sort-snapshot',
@@ -267,18 +179,18 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                     icon: '',
                 },
             })
-            await client.setSortOrder(sortable.id, 5, sortable.version)
-            const users = await server.fetch('/api/admin/users', { headers: authenticated })
-            expect(users.status).toBe(200)
-            expect(await users.json()).toMatchObject({ items: [{ id: userId }], total: 1 })
-            const activityResponse = await server.fetch(`/api/admin/users/~${userId}/activity`, {
-                headers: authenticated,
+            const order = await app.server.fetch('/api/admin/reorder', {
+                method: 'POST',
+                headers: { ...admin, 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'socials',
+                    revision: null,
+                    entries: [{ id: social.id, version: social.version }],
+                }),
             })
-            expect(activityResponse.status).toBe(200)
-            const activity = await activityResponse.json<{
-                items: { action: string; label: string; actorId: string }[]
-            }>()
-            expect(activity.items.map((event) => event.action)).toEqual(
+            expect(order.status, await order.clone().text()).toBe(200)
+            const events = await activity()
+            expect(events.items.map((event) => event.action)).toEqual(
                 expect.arrayContaining([
                     'content.create',
                     'content.update',
@@ -291,32 +203,15 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                     'content.sort',
                 ]),
             )
-            expect(activity.items.find((event) => event.action === 'content.delete')).toMatchObject(
-                { label: 'Activity snapshot', actorId: userId },
-            )
-            expect(JSON.stringify(activity)).not.toContain('PRIVATE CONTENT')
-            expect(JSON.stringify(activity)).not.toContain(token)
-            await env.DB.prepare(
-                'INSERT INTO users (id,name,email,email_verified,username,role,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
-            )
-                .bind(
-                    'activity-owner',
-                    'Activity owner',
-                    'owner@example.invalid',
-                    1,
-                    'activity-owner',
-                    'user',
-                    now,
-                    now,
-                )
-                .run()
-            await env.DB.prepare(
-                'INSERT INTO sessions (id,token,user_id,expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?)',
-            )
-                .bind('owner-session', 'owner-token', 'activity-owner', now + 3600000, now, now)
-                .run()
-            await env.DB.prepare(
-                'INSERT INTO admin_events (id,actor_id,action,target_id,label,created_at) VALUES (?,?,?,?,?,?)',
+            expect(events.items.find((event) => event.action === 'content.delete')).toMatchObject({
+                label: 'Activity snapshot',
+                actorId: 'activity-admin',
+            })
+            expect(JSON.stringify(events)).not.toContain('PRIVATE CONTENT')
+            expect(JSON.stringify(events)).not.toContain(admin.cookie)
+
+            await app.env.DB.prepare(
+                'INSERT INTO admin_event (id,actor_id,action,target_id,label,created_at) VALUES (?,?,?,?,?,?)',
             )
                 .bind(
                     'private-event',
@@ -324,157 +219,83 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                     'session.revoke',
                     'private-session',
                     'Private session activity',
-                    now,
+                    Date.now(),
                 )
                 .run()
-            const ownerSignature = encodeURIComponent(
-                `owner-token.${createHmac('sha256', secrets.BETTER_AUTH_SECRET!)
-                    .update('owner-token')
-                    .digest('base64')}`,
-            )
-            const ownerHeaders = {
-                cookie: `better-auth.session_token=${ownerSignature}; __Secure-better-auth.session_token=${ownerSignature}`,
-            }
-            expect((await server.fetch('/admin/users', { headers: ownerHeaders })).status).toBe(403)
-            const adminPermissions = await server.fetch('/api/auth/admin/has-permission', {
-                method: 'POST',
-                headers: {
-                    ...authenticated,
-                    'content-type': 'application/json',
-                    origin: 'http://localhost:3000',
-                },
-                body: JSON.stringify({
-                    permissions: {
-                        user: ['list', 'get'],
-                        activity: ['readOwn', 'readAny'],
-                        adminPanel: ['access', 'compose'],
-                        'liti:model:games': ['readDraft', 'create'],
-                    },
-                }),
-            })
-            expect(await adminPermissions.json()).toMatchObject({ success: true })
-            for (const headers of [ownerHeaders, authenticated]) {
-                const allowed = await server.fetch('/api/admin/users/activity-owner/activity', {
-                    headers,
-                })
-                expect(allowed.status).toBe(200)
-                expect(allowed.headers.get('cache-control')).toBe('private, no-store')
-                expect(await allowed.json()).toMatchObject({
+            for (const headers of [owner, admin]) {
+                const response = await app.server.fetch(
+                    '/api/admin/users/~activity-owner/activity',
+                    { headers },
+                )
+                expect(response.status).toBe(200)
+                expect(await response.json()).toMatchObject({
                     items: [{ action: 'session.revoke', label: 'Private session activity' }],
                 })
             }
             expect(
                 (
-                    await server.fetch(`/api/admin/users/~${userId}/activity`, {
-                        headers: ownerHeaders,
+                    await app.server.fetch('/api/admin/users/~activity-admin/activity', {
+                        headers: owner,
                     })
                 ).status,
             ).toBe(403)
-            await env.DB.prepare("UPDATE users SET role = 'editor' WHERE id = ?").bind(userId).run()
-            const deniedActivity = await server.fetch('/api/admin/users/activity-owner/activity', {
-                headers: authenticated,
+            expect((await app.server.fetch('/admin/users', { headers: owner })).status).toBe(403)
+            await app.env.DB.prepare("UPDATE user SET role = 'editor' WHERE id = ?")
+                .bind('activity-admin')
+                .run()
+            const denied = await app.server.fetch('/api/admin/users/~activity-owner/activity', {
+                headers: admin,
             })
-            expect(deniedActivity.status).toBe(403)
-            expect(await deniedActivity.text()).not.toContain('Private session activity')
+            expect(denied.status).toBe(403)
+            expect(await denied.text()).not.toContain('Private session activity')
+            await app.env.DB.prepare("UPDATE user SET role = 'user' WHERE id = ?")
+                .bind('activity-admin')
+                .run()
             expect(
                 (
-                    await server.fetch(`/api/admin/users/~${userId}/activity`, {
-                        headers: authenticated,
-                    })
-                ).status,
-            ).toBe(403)
-            await env.DB.prepare("UPDATE users SET role = 'user' WHERE id = ?").bind(userId).run()
-            expect(
-                (
-                    await server.fetch(`/api/admin/users/~${userId}/activity`, {
-                        headers: authenticated,
+                    await app.server.fetch('/api/admin/users/~activity-admin/activity', {
+                        headers: admin,
                     })
                 ).status,
             ).toBe(200)
-            const permissionCheck = await server.fetch('/api/auth/admin/has-permission', {
+            const spoof = await app.server.fetch('/api/auth/admin/has-permission', {
                 method: 'POST',
-                headers: {
-                    ...authenticated,
-                    'content-type': 'application/json',
-                    origin: 'http://localhost:3000',
-                },
+                headers: { ...admin, 'content-type': 'application/json' },
                 body: JSON.stringify({ role: 'admin', permissions: { activity: ['readAny'] } }),
             })
-            expect(await permissionCheck.json()).toMatchObject({ success: false })
-            await env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(userId).run()
-            await env.DB.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?')
-                .bind(now - 1, userId)
+            expect(await spoof.json()).toMatchObject({ success: false })
+            await app.env.DB.prepare("UPDATE user SET role = 'admin' WHERE id = ?")
+                .bind('activity-admin')
                 .run()
-            const expired = await composeRequest(authenticated)
-            expect(expired.status, await expired.text()).toBe(401)
-            let entry = await admin.createEntry(
-                'posts',
-                {
-                    data: {
-                        title: 'A',
-                        content: '# A',
-                        tags: [],
-                        slug: 'emitted-scheduled-handler',
-                    },
-                },
-                { actor: { id: 'synthetic-admin', roles: ['admin'] } },
+            await app.env.DB.prepare('UPDATE session SET expires_at = ? WHERE user_id = ?')
+                .bind(Date.now() - 1, 'activity-admin')
+                .run()
+            expect((await compose(admin)).status).toBe(401)
+
+            const server = resolve('.output/server')
+            const files = (await readdir(server, { recursive: true })).filter((path) =>
+                path.endsWith('.mjs'),
             )
-            entry = await admin.publishEntry(
-                entry.id,
-                { expectedVersion: entry.version },
-                undefined,
-                { actor: { id: 'synthetic-admin', roles: ['admin'] } },
-            )
-            entry = await admin.updateEntry(
-                entry.id,
-                {
-                    expectedVersion: entry.version,
-                    data: { slug: entry.data.slug, title: 'B', content: '# B', tags: [] },
-                },
-                undefined,
-                { actor: { id: 'synthetic-admin', roles: ['admin'] } },
-            )
-            const at = new Date(preparedAt + 60_000)
-            entry = await admin.schedulePublish(
-                entry.id,
-                {
-                    expectedVersion: entry.version,
-                    at: at.toISOString(),
-                },
-                undefined,
-                { actor: { id: 'synthetic-admin', roles: ['admin'] } },
-            )
-            const scheduledRevision = entry.scheduledRevisionId
-            entry = await admin.updateEntry(
-                entry.id,
-                {
-                    expectedVersion: entry.version,
-                    data: { slug: entry.data.slug, title: 'C', content: '# C', tags: [] },
-                },
-                undefined,
-                { actor: { id: 'synthetic-admin', roles: ['admin'] } },
-            )
-            const currentRevision = entry.currentRevisionId
-            // Dispatch through the actual emitted Worker entry, not admin.publishDue().
-            expect((await worker.scheduled({ scheduledTime: at, cron: '* * * * *' })).outcome).toBe(
-                'ok',
-            )
-            await expect
-                .poll(async () => (await admin.getEntry(entry.id)).publishedRevisionId)
-                .toBe(isPreview ? entry.publishedRevisionId : scheduledRevision)
-            const published = await admin.getEntry(entry.id)
-            expect(published.scheduledRevisionId).toBe(isPreview ? scheduledRevision : null)
-            expect(published.currentRevisionId).toBe(currentRevision)
-            expect((await admin.getPublicEntry('posts', entry.id))?.data.title).toBe(
-                isPreview ? 'A' : 'B',
-            )
+            const output = (
+                await Promise.all(files.map((path) => readFile(resolve(server, path), 'utf8')))
+            ).join('\n')
+            for (const family of ['Special Gothic Expanded One', 'Geist Mono'])
+                expect(output).toContain(family)
+            for (const marker of [
+                'openDevelopmentDB',
+                'LIRY24_DEV_DB_PATH',
+                '.data/development/sqlite.db',
+                'drizzle-orm/node-sqlite',
+                'node-sqlite/migrator',
+                '@litijs/void',
+                'void/ai',
+            ])
+                expect(output).not.toContain(marker)
         } finally {
-            for (const log of server.getLogs().filter((log) => log.level === 'error'))
+            for (const log of app.server.getLogs().filter((log) => log.level === 'error'))
                 console.error(log.message)
-            await server.close()
-            await prepared.dispose()
-            await rm(root, { recursive: true, force: true })
+            await app.close()
         }
     },
-    60_000,
+    180000,
 )

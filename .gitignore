@@ -35,3 +35,5 @@ logs
 .void-wrangler.jsonc
 server/middleware/__void-dev-trigger.ts
 .liti
+
+.vitehub

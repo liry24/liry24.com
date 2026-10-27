@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { TableColumn, TableRow } from '@nuxt/ui'
-import type { Entry } from 'liti'
 
 const route = useRoute()
 const router = useRouter()
@@ -12,51 +11,49 @@ const query = computed(() =>
 const page = ref(1)
 
 const { data: models } = useLitiModels()
-const { data, status, error, total, refresh } = useLitiQuery('posts', {
-    view: 'current',
+const { data, status, error, total, refresh } = useAdminEntries('posts', {
     q: query,
-    page: () => ({ limit: 20, offset: (page.value - 1) * 20 }),
+    limit: 20,
+    offset: () => (page.value - 1) * 20,
 })
 
-const model = computed(() => models.value['posts'])
-const features = computed(
-    () =>
-        model.value?.features ?? {
-            publishing: false,
-            scheduling: false,
-            revisions: false,
-            sortable: false,
-        },
-)
-const meta = computed(() => model.value?.meta ?? { label: 'post', plural: 'posts', fields: [] })
+const model = computed(() => models.value?.find((model) => model.name === 'posts'))
+const features = computed(() => ({
+    publishing: true,
+    scheduling: true,
+    revisions: true,
+    sortable: false,
+}))
+const meta = computed(() => ({
+    label: model.value?.label ?? 'Posts',
+    plural: model.value?.label ?? 'Posts',
+}))
 const busy = computed(() => status.value === 'pending')
-const columns: TableColumn<Entry<'posts'>>[] = [
+const columns: TableColumn<AdminEntry>[] = [
     { id: 'title', header: 'Title' },
     { id: 'status', header: 'Status' },
     {
         accessorKey: 'updatedAt',
         header: 'Updated',
-        cell: ({ row }) => new Date(row.original.updatedAt).toLocaleString(),
+        cell: ({ row }) => new Date(row.original.updatedAt ?? 0).toLocaleString(),
     },
     { id: 'actions', header: 'Actions' },
 ]
 
-const edit = async (entry?: Entry<'posts'>) =>
+const edit = async (entry?: AdminEntry) =>
     navigateTo(entry ? `/admin/posts/${encodeURIComponent(entry.id)}` : '/admin/posts/new')
 
-function select(_event: Event, row: TableRow<Entry<'posts'>>) {
+function select(_event: Event, row: TableRow<AdminEntry>) {
     void edit(row.original)
 }
 const search = useDebounceFn((value: string) => {
     void router.replace({ query: { ...route.query, model: 'posts', q: value || undefined } })
 }, 250)
 
-const publication = (entry: Entry) =>
-    entry.publishedRevisionId
-        ? entry.currentRevisionId === entry.publishedRevisionId
-            ? 'Published'
-            : 'Unpublished changes'
-        : 'Draft'
+const publication = (entry: AdminEntry) =>
+    ({ draft: 'Draft', published: 'Published', changed: 'Unpublished changes', immediate: 'Live' })[
+        entry.status
+    ]
 
 watch(query, () => {
     page.value = 1
@@ -134,7 +131,7 @@ watch(
                         :entry="row.original"
                         :features
                         :busy
-                        :title="row.original.data.title"
+                        :title="String(row.original.data.title ?? row.original.id)"
                         @changed="refresh()"
                         posts
                         @edit="edit(row.original)"

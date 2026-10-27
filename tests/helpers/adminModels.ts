@@ -1,19 +1,4 @@
-import { resolveLitiConfig } from 'liti'
-import { createLitiDescriptor } from 'liti/adapter'
+import * as content from '../../server/models/content'
+import * as records from '../../server/models/records'
 
-import config from '../../liti.config'
-
-export const adminModels = Object.entries(
-    createLitiDescriptor(resolveLitiConfig(config, [])).models,
-).map(([name, model]) => ({
-    name,
-    meta: model.meta ?? { label: name, plural: name },
-    fields: model.fields,
-    displayFields: model.displayFields,
-    features: {
-        publishing: model.publishing,
-        scheduling: model.scheduling,
-        revisions: model.revisions,
-        sortable: model.sortable,
-    },
-}))
+export const adminModels = [...Object.values(content), ...Object.values(records)]

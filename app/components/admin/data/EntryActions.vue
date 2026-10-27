@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import type { Entry, Revision, EntryFeatures } from 'liti'
-import { createLitiClient } from 'liti/client'
+import type { LitiRuntime } from 'liti/server'
 
 const {
     entry,
@@ -9,39 +8,66 @@ const {
     busy: loading = false,
     posts = false,
 } = defineProps<{
-    entry: Entry
-    features: EntryFeatures
+    entry: AdminEntry
+    features: { publishing: boolean; scheduling: boolean; revisions: boolean }
     title: string
     busy?: boolean
     posts?: boolean
 }>()
 const emit = defineEmits<{ edit: []; changed: [] }>()
-const client = createLitiClient()
-const running = ref(false)
-const error = ref('')
+const request = useRequestFetch(),
+    origin = useRequestURL().origin
+const running = ref(false),
+    error = ref(''),
+    schedule = ref(''),
+    selectedRevision = ref('')
+const inspection = ref<Awaited<ReturnType<LitiRuntime['content']['inspect']>>>()
 const busy = computed(() => loading || running.value)
-const schedule = ref('')
-const revisions = ref<Array<Pick<Revision, 'id' | 'createdAt'>>>()
-const selectedRevision = ref<string>()
-async function run(operation: () => Promise<unknown>, changed = true) {
+watch(
+    () => `${entry.model}:${entry.id}:${entry.digest ?? entry.version}`,
+    () => {
+        inspection.value = undefined
+        selectedRevision.value = ''
+        error.value = ''
+    },
+)
+async function command<Value = unknown>(action: string, input: Record<string, unknown> = {}) {
+    return await request<Value, '/api/_liti/manage', 'POST'>('/api/_liti/manage', {
+        method: 'POST',
+        headers: { origin },
+        body: {
+            action,
+            model: entry.model,
+            id: entry.id,
+            ifDigest: entry.digest ?? null,
+            ifVersion: entry.version,
+            ...input,
+        },
+    })
+}
+async function run(task: () => Promise<unknown>, changed = true) {
     if (busy.value) return
     running.value = true
     error.value = ''
+    const identity = `${entry.model}:${entry.id}`
     try {
-        await operation()
-        if (changed) emit('changed')
+        await task()
+        if (changed && identity === `${entry.model}:${entry.id}`) {
+            inspection.value = undefined
+            emit('changed')
+        }
     } catch (cause) {
-        error.value = cause instanceof Error ? cause.message : 'The operation failed.'
+        error.value = adminErrorMessage(cause, 'The operation failed.')
     } finally {
         running.value = false
     }
 }
-const history = () =>
-    run(async () => {
-        revisions.value = await client.listRevisions(entry.id)
-    }, false)
+async function inspect() {
+    const identity = `${entry.model}:${entry.id}`
+    const result = await command<Awaited<ReturnType<LitiRuntime['content']['inspect']>>>('inspect')
+    if (identity === `${entry.model}:${entry.id}`) inspection.value = result
+}
 </script>
-
 <template>
     <div class="flex items-center gap-1">
         <UButton
@@ -53,7 +79,13 @@ const history = () =>
             :disabled="busy"
             @click="emit('edit')"
         />
-        <UPopover>
+        <UPopover
+            @update:open="
+                (open) => {
+                    if (open && features.revisions) run(inspect, false)
+                }
+            "
+        >
             <UButton
                 aria-label="Entry actions"
                 icon="mingcute:more-1-line"
@@ -61,78 +93,67 @@ const history = () =>
                 color="neutral"
                 size="sm"
             />
-            <template #content>
-                <div class="flex w-80 flex-col gap-3 p-4">
-                    <p class="truncate text-sm font-medium">
-                        {{ title }}
-                    </p>
+            <template #content
+                ><div class="flex w-80 flex-col gap-3 p-4">
+                    <p class="truncate text-sm font-medium">{{ title }}</p>
                     <UAlert v-if="error" :title="error" color="error" />
                     <template v-if="features.publishing">
                         <UButton
-                            :label="posts ? 'Edit & Publish' : 'Publish'"
+                            :label="posts ? 'Edit & Publish' : 'Publish reviewed draft'"
                             variant="soft"
                             color="neutral"
-                            :disabled="busy"
+                            :disabled="busy || !entry.digest"
                             @click="
                                 posts
                                     ? emit('edit')
                                     : run(() =>
-                                          client.publishEntry(entry.id, {
-                                              expectedVersion: entry.version,
+                                          command('publish', {
+                                              digests: { [entry.locale ?? 'und']: entry.digest },
                                           }),
                                       )
                             "
                         />
                         <UButton
-                            v-if="entry.publishedRevisionId"
+                            v-if="inspection?.published"
                             label="Unpublish"
                             variant="ghost"
                             color="neutral"
                             :disabled="busy"
                             @click="
                                 run(() =>
-                                    client.unpublishEntry(entry.id, {
-                                        expectedVersion: entry.version,
-                                    }),
+                                    command('unpublish', { ifHead: inspection?.publishedHead }),
                                 )
                             "
                         />
                     </template>
-                    <template v-if="features.scheduling && !posts">
-                        <UInput
+                    <template v-if="features.scheduling && !posts"
+                        ><UInput
                             v-model="schedule"
                             type="datetime-local"
-                            aria-label="Schedule publish time"
-                        />
-                        <UButton
+                            aria-label="Schedule publish time" /><UButton
                             label="Schedule Publish"
                             variant="soft"
                             color="neutral"
-                            :disabled="busy || !schedule"
+                            :disabled="busy || !schedule || !entry.digest"
                             @click="
                                 run(() =>
-                                    client.schedulePublish(entry.id, {
+                                    command('schedule', {
                                         at: new Date(schedule).toISOString(),
-                                        expectedVersion: entry.version,
+                                        digests: { [entry.locale ?? 'und']: entry.digest },
                                     }),
                                 )
                             "
+                    /></template>
+                    <div v-for="job in inspection?.schedules" :key="job.id" class="grid gap-1">
+                        <p class="text-sm">Scheduled: {{ new Date(job.at).toLocaleString() }}</p>
+                        <UButton
+                            label="Cancel Schedule"
+                            variant="ghost"
+                            color="neutral"
+                            :disabled="busy"
+                            @click="run(() => command('cancelSchedule', { schedule: job.id }))"
                         />
-                    </template>
-                    <UButton
-                        v-if="entry.scheduledRevisionId"
-                        label="Cancel Schedule"
-                        variant="ghost"
-                        color="neutral"
-                        :disabled="busy"
-                        @click="
-                            run(() =>
-                                client.cancelScheduledPublish(entry.id, {
-                                    expectedVersion: entry.version,
-                                }),
-                            )
-                        "
-                    />
+                    </div>
                     <template v-if="features.revisions">
                         <UButton
                             label="Revision history"
@@ -140,50 +161,43 @@ const history = () =>
                             variant="ghost"
                             color="neutral"
                             :disabled="busy"
-                            @click="history"
+                            @click="run(inspect, false)"
                         />
-                        <template v-if="revisions">
-                            <USelect
-                                v-model="selectedRevision"
-                                aria-label="Revision to restore"
-                                :items="
-                                    revisions.map((revision) => ({
-                                        label: `${new Date(revision.createdAt).toLocaleString()} — ${revision.id}`,
-                                        value: revision.id,
-                                    }))
-                                "
-                                placeholder="Select a revision"
-                            />
-                            <UButton
-                                label="Restore as draft"
-                                variant="soft"
-                                color="neutral"
-                                :disabled="busy || !selectedRevision"
-                                @click="
-                                    run(() =>
-                                        client.restoreRevision(entry.id, selectedRevision!, {
-                                            expectedVersion: entry.version,
-                                        }),
-                                    )
-                                "
-                            />
-                        </template>
+                        <USelect
+                            v-if="inspection"
+                            v-model="selectedRevision"
+                            aria-label="Revision to restore"
+                            :items="
+                                inspection.history.revisions.map((revision) => ({
+                                    label: `${new Date(revision.createdAt).toLocaleString()} — ${revision.id}`,
+                                    value: revision.id,
+                                }))
+                            "
+                            placeholder="Select a revision"
+                        />
+                        <UButton
+                            v-if="inspection"
+                            label="Restore as draft"
+                            variant="soft"
+                            color="neutral"
+                            :disabled="busy || !selectedRevision"
+                            @click="run(() => command('restore', { revision: selectedRevision }))"
+                        />
                     </template>
                     <USeparator />
+                    <p v-if="inspection?.published" class="text-muted text-xs">
+                        Deleting the draft keeps its public version. Unpublish first to remove the
+                        public page.
+                    </p>
                     <UButton
-                        label="Delete"
+                        :label="features.publishing ? 'Delete draft' : 'Delete record'"
                         icon="mingcute:delete-2-line"
                         variant="ghost"
                         color="error"
-                        :disabled="busy"
-                        @click="
-                            run(() =>
-                                client.deleteEntry(entry.id, { expectedVersion: entry.version }),
-                            )
-                        "
-                    />
-                </div>
-            </template>
+                        :disabled="busy || (features.publishing && !entry.digest)"
+                        @click="run(() => command('remove'))"
+                    /></div
+            ></template>
         </UPopover>
     </div>
 </template>
