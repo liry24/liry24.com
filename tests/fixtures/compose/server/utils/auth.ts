@@ -2,6 +2,22 @@ import { betterAuth } from 'better-auth'
 import { admin, createAccessControl } from 'better-auth/plugins'
 import { createError } from 'nuxt/server'
 
+import { sqlite } from '../../../admin/database'
+import { configureGameFixture } from '../../games'
+
+sqlite
+    .prepare(
+        'INSERT OR IGNORE INTO liti_games (id, version, created_at, updated_at, igdbId, slug, name, metrics, "order") VALUES (?, 1, ?, ?, 1, ?, ?, ?, 0)',
+    )
+    .run(
+        'igdb-1',
+        '2026-10-28T00:00:00Z',
+        '2026-10-28T00:00:00Z',
+        'exact--igdb-slug',
+        'Exact Game',
+        '[]',
+    )
+
 const fixtureAccess = createAccessControl({
     ...adminAccess.statements,
     'liti:model:games': ['readDraft', 'create'],
@@ -24,14 +40,17 @@ const auth = betterAuth({
         }),
     ],
 })
-export async function requireUserSession(request: Request) {
+export async function requireAppSession(request: Request) {
+    configureGameFixture(request.headers.get('x-fixture-case'))
     await new Promise((resolve) => setTimeout(resolve, 10))
     const role = request.headers.get('x-fixture-role')
     if (!role) throw createError({ status: 401, message: 'Sign in' })
-    return { user: { id: 'synthetic-admin', role } }
+    return {
+        user: { id: 'synthetic-admin', role, scenario: request.headers.get('x-fixture-case') },
+    }
 }
 
-export function serverAuth(request: Request) {
+export function getAppAuth(request: Request) {
     return {
         api: {
             userHasPermission: ({ body }: { body: { permissions: Record<string, string[]> } }) =>

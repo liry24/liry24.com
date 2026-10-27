@@ -1,8 +1,9 @@
+import { count, desc } from 'drizzle-orm'
 import { createError, defineEventHandler, getQuery } from 'nuxt/server'
-import { db, count, desc } from 'void/db'
+import { db } from 'vite-hub/database/drizzle'
 import { z } from 'zod'
 
-import { users } from '../../../../db/schema'
+import { user as users } from '../../../database/auth-schema'
 
 export default defineEventHandler(async (event) => {
     await requireAdminPermission(event, { user: ['list'] })

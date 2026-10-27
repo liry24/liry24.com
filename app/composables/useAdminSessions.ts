@@ -1,8 +1,8 @@
 import type { Session } from 'better-auth'
 
 export function useAdminSessions() {
-    const client = useAuthClient()
-    const { user, session, signOut } = useUserSession()
+    const client = authClient
+    const { user, session, signOut } = useAppSession()
     const sessions = ref<Session[]>([])
     const busy = ref(false)
     const failure = ref('')

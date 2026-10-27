@@ -1,6 +1,8 @@
 import type { BetterAuthPlugin } from 'better-auth'
 import { createAuthMiddleware, isAPIError } from 'better-auth/api'
 
+import { recordAdminActivity } from './adminActivity.js'
+
 const revocationPaths = new Set([
     '/revoke-session',
     '/revoke-sessions',

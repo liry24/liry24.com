@@ -1,8 +1,13 @@
 export function useAdminUserScope() {
-    const { user, session } = useUserSession()
+    const nuxt = useNuxtApp()
+    const { user, session } = useAppSession()
     const scope = computed(
         () => `${user.value?.id ?? ''}:${session.value?.id ?? ''}:${user.value?.role ?? ''}`,
     )
-    watch(scope, () => clearNuxtData((key) => key.startsWith('admin-users:')), { flush: 'sync' })
+    watch(
+        scope,
+        () => nuxt.runWithContext(() => clearNuxtData((key) => key.startsWith('admin-'))),
+        { flush: 'sync' },
+    )
     return scope
 }

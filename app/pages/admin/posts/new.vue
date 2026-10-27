@@ -1,4 +1,5 @@
 <script setup lang="ts">
+definePageMeta({ keepalive: true, key: (route) => route.fullPath })
 const route = useRoute()
 
 const composerId = computed(() =>

@@ -1,18 +1,22 @@
-import { useAdmin } from 'liti/nuxt/server'
 import { defineEventHandler, createError, readBody } from 'nuxt/server'
-import { UsageLimit } from 'void/limits'
+import { z } from 'zod'
+
+import runtime from '#liti/runtime'
+
+import { evaluateClef, type ComposerInference } from '../../utils/clef'
+import { listAdminEntries } from '../../utils/entryList'
 
 export default defineEventHandler(async (event) => {
     const started = performance.now()
-    await requireAdminPermission(event, { adminPanel: ['compose'] })
+    await assertAppOrigin(event.req)
+    const session = await requireAdminPermission(event, { adminPanel: ['compose'] })
     if (!event.req.headers.get('content-type')?.startsWith('application/json'))
         throw createError({ status: 415, statusText: 'JSON required' })
-    const admin = useAdmin(event)
-    const allowed = await admin.models()
+    const allowed = await runtime.descriptors(session.user)
     const authorizationMs = performance.now() - started
     const input = composerRequest.safeParse(await readBody(event))
     if (!input.success) throw createError({ status: 400, statusText: 'Invalid composer input' })
-    const models = composerModelInfo(allowed)
+    const models = await composerModelInfo(allowed.map((model) => runtime.definition(model.name)))
     if (!models.length) throw createError({ status: 403, statusText: 'No models available' })
     const allowedModels = new Set(models.map((model) => model.name))
     const requestedModels = [...(input.data.items ?? []), input.data.context]
@@ -20,6 +24,25 @@ export default defineEventHandler(async (event) => {
         requestedModels.some((selection) => selection?.model && !allowedModels.has(selection.model))
     )
         throw createError({ status: 403, statusText: 'Model unavailable' })
+    const binding = z
+        .object({
+            env: z.object({
+                AI: z.custom<ComposerInference>(
+                    (value) =>
+                        value !== null &&
+                        typeof value === 'object' &&
+                        'run' in value &&
+                        typeof value.run === 'function',
+                ),
+            }),
+        })
+        .safeParse(event.context.cloudflare)
+    if (!binding.success)
+        throw createError({
+            status: 503,
+            statusText: 'Composer inference is unavailable. Use the regular form.',
+        })
+    const inference = binding.data.env.AI
     const inferences: { durationMs: number; questionCount: number; payloadBytes: number }[] = []
     let lookupMs = 0,
         activeLookups = 0,
@@ -41,15 +64,34 @@ export default defineEventHandler(async (event) => {
             {
                 models,
                 list: (model, q, signal) =>
-                    lookup(() =>
-                        admin.entries.list(model, {
+                    lookup(async () => {
+                        signal.throwIfAborted()
+                        const page = await listAdminEntries(model, session.user, {
                             q,
                             limit: 5,
-                            locale: input.data.locale,
-                            signal,
-                        }),
-                    ),
-                get: (model, id) => lookup(() => admin.entries.get(model, id)),
+                            offset: 0,
+                        })
+                        signal.throwIfAborted()
+                        return page
+                    }),
+                get: (model, id) =>
+                    lookup(async () => {
+                        const definition = runtime.definition(model)
+                        const entry =
+                            definition.storage === 'content'
+                                ? await runtime.content.readDraft(
+                                      model,
+                                      id,
+                                      { actor: session.user },
+                                      definition.locales?.default,
+                                  )
+                                : await runtime.records.readDraft(model, id, {
+                                      actor: session.user,
+                                  })
+                        if (!entry)
+                            throw createError({ status: 404, statusText: 'Entry unavailable' })
+                        return entry
+                    }),
             },
             async (request) => {
                 const measurement = {
@@ -66,7 +108,7 @@ export default defineEventHandler(async (event) => {
                 inferences.push(measurement)
                 const inferenceStart = performance.now()
                 try {
-                    return await evaluateClef(request)
+                    return await evaluateClef(request, inference)
                 } finally {
                     measurement.durationMs = performance.now() - inferenceStart
                 }
@@ -75,7 +117,7 @@ export default defineEventHandler(async (event) => {
         )
     } catch (error) {
         if (event.req.signal.aborted) throw error
-        const limited = error instanceof UsageLimit
+        const limited = error instanceof Error && error.name === 'UsageLimit'
         const timedOut = error instanceof Error && error.name === 'TimeoutError'
         throw createError({
             status: limited ? 429 : timedOut ? 504 : 502,

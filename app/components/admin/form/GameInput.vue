@@ -1,11 +1,12 @@
 <script setup lang="ts">
 interface Props {
+    id?: string
     modelValue: string
     multiline?: boolean
     placeholder?: string
     disabled?: boolean
 }
-const { modelValue, multiline, placeholder, disabled } = defineProps<Props>()
+const { id, modelValue, multiline, placeholder, disabled } = defineProps<Props>()
 const emit = defineEmits<{
     'update:modelValue': [value: string]
     blur: []
@@ -83,6 +84,7 @@ const blur = () => {
     >
         <UTextarea
             v-if="multiline"
+            :id
             :model-value
             :disabled
             :placeholder
@@ -98,6 +100,7 @@ const blur = () => {
         />
         <UInput
             v-else
+            :id
             :model-value
             :disabled
             :placeholder

@@ -3,8 +3,7 @@ import type {
     Experimental_CompositionEvaluator,
     Experimental_ChoiceQuestion,
 } from '@json-render/core'
-import type { ServerAdmin } from 'liti/nuxt/server'
-import { UsageLimit } from 'void/limits'
+import { describeModel, type Model } from '@litijs/model'
 
 export type ComposerModelInfo = {
     name: ComposerModel
@@ -15,36 +14,40 @@ export type ComposerModelInfo = {
     scheduling?: boolean
 }
 
-export function composerModelInfo(
-    allowed: Awaited<ReturnType<ServerAdmin['models']>>,
-): ComposerModelInfo[] {
-    return composerModels.flatMap((name) => {
-        const model = allowed.find((model) => model.name === name)
-        if (!model) return []
-        return [
-            {
-                name,
-                label: model.meta.label,
-                displayField: model.displayFields?.title,
-                features: model.features,
-                scheduling: model.features.scheduling,
-                fields: Object.entries(model.fields)
-                    .filter(([key, field]) =>
-                        name === 'posts'
-                            ? ['title', 'tags'].includes(key)
-                            : field.kind !== 'object',
-                    )
-                    .map(([key, field]) => ({
-                        key,
-                        kind: field.kind,
-                        label: field.label ?? key,
-                        required: field.required,
-                        hasDefault: field.default !== undefined,
-                        values: field.values,
-                    })),
+export async function composerModelInfo(allowed: Model[]): Promise<ComposerModelInfo[]> {
+    const results: ComposerModelInfo[] = []
+    for (const name of composerModels) {
+        const definition = allowed.find((model) => model.name === name)
+        if (!definition) continue
+        const model = describeModel(definition, 'management')
+        const fields = await Promise.all(
+            modelFields(model).map(async (field) => ({
+                ...field,
+                hasDefault: field.hasDefault || field.key === 'slug',
+                required: !!(
+                    await definition.fields[field.key]!['schema']['~standard'].validate(undefined)
+                ).issues?.length,
+            })),
+        )
+        results.push({
+            name,
+            label: model.label,
+            displayField: model.title,
+            features: {
+                publishing: model.storage === 'content',
+                scheduling: model.storage === 'content',
+                revisions: model.storage === 'content',
+                sortable: true,
             },
-        ]
-    })
+            scheduling: model.storage === 'content',
+            fields: fields.filter((field) =>
+                name === 'posts'
+                    ? ['title', 'tags'].includes(field.key)
+                    : !['json', 'relation'].includes(field.kind),
+            ),
+        })
+    }
+    return results
 }
 type Entry = { id: string; data: Record<string, unknown> }
 export type ComposerAdmin = {
@@ -628,12 +631,12 @@ function finishItem(
                 plan.dateIncomplete = !date
             } else if (
                 plan.datePurpose === 'creation' &&
-                plan.fields.some((field) => field.key === 'createdAt')
+                plan.fields.some((field) => field.key === 'authoredAt')
             ) {
-                plan.visibleFields.push('createdAt')
+                plan.visibleFields.push('authoredAt')
                 plan.dateIncomplete = !date
                 if (date)
-                    plan.values.createdAt = toZoned(
+                    plan.values.authoredAt = toZoned(
                         parseDateTime(date),
                         input.timeZone,
                         'reject',
@@ -869,7 +872,7 @@ async function splitItems(
 
 function failedItem(item: ComposerItemInput, error: unknown, signal: AbortSignal): ComposerItem {
     signal.throwIfAborted()
-    if (error instanceof UsageLimit || (error instanceof Error && error.name === 'TimeoutError'))
+    if (error instanceof Error && (error.name === 'UsageLimit' || error.name === 'TimeoutError'))
         throw error
     return { ...item, error: 'この項目を準備できませんでした。再試行してください。' }
 }

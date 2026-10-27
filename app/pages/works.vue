@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import { MasonryWall } from '@yeger/vue-masonry-wall'
 
-const { data } = await useLitiQuery('works', {
-    transform: (entries) =>
-        entries.map((entry) => ({
-            ...entry.data,
-            slug: entry.data.slug,
-            image: entry.data.image?.url,
-        })),
-})
+useSeoMeta({ title: 'Works', description: 'A collection of works by Liry24.' })
+defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
+    { key: 'og' },
+    { key: 'whatsapp', width: 800, height: 800 },
+])
+
+const entries = await usePortfolioQuery('works')
+const data = computed(() =>
+    (entries.data.value ?? []).map((entry) => ({
+        ...entry.data,
+        slug: entry.data.slug,
+        image: mediaUrl(entry.data.image),
+    })),
+)
 </script>
 
 <template>

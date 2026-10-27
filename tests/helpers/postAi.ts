@@ -1,30 +1,22 @@
 import { createOpenAI } from '@ai-sdk/openai'
-import { ai } from '@litijs/ai'
-import { aiSdk } from '@litijs/ai/ai-sdk'
-import { executeAction } from 'liti/server'
+import { proofreadingAgent, slugAgent } from '@litijs/blog/agents'
+import { runAgent } from 'vite-hub/agent'
 
-import { postAiActions } from '../../server/utils/posts'
+import { validatePostProofreading } from '../../server/utils/postEditorial'
 
-// Always use an explicit synthetic key and a supplied fetch. These tests never
-// read credentials or contact OpenAI, Workers AI, or an AI Gateway.
+// Explicit synthetic credentials and fetch; no provider or gateway is contacted.
 export function mockPostActions(fetch: typeof globalThis.fetch) {
-    const model = createOpenAI({ apiKey: 'synthetic-test-only', fetch })('gpt-6-luna')
-    const plugin = ai({ provider: aiSdk({ text: model }), actions: postAiActions })
-    const execute = async (name: keyof typeof postAiActions, input: Record<string, unknown>) =>
-        (
-            await executeAction(plugin, name, input as never, {
-                actor: { id: 'synthetic-action-admin', roles: ['admin'] },
-            })
-        ).data
+    const model = createOpenAI({ apiKey: 'synthetic-test-only', fetch }).responses('gpt-6-luna')
     return {
-        async publication(props: { title: string; content: string }) {
-            return (await execute('publication', {
-                title: props.title,
-                context: props.content,
-            })) as { slug: string }
+        async publication(input: { title: string; body: string }) {
+            const [error, proposal] = await runAgent(slugAgent({ model }), { data: input })
+            if (error || !proposal) throw error ?? new Error('Missing slug proposal')
+            return proposal
         },
-        async proofread(props: { content: string }) {
-            return (await execute('proofread', props)) as { content: string }
+        async proofread(input: { body: string }) {
+            const [error, proposal] = await runAgent(proofreadingAgent({ model }), { data: input })
+            if (error || !proposal) throw error ?? new Error('Missing proofreading proposal')
+            return await validatePostProofreading(input.body, proposal.body)
         },
     }
 }

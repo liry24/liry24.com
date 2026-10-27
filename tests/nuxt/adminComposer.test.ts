@@ -9,7 +9,7 @@ import { useAdminComposer } from '../../app/composables/useAdminComposer'
 const { fetchBoundary } = vi.hoisted(() => ({ fetchBoundary: vi.fn() }))
 mockNuxtImport('$fetch', () => fetchBoundary)
 const { boundary } = vi.hoisted(() => ({ boundary: {} as Record<string, any> }))
-mockNuxtImport('useUserSession', () => () => ({ user: boundary.user }))
+mockNuxtImport('useAppSession', () => () => ({ user: boundary.user }))
 mockNuxtImport('useI18n', () => () => ({ locale: boundary.locale }))
 mockNuxtImport('useRoute', () => () => boundary.route)
 

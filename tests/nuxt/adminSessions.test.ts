@@ -5,8 +5,8 @@ import { defineComponent, h, ref } from 'vue'
 import { adminSessionDevice, useAdminSessions } from '#imports'
 
 const { boundary } = vi.hoisted(() => ({ boundary: {} as Record<string, any> }))
-mockNuxtImport('useAuthClient', () => () => boundary.client)
-mockNuxtImport('useUserSession', () => () => boundary.identity)
+mockNuxtImport('authClient', () => new Proxy({}, { get: (_target, key) => boundary.client?.[key] }))
+mockNuxtImport('useAppSession', () => () => boundary.identity)
 let wrapper: Awaited<ReturnType<typeof mountSuspended>> | undefined
 beforeEach(() => {
     boundary.client = {

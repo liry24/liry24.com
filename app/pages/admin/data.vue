@@ -1,28 +1,21 @@
 <script setup lang="ts">
-import type { Entry } from 'liti'
-import { createLitiClient } from 'liti/client'
-
 import { LazyAdminFormEntryModal } from '#components'
 
 const { open } = useAdminComposer()
 const { data: permissions } = await useAdminPermissions()
 const { data: models, status, error, refresh } = useLitiModels()
-const route = useRoute()
-const router = useRouter()
+const route = useRoute(),
+    router = useRouter(),
+    request = useRequestFetch(),
+    origin = useRequestURL().origin
 const modal = useOverlay().create(LazyAdminFormEntryModal)
-const client = createLitiClient()
-
 const sections = (['works', 'arts', 'careers', 'gameStats', 'skills', 'socials'] as const).map(
     (name) => {
-        const model = computed(() => models.value[name])
+        const model = computed(() => models.value?.find((model) => model.name === name))
         const query = computed(() =>
             String(route.query.model ?? 'posts') === name ? String(route.query.q ?? '') : '',
         )
-        const source = useLitiQuery(name, {
-            view: 'current',
-            q: query,
-            immediate: false,
-        })
+        const source = useAdminEntries(name, { q: query, immediate: false })
         watch(
             model,
             (available) => {
@@ -30,62 +23,81 @@ const sections = (['works', 'arts', 'careers', 'gameStats', 'skills', 'socials']
             },
             { immediate: true },
         )
-        const features = computed(
-            () =>
-                model.value?.features ?? {
-                    publishing: false,
-                    scheduling: false,
-                    revisions: false,
-                    sortable: false,
-                },
-        )
-        const meta = computed(() => model.value?.meta ?? { label: name, plural: name, fields: [] })
-        const moving = ref(false)
-        const mutationError = ref('')
+        const features = computed(() => ({
+            publishing: model.value?.storage === 'content',
+            scheduling: model.value?.storage === 'content',
+            revisions: model.value?.storage === 'content',
+            sortable: true,
+        }))
+        const meta = computed(() => ({
+            label:
+                name === 'gameStats'
+                    ? 'Game Stats'
+                    : (model.value?.label ?? name).replace(/s$/u, ''),
+            plural: model.value?.label ?? name,
+            icon: name === 'gameStats' ? 'mingcute:game-2-fill' : 'mingcute:storage-fill',
+            fields: Object.keys(model.value?.fields ?? {})
+                .filter((key) =>
+                    [
+                        'slug',
+                        'category',
+                        'description',
+                        'period',
+                        'position',
+                        'href',
+                        'rank',
+                    ].includes(key),
+                )
+                .slice(0, 4),
+        }))
+        const moving = ref(false),
+            mutationError = ref('')
         const busy = computed(() => source.status.value === 'pending' || moving.value)
-        const sortable = computed(() => features.value.sortable && !busy.value && !query.value)
-        const display = (data: Record<string, unknown>) => {
-            const fields = model.value?.displayFields
-            const image = data[fields?.image ?? 'image']
-            return {
-                title: String(data[fields?.title ?? 'title'] ?? ''),
-                image:
-                    image && typeof image === 'object' && 'url' in image
-                        ? String(image.url)
-                        : undefined,
-            }
-        }
-        async function reorder(entries: Entry[]) {
-            if (busy.value) return
+        const sortable = computed(
+            () =>
+                !busy.value &&
+                !query.value &&
+                source.data.value.length === source.total.value &&
+                (model.value?.storage !== 'content' ||
+                    source.data.value.every((entry) => Boolean(entry.digest))),
+        )
+        const display = (data: Record<string, unknown>) => ({
+            title: String(data[model.value?.title ?? 'title'] ?? ''),
+            image: gameImageUrl(
+                data.image ??
+                    data.icon ??
+                    (Array.isArray(data.images) ? data.images[0] : undefined),
+            ),
+        })
+        async function reorder(entries: AdminEntry[]) {
+            if (!sortable.value) return
             moving.value = true
             mutationError.value = ''
             try {
-                await client.setSortOrders(
-                    name,
-                    entries.map((entry, sortOrder) => ({
-                        id: entry.id,
-                        sortOrder,
-                        expectedVersion: entry.version,
-                    })),
-                )
+                await request('/api/admin/reorder', {
+                    method: 'POST',
+                    headers: { origin },
+                    body: {
+                        model: name,
+                        revision: source.revision.value,
+                        entries: entries.map((entry) => ({ id: entry.id, version: entry.version })),
+                    },
+                })
                 await source.refresh()
             } catch (cause) {
-                mutationError.value =
-                    cause instanceof Error ? cause.message : 'Could not reorder entries.'
+                mutationError.value = adminErrorMessage(cause, 'Could not reorder entries.')
             } finally {
                 moving.value = false
             }
         }
-        async function edit(entry?: Entry) {
+        async function edit(entry?: AdminEntry) {
             const changed = await modal.open({
                 modelName: name,
                 id: entry?.id,
                 categories: [
                     ...new Set(
                         source.data.value
-                            .map((item) =>
-                                'category' in item.data ? item.data.category : undefined,
-                            )
+                            .map((item) => item.data.category)
                             .filter(
                                 (value): value is string =>
                                     typeof value === 'string' && Boolean(value),
@@ -95,21 +107,23 @@ const sections = (['works', 'arts', 'careers', 'gameStats', 'skills', 'socials']
             }).result
             if (changed) await source.refresh()
         }
-        function move(entry: Entry, offset: number) {
-            const index = source.data.value.findIndex((item) => item.id === entry.id)
-            const target = index + offset
-            if (!sortable.value || index < 0 || target < 0 || target >= source.data.value.length)
-                return
+        function move(entry: AdminEntry, offset: number) {
+            const index = source.data.value.findIndex((item) => item.id === entry.id),
+                target = index + offset
+            if (target < 0 || target >= source.data.value.length) return
             const order = [...source.data.value]
-            ;[order[index], order[target]] = [order[target]!, order[index]!]
+            order.splice(index, 1)
+            order.splice(target, 0, entry)
             void reorder(order)
         }
         return reactive({
             name,
-            ...source,
-            meta,
-            features,
+            model,
             query,
+            ...source,
+            features,
+            meta,
+            moving,
             mutationError,
             busy,
             sortable,
@@ -120,15 +134,11 @@ const sections = (['works', 'arts', 'careers', 'gameStats', 'skills', 'socials']
         })
     },
 )
-const visibleSections = computed(() => sections.filter((section) => models.value[section.name]))
-
-const publication = (entry: Entry) =>
-    entry.publishedRevisionId
-        ? entry.currentRevisionId === entry.publishedRevisionId
-            ? 'Published'
-            : 'Unpublished changes'
-        : 'Draft'
-
+const visibleSections = computed(() => sections.filter((section) => section.model))
+const publication = (entry: AdminEntry) =>
+    ({ draft: 'Draft', published: 'Published', changed: 'Unpublished changes', immediate: 'Live' })[
+        entry.status
+    ]
 useHead({ title: 'Data' })
 </script>
 
@@ -172,6 +182,14 @@ useHead({ title: 'Data' })
                                     {{ section.meta.plural }}
                                     <span class="text-dimmed ml-1">{{ section.total }}</span>
                                 </h2>
+                                <AdminDataPublishList
+                                    v-if="section.features.publishing"
+                                    :entries="section.data"
+                                    :revision="section.revision"
+                                    :label="section.meta.plural"
+                                    :disabled="!section.sortable"
+                                    @changed="section.refresh()"
+                                />
                                 <UButton
                                     v-if="section.query"
                                     :label="`Clear search: ${section.query}`"
@@ -319,7 +337,7 @@ useHead({ title: 'Data' })
                             </template>
                         </section>
 
-                        <AdminDataPosts v-if="models.posts" />
+                        <AdminDataPosts v-if="models?.some((model) => model.name === 'posts')" />
                     </UContainer>
                 </div>
             </template>

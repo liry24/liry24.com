@@ -1,136 +1,130 @@
 <script setup lang="ts">
-interface Props {
+const { plan, pending, itemId } = defineProps<{
     plan: ComposerPlan
     pending: boolean
     itemId: string
-}
-const { plan, pending, itemId } = defineProps<Props>()
-const emit = defineEmits<{
-    saved: []
-    ready: [submit: (() => Promise<void>) | undefined]
 }>()
-
+const emit = defineEmits<{ saved: []; ready: [submit: (() => Promise<void>) | undefined] }>()
+if (!plan.model) throw new Error('Choose a model before opening its form.')
 const { open, busy: writing, setBusy, preparation } = useAdminComposer()
-const { form, fields, upload, operation, error, state, features } = await useLitiForm(
-    String(plan.model),
+const { form, id, descriptor, values, receipt, save, error, hasUnsavedChanges } = await useLitiForm(
+    plan.model,
     {
-        instance: 'composer:' + itemId,
         id: plan.entryId,
         defaultValues: plan.values,
-        onSuccess: () => emit('saved'),
+        onSuccess: (_receipt, { hasUnsavedChanges }) => {
+            if (!hasUnsavedChanges) emit('saved')
+        },
     },
 )
-
-const { baseline } = preparation(
+const { upload, busy: uploading, error: uploadError } = useImageUpload(plan.model, form, id)
+const prepared = preparation(
     itemId + ':' + plan.model + ':' + (plan.entryId ?? 'new'),
-    form.state.values,
+    values.value.data,
 )
-const conflict = computed(() => state.value.conflict)
-const busy = computed(() => pending || writing.value || !state.value.ready || state.value.busy)
-
-const submit = async () => {
-    if (state.value.can.save) await form.handleSubmit()
+const { baseline } = prepared
+if (prepared.draft) {
+    form.setFieldValue(
+        'data',
+        structuredClone(toRaw(prepared.draft.data)) as typeof values.value.data,
+    )
+    receipt.value = prepared.draft.receipt
 }
-
-const full = ref(false)
-const descriptors = computed(() =>
-    Object.fromEntries(fields.value.map((field) => [field.key, field])),
-)
-const visiblePlan = computed(() =>
-    full.value ? { ...plan, visibleFields: plan.fields.map((field) => field.key) } : plan,
-)
-
-const removeNavigationGuard = useRouter().beforeEach(() => state.value.canLeave)
-onScopeDispose(removeNavigationGuard)
-
 watch(
-    () => state.value.busy,
-    (value) => {
-        setBusy(itemId, value)
+    [values, receipt],
+    () => {
+        prepared.draft = {
+            data: structuredClone(toRaw(values.value.data)),
+            receipt: receipt.value ? structuredClone(toRaw(receipt.value)) : null,
+        }
     },
-    { flush: 'sync', immediate: true },
+    { deep: true, immediate: true, flush: 'sync' },
 )
-onScopeDispose(() => {
-    setBusy(itemId, false)
-    emit('ready', undefined)
-})
+const invalid = ref(false),
+    failure = ref(''),
+    full = ref(false)
+const fields = computed(() =>
+    descriptor.value
+        ? modelFields(descriptor.value).filter(
+              (field) => full.value || plan.visibleFields.includes(field.key),
+          )
+        : [],
+)
+const busy = computed(() => pending || writing.value || uploading.value)
+async function submit() {
+    if (busy.value || invalid.value) return
+    setBusy(itemId, true)
+    failure.value = ''
+    try {
+        await save()
+    } catch (cause) {
+        failure.value = adminErrorMessage(cause, 'Save failed.')
+    } finally {
+        setBusy(itemId, false)
+    }
+}
 watch(
     () => plan.values,
-    (values) => {
-        if (operation.value) return
-        for (const [key, value] of Object.entries(
-            composerValueUpdates(form.state.values, baseline, values),
-        )) {
-            if (!fields.value.some((field) => field.key === key)) continue
-            form.setFieldValue(key, value)
-            baseline[key] = value
-        }
+    (incoming) => {
+        if (busy.value) return
+        const updates = composerValueUpdates(values.value.data, baseline, incoming)
+        form.setFieldValue('data', { ...values.value.data, ...updates })
+        Object.assign(baseline, updates)
     },
     { immediate: true },
 )
+const removeGuard = useRouter().beforeEach(
+    () => !hasUnsavedChanges.value || window.confirm('Discard unsaved changes?'),
+)
 onMounted(() => emit('ready', submit))
+onScopeDispose(() => {
+    removeGuard()
+    setBusy(itemId, false)
+    emit('ready', undefined)
+})
 </script>
-
 <template>
-    <form.Subscribe :selector="(state) => ({ saving: state.isSubmitting })" v-slot="{ saving }">
-        <form class="grid gap-4" @submit.prevent="!busy && submit()">
+    <form.Subscribe :selector="(state) => state.isSubmitting" v-slot="saving">
+        <form class="grid gap-4" @submit.prevent="submit">
             <UAlert
-                v-if="error"
-                :title="error.message"
-                :description="
-                    conflict
-                        ? 'Your input is kept. Open the full screen to compare with the latest version.'
-                        : undefined
-                "
+                v-if="error || failure || uploadError"
+                :title="failure || uploadError || String(error)"
                 color="error"
             />
-            <fieldset :disabled="busy || conflict" class="min-w-0">
-                <AdminComposerSurface :plan="visiblePlan">
-                    <template #field="{ fieldName: name }">
-                        <form.Field v-if="descriptors[name]" :name="descriptors[name].name">
-                            <template #default="{ field }">
-                                <AdminFormField
-                                    :descriptor="descriptors[name]"
-                                    :model-value="field.value"
-                                    :errors="field.errors"
-                                    :disabled="busy || saving"
-                                    :uploading="operation === 'upload'"
-                                    @update:model-value="field.handleChange"
-                                    @blur="field.handleBlur"
-                                    @upload="(files) => upload(descriptors[name]!.name, files)"
-                                />
-                            </template>
-                        </form.Field>
-                    </template>
-                    <template #action>
-                        <UButton
-                            type="submit"
-                            :label="features.publishing ? 'Save Draft' : 'Save'"
-                            icon="mingcute:save-line"
-                            color="neutral"
-                            size="lg"
-                            block
-                            :loading="saving"
-                            :disabled="busy || conflict"
-                        />
-                    </template>
-                </AdminComposerSurface>
-            </fieldset>
-            <div class="flex flex-wrap items-center justify-between gap-2">
+            <AdminComposerSurface
+                :plan="
+                    full ? { ...plan, visibleFields: plan.fields.map((field) => field.key) } : plan
+                "
+            >
+                <template #field="{ fieldName }"
+                    ><AdminFormModelFields
+                        :form
+                        :fields="fields.filter((field) => field.key === fieldName)"
+                        :disabled="pending"
+                        :uploading
+                        @upload="upload"
+                        @invalid="invalid = $event"
+                /></template>
+                <template #action
+                    ><UButton
+                        type="submit"
+                        :label="descriptor?.storage === 'content' ? 'Save Draft' : 'Save'"
+                        :loading="saving"
+                        :disabled="busy || invalid"
+                        color="neutral"
+                        block
+                /></template>
+            </AdminComposerSurface>
+            <div class="flex justify-between gap-2">
                 <UButton
                     :label="full ? 'Show suggested fields' : 'Show all fields'"
                     variant="link"
-                    color="neutral"
-                    :disabled="busy"
                     @click="full = !full"
-                />
-                <UButton
+                /><UButton
                     :to="'/admin/' + plan.model"
                     label="Open full screen"
-                    :disabled="busy"
-                    @click="open = false"
                     variant="link"
-                    color="neutral"
+                    @click="open = false"
                 />
             </div>
         </form>

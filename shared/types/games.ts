@@ -1,9 +1,9 @@
-import type { AssetInput } from 'liti'
+import type { BlobReference } from '@vite-hub/blob/reference'
 
 export type GamePosition = {
     value: number
     label: string
-    image?: AssetInput | null
+    image?: BlobReference | null
     color?: string | null
 }
 
@@ -19,7 +19,7 @@ export type GameValue = {
     key: string
     value: number
     label?: string | null
-    image?: AssetInput | null
+    image?: BlobReference | null
     color?: string | null
 }
 
@@ -28,7 +28,7 @@ export type GameData = {
     igdbId: number
     name: string
     cover?: string | null
-    icon?: AssetInput | null
+    icon?: BlobReference | null
     primaryMetric?: string | null
     metrics?: GameMetric[] | null
 }

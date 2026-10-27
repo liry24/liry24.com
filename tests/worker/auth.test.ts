@@ -1,9 +1,10 @@
-import { createAuthDatabase } from '@litijs/void/session'
 import { betterAuth } from 'better-auth'
+import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { createAuthEndpoint } from 'better-auth/api'
+import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { expect, test } from 'vitest'
 
-import * as schema from '../../db/schema'
+import * as schema from '../../server/database/auth-schema'
 import { openTestDatabase } from '../helpers/database'
 
 test('auth counters bound unknown paths and dynamic routes while preserving ingress rules', async () => {
@@ -13,7 +14,24 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
         const auth = betterAuth({
             baseURL: 'https://auth.invalid',
             secret: 'test-only-auth-secret-not-for-deployment',
-            database: createAuthDatabase(schema, { usePlural: true }, { env: local.env }),
+            database: drizzleAdapter(
+                drizzle(
+                    async (query, params, method) => {
+                        const statement = db.prepare(query)
+                        statement.setReturnArrays(true)
+                        return {
+                            rows:
+                                method === 'run'
+                                    ? (statement.run(...params), [])
+                                    : method === 'get'
+                                      ? (statement.get(...params) ?? [])
+                                      : statement.all(...params),
+                        }
+                    },
+                    { schema },
+                ),
+                { provider: 'sqlite', schema },
+            ),
             rateLimit: {
                 enabled: true,
                 storage: 'database',
@@ -56,7 +74,7 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
             )
         for (const path of ['/missing-a', '/missing-b?x=1', '/%67et-session'])
             expect((await request(path)).status).toBe(404)
-        expect(db.prepare('SELECT COUNT(*) n FROM rate_limits').get()?.n).toBe(1)
+        expect(db.prepare('SELECT COUNT(*) n FROM rate_limit').get()?.n).toBe(1)
         expect((await request('/missing-c')).status).toBe(429)
         expect((await request('/missing-c', '198.51.100.21')).status).toBe(404)
 
@@ -64,7 +82,7 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
             expect((await request(path)).status).toBe(200)
         expect((await request('/probe/next')).status).toBe(429)
         expect((await request('/probe/strict')).status).toBe(429)
-        expect(db.prepare('SELECT COUNT(*) n FROM rate_limits').get()?.n).toBe(3)
+        expect(db.prepare('SELECT COUNT(*) n FROM rate_limit').get()?.n).toBe(3)
         for (let i = 0; i < 4; i++) expect((await request('/get-session')).status).toBe(200)
         expect((await request('/get-session')).status).toBe(429)
 
@@ -79,12 +97,12 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
         expect((await request('/rewrite-third', '198.51.100.23')).status).toBe(200)
         expect((await request('/early-fourth', '198.51.100.23')).status).toBe(429)
         expect(
-            db.prepare('SELECT COUNT(*) n FROM rate_limits WHERE key LIKE ?').get('198.51.100.23|%')
+            db.prepare('SELECT COUNT(*) n FROM rate_limit WHERE key LIKE ?').get('198.51.100.23|%')
                 ?.n,
         ).toBe(1)
-        db.exec('UPDATE rate_limits SET last_request = 0')
+        db.exec('UPDATE rate_limit SET last_request = 0')
         expect((await request('/missing-after-expiry')).status).toBe(404)
-        expect(db.prepare('SELECT COUNT(*) n FROM rate_limits').get()?.n).toBe(1)
+        expect(db.prepare('SELECT COUNT(*) n FROM rate_limit').get()?.n).toBe(1)
     } finally {
         db.close()
     }

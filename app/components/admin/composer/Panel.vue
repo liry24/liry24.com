@@ -8,7 +8,6 @@ const {
     requestId,
     result,
     saved,
-    setBusy,
     error,
     retry,
     selectItem,
@@ -33,13 +32,7 @@ const saveable = computed(
 const saveAll = async () => {
     if (!saveable.value || writing.value || running.value) return
 
-    setBusy('all', true)
-
-    try {
-        for (const item of eligible.value) await forms[item.id]?.()
-    } finally {
-        setBusy('all', false)
-    }
+    for (const item of eligible.value) await forms[item.id]?.()
 }
 
 watch(

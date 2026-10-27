@@ -28,10 +28,11 @@ export default defineConfig({
         {
             // These configuration dependencies also run directly in schema tooling.
             files: [
-                'app/auth.config.ts',
-                'server/auth.config.ts',
-                'server/utils/entryPreparation.ts',
-                'server/utils/gameValidation.ts',
+                'server/models/*.ts',
+                'server/utils/authOptions.ts',
+                'server/utils/modelValidation.ts',
+                'server/utils/modelActivity.ts',
+                'server/utils/adminActivity.ts',
             ],
             rules: { 'no-restricted-imports': 'off' },
         },

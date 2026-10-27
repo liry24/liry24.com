@@ -1,103 +1,30 @@
 import assert from 'node:assert/strict'
-import { createHmac } from 'node:crypto'
-import { readFile, writeFile, mkdir } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { mkdir } from 'node:fs/promises'
 
-import type { D1Database } from '@cloudflare/workers-types'
 import { chromium } from 'playwright-core'
 import { test } from 'vitest'
-import { createTestHarness } from 'wrangler'
 
 import type { ComposerPlan } from '../../shared/types/adminComposer'
-import { baselineStatements } from '../helpers/database'
+import { builtWorker } from '../helpers/builtWorker'
 
 test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
     'composer isolates requests, selects models, saves mixed batches and keeps post drafts separate',
     async () => {
         await mkdir('.tmp', { recursive: true })
-        const config = JSON.parse(await readFile('.void-wrangler.jsonc', 'utf8'))
-        config.name = 'composer-browser-test'
-        config.main = resolve('.output/server/index.mjs')
-        config.assets = { binding: 'ASSETS', directory: resolve('.output/public') }
-        config.vars = {
-            ...config.vars,
-            APP_ENV: 'test',
-            OPENAI_BASE_URL: 'http://127.0.0.1:1/v1',
-            NUXT_PUBLIC_PREVIEW: 'false',
-            NUXT_PUBLIC_SITE_URL: '',
-        }
-        config.routes = []
-        config.triggers = { crons: [] }
-        config.d1_databases = [
-            {
-                binding: 'DB',
-                database_name: 'composer-test',
-                database_id: '00000000-0000-4000-8000-000000000099',
-            },
-        ]
-        config.r2_buckets = [{ binding: 'STORAGE', bucket_name: 'composer-test-assets' }]
-        delete config.ai
-        delete config.previews
-        const configPath = resolve('.tmp/composer-wrangler.json')
-        await writeFile(configPath, JSON.stringify(config))
-        const secrets = Object.fromEntries(
-            [
-                ...(config.secrets?.required ?? [
-                    'BETTER_AUTH_SECRET',
-                    'NUXT_APP_SECRET',
-                    'GITHUB_CLIENT_ID',
-                    'GITHUB_CLIENT_SECRET',
-                ]),
-                'PREVIEW_GITHUB_TOKEN',
-            ].map((name) => [name, 'test-only-composer-secret-0123456789abcdef0123456789abcdef']),
-        )
-        const server = createTestHarness({ workers: [{ configPath, secrets }] })
+        const app = await builtWorker()
+        const { server, env, url } = app
         let browser
         const errors: string[] = []
         try {
-            const { url } = await server.listen()
-            config.vars.NUXT_PUBLIC_SITE_URL = url.origin
-            await writeFile(configPath, JSON.stringify(config))
-            await server.update({ workers: [{ configPath, secrets }] })
-            const env = await server.getWorker<{ DB: D1Database }>().getEnv()
-            await env.DB.batch(baselineStatements().map((sql) => env.DB.prepare(sql)))
             const now = Date.now()
-            await env.DB.prepare(
-                'INSERT INTO users (id,name,email,email_verified,role,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
+            const { cookie } = await app.session('composer-admin')
+            const signed = decodeURIComponent(
+                cookie.split(';')[0]!.slice('better-auth.session_token='.length),
             )
-                .bind(
-                    'composer-admin',
-                    'Synthetic admin',
-                    'composer@example.invalid',
-                    1,
-                    'admin',
-                    now,
-                    now,
-                )
-                .run()
-            await env.DB.prepare(
-                'INSERT INTO sessions (id,token,user_id,expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?)',
-            )
-                .bind(
-                    'composer-session',
-                    'composer-token',
-                    'composer-admin',
-                    now + 3600000,
-                    now,
-                    now,
-                )
-                .run()
-            const signed =
-                'composer-token.' +
-                createHmac('sha256', secrets.BETTER_AUTH_SECRET!)
-                    .update('composer-token')
-                    .digest('base64')
-            const cookie =
-                'better-auth.session_token=' +
-                encodeURIComponent(signed) +
-                '; __Secure-better-auth.session_token=' +
-                encodeURIComponent(signed)
-            browser = await chromium.launch({ headless: true })
+            browser = await chromium.launch({
+                headless: true,
+                ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+            })
             const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
             await context.route('**/*', (route) =>
                 new URL(route.request().url()).origin === url.origin
@@ -152,7 +79,11 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             let calls = 0,
                 writes = 0
             page.on('request', (request) => {
-                if (request.method() !== 'GET' && request.url().includes('/api/liti/')) writes++
+                if (
+                    request.url().includes('/api/_liti/manage') &&
+                    ['save', 'publish', 'remove'].includes(request.postDataJSON()?.action)
+                )
+                    writes++
             })
             await page.route('**/api/admin/compose', async (route) => {
                 calls++
@@ -281,7 +212,8 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 releaseModels = resolve
             })
             let modelRequests = 0
-            await page.route('**/api/liti/models**', async (route) => {
+            await page.route('**/api/_liti/manage', async (route) => {
+                if (route.request().postDataJSON()?.action !== 'models') return route.fallback()
                 modelRequests++
                 await modelsGate
                 await route.continue()
@@ -330,7 +262,9 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             const saveGate = new Promise<void>((resolve) => {
                 releaseSave = resolve
             })
-            await page.route('**/api/liti/entries/socials', async (route) => {
+            await page.route('**/api/_liti/manage', async (route) => {
+                const input = route.request().postDataJSON()
+                if (input?.action !== 'save' || input?.model !== 'socials') return route.fallback()
                 await saveGate
                 await route.continue()
             })
@@ -342,7 +276,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             assert(await page.getByLabel('Content request').isDisabled())
             await page.keyboard.press('Control+k')
             assert.equal(await page.getByRole('dialog').count(), 0, 'Saving keeps its form mounted')
-            await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
+            await navigate('/admin')
             assert.equal(
                 new URL(page.url()).pathname,
                 '/admin/data',
@@ -356,7 +290,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             assert.equal(await page.getByLabel('Title', { exact: true }).count(), 1)
             assert.equal(await page.getByText('Publication schedule', { exact: true }).count(), 0)
             assert.equal(await page.getByLabel('Tags', { exact: true }).count(), 0)
-            const entries = await server.fetch('/api/liti/entries?model=socials&locale=ja', {
+            const entries = await server.fetch('/api/admin/entries?model=socials', {
                 headers: { cookie },
             })
             assert.equal(entries.status, 200)
@@ -371,13 +305,10 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             )
             await page.getByLabel('Title', { exact: true }).fill('Existing unsaved title')
             await page.getByLabel('Content', { exact: true }).fill('Existing unsaved body')
-            await page.waitForFunction(() => {
-                const state = (document.querySelector('#__nuxt') as any).__vue_app__.config
-                    .globalProperties.$nuxt.payload.state
-                return Object.values(state['$sliti:form-drafts'] ?? {}).some(
-                    (draft: any) => draft.value.title === 'Existing unsaved title',
-                )
-            })
+            assert.equal(
+                await page.getByLabel('Title', { exact: true }).inputValue(),
+                'Existing unsaved title',
+            )
             await page.getByRole('link', { name: 'Data', exact: true }).click()
             await page.getByLabel('Content request').fill('new post with schedule')
             await page.getByRole('button', { name: 'Continue in Post Editor' }).click()
@@ -395,6 +326,58 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 await page.getByLabel('Publish at', { exact: true }).inputValue(),
                 '2027-01-20T18:00',
             )
+            const originalReviewBody = 'This are an example. `one()`'
+            const laterReviewBody = 'Later edit. `one()`'
+            const reviewRequested = Promise.withResolvers<void>()
+            const releaseReview = Promise.withResolvers<void>()
+            let reviewCalls = 0
+            await page.route('**/api/admin/posts/proofread', async (route) => {
+                const input = route.request().postDataJSON()
+                reviewCalls++
+                if (reviewCalls === 1) {
+                    assert.deepEqual(input, { body: originalReviewBody })
+                    reviewRequested.resolve()
+                    await releaseReview.promise
+                } else assert.deepEqual(input, { body: laterReviewBody })
+                await route.fulfill({
+                    json: {
+                        body:
+                            reviewCalls === 1
+                                ? 'This is an example. `one()`'
+                                : 'Reviewed later edit. `one()`',
+                    },
+                })
+            })
+            await page.getByLabel('Content', { exact: true }).fill(originalReviewBody)
+            await page.getByRole('button', { name: 'Proofread Content', exact: true }).click()
+            await reviewRequested.promise
+            await page.getByLabel('Content', { exact: true }).fill(laterReviewBody)
+            releaseReview.resolve()
+            await page
+                .getByText('Content has changed. Run proofreading again.', { exact: true })
+                .waitFor()
+            assert(
+                await page
+                    .getByRole('button', { name: 'Apply Suggestion', exact: true })
+                    .isDisabled(),
+            )
+            assert.equal(
+                await page.getByLabel('Content', { exact: true }).inputValue(),
+                laterReviewBody,
+            )
+            await page.getByRole('button', { name: 'Proofread Content', exact: true }).click()
+            await page.getByRole('button', { name: 'Apply Suggestion', exact: true }).click()
+            assert.equal(
+                await page.getByLabel('Content', { exact: true }).inputValue(),
+                'Reviewed later edit. `one()`',
+            )
+            assert.equal(
+                await page.getByLabel('Title', { exact: true }).inputValue(),
+                'Prepared post',
+            )
+            await page.unroute('**/api/admin/posts/proofread')
+            await page.getByLabel('Content', { exact: true }).fill('')
+
             await page.keyboard.press('Control+k')
             await page.getByRole('dialog').waitFor()
             await page.keyboard.press('Escape')
@@ -427,7 +410,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await cards.nth(1).getByText('Saved', { exact: true }).waitFor()
             assert.equal(writes, beforeAll + 2, 'Save all excludes posts')
             const savedSocials = (await (
-                await server.fetch('/api/liti/entries?model=socials&locale=ja', {
+                await server.fetch('/api/admin/entries?model=socials', {
                     headers: { cookie },
                 })
             ).json()) as any
@@ -490,20 +473,36 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 .getByRole('button', { name: 'Save', exact: true })
                 .waitFor()
             let attempts = 0
-            await page.route('**/api/liti/entries/socials', async (route) => {
+            await page.route('**/api/_liti/manage', async (route) => {
+                const input = route.request().postDataJSON()
+                if (input?.action !== 'save' || input?.model !== 'socials') return route.fallback()
                 if (++attempts === 2)
                     await route.fulfill({
                         status: 500,
                         contentType: 'application/json',
                         body: JSON.stringify({
-                            error: { code: 'SYNTHETIC_FAILURE', message: 'Synthetic save failure' },
+                            statusCode: 500,
+                            message: 'Synthetic save failure',
+                            data: { code: 'SYNTHETIC_FAILURE' },
                         }),
                     })
                 else await route.continue()
             })
             const beforePartial = writes
             await page.getByRole('button', { name: 'Save all', exact: true }).click()
-            await page.getByText('Synthetic save failure', { exact: true }).first().waitFor()
+            await page
+                .getByText('Synthetic save failure', { exact: true })
+                .first()
+                .waitFor()
+                .catch((cause) => {
+                    throw new Error(
+                        'Partial batch attempts=' +
+                            attempts +
+                            ', writes=' +
+                            (writes - beforePartial),
+                        { cause },
+                    )
+                })
             assert.equal(await page.getByText('Saved', { exact: true }).count(), 1)
             assert.equal(await page.getByLabel('Label', { exact: true }).inputValue(), 'Partial 1')
             await page.getByRole('button', { name: 'Save all', exact: true }).click()
@@ -541,12 +540,12 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             assert(calls >= 4)
             assert.equal(writes, 6)
             // Verify real user links, activity and session revocation against the emitted app.
-            await env.DB.prepare('UPDATE users SET username = ?, display_username = ? WHERE id = ?')
+            await env.DB.prepare('UPDATE user SET username = ?, display_username = ? WHERE id = ?')
                 .bind('synthetic-admin', 'Synthetic-Admin', 'composer-admin')
                 .run()
             await page.setViewportSize({ width: 1280, height: 900 })
             await goto(new URL('/admin/users', url).href)
-            const userLink = page.getByRole('link', { name: 'Synthetic admin', exact: true })
+            const userLink = page.getByRole('link', { name: 'composer-admin', exact: true })
             await userLink.waitFor()
             assert.equal(await userLink.getAttribute('href'), '/admin/@synthetic-admin')
             await userLink.click()
@@ -563,7 +562,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.setViewportSize({ width: 1280, height: 900 })
             for (const id of ['device-one', 'device-two'])
                 await env.DB.prepare(
-                    'INSERT INTO sessions (id,token,user_id,expires_at,created_at,updated_at,user_agent,ip_address) VALUES (?,?,?,?,?,?,?,?)',
+                    'INSERT INTO session (id,token,user_id,expires_at,created_at,updated_at,user_agent,ip_address) VALUES (?,?,?,?,?,?,?,?)',
                 )
                     .bind(
                         id,
@@ -592,14 +591,16 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 .waitFor({ state: 'hidden' })
             assert.equal(
                 (
-                    await env.DB.prepare('SELECT COUNT(*) AS count FROM sessions WHERE user_id = ?')
+                    await env.DB.prepare('SELECT COUNT(*) AS count FROM session WHERE user_id = ?')
                         .bind('composer-admin')
                         .first<{ count: number }>()
                 )?.count,
                 1,
             )
             await goto(new URL('/admin/users', url).href)
-            const userRow = page.getByRole('row').filter({ hasText: 'composer@example.invalid' })
+            const userRow = page
+                .getByRole('row')
+                .filter({ hasText: 'composer-admin@example.invalid' })
             await page.waitForFunction(
                 () =>
                     (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
@@ -611,24 +612,34 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.waitForURL('**/admin/@synthetic-admin')
             await page.getByText('Revoked a session', { exact: true }).first().waitFor()
             // Game fixtures and all browser traffic stay inside synthetic Worker bindings.
-            async function create(model: string, data: Record<string, unknown>, id?: string) {
-                const response = await server.fetch(`/api/liti/entries/${model}`, {
+            async function create(
+                model: string,
+                input: Record<string, unknown>,
+                id = crypto.randomUUID(),
+            ) {
+                const { body, ...data } = input
+                const response = await server.fetch('/api/_liti/manage', {
                     method: 'POST',
-                    headers: { cookie, 'content-type': 'application/json' },
-                    body: JSON.stringify({ id, data }),
+                    headers: { cookie, origin: url.origin, 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'save',
+                        model,
+                        id,
+                        data,
+                        body,
+                        ifDigest: null,
+                        ifVersion: null,
+                        locale: model === 'posts' ? 'ja' : 'und',
+                    }),
                 })
-                const result = (await response.json()) as {
-                    id: string
-                    version: number
-                    data: Record<string, unknown>
-                }
-                assert.equal(response.status, 201, JSON.stringify(result))
-                return result
+                const receipt = (await response.json()) as { digest?: string; version?: number }
+                assert.equal(response.status, 200, JSON.stringify(receipt))
+                return { ...receipt, id, data }
             }
             for (let index = 0; index < 21; index++)
                 await create('posts', {
                     title: `Page Probe ${index}`,
-                    content: 'Synthetic draft',
+                    body: 'Synthetic draft',
                     tags: [],
                     slug: `page-probe-${index}`,
                 })
@@ -678,7 +689,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             )
             await goto(new URL('/admin/posts?q=Page%20Probe%2020', url).href)
             await postsSection.getByRole('button', { name: 'Entry actions', exact: true }).click()
-            await page.getByRole('button', { name: 'Delete', exact: true }).click()
+            await page.getByRole('button', { name: 'Delete draft', exact: true }).click()
             await postsSection.getByText('No posts found.', { exact: true }).waitFor()
             await page.keyboard.press('Escape')
             await create('skills', { name: 'Sort first', icon: 'mingcute:check-line' })
@@ -694,12 +705,14 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 .nth(1)
                 .innerText()
             await page.route(
-                '**/api/liti/entries/skills/reorder',
+                '**/api/admin/reorder',
                 (route) =>
                     route.fulfill({
                         status: 409,
                         json: {
-                            error: { code: 'LITI_CONFLICT', message: 'Reorder conflict' },
+                            statusCode: 409,
+                            message: 'Reorder conflict',
+                            data: { code: 'LITI_CONFLICT' },
                         },
                     }),
                 { times: 1 },
@@ -712,7 +725,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             )
             const sorted = page.waitForResponse(
                 (response) =>
-                    response.url().includes('/api/liti/entries/skills/reorder') &&
+                    response.url().includes('/api/admin/reorder') &&
                     response.request().method() === 'POST',
             )
             await reorder.press('ArrowRight')
@@ -727,6 +740,37 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                         .querySelector('[data-model="skills"] article button.truncate')
                         ?.textContent?.trim() === expected,
                 nextTitle,
+            )
+
+            const reviewedOrder = (await (
+                await server.fetch('/api/admin/entries?model=skills', { headers: { cookie } })
+            ).json()) as any
+            await skillSection
+                .getByRole('button', { name: 'Review & publish list', exact: true })
+                .click()
+            const listReview = page.getByRole('dialog')
+            await listReview
+                .getByText(
+                    'Publish every draft below, including its fields and list order. Later edits require a new review.',
+                    { exact: true },
+                )
+                .waitFor()
+            const listPublished = page.waitForResponse(
+                (response) =>
+                    response.url().includes('/api/_liti/manage') &&
+                    response.request().postDataJSON()?.action === 'publishMany',
+            )
+            await listReview
+                .getByRole('button', { name: 'Publish reviewed list', exact: true })
+                .click()
+            assert.equal((await listPublished).status(), 200)
+            await listReview.waitFor({ state: 'hidden' })
+            const publicSkills = (await (
+                await server.fetch('/api/_liti?model=skills')
+            ).json()) as any
+            assert.deepEqual(
+                publicSkills.items.map((entry: any) => entry.id),
+                reviewedOrder.items.map((entry: any) => entry.id),
             )
             await skillSection.getByRole('button', { name: 'Add new Skill', exact: true }).click()
             const skillEditor = page.getByRole('dialog')
@@ -744,7 +788,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 .locator('article')
                 .filter({ hasText: 'Edited in data page' })
             await editedSkill.getByRole('button', { name: 'Entry actions', exact: true }).click()
-            await page.getByRole('button', { name: 'Delete', exact: true }).click()
+            await page.getByRole('button', { name: 'Delete draft', exact: true }).click()
             await editedSkill.waitFor({ state: 'hidden' })
             await page.keyboard.press('Escape')
             await page.screenshot({ path: '.tmp/admin-data-desktop.png', fullPage: true })
@@ -753,7 +797,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.screenshot({ path: '.tmp/admin-data-mobile.png', fullPage: true })
             await page.setViewportSize({ width: 1280, height: 900 })
             // Keep the independent game flow within the real per-minute auth limits.
-            await env.DB.prepare('DELETE FROM rate_limits').run()
+            await env.DB.prepare('DELETE FROM rate_limit').run()
             const game = await create(
                 'games',
                 {
@@ -795,14 +839,19 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 })
             const post = await create('posts', {
                 title: 'Played <game:valorant>',
-                content: 'Before <game:valorant> after.\n\n<!-- more -->\n\nBody.',
+                body: 'Before <game:valorant> after.\n\n<!-- more -->\n\nBody.',
                 tags: [],
                 slug: 'synthetic-game-mention',
             })
-            const published = await server.fetch(`/api/liti/entries/${post.id}/publish`, {
+            const published = await server.fetch('/api/_liti/manage', {
                 method: 'POST',
-                headers: { cookie, 'content-type': 'application/json' },
-                body: JSON.stringify({ expectedVersion: post.version }),
+                headers: { cookie, origin: url.origin, 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'publish',
+                    model: 'posts',
+                    id: post.id,
+                    digests: { ja: post.digest },
+                }),
             })
             assert.equal(published.status, 200, await published.text())
             const denied = await server.fetch('/api/admin/games')
@@ -816,7 +865,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             )
             const imported = await server.fetch('/api/admin/games', {
                 method: 'POST',
-                headers: { cookie, 'content-type': 'application/json' },
+                headers: { cookie, origin: url.origin, 'content-type': 'application/json' },
                 body: JSON.stringify({ igdbId: 126459, slug: 'ignored-client-slug' }),
             })
             assert.equal(imported.status, 200)
@@ -942,10 +991,12 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 return rect && rect.left >= 0 && rect.right <= innerWidth
             })
             await page.screenshot({ path: '.tmp/game-stats-mobile.png', fullPage: true })
-            await page
-                .getByRole('dialog')
-                .getByRole('button', { name: 'Close', exact: true })
-                .click()
+            const closeStats = page.getByRole('dialog').locator('button[data-slot="close"]')
+            assert(
+                await closeStats.getAttribute('aria-label'),
+                'The localized close button keeps an accessible name',
+            )
+            await closeStats.click()
             await page.setViewportSize({ width: 1280, height: 900 })
             await goto(new URL('/admin/gameStats', url).href)
             await page.waitForFunction(
@@ -956,7 +1007,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await page.getByRole('button', { name: 'Add new Game Stats', exact: true }).click()
             const editor = page.getByRole('dialog')
             await editor.getByRole('button', { name: 'Save', exact: true }).click()
-            await editor.getByText('Check the fields before saving', { exact: true }).waitFor()
+            await editor.getByText('Model validation failed.', { exact: true }).waitFor()
             await editor.getByLabel('Game', { exact: true }).click()
             await page.getByRole('option', { name: 'VALORANT', exact: true }).click()
             await editor.getByLabel('Period key', { exact: true }).fill('act-4')
@@ -989,10 +1040,10 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             let uploadedImageId = ''
             const uploadReceived = Promise.withResolvers<void>()
             const releaseUpload = Promise.withResolvers<void>()
-            await page.route('**/api/liti/assets', async (route) => {
+            await page.route('**/api/admin/images**', async (route) => {
                 const response = await route.fetch()
-                const body = (await response.json()) as { id: string }
-                uploadedImageId = body.id
+                const body = (await response.json()) as { pathname: string }[]
+                uploadedImageId = body[0]!.pathname
                 uploadReceived.resolve()
                 await releaseUpload.promise
                 await route.fulfill({ response })
@@ -1036,7 +1087,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await editor.getByRole('button', { name: 'Save', exact: true }).click()
             await editor.waitFor({ state: 'hidden' })
 
-            const statsResponse = await server.fetch('/api/liti/entries?model=gameStats', {
+            const statsResponse = await server.fetch('/api/admin/entries?model=gameStats', {
                 headers: { cookie },
             })
             const stats = (await statsResponse.json()) as {
@@ -1047,7 +1098,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 key: string
                 value: number
                 label: string
-                image: string | { id: string }
+                image: { pathname: string }
                 color: string
             }
             assert.equal(savedPoint.key, 'peakRank')
@@ -1055,7 +1106,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             assert.equal(savedPoint.label, 'Immortal 1 23 RR')
             assert.equal(savedPoint.color, '#EF4444')
             assert.equal(
-                typeof savedPoint.image === 'string' ? savedPoint.image : savedPoint.image.id,
+                typeof savedPoint.image === 'object' ? savedPoint.image.pathname : undefined,
                 uploadedImageId,
             )
             await goto(new URL('/admin/games', url).href)
@@ -1117,7 +1168,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                     game: 'Legacy game alias',
                     season: 'Earlier Act',
                     rank: 'Earlier tier',
-                    image: uploadedImageId,
+                    image: { pathname: uploadedImageId, contentType: 'image/png' },
                     href: 'https://example.invalid/profile',
                 },
                 'alias-rank',
@@ -1125,7 +1176,6 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await create(
                 'gameStats',
                 {
-                    slug: 'copied-rank',
                     game: game.id,
                     periodKey: 'earlier-act',
                     period: 'Earlier Act',
@@ -1135,7 +1185,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                             key: 'peakRank',
                             value: 2000,
                             label: 'Earlier tier',
-                            image: uploadedImageId,
+                            image: { pathname: uploadedImageId, contentType: 'image/png' },
                             color: '#22AA66',
                         },
                     ],
@@ -1172,7 +1222,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             throw error
         } finally {
             await browser?.close()
-            await server.close()
+            await app.close()
         }
     },
     180000,

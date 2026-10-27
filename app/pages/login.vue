@@ -4,24 +4,31 @@ definePageMeta({
 })
 
 const toast = useToast()
-const passkey = useSignIn('passkey')
-const social = useSignIn('social')
+const signingIn = ref(false)
 const isPreview = String(useRuntimeConfig().public.preview) === 'true'
 
 const signInWithPasskey = async () => {
-    await passkey.execute()
-    if (passkey.error.value) {
+    if (signingIn.value) return
+    signingIn.value = true
+    try {
+        const result = await authClient.signIn.passkey()
+        if (result.error) throw result.error
+        await navigateTo('/admin')
+    } catch (error) {
         toast.add({
             title: 'Passkeyでログインできませんでした',
-            description: passkey.error.value.message,
+            description: error instanceof Error ? error.message : 'Please try again.',
             color: 'error',
         })
-        return
+    } finally {
+        signingIn.value = false
     }
 }
 
-const signInWithGitHub = () => social.execute({ provider: 'github' })
-const signInWithVercel = () => social.execute({ provider: 'vercel' })
+const signInWithGitHub = () =>
+    authClient.signIn.social({ provider: 'github', callbackURL: '/admin' })
+const signInWithVercel = () =>
+    authClient.signIn.social({ provider: 'vercel', callbackURL: '/admin' })
 </script>
 
 <template>

@@ -10,7 +10,7 @@ export function configureGameFixture(value: string | null) {
 export async function savedGame() {
     reads++
     return scenario === 'existing' || (scenario === 'simultaneous' && reads > 1)
-        ? { id: 'igdb-1', data: { ...game, metrics: [] } }
+        ? { id: 'igdb-1', data: { ...game, cover: undefined, metrics: [] } }
         : null
 }
 export async function queryIgdb() {
@@ -20,7 +20,10 @@ export async function queryIgdb() {
 }
 export async function createGame(model: string, input: unknown) {
     assert.equal(model, 'games')
-    assert.deepEqual(input, { id: 'igdb-1', data: { ...game, metrics: [] } })
+    assert.deepEqual(input, {
+        id: 'igdb-1',
+        data: { ...game, cover: undefined, order: 0, metrics: [] },
+    })
     if (scenario === 'simultaneous' || scenario === 'save-failure') throw new Error('Duplicate')
     console.info('fixture-game-created')
 }

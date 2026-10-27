@@ -1,10 +1,12 @@
-import type { GameMetric, GameValue } from '../types/games'
+import type { GameMetric, GameValue } from '../types/games.js'
 
 export const gameSlugPattern = /^[a-z0-9][a-z0-9-]*$/
 export const gameColorPattern = /^#[0-9a-fA-F]{6}$/
 
 export const gameImageUrl = (image: unknown): string | undefined =>
-    image && typeof image === 'object' && 'url' in image ? String(image.url) : undefined
+    image && typeof image === 'object' && 'pathname' in image && typeof image.pathname === 'string'
+        ? '/media/' + image.pathname.split('/').map(encodeURIComponent).join('/')
+        : undefined
 
 export function formatGameValue(value: GameValue | undefined, metric?: GameMetric): string {
     if (!value) return '—'

@@ -8,10 +8,10 @@ const path = (value: string) =>
     fileURLToPath(new URL(value, import.meta.url))
         .split(sep)
         .join('/')
-const migrations = readdirSync(path('../../../db/migrations'))
+const migrations = readdirSync(path('../../../server/databases/migrations'))
     .filter((file) => file.endsWith('.sql'))
     .sort()
-    .map((file) => readFileSync(path(`../../../db/migrations/${file}`), 'utf8'))
+    .map((file) => readFileSync(path(`../../../server/databases/migrations/${file}`), 'utf8'))
 export default defineNuxtConfig({
     compatibilityDate: '2026-10-13',
     ssr: false,
@@ -27,8 +27,7 @@ export default defineNuxtConfig({
             ],
         },
         alias: {
-            'void/db': path('./database.ts'),
-            'liti/nuxt/server': path('../compose/sdk.ts'),
+            'vite-hub/database/drizzle': path('./database.ts'),
         },
         virtual: { '#fixture/migrations': `export default ${JSON.stringify(migrations)}` },
     },

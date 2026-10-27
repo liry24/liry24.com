@@ -2,13 +2,16 @@ import { afterEach, expect, test, vi } from 'vitest'
 
 import { mockPostActions, postActionRequest, postActionResponse } from './helpers/postAi'
 
-const draft = { title: '日本語投稿', content: 'これは原稿です。', tags: [] }
+const draft = { title: '日本語投稿', body: 'これは原稿です。', tags: [] }
 const metadataProps = {
     title: draft.title,
-    content: draft.content,
+    body: draft.body,
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+})
 
 test('native Output generates only a slug through the unchanged provider and preserves input', async () => {
     const external = vi.fn(() => {
@@ -19,20 +22,18 @@ test('native Output generates only a slug through the unchanged provider and pre
     const fetch = vi.fn(async (input, init) => {
         requests.push(await postActionRequest(input, init))
         return postActionResponse(
-            requests.length === 1
-                ? { slug: 'test-post' }
-                : { content: 'これは校正された原稿です。' },
+            requests.length === 1 ? { slug: 'test-post' } : { body: 'これは校正された原稿です。' },
         )
     })
     const actions = mockPostActions(fetch)
     const input = structuredClone(metadataProps)
     expect(await actions.publication(input)).toEqual({ slug: 'test-post' })
-    expect(await actions.proofread({ content: input.content })).toEqual({
-        content: 'これは校正された原稿です。',
+    expect(await actions.proofread({ body: input.body })).toEqual({
+        body: 'これは校正された原稿です。',
     })
     expect(input).toEqual(metadataProps)
     expect(fetch).toHaveBeenCalledTimes(2)
-    for (const [index, fields] of [['slug'], ['content']].entries()) {
+    for (const [index, fields] of [['slug'], ['body']].entries()) {
         const request = requests[index]!
         expect(request.url).toBe('https://api.openai.com/v1/responses')
         expect(request.body.model).toBe('gpt-6-luna')
@@ -48,7 +49,7 @@ test('native Output generates only a slug through the unchanged provider and pre
 test('slug generation validates exact fields and shape', async () => {
     for (const output of [
         { slug: 'bad/slug' },
-        { slug: 'valid-slug', content: 'Unexpected rewrite' },
+        { slug: 'valid-slug', body: 'Unexpected rewrite' },
         { slug: 'valid-slug', excerpt: 'Unexpected introduction' },
         { slug: '' },
         { slug: 'a'.repeat(81) },
@@ -62,16 +63,16 @@ test('slug generation validates exact fields and shape', async () => {
 test('proofreading rejects changes to code, links, and assets without changing the draft', async () => {
     const input = {
         ...draft,
-        content: 'Example `one()`\n\n[link](/posts/a)\n\n![image](liti:asset-one)',
+        body: 'Example `one()`\n\n[link](/posts/a)\n\n![image](liti:asset-one)',
     }
     const original = structuredClone(input)
-    for (const content of [
-        input.content.replace('one()', 'two()'),
-        input.content.replace('/posts/a', '/posts/b'),
-        input.content.replace('asset-one', 'asset-two'),
+    for (const body of [
+        input.body.replace('one()', 'two()'),
+        input.body.replace('/posts/a', '/posts/b'),
+        input.body.replace('asset-one', 'asset-two'),
     ]) {
-        const run = vi.fn(async () => postActionResponse({ content }))
-        await expect(mockPostActions(run).proofread({ content: input.content })).rejects.toThrow()
+        const run = vi.fn(async () => postActionResponse({ body }))
+        await expect(mockPostActions(run).proofread({ body: input.body })).rejects.toThrow()
         expect(input).toEqual(original)
         expect(run).toHaveBeenCalledTimes(1)
     }
@@ -91,24 +92,24 @@ test.each([
         '[link][a]\n\n[a]: /posts/a(foo).jpg',
     ],
     ['unused reference', '[unused]: /posts/a(foo).png', '[unused]: /posts/a(foo).jpg'],
-])('proofreading protects %s using native Markdown parsing', async (_name, content, changed) => {
-    const input = { ...draft, content }
+])('proofreading protects %s using native Markdown parsing', async (_name, body, changed) => {
+    const input = { ...draft, body }
     const original = structuredClone(input)
-    const run = vi.fn(async () => postActionResponse({ content: changed }))
-    await expect(mockPostActions(run).proofread({ content: input.content })).rejects.toThrow()
+    const run = vi.fn(async () => postActionResponse({ body: changed }))
+    await expect(mockPostActions(run).proofread({ body: input.body })).rejects.toThrow()
     expect(input).toEqual(original)
     expect(run).toHaveBeenCalledTimes(1)
 })
 
 test('proofreading can edit prose around protected Markdown without changing its source', async () => {
-    const content =
+    const body =
         'This are an example `one()\nnext()` with [a link](/posts/a(foo).png).\n\n    one()\n\n![image](liti:asset-one)\n\n[unused]: /posts/a(foo).png'
-    const corrected = content.replace('This are', 'This is')
-    const input = { ...draft, content }
-    const run = vi.fn(async () => postActionResponse({ content: corrected }))
-    const result = await mockPostActions(run).proofread({ content: input.content })
-    expect(result.content).toBe(corrected)
-    expect(input.content).toBe(content)
+    const corrected = body.replace('This are', 'This is')
+    const input = { ...draft, body }
+    const run = vi.fn(async () => postActionResponse({ body: corrected }))
+    const result = await mockPostActions(run).proofread({ body: input.body })
+    expect(result.body).toBe(corrected)
+    expect(input.body).toBe(body)
     expect(run).toHaveBeenCalledTimes(1)
 })
 
@@ -144,33 +145,33 @@ test.each([
         '<div>\nThis are an example.\n</div>',
         '<div>\nThis is an example.\n</div>',
     ],
-])('proofreading conservatively preserves %s', async (_name, content, changed) => {
-    const input = { ...draft, content }
+])('proofreading conservatively preserves %s', async (_name, body, changed) => {
+    const input = { ...draft, body }
     const original = structuredClone(input)
-    const run = vi.fn(async () => postActionResponse({ content: changed }))
-    await expect(mockPostActions(run).proofread({ content: input.content })).rejects.toThrow()
+    const run = vi.fn(async () => postActionResponse({ body: changed }))
+    await expect(mockPostActions(run).proofread({ body: input.body })).rejects.toThrow()
     expect(input).toEqual(original)
     expect(run).toHaveBeenCalledTimes(1)
 })
 
 test('proofreading can edit surrounding prose while preserving raw HTML tokens', async () => {
-    const content =
+    const body =
         'This are <a href="/posts/original">a link</a> and <img src="/assets/original.png">.\n\n<div>\nThis block stays exact.\n</div>'
-    const corrected = content.replace('This are', 'These are')
-    const input = { ...draft, content }
-    const run = vi.fn(async () => postActionResponse({ content: corrected }))
-    const result = await mockPostActions(run).proofread({ content: input.content })
-    expect(result.content).toBe(corrected)
-    expect(input.content).toBe(content)
+    const corrected = body.replace('This are', 'These are')
+    const input = { ...draft, body }
+    const run = vi.fn(async () => postActionResponse({ body: corrected }))
+    const result = await mockPostActions(run).proofread({ body: input.body })
+    expect(result.body).toBe(corrected)
+    expect(input.body).toBe(body)
     expect(run).toHaveBeenCalledTimes(1)
 })
 
 test('proofreading retains an explicit summary boundary and its blank lines', async () => {
-    const content =
+    const body =
         'This are an introduction with [a link](/posts/example).\n\n<!-- more -->\n\nThe rest has `one()`.\n\nA final paragraph.'
-    const corrected = content.replace('This are', 'This is')
-    const run = vi.fn(async () => postActionResponse({ content: corrected }))
-    expect(await mockPostActions(run).proofread({ content })).toEqual({ content: corrected })
+    const corrected = body.replace('This are', 'This is')
+    const run = vi.fn(async () => postActionResponse({ body: corrected }))
+    expect(await mockPostActions(run).proofread({ body })).toEqual({ body: corrected })
     for (const changed of [
         corrected.replace('<!-- more -->', ''),
         corrected.replace('<!-- more -->', '<!-- other -->'),
@@ -179,8 +180,35 @@ test('proofreading retains an explicit summary boundary and its blank lines', as
             .replace('\n\n<!-- more -->', '')
             .replace('\n\nA final', '\n\n<!-- more -->\n\nA final'),
     ]) {
-        const invalid = vi.fn(async () => postActionResponse({ content: changed }))
-        await expect(mockPostActions(invalid).proofread({ content })).rejects.toThrow()
+        const invalid = vi.fn(async () => postActionResponse({ body: changed }))
+        await expect(mockPostActions(invalid).proofread({ body })).rejects.toThrow()
         expect(invalid).toHaveBeenCalledTimes(1)
     }
+})
+test('application Agent definitions stay lazy and use the existing model only for an explicit invocation', async () => {
+    vi.stubEnv('OPENAI_API_KEY', '')
+    const external = vi.fn(async () => {
+        throw new Error('Unexpected external request')
+    })
+    vi.stubGlobal('fetch', external)
+    const { default: proofread } = await import('../server/agents/post-proofread')
+    expect((await import('../server/agents/post-slug')).default).toBeDefined()
+    expect(external).not.toHaveBeenCalled()
+    const { postEditorialModel } = await import('../server/utils/postEditorialModel')
+    expect(postEditorialModel).toThrow('not configured')
+    vi.stubEnv('OPENAI_API_KEY', 'synthetic-app-model-key')
+    vi.stubEnv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
+    const requests: Awaited<ReturnType<typeof postActionRequest>>[] = []
+    const mock = vi.fn(async (input, init) => {
+        requests.push(await postActionRequest(input, init))
+        return postActionResponse({ body: 'Reviewed article' })
+    })
+    vi.stubGlobal('fetch', mock)
+    const { runAgent } = await import('vite-hub/agent')
+    const [error, result] = await runAgent(proofread, { data: { body: 'Original article' } })
+    expect(error).toBeNull()
+    expect(result).toEqual({ body: 'Reviewed article' })
+    expect(mock).toHaveBeenCalledTimes(1)
+    expect(requests[0]?.url).toBe('https://api.openai.com/v1/responses')
+    expect(requests[0]?.body.model).toBe('gpt-6-luna')
 })

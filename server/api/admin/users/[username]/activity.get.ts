@@ -1,13 +1,13 @@
-import { getNitroRequest } from 'liti/nuxt/server'
+import { and, or, eq, lt, desc } from 'drizzle-orm'
 import { createError, defineEventHandler, getQuery } from 'nuxt/server'
-import { db, and, or, eq, lt, desc } from 'void/db'
+import { db } from 'vite-hub/database/drizzle'
 import { z } from 'zod'
 
-import { adminEvents } from '../../../../../db/schema'
+import { adminEvent as adminEvents } from '../../../../database/auth-schema'
 
 export default defineEventHandler(async (event) => {
     event.res.headers.set('Cache-Control', 'private, no-store')
-    const viewer = await requireUserSession(getNitroRequest(event))
+    const viewer = await requireAppSession(event.req)
     const user = await findAdminUser(event)
     await requireAdminPermission(event, {
         activity: [viewer.user.id === user.id ? 'readOwn' : 'readAny'],

@@ -1,5 +1,4 @@
 import type { Experimental_CompositionEvaluator } from '@json-render/core'
-import { ai } from 'void/ai'
 import { z } from 'zod'
 
 const resultSchema = z.object({
@@ -9,11 +8,17 @@ const resultSchema = z.object({
     ),
     usage: z.object({ input_tokens: z.number().optional() }).optional(),
 })
-export const evaluateClef: Experimental_CompositionEvaluator = async ({
-    state,
-    questions,
-    signal,
-}) => {
+export type ComposerInference = {
+    run(
+        model: string,
+        input: Record<string, unknown>,
+        options: { signal?: AbortSignal },
+    ): Promise<unknown>
+}
+export const evaluateClef = async (
+    { state, questions, signal }: Parameters<Experimental_CompositionEvaluator>[0],
+    ai: ComposerInference,
+) => {
     const result = resultSchema.parse(
         await ai.run(
             '@cf/cloudflare/clef-flash',

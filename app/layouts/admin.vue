@@ -1,5 +1,6 @@
 <script setup lang="ts">
-const { user } = useUserSession()
+const { user, load } = useAppSession()
+await load()
 const { data: permissions } = await useAdminPermissions()
 const { open, busy } = useAdminComposer()
 

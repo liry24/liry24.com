@@ -1,4 +1,4 @@
-import * as schema from '../../../../../db/schema'
+import * as schema from '../../../../../server/database/auth-schema'
 import { auth } from '../../auth'
 import { db, sqlite } from '../../database'
 
@@ -6,13 +6,13 @@ export default defineEventHandler(async (event) => {
     const input = await readBody(event)
     if (input.action === 'seed') {
         sqlite.exec(
-            'DELETE FROM admin_events; DELETE FROM sessions; DELETE FROM accounts; DELETE FROM users;',
+            'DELETE FROM admin_event; DELETE FROM session; DELETE FROM account; DELETE FROM user;',
         )
         for (let i = 0; i < 23; i++) {
             const id = `user-${String(i).padStart(2, '0')}`
             sqlite
                 .prepare(
-                    'INSERT INTO users (id,name,email,email_verified,username,role,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
+                    'INSERT INTO user (id,name,email,email_verified,username,role,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
                 )
                 .run(
                     id,
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
         }
         sqlite
             .prepare(
-                'INSERT INTO accounts (id,account_id,provider_id,user_id,access_token,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
+                'INSERT INTO account (id,account_id,provider_id,user_id,access_token,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
             )
             .run(
                 'account',
@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
         for (let i = 0; i < 23; i++)
             sqlite
                 .prepare(
-                    'INSERT INTO admin_events (id,actor_id,action,target_id,model,label,created_at) VALUES (?,?,?,?,?,?,?)',
+                    'INSERT INTO admin_event (id,actor_id,action,target_id,model,label,created_at) VALUES (?,?,?,?,?,?,?)',
                 )
                 .run(
                     `event-${String(i).padStart(2, '0')}`,
@@ -65,7 +65,7 @@ export default defineEventHandler(async (event) => {
         ])
             sqlite
                 .prepare(
-                    'INSERT INTO admin_events (id,actor_id,action,target_id,label,created_at) VALUES (?,?,?,?,?,?)',
+                    'INSERT INTO admin_event (id,actor_id,action,target_id,label,created_at) VALUES (?,?,?,?,?,?)',
                 )
                 .run(
                     action,
@@ -77,7 +77,7 @@ export default defineEventHandler(async (event) => {
                 )
         return { ok: true }
     }
-    if (input.action === 'events') return db.select().from(schema.adminEvents)
+    if (input.action === 'events') return db.select().from(schema.adminEvent)
     if (input.action === 'credentials') {
         const account = await (
             await auth.$context
@@ -87,7 +87,7 @@ export default defineEventHandler(async (event) => {
             accountId: '456',
             accessToken: 'SECRET_LINK',
         })
-        await db.insert(schema.passkeys).values({
+        await db.insert(schema.passkey).values({
             id: 'synthetic-passkey',
             userId: input.userId,
             name: 'Original',

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { articleDates } from '@litijs/blog'
 const route = useRoute()
 const location = useBrowserLocation()
 const { isSupported: isShareSupported, share } = useShare(() => ({
@@ -17,9 +18,26 @@ const data = computed(() =>
         ? {
               ...entry.value.data,
               slug: entry.value.data.slug,
-              createdAt: entry.value.meta.blog.date,
+              date: articleDates(entry.value).date,
+              body: entry.value.body,
           }
         : null,
+)
+
+if (entry.value?.url && entry.value.url !== route.path)
+    await navigateTo(entry.value.url, { redirectCode: 301 })
+useLitiSeo(
+    () =>
+        entry.value
+            ? {
+                  url: entry.value.url,
+                  title: entry.value.data.plainTitle || entry.value.data.title,
+                  description: entry.value.data.summary,
+                  image: mediaUrl(entry.value.data.cover),
+                  publication: entry.value.publication,
+              }
+            : null,
+    { origin: String(useRuntimeConfig().public.siteUrl) || useRequestURL().origin },
 )
 
 if (!data.value) throw createError({ status: 404, statusText: 'Post not found' })
@@ -34,8 +52,8 @@ if (!data.value) throw createError({ status: 404, statusText: 'Post not found' }
 
             <div class="flex items-center gap-3">
                 <NuxtTime
-                    v-if="data.createdAt"
-                    :datetime="data.createdAt"
+                    v-if="data.date"
+                    :datetime="data.date"
                     date-style="short"
                     time-style="short"
                     class="text-muted font-mono font-features-['calt'] text-sm tracking-wide"
@@ -93,7 +111,11 @@ if (!data.value) throw createError({ status: 404, statusText: 'Post not found' }
             <div class="flex w-full max-w-[65ch] flex-col gap-6">
                 <USeparator decorative class="my-4" />
 
-                <MarkdownDocument :value="data.content" class="px-1 *:first:mt-0 *:last:mb-0" />
+                <Markdown
+                    :value="data.body"
+                    :plugins="[postMarkdownSecurity]"
+                    class="px-1 *:first:mt-0 *:last:mb-0"
+                />
             </div>
         </UContainer>
     </UPage>

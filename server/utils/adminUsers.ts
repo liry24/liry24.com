@@ -1,7 +1,8 @@
+import { eq, and, or, isNull } from 'drizzle-orm'
 import { createError, getRouterParam, type RequestEvent } from 'nuxt/server'
-import { db, eq, and, or, isNull } from 'void/db'
+import { db } from 'vite-hub/database/drizzle'
 
-import { users } from '../../db/schema'
+import { user as users } from '../database/auth-schema'
 
 export const adminUserFields = {
     id: users.id,
