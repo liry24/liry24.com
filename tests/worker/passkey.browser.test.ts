@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { chromium } from 'playwright-core'
+import { chromium, type Response } from 'playwright-core'
 import { test } from 'vitest'
 
 import { builtWorker } from '../helpers/builtWorker'
@@ -38,15 +38,17 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             const publicPage = await publicContext.newPage()
             const publicSources: Promise<string>[] = []
             publicPage.on('pageerror', (error) => failures.push(error.message))
-            publicPage.on('response', (response) => {
+            const capturePublicSource = (response: Response) => {
                 if (/\.(?:m?js)(?:\?|$)/u.test(response.url())) publicSources.push(response.text())
-            })
+            }
+            publicPage.on('response', capturePublicSource)
             await publicPage.goto(base + '/', { waitUntil: 'load' })
             await publicPage.waitForFunction(
                 () =>
                     (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
                         .$nuxt?.isHydrating === false,
             )
+            publicPage.off('response', capturePublicSource)
             assert(publicSources.length > 0)
             for (const source of await Promise.all(publicSources))
                 for (const marker of [
