@@ -42,6 +42,11 @@ export async function builtWorker() {
     const secrets = {
         BETTER_AUTH_SECRET: 'synthetic-worker-auth-secret-0123456789abcdef',
         NUXT_APP_SECRET: 'synthetic-worker-app-secret-0123456789abcdef',
+        GITHUB_CLIENT_ID: 'synthetic-github-client',
+        GITHUB_CLIENT_SECRET: 'synthetic-github-secret',
+        PREVIEW_GITHUB_TOKEN: 'synthetic-preview-token',
+        VERCEL_CLIENT_ID: 'synthetic-vercel-client',
+        VERCEL_CLIENT_SECRET: 'synthetic-vercel-secret',
     }
     const configPath = resolve(directory, 'wrangler.json')
     await writeFile(configPath, JSON.stringify(config))
