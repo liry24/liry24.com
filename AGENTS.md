@@ -4,7 +4,7 @@
 
 - Use the exact ViteHub npm 0.1.0 cohort and the verified Liti preview `a6593a94da5475c12be9b5c2ef900f032fd562cd` together. Keep all required native patches identical to the SDK; the Blob H3 patch and Source Windows-path patch retain their runtime/authorization checks.
 - Native Agent 0.1.0 still uses AI SDK 7.0.130. Keep `ai@7.0.130` and `@ai-sdk/openai@4.0.88` until that native provider contract supports the newer pair. Keep vue-tsc at 3.3.13: 3.3.14 produces incorrect ref diagnostics with the existing TypeScript bridge. Recheck and remove the corresponding taze exclusions when upstream supports those updates.
-- Keep `@vue/shared` aligned with the Vue RC: native dev SSR aliases the root package, where an independently hoisted stable version lacks the RC runtime helpers.
+- Keep Vue and compiler-sfc at 3.6.0-rc.12: rc.14 native Nuxt dev SSR loads an ESM Vapor runtime against the CommonJS DOM export, where `createInternalObject` is unavailable. Recheck and remove its taze exclusion when upstream supports this path.
 - TanStack Form alpha.3 slot fields use `field.value` and `field.meta`, including the common model-field renderer.
 - The official auth generator and `liti generate` report no schema changes against the reviewed application migrations. This dependency refresh needs no data migration and authorizes no remote data/deployment change.
 

@@ -9,8 +9,8 @@ export default defineConfig({
     includeLocked: true,
     ignorePaths: ['**/node_modules/**', '**/.tmp/**', '**/.data/**'],
     ignoreOtherWorkspaces: true,
-    // Native Agent 0.1 uses the 7.0.130 provider contract; vue-tsc 3.3.14 misreads the TS bridge.
-    exclude: ['typescript@7', 'ai', '@ai-sdk/openai', 'vue-tsc@3.3.14'],
+    // Native Agent keeps its provider contract; newer Vue/vue-tsc break native dev SSR/the TS bridge.
+    exclude: ['typescript@7', 'ai', '@ai-sdk/openai', 'vue-tsc@3.3.14', 'vue@3.6.0-rc.14'],
     depFields: {
         overrides: false,
         'bun-workspace': true,
