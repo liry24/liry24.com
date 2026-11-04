@@ -1,8 +1,8 @@
 diff --git a/dist/api/index.mjs b/dist/api/index.mjs
-index f05cc377aa18d7fca02dfd0a34341f64a0b2e47d..e2a61f412ce593585f4efd26ac82e50033d124ef 100644
+index b78738e..3c08e73 100644
 --- a/dist/api/index.mjs
 +++ b/dist/api/index.mjs
-@@ -152,7 +152,7 @@ const router = (ctx, options) => {
+@@ -154,7 +154,7 @@ const router = (ctx, options) => {
  	const withSpan = createWithSpan(options);
  	const { api, middlewares } = getEndpoints(ctx, options);
  	const basePath = new URL(ctx.baseURL).pathname;
@@ -11,7 +11,7 @@ index f05cc377aa18d7fca02dfd0a34341f64a0b2e47d..e2a61f412ce593585f4efd26ac82e500
  		routerContext: ctx,
  		openapi: { disabled: true },
  		basePath,
-@@ -169,7 +169,7 @@ const router = (ctx, options) => {
+@@ -171,7 +171,7 @@ const router = (ctx, options) => {
  			const pendingSchemaCheck = ctx.checkSchema?.();
  			if (pendingSchemaCheck) await pendingSchemaCheck;
  			let currentRequest = req;
@@ -20,16 +20,16 @@ index f05cc377aa18d7fca02dfd0a34341f64a0b2e47d..e2a61f412ce593585f4efd26ac82e500
  			if (rateLimitResponse) return rateLimitResponse;
  			for (const plugin of ctx.options.plugins || []) if (plugin.onRequest) {
  				const response = await withSpan(`onRequest ${plugin.id}`, {
-@@ -219,6 +219,7 @@ const router = (ctx, options) => {
+@@ -221,6 +221,7 @@ const router = (ctx, options) => {
  			}
  		}
  	});
 +	return authRouter;
  };
  //#endregion
- export { APIError, NO_STORE_HEADERS, accountInfo, addOAuthServerContext, callbackOAuth, changeEmail, changePassword, checkEndpointConflicts, createAuthEndpoint, createAuthMiddleware, createEmailVerificationToken, deleteUser, deleteUserCallback, dispatchAuthEndpoint, error, formCsrfMiddleware, freshSessionMiddleware, getAccessToken, getAuthoritativeSessionFromCtx, getEndpoints, getIP, getOAuthState, getSession, getSessionFromCtx, getShouldSkipSessionRefresh, isAPIError, isStateful, linkSocialAccount, listSessions, listUserAccounts, ok, optionsMiddleware, originCheck, originCheckMiddleware, refreshToken, requestOnlySessionMiddleware, requestPasswordReset, requestPasswordResetCallback, requireOrgRole, requireResourceOwnership, resetPassword, revokeOtherSessions, revokeSession, revokeSessions, router, sendVerificationEmail, sendVerificationEmailFn, sensitiveSessionMiddleware, sessionMiddleware, setPassword, setShouldSkipSessionRefresh, signInEmail, signInSocial, signOut, signUpEmail, unlinkAccount, updateSession, updateUser, verifyEmail, verifyPassword };
+ export { APIError, NO_STORE_HEADERS, accountInfo, addOAuthServerContext, callbackOAuth, changeEmail, changePassword, checkEndpointConflicts, createAuthEndpoint, createAuthMiddleware, createEmailVerificationToken, deleteUser, deleteUserCallback, dispatchAuthEndpoint, error, formCsrfMiddleware, freshSessionMiddleware, getAccessToken, getAuthoritativeSessionFromCtx, getEndpoints, getIP, getOAuthState, getSession, getSessionFromCtx, getShouldSkipSessionRefresh, isAPIError, isStateful, linkSocialAccount, listSessions, listUserAccounts, markSessionOutsideStore, ok, optionsMiddleware, originCheck, originCheckMiddleware, refreshToken, requestOnlySessionMiddleware, requestPasswordReset, requestPasswordResetCallback, requireOrgRole, requireResourceOwnership, resetPassword, revokeOtherSessions, revokeSession, revokeSessions, router, sendVerificationEmail, sendVerificationEmailFn, sensitiveSessionMiddleware, sessionMiddleware, setPassword, setShouldSkipSessionRefresh, signInEmail, signInSocial, signOut, signUpEmail, unlinkAccount, updateSession, updateUser, verifyEmail, verifyPassword };
 diff --git a/dist/api/rate-limiter/index.mjs b/dist/api/rate-limiter/index.mjs
-index abe4c5e404ae262411252f780b1ab92f619c5b9c..b2d6579ec7d59f9fe902d74bb44c4d8e8e4b9251 100644
+index abe4c5e..b2d6579 100644
 --- a/dist/api/rate-limiter/index.mjs
 +++ b/dist/api/rate-limiter/index.mjs
 @@ -234,7 +234,7 @@ function getRateLimitStorage(ctx, rateLimitSettings) {
