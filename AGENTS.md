@@ -1,5 +1,13 @@
 # Development constraints
 
+## Dependency refresh — 2026-11-04
+
+- Use the exact ViteHub npm 0.1.0 cohort and the verified Liti preview `a6593a94da5475c12be9b5c2ef900f032fd562cd` together. Keep all required native patches identical to the SDK; the Blob H3 patch and Source Windows-path patch retain their runtime/authorization checks.
+- Native Agent 0.1.0 still uses AI SDK 7.0.130. Keep `ai@7.0.130` and `@ai-sdk/openai@4.0.88` until that native provider contract supports the newer pair. Keep vue-tsc at 3.3.13: 3.3.14 produces incorrect ref diagnostics with the existing TypeScript bridge. Recheck and remove the corresponding taze exclusions when upstream supports those updates.
+- Keep `@vue/shared` aligned with the Vue RC: native dev SSR aliases the root package, where an independently hoisted stable version lacks the RC runtime helpers.
+- TanStack Form alpha.3 slot fields use `field.value` and `field.meta`, including the common model-field renderer.
+- The official auth generator and `liti generate` report no schema changes against the reviewed application migrations. This dependency refresh needs no data migration and authorizes no remote data/deployment change.
+
 ## ViteHub migration contract — 2026-10-27
 
 - The user's phased ViteHub rebuild plan supersedes the old Void/Liti architecture below. Work only on this dedicated `rebuild/vitehub` worktree from remote dev `634c98c5a1b7ceee0df7e1730b9cd0c983c6c529`; preserve the original checkout's uncommitted changes. No remote dev update or deployment until synthetic acceptance and a separately rehearsed data transition.

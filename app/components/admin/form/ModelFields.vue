@@ -27,8 +27,8 @@ function validity(key: string, value: boolean) {
     >
         <AdminFormField
             :descriptor
-            :model-value="field.state.value"
-            :errors="field.state.meta.errors"
+            :model-value="field.value"
+            :errors="field.meta.errors"
             :disabled
             :uploading
             :categories
