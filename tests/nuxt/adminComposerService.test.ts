@@ -1,13 +1,13 @@
 import type { Experimental_CompositionEvaluator } from '@json-render/core'
 import { expect, test, vi } from 'vitest'
 
-import { composerValueUpdates } from '../../app/utils/composerValues'
+import { composerValueUpdates } from '../../packages/admin-composer/app/utils/composerValues'
 import {
     composeAdminRequest,
     composerModelInfo,
     type ComposerAdmin,
     type ComposerModelInfo,
-} from '../../server/utils/adminComposer'
+} from '../../packages/admin-composer/server/utils/adminComposer'
 import { adminModels } from '../helpers/adminModels'
 
 const models = await composerModelInfo(adminModels)

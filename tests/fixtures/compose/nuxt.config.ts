@@ -12,6 +12,7 @@ const migrations = readdirSync(path('../../../server/databases/migrations'))
     .sort()
     .map((file) => readFileSync(path(`../../../server/databases/migrations/${file}`), 'utf8'))
 export default defineNuxtConfig({
+    extends: ['@liry24/admin-composer/nuxt', '@liry24/game-mentions/nuxt'],
     compatibilityDate: '2026-10-13',
     ssr: false,
     devtools: { enabled: false },

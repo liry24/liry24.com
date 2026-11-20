@@ -27,6 +27,11 @@ export default defineAppConfig({
         colors: {
             neutral: 'zinc',
         },
+        formField: {
+            slots: {
+                error: 'text-red-700 dark:text-red-400',
+            },
+        },
         accordion: {
             slots: {
                 item: 'md:py-2',

@@ -1,8 +1,12 @@
 import { parseMarkdown } from 'comark/parse'
 import { expect, test } from 'vitest'
 
-import { gameTitleParts, postGameSlugs, gameMentionQuery } from '../shared/utils/gameMentions'
-import { postMarkdownSecurity } from '../shared/utils/postMarkdown'
+import {
+    gameTitleParts,
+    postGameSlugs,
+    gameMentionQuery,
+} from '../packages/game-mentions/shared/utils/gameMentions'
+import { postMarkdownSecurity } from '../packages/game-mentions/shared/utils/postMarkdown'
 
 test('the inline rule keeps exact IGDB slugs and excludes code, escapes, unsafe attributes and linked labels', async () => {
     const source =

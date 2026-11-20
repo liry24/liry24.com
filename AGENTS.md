@@ -1,5 +1,24 @@
 # Development constraints
 
+## Production integration — 2026-11-06
+
+- The user approved integrating the ViteHub dependency refresh, the three private application feature layers, all existing local UI/accessibility work and Pocket ID through dev acceptance and production data migration. Keep the original application's uncommitted work intact. Stable npm publication stays deferred and continues to require the existing uppt workflow.
+- Pin all three Liti packages to the verified main commit `a34bcd97069a9442896aeca28d768cd6d1419cef`, using its actual pkg.pr.new archives and the identical required native patches. Native ViteHub is `0.1.0`.
+- Pocket ID supplies authentication through the fixed `https://sso.liry24.com` issuer. The app owns users, roles, sessions, bans and activity. First sign-in creates an ordinary user in both dev and production. Existing administrators require explicit verified issuer/subject bindings to their existing user IDs. Implicit email linking, first-user promotion and GitHub permission lookups are disabled.
+- Use environment-specific confidential OIDC clients with exact `/api/auth/callback/pocket-id` callbacks, PKCE, state/nonce and verified ID tokens. Store credentials only in Worker Secrets. The new `liry24-pocket` cookie namespace invalidates old cookies. Logout ends the local app session. Keep historical activity labels readable.
+- The issuer is fixed per provider. Native account uniqueness on `(providerId, accountId)` prevents duplicate identities. Apply the generated Pocket ID migration only after backing up auth data and preparing the account transition. New production storage uses separate D1, public-media R2 and private-Content R2 resources.
+- Ordinary development keeps Hints, a11y and the timeline opt-in with `bun dev:inspect`. Build before `bun run test:a11y`. All automatically detected WCAG 2.2 A/AA violations and scan errors fail CI. Wait for hydration, transitions, finite animations and fonts.
+- Public queries and lazy charts/viewers must exclude admin/form/Agent implementations from their loaded scripts. Permission result reuse is limited to successful initial reads within one SSR request. Refreshes, errors and browser cache disposal retain native behavior.
+- Production cutover preserves anonymous public reads while pausing auth/management/upload writes and Cron. Recheck live deployment/resource IDs, copy and verify the final source snapshot, then enable the tested candidate. Capture post-cutover writes before recovery. A legacy schema that cannot represent Pocket ID identities requires restoration to the native schema and forward repair.
+
+## Dependency refresh — 2026-11-04
+
+- Use the exact ViteHub npm 0.1.0 cohort and the verified Liti preview `a6593a94da5475c12be9b5c2ef900f032fd562cd` together. Keep all required native patches identical to the SDK; the Blob H3 patch and Source Windows-path patch retain their runtime/authorization checks.
+- Native Agent 0.1.0 still uses AI SDK 7.0.130. Keep `ai@7.0.130` and `@ai-sdk/openai@4.0.88` until that native provider contract supports the newer pair. Keep vue-tsc at 3.3.13: 3.3.14 produces incorrect ref diagnostics with the existing TypeScript bridge. Recheck and remove the corresponding taze exclusions when upstream supports those updates.
+- Keep Vue and compiler-sfc at 3.6.0-rc.12: rc.14 native Nuxt dev SSR loads an ESM Vapor runtime against the CommonJS DOM export, where `createInternalObject` is unavailable. Recheck and remove its taze exclusion when upstream supports this path.
+- TanStack Form alpha.3 slot fields use `field.value` and `field.meta`, including the common model-field renderer.
+- The official auth generator and `liti generate` report no schema changes against the reviewed application migrations. This dependency refresh needs no data migration and authorizes no remote data/deployment change.
+
 ## ViteHub migration contract — 2026-10-27
 
 - The user's phased ViteHub rebuild plan supersedes the old Void/Liti architecture below. Work only on this dedicated `rebuild/vitehub` worktree from remote dev `634c98c5a1b7ceee0df7e1730b9cd0c983c6c529`; preserve the original checkout's uncommitted changes. No remote dev update or deployment until synthetic acceptance and a separately rehearsed data transition.

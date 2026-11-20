@@ -43,6 +43,7 @@ const devices = computed(() =>
                             v-if="item.session.id === current?.id"
                             label="Current session"
                             color="success"
+                            class="text-green-800 dark:text-green-300"
                             variant="subtle"
                         />
                     </div>

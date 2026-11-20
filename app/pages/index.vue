@@ -23,6 +23,7 @@ const games = usePortfolioQuery('games')
 const gameStats = usePortfolioQuery('gameStats')
 const posts = useFetch<PostCardsPage>('/api/posts/cards', { query: { limit: 10 } })
 await Promise.all([arts, socials, careers, ranks, games, gameStats, posts])
+
 const data = computed(() => ({
     arts: arts.data.value || [],
     socials: socials.data.value?.map((entry) => entry.data) || [],
@@ -279,7 +280,7 @@ useKeyCommand(modalStacks.open)
 
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <article
-                        v-for="post in data.posts.slice(0, 10)"
+                        v-for="post in data.posts"
                         :key="String(post.slug)"
                         class="hover:bg-muted flex h-fit flex-col gap-3 rounded-xl p-6 transition-colors"
                     >

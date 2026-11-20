@@ -1,0 +1,10 @@
+{
+    "name": "@liry24/admin-composer",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": "./index.ts",
+        "./nuxt": "./nuxt.config.ts",
+        "./server": "./server/index.ts"
+    }
+}

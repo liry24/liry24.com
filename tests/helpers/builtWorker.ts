@@ -8,7 +8,7 @@ import { createTestHarness, type Unstable_RawConfig } from 'wrangler'
 
 import { baselineStatements } from './database'
 
-export async function builtWorker() {
+export async function builtWorker(authSecrets: Record<string, string> = {}) {
     const temporaryRoot = resolve(tmpdir())
     const directory = await mkdtemp(resolve(temporaryRoot, 'liry24-native-worker-'))
     const generatedPath = resolve('.output/server/wrangler.json')
@@ -23,6 +23,7 @@ export async function builtWorker() {
             APP_ENV: 'test',
             NUXT_PUBLIC_PREVIEW: 'false',
             NUXT_PUBLIC_SITE_URL: '',
+            NUXT_PUBLIC_IMAGES_DOMAIN: '',
         },
         routes: [],
         triggers: { crons: [] },
@@ -42,11 +43,9 @@ export async function builtWorker() {
     const secrets = {
         BETTER_AUTH_SECRET: 'synthetic-worker-auth-secret-0123456789abcdef',
         NUXT_APP_SECRET: 'synthetic-worker-app-secret-0123456789abcdef',
-        GITHUB_CLIENT_ID: 'synthetic-github-client',
-        GITHUB_CLIENT_SECRET: 'synthetic-github-secret',
-        PREVIEW_GITHUB_TOKEN: 'synthetic-preview-token',
-        VERCEL_CLIENT_ID: 'synthetic-vercel-client',
-        VERCEL_CLIENT_SECRET: 'synthetic-vercel-secret',
+        POCKET_ID_CLIENT_ID: 'synthetic-pocket-client',
+        POCKET_ID_CLIENT_SECRET: 'synthetic-pocket-secret',
+        ...authSecrets,
     }
     const configPath = resolve(directory, 'wrangler.json')
     await writeFile(configPath, JSON.stringify(config))
@@ -73,7 +72,7 @@ export async function builtWorker() {
                 `${token}.${createHmac('sha256', secrets.BETTER_AUTH_SECRET).update(token).digest('base64')}`,
             )
             return {
-                cookie: `better-auth.session_token=${signed}; __Secure-better-auth.session_token=${signed}`,
+                cookie: `liry24-pocket.session_token=${signed}; __Secure-liry24-pocket.session_token=${signed}`,
                 origin: url.origin,
             }
         }

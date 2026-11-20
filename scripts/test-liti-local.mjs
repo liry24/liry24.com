@@ -82,7 +82,13 @@ try {
     assert.ok(!existsSync(sqlite))
     run(process.execPath, ['node_modules/liti/dist/cli/index.js', 'generate'])
     assert.ok(!existsSync(sqlite), 'Generation must not create or migrate the local database')
-    run(process.execPath, ['node_modules/vite-hub/dist/bin.js', 'db', 'migrate'])
+    // The Pocket ID migration drops the unused passkey table in this fresh test database.
+    run(process.execPath, [
+        'node_modules/vite-hub/dist/bin.js',
+        'db',
+        'migrate',
+        '--allow-data-loss',
+    ])
     assert.ok(existsSync(sqlite), 'Use the local SQLite target owned by the native Nuxt dev CLI')
     database = new DatabaseSync(sqlite)
     const now = Date.now(),
@@ -103,7 +109,7 @@ try {
     const signed = encodeURIComponent(
         token + '.' + createHmac('sha256', env.BETTER_AUTH_SECRET).update(token).digest('base64'),
     )
-    const cookie = 'better-auth.session_token=' + signed
+    const cookie = 'liry24-pocket.session_token=' + signed
     child = spawn(
         process.execPath,
         [
@@ -267,7 +273,7 @@ try {
     const context = await browser.newContext()
     await context.addCookies([
         {
-            name: 'better-auth.session_token',
+            name: 'liry24-pocket.session_token',
             value: signed,
             domain: '127.0.0.1',
             path: '/',

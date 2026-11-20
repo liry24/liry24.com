@@ -108,21 +108,6 @@ test('native auth hooks log successful actions and storage failure cannot fail a
     expect((await call('/update-user', { name: 'Renamed' }, cookie)).status).toBe(200)
     const credentials = await fixture({ action: 'credentials', userId: signup.body.user.id })
     expect(
-        (
-            await call(
-                '/passkey/update-passkey',
-                { id: 'synthetic-passkey', name: 'Renamed' },
-                cookie,
-            )
-        ).status,
-    ).toBe(200)
-    expect(
-        (await call('/passkey/delete-passkey', { id: 'synthetic-passkey' }, cookie)).status,
-    ).toBe(200)
-    expect(
-        (await call('/passkey/delete-passkey', { id: 'synthetic-passkey' }, cookie)).status,
-    ).toBe(404)
-    expect(
         (await call('/unlink-account', { accountId: credentials.accountId }, cookie)).status,
     ).toBe(200)
     const login = await call('/sign-in/email', {
@@ -154,8 +139,6 @@ test('native auth hooks log successful actions and storage failure cannot fail a
             'session.logout',
             'provider.link',
             'provider.unlink',
-            'passkey.update',
-            'passkey.delete',
         ]),
     )
     expect(
@@ -163,9 +146,6 @@ test('native auth hooks log successful actions and storage failure cannot fail a
     ).toHaveLength(3)
     expect(JSON.stringify(rows)).not.toContain('synthetic-password')
     expect(JSON.stringify(rows)).not.toContain(login.body.token)
-    expect(
-        rows.filter((item: { action: string }) => item.action === 'passkey.delete'),
-    ).toHaveLength(1)
     expect(JSON.stringify(rows)).not.toMatch(/SECRET_LINK|synthetic-key|synthetic-credential/)
     const count = rows.length
     expect(

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { MasonryWall } from '@yeger/vue-masonry-wall'
 
-import { ArtViewer } from '#components'
+import { LazyArtViewer } from '#components'
 
 useSeoMeta({ title: 'Arts', description: 'A collection of artworks by Liry24.' })
 defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'arts' }, [
@@ -14,7 +14,7 @@ const overlay = useOverlay()
 
 const { data } = await usePortfolioQuery('arts')
 
-const modalArtViewer = overlay.create(ArtViewer)
+const modalArtViewer = overlay.create(LazyArtViewer)
 
 onMounted(() => {
     if (

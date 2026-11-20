@@ -167,7 +167,7 @@ useHead({ title: 'Data' })
                             v-else-if="status === 'pending' && !visibleSections.length"
                             class="text-muted text-sm"
                         >
-                            Loading models…
+                            Loading models窶ｦ
                         </p>
                         <section
                             :id="`model-${section.name}`"
@@ -277,13 +277,13 @@ useHead({ title: 'Data' })
                                                         }}
                                                     </button>
                                                 </div>
-                                                <p class="text-dimmed truncate text-xs">
+                                                <p class="text-toned truncate text-xs">
                                                     {{ item.data.slug || item.id }}
                                                 </p>
                                                 <div
                                                     v-for="field in section.meta.fields"
                                                     :key="field"
-                                                    class="text-muted truncate text-xs"
+                                                    class="text-toned truncate text-xs"
                                                 >
                                                     <template
                                                         v-if="

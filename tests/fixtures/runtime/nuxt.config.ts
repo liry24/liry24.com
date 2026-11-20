@@ -7,6 +7,11 @@ const root = fileURLToPath(new URL('../../../', import.meta.url))
     .split(sep)
     .join('/')
 export default defineNuxtConfig({
+    extends: [
+        '@liry24/admin-activity/nuxt',
+        '@liry24/admin-composer/nuxt',
+        '@liry24/game-mentions/nuxt',
+    ],
     compatibilityDate: '2026-10-13',
     devtools: { enabled: false },
     pages: false,

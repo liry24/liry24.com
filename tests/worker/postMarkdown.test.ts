@@ -2,7 +2,7 @@ import { parseMarkdown } from 'comark/parse'
 import summary from 'comark/plugins/summary'
 import { expect, test } from 'vitest'
 
-import { postMarkdownSecurity } from '../../shared/utils/postMarkdown'
+import { postMarkdownSecurity } from '../../packages/game-mentions/shared/utils/postMarkdown'
 import { content, assertSafe } from '../helpers/postMarkdown'
 
 test('post preview and card summaries share the Markdown security policy', async () => {

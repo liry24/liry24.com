@@ -6,6 +6,7 @@ import { mediaUrl } from '../../app/utils/mediaUrl'
 
 test('native Blob paths retain encoding and switch between app and image domain', () => {
     const config = useRuntimeConfig()
+    config.public.preview = false
     config.public.imagesDomain = ''
     config.public.siteUrl = ''
     const image = { pathname: '作品/cover image.png' }
@@ -17,4 +18,6 @@ test('native Blob paths retain encoding and switch between app and image domain'
     expect(mediaUrl(image)).toBe('https://images.example/%E4%BD%9C%E5%93%81/cover%20image.png')
     expect(mediaUrl(undefined)).toBeUndefined()
     expect(mediaUrl(null)).toBeUndefined()
+    config.public.preview = true
+    expect(mediaUrl(image)).toBe('/media/%E4%BD%9C%E5%93%81/cover%20image.png')
 })

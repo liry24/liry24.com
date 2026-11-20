@@ -13,7 +13,15 @@ useHead(() => ({ title: props.title }))
             }"
         >
             <template #header>
-                <UDashboardNavbar :title :icon>
+                <UDashboardNavbar
+                    :title
+                    :icon
+                    :ui="{
+                        root: 'max-lg:h-auto max-lg:min-h-(--ui-header-height) max-lg:flex-wrap max-lg:py-2',
+                        right: 'max-lg:max-w-full max-lg:flex-wrap',
+                        toggle: 'shrink-0',
+                    }"
+                >
                     <template #trailing>
                         <slot name="trailing" />
                     </template>

@@ -9,8 +9,8 @@ import { image } from '@vite-hub/blob/reference'
 import { optional } from '@vite-hub/content/collections'
 import { z } from 'zod'
 
+import { modelActivity } from '../../packages/admin-activity/server/utils/modelActivity.js'
 import { imageSchema } from '../utils/imageSchema.js'
-import { modelActivity } from '../utils/modelActivity.js'
 import { modelAuthorization, preparePostGames } from '../utils/modelValidation.js'
 
 const text = () => field(z.string().optional())

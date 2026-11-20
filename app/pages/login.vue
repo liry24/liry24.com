@@ -1,22 +1,25 @@
 <script setup lang="ts">
-definePageMeta({
-    layout: 'minimal',
-})
+definePageMeta({ layout: 'minimal' })
 
 const toast = useToast()
+const route = useRoute()
+const { user, load, signOut } = useAppSession()
+await load()
+if (user.value?.role === 'admin') await navigateTo('/admin')
 const signingIn = ref(false)
-const isPreview = String(useRuntimeConfig().public.preview) === 'true'
-
-const signInWithPasskey = async () => {
+async function signIn() {
     if (signingIn.value) return
     signingIn.value = true
     try {
-        const result = await authClient.signIn.passkey()
+        const result = await authClient.signIn.social({
+            provider: 'pocket-id',
+            callbackURL: '/auth/complete',
+            errorCallbackURL: '/login',
+        })
         if (result.error) throw result.error
-        await navigateTo('/admin')
     } catch (error) {
         toast.add({
-            title: 'Passkeyでログインできませんでした',
+            title: 'サインインできませんでした',
             description: error instanceof Error ? error.message : 'Please try again.',
             color: 'error',
         })
@@ -24,44 +27,35 @@ const signInWithPasskey = async () => {
         signingIn.value = false
     }
 }
-
-const signInWithGitHub = () =>
-    authClient.signIn.social({ provider: 'github', callbackURL: '/admin' })
-const signInWithVercel = () =>
-    authClient.signIn.social({ provider: 'vercel', callbackURL: '/admin' })
+const error = computed(() => typeof route.query.error === 'string')
 </script>
 
 <template>
     <div class="grid grow items-center">
-        <UAuthForm
-            title="Admin Console"
-            :providers="[
-                ...(!isPreview
-                    ? [
-                          {
-                              icon: 'mingcute:key-2-fill',
-                              label: 'Passkey',
-                              onClick: signInWithPasskey,
-                          },
-                      ]
-                    : []),
-                {
-                    icon: 'mingcute:github-fill',
-                    label: 'GitHub',
-                    onClick: signInWithGitHub,
-                },
-                ...(!isPreview
-                    ? [
-                          {
-                              icon: 'mingcute:triangle-fill',
-                              label: 'Vercel',
-                              onClick: signInWithVercel,
-                          },
-                      ]
-                    : []),
-            ]"
-            :ui="{ title: 'font-extralight text-4xl' }"
-            class="mx-auto max-w-sm"
-        />
+        <div class="mx-auto flex w-full max-w-sm flex-col gap-4">
+            <UAlert
+                v-if="error"
+                title="サインインできませんでした。もう一度お試しください。"
+                color="error"
+            />
+            <template v-if="user">
+                <p>{{ user.name }} としてサインインしています。</p>
+                <UButton to="/" label="Back to site" />
+                <UButton label="Logout" variant="outline" @click="signOut()" />
+            </template>
+            <UAuthForm
+                v-else
+                title="Liry24"
+                :providers="[
+                    {
+                        label: 'Pocket ID でサインイン',
+                        icon: 'mingcute:key-2-fill',
+                        onClick: signIn,
+                        loading: signingIn,
+                    },
+                ]"
+                :ui="{ title: 'font-extralight text-4xl' }"
+            />
+        </div>
     </div>
 </template>

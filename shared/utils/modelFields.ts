@@ -1,6 +1,6 @@
 import type { describeModel } from '@litijs/model'
 
-import type { ComposerField } from '../types/adminComposer'
+import type { ComposerField } from '../../packages/admin-composer/shared/types/adminComposer'
 
 export function modelFields(model: ReturnType<typeof describeModel>): ComposerField[] {
     return Object.entries(model.fields).map(([key, definition]) => {
