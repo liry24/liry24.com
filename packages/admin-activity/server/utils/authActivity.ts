@@ -1,5 +1,4 @@
 import type { BetterAuthPlugin } from 'better-auth'
-import { createAuthMiddleware, isAPIError } from 'better-auth/api'
 
 import { recordAdminActivity } from './adminActivity.js'
 
@@ -18,12 +17,6 @@ const profilePaths = new Set([
     '/admin/ban-user',
     '/admin/unban-user',
 ])
-const passkeyActions = {
-    '/passkey/verify-registration': 'passkey.create',
-    '/passkey/update-passkey': 'passkey.update',
-    '/passkey/delete-passkey': 'passkey.delete',
-} as const
-
 export const authActivity = {
     id: 'admin-activity',
     schema: {
@@ -118,33 +111,5 @@ export const authActivity = {
                 },
             },
         }
-    },
-    hooks: {
-        after: [
-            {
-                matcher: (ctx) => Boolean(ctx.path && Object.hasOwn(passkeyActions, ctx.path)),
-                handler: createAuthMiddleware(async (ctx) => {
-                    const result = ctx.context.returned
-                    if (isAPIError(result) || !result || typeof result !== 'object') return
-                    const action = passkeyActions[ctx.path as keyof typeof passkeyActions]
-                    const passkey = 'passkey' in result ? result.passkey : result
-                    const actorId = ctx.context.session?.user.id ?? ctx.context.newSession?.user.id
-                    const targetId =
-                        action === 'passkey.create' &&
-                        passkey &&
-                        typeof passkey === 'object' &&
-                        'id' in passkey
-                            ? passkey.id
-                            : ctx.body?.id
-                    if (!actorId || typeof targetId !== 'string') return
-                    if (
-                        action === 'passkey.delete' &&
-                        (!('status' in result) || result.status !== true)
-                    )
-                        return
-                    await recordAdminActivity({ actorId, action, targetId })
-                }),
-            },
-        ],
     },
 } satisfies BetterAuthPlugin

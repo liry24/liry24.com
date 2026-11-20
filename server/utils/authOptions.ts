@@ -1,45 +1,37 @@
-import { passkey } from '@better-auth/passkey'
 import type { BetterAuthOptions } from 'better-auth'
-import { admin, jwt, lastLoginMethod, username } from 'better-auth/plugins'
+import { admin, genericOAuth, jwt, username } from 'better-auth/plugins'
 
+import { authActivity } from '../../packages/admin-activity/server/utils/authActivity.js'
 import { adminAccess, adminRoles } from '../../shared/utils/authAccess.js'
-import { authActivity } from './authActivity.js'
-import { isPreviewGitHubAccountAdmin, validatePreviewIdentity } from './previewAuthorization.js'
 
 export function createAuthOptions() {
-    const isPreview = !import.meta.dev && process.env.APP_ENV === 'dev'
+    const synthetic = process.env.LIRY24_TEST_LOCAL === 'true' || process.env.APP_ENV === 'test'
+    const issuer = synthetic
+        ? (process.env.POCKET_ID_TEST_ISSUER ?? 'http://127.0.0.1:1')
+        : 'https://sso.liry24.com'
     return {
         appName: 'liry24',
-
         trustedOrigins: [
             'http://localhost:3000',
             'http://127.0.0.1:3000',
             'http://localhost:3100',
             'http://127.0.0.1:3100',
             'https://liry24.com',
-            ...(isPreview && process.env.NUXT_PUBLIC_SITE_URL
-                ? [process.env.NUXT_PUBLIC_SITE_URL]
-                : []),
+            'https://liry24-com-dev.liry.workers.dev',
         ],
-
+        disabledPaths: ['/sign-in/username', '/link-social', '/unlink-account'],
         account: {
             additionalFields: { issuer: { type: 'string', required: false, input: false } },
             storeStateStrategy: 'database',
             updateAccountOnSignIn: true,
-            accountLinking: {
-                enabled: true,
-                trustedProviders: ['github'],
-                allowDifferentEmails: true,
-            },
+            accountLinking: { enabled: false, disableImplicitLinking: true },
         },
-
         session: {
             expiresIn: 60 * 60 * 24 * 30,
             updateAge: 60 * 60 * 24,
             freshAge: 0,
             cookieCache: { enabled: true, maxAge: 60 * 5 },
         },
-
         rateLimit: {
             enabled: true,
             storage: 'database',
@@ -50,105 +42,53 @@ export function createAuthOptions() {
                 '/get-session': { window: 60, max: 200 },
             },
         },
-
         emailAndPassword: { enabled: false },
-
-        socialProviders: {
-            github: {
-                clientId: process.env.GITHUB_CLIENT_ID!,
-                clientSecret: process.env.GITHUB_CLIENT_SECRET,
-                mapProfileToUser: async (profile) => ({
-                    email: profile.email,
-                    username: profile.login,
-                    displayUsername: profile.login,
-                    name: profile.name,
-                    image: profile.avatar_url,
-                    emailVerified: true,
-                }),
-                disableSignUp: !isPreview && process.env.ALLOW_SIGNUP !== 'true',
-            },
-            ...(!isPreview
-                ? {
-                      vercel: {
-                          clientId: process.env.VERCEL_CLIENT_ID!,
-                          clientSecret: process.env.VERCEL_CLIENT_SECRET,
-                          mapProfileToUser: async (profile) => ({
-                              email: profile.email,
-                              username: profile.preferred_username,
-                              displayUsername: profile.preferred_username,
-                              name: profile.name,
-                              image: profile.picture,
-                              emailVerified: true,
-                          }),
-                          disableSignUp: process.env.ALLOW_SIGNUP !== 'true',
-                      },
-                  }
-                : {}),
-        },
-
         plugins: [
-            admin({ ac: adminAccess, roles: adminRoles }),
+            admin({ ac: adminAccess, roles: adminRoles, defaultRole: 'user' }),
             username({
                 minUsernameLength: 1,
                 maxUsernameLength: 64,
                 usernameValidator: (value) => /^[a-z\d_.-]{1,64}$/i.test(value),
             }),
+            {
+                ...genericOAuth({
+                    config: [
+                        {
+                            providerId: 'pocket-id',
+                            discoveryUrl: `${issuer}/.well-known/openid-configuration`,
+                            clientId: process.env.POCKET_ID_CLIENT_ID ?? 'offline-schema-client',
+                            clientSecret: process.env.POCKET_ID_CLIENT_SECRET,
+                            scopes: ['openid', 'profile', 'email'],
+                            pkce: true,
+                            requireIdTokenVerification: true,
+                            disableProviderLogout: true,
+                        },
+                    ],
+                }),
+                schema: {
+                    account: {
+                        fields: {},
+                        indexes: [
+                            {
+                                name: 'account_oidc_identity',
+                                fields: ['providerId', 'accountId'],
+                                unique: true,
+                            },
+                        ],
+                    },
+                },
+            },
             authActivity,
-            ...(!isPreview ? [passkey()] : []),
-            lastLoginMethod(),
             jwt({
                 schema: { jwks: { modelName: 'jwk' } },
                 disableSettingJwtHeader: true,
-                jwks: {
-                    rotationInterval: 60 * 60 * 24 * 30,
-                    gracePeriod: 60 * 60 * 24 * 30,
-                },
+                jwks: { rotationInterval: 60 * 60 * 24 * 30, gracePeriod: 60 * 60 * 24 * 30 },
             }),
         ],
-
-        user: {
-            validateUserInfo: validatePreviewIdentity,
-            changeEmail: { enabled: false },
-            deleteUser: { enabled: false },
-        },
-
-        databaseHooks: {
-            user: {
-                create: {
-                    before: async (user, ctx) => {
-                        // validateUserInfo has already checked the GitHub identity before this write.
-                        if (isPreview) return { data: { ...user, role: 'admin' } }
-                        const existingUser = await ctx?.context.adapter.findMany({
-                            model: 'user',
-                            limit: 1,
-                        })
-                        return existingUser?.length
-                            ? { data: user }
-                            : { data: { ...user, role: 'admin' } }
-                    },
-                },
-            },
-            session: {
-                create: {
-                    before: async (session, ctx) => {
-                        if (!isPreview) return
-                        const accounts = await ctx?.context.internalAdapter.findAccounts(
-                            session.userId,
-                        )
-                        const githubAccount = accounts?.find(
-                            (account) => account.providerId === 'github',
-                        )
-                        if (
-                            !githubAccount ||
-                            !(await isPreviewGitHubAccountAdmin(githubAccount.accountId))
-                        )
-                            return false
-                    },
-                },
-            },
-        },
-
+        user: { changeEmail: { enabled: false }, deleteUser: { enabled: false } },
         advanced: {
+            // A new namespace rejects old cached sessions as well as old session tokens.
+            cookiePrefix: 'liry24-pocket',
             database: { joins: true },
             ipAddress: {
                 ipAddressHeaders: ['x-forwarded-for', 'x-real-ip', 'cf-connecting-ip'],

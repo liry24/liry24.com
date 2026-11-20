@@ -4,7 +4,7 @@ import { defineComponent, h, nextTick, reactive, ref } from 'vue'
 
 import { clearNuxtState } from '#app'
 
-import { useAdminComposer } from '../../app/composables/useAdminComposer'
+import { useAdminComposer } from '../../packages/admin-composer/app/composables/useAdminComposer'
 
 const { fetchBoundary } = vi.hoisted(() => ({ fetchBoundary: vi.fn() }))
 mockNuxtImport('$fetch', () => fetchBoundary)

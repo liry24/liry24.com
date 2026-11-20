@@ -4,7 +4,7 @@ export async function recordAdminActivity(input: AdminActivityInput) {
     try {
         // Lazy imports keep auth schema generation independent of the previous generated schema.
         const { db } = await import('vite-hub/database/drizzle')
-        const { adminEvent } = await import('../database/auth-schema.js')
+        const { adminEvent } = await import('../../../../server/database/auth-schema.js')
         await db.insert(adminEvent).values({
             id: crypto.randomUUID(),
             actorId: input.actorId,

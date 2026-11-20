@@ -5,18 +5,12 @@ interface Props {
 }
 const { game, periods } = defineProps<Props>()
 
-const gradientId = useId().replaceAll(':', '')
 const sortedPeriods = computed(() => [...periods].sort((a, b) => a.order - b.order))
 const latest = computed(() => sortedPeriods.value.at(-1))
 const metric = computed(() => game.metrics?.find((metric) => metric.key === game.primaryMetric))
 const representative = computed(() =>
     latest.value?.values.find((value) => value.key === metric.value?.key),
 )
-const definition = computed(() =>
-    metric.value ? gameChart(sortedPeriods.value, metric.value, gradientId) : undefined,
-)
-
-const point = (value: unknown) => value as RankPoint
 </script>
 
 <template>
@@ -41,35 +35,7 @@ const point = (value: unknown) => value as RankPoint
             <span class="text-sm">{{ formatGameValue(representative, metric) }}</span>
         </UButton>
         <template #body>
-            <UChart
-                v-if="definition"
-                type="area"
-                curve="monotone"
-                :definition
-                :height="280"
-                :x-axis="false"
-                :tooltip="{ portal: true, content: { collisionPadding: 16, sticky: 'always' } }"
-                :aria-label="`${game.name} ${metric?.label} history`"
-            >
-                <template #tooltip="{ primaryPoint }">
-                    <div class="flex items-center gap-2">
-                        <img
-                            v-if="gameImageUrl(point(primaryPoint.datum).record.image)"
-                            :src="gameImageUrl(point(primaryPoint.datum).record.image)"
-                            alt=""
-                            class="size-8 object-contain"
-                        />
-                        <div>
-                            <p class="text-muted text-xs">
-                                {{ point(primaryPoint.datum).period.period }}
-                            </p>
-                            <p class="font-medium">
-                                {{ formatGameValue(point(primaryPoint.datum).record, metric) }}
-                            </p>
-                        </div>
-                    </div>
-                </template>
-            </UChart>
+            <LazyGameStatsChart v-if="metric" :game="game.name" :metric :periods="sortedPeriods" />
             <div class="mt-4 overflow-x-auto">
                 <table class="w-full text-left text-sm">
                     <caption class="sr-only">

@@ -1,7 +1,7 @@
 import type { ComarkPlugin, MarkdownItPlugin, Node } from 'comark'
 import { parseMarkdown } from 'comark/parse'
 
-import { gameSlugPattern } from './games.js'
+import { gameSlugPattern } from '../../../../shared/utils/games.js'
 
 type TitlePart = { text: string; slug?: string }
 

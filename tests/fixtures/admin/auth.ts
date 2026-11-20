@@ -1,4 +1,3 @@
-import { passkey } from '@better-auth/passkey'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin, username } from 'better-auth/plugins'
@@ -26,6 +25,5 @@ export const auth = betterAuth({
             usernameValidator: (value) => /^[a-z\d_.-]{1,64}$/i.test(value),
         }),
         authActivity,
-        passkey(),
     ],
 })

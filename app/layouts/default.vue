@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { cn } from 'cn'
+
 const route = useRoute()
 
 const tabs = [
@@ -46,8 +47,8 @@ const handleMouseLeave = () => {
 </script>
 
 <template>
-    <MotionConfig :transition="{ duration: 0.6 }" reduced-motion="user">
-        <div class="flex flex-col gap-16">
+    <div class="flex flex-col gap-16">
+        <MotionConfig :transition="{ duration: 0.6 }" reduced-motion="user">
             <div class="mx-8 my-12 flex min-h-dvh flex-col gap-12 md:mx-12 lg:mx-24 lg:mt-24">
                 <header class="fade-in flex w-full flex-col items-center gap-3">
                     <NuxtLink
@@ -98,6 +99,13 @@ const handleMouseLeave = () => {
                             class="text-toned ml-auto font-mono text-lg font-medium"
                         />
 
+                        <UButton
+                            to="/login"
+                            icon="mingcute:user-3-line"
+                            aria-label="Account"
+                            variant="ghost"
+                            color="neutral"
+                        />
                         <ColorModeButton />
                     </div>
                 </header>
@@ -113,7 +121,7 @@ const handleMouseLeave = () => {
                 <USeparator decorative />
 
                 <div
-                    class="text-dimmed mt-8 flex w-full items-center justify-between gap-3 text-sm sm:px-10"
+                    class="text-muted mt-8 flex w-full items-center justify-between gap-3 text-sm sm:px-10"
                 >
                     <p>
                         Avatar illustration:
@@ -139,16 +147,18 @@ const handleMouseLeave = () => {
                     to="https://www.igdb.com"
                     target="_blank"
                     rel="noopener"
-                    class="text-dimmed text-xs"
+                    class="text-muted text-xs"
                     >Game data by IGDB</NuxtLink
                 >
 
-                <span
-                    class="text-dimmed/30 max-w-dvw overflow-clip mask-b-from-40% mask-b-to-80% font-[Special_Gothic_Expanded_One] text-[28cqw] select-none"
+                <svg
+                    aria-hidden="true"
+                    focusable="false"
+                    class="text-dimmed/30 h-[1.5em] w-[3.854em] max-w-dvw overflow-clip mask-b-from-40% mask-b-to-80% font-[Special_Gothic_Expanded_One] text-[28cqw] select-none"
                 >
-                    Liry24
-                </span>
+                    <text x="50%" y="1.11em" text-anchor="middle" fill="currentColor">Liry24</text>
+                </svg>
             </footer>
-        </div>
-    </MotionConfig>
+        </MotionConfig>
+    </div>
 </template>

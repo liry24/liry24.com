@@ -42,9 +42,18 @@ jobs:
           LIRY24_TEST_CRON: 'true'
           APP_ENV: test
       - run: bun x playwright-core install --with-deps chromium
-      - run: bun x vitest run tests/worker/built-app.test.ts tests/worker/native-app.test.ts tests/worker/adminComposer.browser.test.ts tests/worker/passkey.browser.test.ts
+      - run: bun x vitest run tests/worker/built-app.test.ts tests/worker/native-app.test.ts tests/worker/adminComposer.browser.test.ts tests/worker/pocket-id.test.ts
         env:
           LIRY24_TEST_BUILT_WORKER: 'true'
           LIRY24_TEST_ADMIN_COMPOSER_BROWSER: 'true'
       - name: Check native ViteHub development
         run: node scripts/test-liti-local.mjs
+      - name: Upload accessibility reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: accessibility-reports
+          path: .tmp/accessibility
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14

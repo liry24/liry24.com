@@ -1,7 +1,5 @@
 <script setup lang="ts">
 const { signOut, user } = useAppSession()
-
-const isPreview = String(useRuntimeConfig().public.preview) === 'true'
 </script>
 
 <template>
@@ -32,14 +30,13 @@ const isPreview = String(useRuntimeConfig().public.preview) === 'true'
                         icon="mingcute:check-line"
                         variant="soft"
                         color="success"
+                        class="text-green-800 dark:text-green-300"
                         size="sm"
                     />
                 </template>
             </UUser>
         </UCard>
 
-        <section v-if="!isPreview" id="passkeys"><AdminSettingsPasskeys /></section>
-        <section id="accounts"><AdminSettingsAccounts /></section>
         <section id="sessions"><AdminSettingsSessions /></section>
     </AdminResourcePage>
 </template>

@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 
 import { defineNuxtConfig } from 'nuxt/config'
+import { useNuxt } from 'nuxt/kit'
 import { parseURL } from 'ufo'
 import viteHub from 'vite-hub/nuxt'
 
@@ -12,13 +13,16 @@ const baseURL =
     (isPreview ? 'https://liry24-com-dev.liry.workers.dev' : 'https://liry24.com')
 const imagesDomain = isPreview ? baseURL : 'https://images.liry24.com'
 const title = 'Liry24'
+const diagnostics = process.env.NUXT_DIAGNOSTICS === '1'
 
 export default defineNuxtConfig({
     compatibilityDate: '2026-10-13',
 
     future: { compatibilityVersion: 5 },
 
-    devtools: { enabled: true, timeline: { enabled: true } },
+    devtools: { enabled: true, timeline: { enabled: false } },
+
+    a11y: { enabled: false },
 
     css: ['~/assets/css/main.css'],
 
@@ -30,7 +34,6 @@ export default defineNuxtConfig({
         '@nuxt/ui',
         '@nuxt/image',
         '@vueuse/nuxt',
-        '@nuxt/hints',
         '@nuxt/a11y',
         '@nuxtjs/i18n',
         'nuxt-site-config',
@@ -104,7 +107,15 @@ export default defineNuxtConfig({
         'motion-v/nuxt',
     ],
 
-    extends: ['~~/layers/cursor', '~~/layers/icons', '~~/layers/squircle', '~~/layers/sentence'],
+    extends: [
+        '~~/layers/cursor',
+        '~~/layers/icons',
+        '~~/layers/squircle',
+        '~~/layers/sentence',
+        '@liry24/admin-activity/nuxt',
+        '@liry24/admin-composer/nuxt',
+        '@liry24/game-mentions/nuxt',
+    ],
 
     components: [
         { path: '~/components/public' },
@@ -113,9 +124,6 @@ export default defineNuxtConfig({
     ],
 
     experimental: {
-        sharedPrerenderData: true,
-        crossOriginPrefetch: true,
-        extractAsyncDataHandlers: true,
         typescriptPlugin: true,
         nitroAutoImports: true,
         prefetchPreloadTags: true,
@@ -127,13 +135,21 @@ export default defineNuxtConfig({
             noDiscovery: true,
             include: [
                 '@unhead/schema-org/vue',
-                '@better-auth/passkey/client',
                 'better-auth/client/plugins',
                 'better-auth/plugins',
                 '@comark/vue',
                 '@formkit/drag-and-drop',
                 '@formkit/drag-and-drop/vue',
                 '@yeger/vue-masonry-wall',
+                '@tanstack/charts',
+                '@tanstack/charts/vue',
+                '@tanstack/charts/scales/band',
+                '@tanstack/charts/scales/linear',
+                '@tanstack/charts/scales/ordinal',
+                '@tanstack/charts/scales/point',
+                '@tanstack/charts/crosshair',
+                '@tanstack/charts/mark/decorative',
+                '@tanstack/charts/polar',
                 'cn',
             ],
         },
@@ -212,7 +228,8 @@ export default defineNuxtConfig({
     fonts: {
         defaults: { weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
         families: [
-            { name: 'Geist', provider: 'google', preload: true, global: true },
+            { name: 'Inter', provider: 'google', preload: true, global: true },
+            { name: 'Geist', weights: [200], provider: 'google', preload: false, global: true },
             { name: 'Geist Mono', provider: 'google', preload: true, global: true },
             {
                 name: 'Special Gothic Expanded One',
@@ -229,7 +246,7 @@ export default defineNuxtConfig({
         name: title,
     },
 
-    ui: { experimental: { componentDetection: true } },
+    ui: { fonts: false, experimental: { componentDetection: true } },
 
     icon: {
         clientBundle: {
@@ -257,17 +274,36 @@ export default defineNuxtConfig({
     },
 
     sitemap: {
-        exclude: ['/admin', '/admin/**', '/login'],
+        exclude: ['/admin', '/admin/**', '/login', '/auth/**'],
         sources: ['/api/sitemap/posts'],
     },
 
     robots: {
-        disallow: ['/admin', '/api/admin', '/api/_liti/manage', '/_vitehub', '/login'],
+        disallow: [
+            '/admin',
+            '/api/admin',
+            '/api/_liti/manage',
+            '/_vitehub',
+            '/login',
+            '/auth',
+            '/auth',
+        ],
     },
 
     $development: {
-        // Background SSR warmup discovers OG font weights and restarts Nitro during requests.
-        vite: { warmupEntry: false },
+        modules: diagnostics ? ['@nuxt/hints'] : [],
+        a11y: { enabled: diagnostics },
+        devtools: { timeline: { enabled: diagnostics } },
+        hooks: {
+            'nuxt-og-image:components'({ components }) {
+                const nuxt = useNuxt()
+                nuxt.options.vite.$server ??= {}
+                nuxt.options.vite.$server.dev ??= {}
+                nuxt.options.vite.$server.dev.warmup = components.flatMap(({ path }) =>
+                    path ? [path] : [],
+                )
+            },
+        },
         runtimeConfig: { public: { siteUrl: '' } },
     },
 

@@ -3,7 +3,7 @@ import { createError, defineEventHandler, getQuery } from 'nuxt/server'
 import { db } from 'vite-hub/database/drizzle'
 import { z } from 'zod'
 
-import { adminEvent as adminEvents } from '../../../../database/auth-schema'
+import { adminEvent as adminEvents } from '../../../../../../../server/database/auth-schema'
 
 export default defineEventHandler(async (event) => {
     event.res.headers.set('Cache-Control', 'private, no-store')

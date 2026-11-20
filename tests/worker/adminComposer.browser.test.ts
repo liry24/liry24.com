@@ -1,25 +1,80 @@
 import assert from 'node:assert/strict'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
-import { chromium } from 'playwright-core'
+import { chromium, type Page } from 'playwright-core'
 import { test } from 'vitest'
 
-import type { ComposerPlan } from '../../shared/types/adminComposer'
+import type { ComposerPlan } from '../../packages/admin-composer/shared/types/adminComposer'
+import { runAccessibilityChecks, scanAccessibility } from '../helpers/accessibility'
 import { builtWorker } from '../helpers/builtWorker'
+
+test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
+    'accessibility checks include target size even though axe disables it by default',
+    async () => {
+        const browser = await chromium.launch({ headless: true })
+        try {
+            const page = await browser.newPage()
+            await page.setContent(`<!doctype html><html lang="en"><head><title>Target size fixture</title>
+                <style>button { width: 12px; height: 12px; padding: 0; border: 0; }</style></head>
+                <body><main><h1>Target size fixture</h1><button aria-label="First">1</button><button aria-label="Second">2</button></main></body></html>`)
+            const configured = await runAccessibilityChecks(page)
+            const defaults = await page.evaluate(() => window.axe.run(document))
+            assert(!defaults.violations.some(({ id }) => id === 'target-size'))
+            assert(configured.violations.some(({ id }) => id === 'target-size'))
+            await page.addStyleTag({ content: 'button { width: 24px; height: 24px; }' })
+            const corrected = await runAccessibilityChecks(page)
+            assert(!corrected.violations.some(({ id }) => id === 'target-size'))
+        } finally {
+            await browser.close()
+        }
+    },
+)
 
 test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
     'composer isolates requests, selects models, saves mixed batches and keeps post drafts separate',
     async () => {
         await mkdir('.tmp', { recursive: true })
+        const { default: manifest } = await import(
+            pathToFileURL(resolve('.output/server/chunks/virtual/precomputed.mjs')).href
+        )
+        const chartKey = 'components/public/GameStatsChart.vue'
+        const chartChunk = '/_nuxt/' + manifest.dependencies[chartKey].preload[chartKey].file
         const app = await builtWorker()
         const { server, env, url } = app
         let browser
         const errors: string[] = []
+        const consoleDiagnostics: { url: string; text: string; arguments: string[] }[] = []
+        const observeErrors = (page: Page, label = '') => {
+            page.on('pageerror', (error) => errors.push(`${label}${page.url()}: ${error.message}`))
+            page.on('console', async (message) => {
+                if (!/hydration.*mismatch|non-element root|NUXT_E400[23]/i.test(message.text()))
+                    return
+                const url = page.url()
+                errors.push(`${label}${url}: ${message.text()}`)
+                consoleDiagnostics.push({
+                    url,
+                    text: message.text(),
+                    arguments: await Promise.all(
+                        message
+                            .args()
+                            .map((argument) =>
+                                argument
+                                    .evaluate((value) =>
+                                        value instanceof Element ? value.outerHTML : String(value),
+                                    )
+                                    .catch(() => '<argument unavailable>'),
+                            ),
+                    ),
+                })
+            })
+        }
         try {
             const now = Date.now()
             const { cookie } = await app.session('composer-admin')
             const signed = decodeURIComponent(
-                cookie.split(';')[0]!.slice('better-auth.session_token='.length),
+                cookie.split(';')[0]!.slice('liry24-pocket.session_token='.length),
             )
             browser = await chromium.launch({
                 headless: true,
@@ -32,15 +87,17 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                     : route.abort(),
             )
             await context.addCookies(
-                ['better-auth.session_token', '__Secure-better-auth.session_token'].map((name) => ({
-                    name,
-                    value: encodeURIComponent(signed),
-                    domain: url.hostname,
-                    path: '/',
-                    httpOnly: true,
-                    sameSite: 'Lax' as const,
-                    secure: name.startsWith('__Secure-'),
-                })),
+                ['liry24-pocket.session_token', '__Secure-liry24-pocket.session_token'].map(
+                    (name) => ({
+                        name,
+                        value: encodeURIComponent(signed),
+                        domain: url.hostname,
+                        path: '/',
+                        httpOnly: true,
+                        sameSite: 'Lax' as const,
+                        secure: name.startsWith('__Secure-'),
+                    }),
+                ),
             )
             const session = await server.fetch('/api/auth/get-session', { headers: { cookie } })
             assert.equal(
@@ -49,13 +106,27 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 'Synthetic session is accepted',
             )
             const page = await context.newPage()
-            page.on('pageerror', (error) => errors.push(error.message))
+            observeErrors(page)
+            const scripts = new Set<string>()
+            page.on('request', (request) => {
+                if (request.resourceType() === 'script')
+                    scripts.add(new URL(request.url()).pathname)
+            })
             const goto = async (...args: Parameters<typeof page.goto>) => {
                 await page.goto(...args)
                 await page.waitForFunction(
                     () =>
                         (document.querySelector('#__nuxt') as any)?.__vue_app__?.config
                             .globalProperties.$nuxt?.isHydrating === false,
+                )
+                const applicationError = await page.evaluate(
+                    () =>
+                        (document.querySelector('#__nuxt') as any)?.__vue_app__?.config
+                            .globalProperties.$nuxt?.payload.error,
+                )
+                assert(
+                    !applicationError,
+                    `Application failed at ${args[0]}: ${JSON.stringify(applicationError)}`,
                 )
             }
             const navigate = (path: string) =>
@@ -434,6 +505,11 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 .click()
             await page.getByRole('dialog').waitFor({ state: 'hidden' })
             await page.getByLabel('Title', { exact: true }).waitFor()
+            await page.waitForFunction(
+                () =>
+                    (document.querySelector('input[placeholder="Post title"]') as HTMLInputElement)
+                        ?.value === 'Second article',
+            )
             assert.equal(
                 await page.getByLabel('Title', { exact: true }).inputValue(),
                 'Second article',
@@ -636,7 +712,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 })
                 const receipt = (await response.json()) as { digest?: string; version?: number }
                 assert.equal(response.status, 200, JSON.stringify(receipt))
-                return { ...receipt, id, data }
+                return { ...receipt, id, data, model }
             }
             for (let index = 0; index < 21; index++)
                 await create('posts', {
@@ -856,6 +932,70 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 }),
             })
             assert.equal(published.status, 200, await published.text())
+            // Publish representative fixtures before the first cacheable public response.
+            const artwork = await readFile('tests/fixtures/accessibility-artwork.png')
+            const upload = new FormData()
+            upload.append('files', new Blob([artwork], { type: 'image/png' }), 'accessibility.png')
+            const uploadRequest = new Request(new URL('/api/admin/images?model=arts', url), {
+                method: 'POST',
+                body: upload,
+            })
+            const uploadBytes = await uploadRequest.arrayBuffer()
+            const assetResponse = await server.fetch('/api/admin/images?model=arts', {
+                method: 'POST',
+                headers: {
+                    cookie,
+                    origin: url.origin,
+                    'content-type': uploadRequest.headers.get('content-type')!,
+                    'content-length': String(uploadBytes.byteLength),
+                },
+                body: uploadBytes,
+            })
+            assert.equal(assetResponse.status, 200, await assetResponse.clone().text())
+            const [asset] = (await assetResponse.json()) as {
+                pathname: string
+                contentType: string
+                size: number
+            }[]
+            const publicFixtures = [
+                await create('arts', {
+                    title: 'Accessibility artwork',
+                    slug: 'accessibility-artwork',
+                    description: 'Synthetic artwork with a local image.',
+                    images: [asset],
+                }),
+                await create('careers', {
+                    company: 'Synthetic studio',
+                    slug: 'synthetic-studio',
+                    period: '2026',
+                    position: 'Developer',
+                }),
+            ]
+            for (const style of ['small', 'large'])
+                publicFixtures.push(
+                    await create('works', {
+                        title: `Accessibility ${style} work`,
+                        slug: `accessibility-${style}-work`,
+                        description: 'Synthetic project description.',
+                        category: 'Development',
+                        image: asset,
+                        href: 'https://example.invalid/project',
+                        style,
+                    }),
+                )
+            for (const fixture of publicFixtures) {
+                const response = await server.fetch('/api/_liti/manage', {
+                    method: 'POST',
+                    headers: { cookie, origin: url.origin, 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'publish',
+                        model: fixture.model,
+                        id: fixture.id,
+                        digests: { und: fixture.digest },
+                    }),
+                })
+                assert.equal(response.status, 200, await response.text())
+            }
             const denied = await server.fetch('/api/admin/games')
             assert.equal(denied.status, 401)
             const localGames = await server.fetch('/api/admin/games', { headers: { cookie } })
@@ -956,10 +1096,12 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                     (document.querySelector('#__nuxt') as any)?.__vue_app__?.config.globalProperties
                         .$nuxt?.isHydrating === false,
             )
+            assert(!scripts.has(chartChunk), 'Home does not load the chart before the dialog opens')
             await page.getByRole('button', { name: /VALORANT Act 3/ }).click()
             await page.getByRole('dialog').getByRole('table').waitFor()
             await page.getByRole('dialog').locator('svg[role="img"]').waitFor()
             const chart = page.getByRole('dialog').locator('svg[role="img"]')
+            assert(scripts.has(chartChunk), 'Opening the stats dialog loads its chart')
             assert((await chart.locator('linearGradient stop').count()) >= 3)
             assert.equal(await chart.locator('text').filter({ hasText: /^act-/ }).count(), 0)
             assert.equal(
@@ -1201,12 +1343,310 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 0,
                 'Copied ranks do not duplicate cards when the legacy name differs from IGDB',
             )
+
+            // Use the same isolated Worker and assets for the accessibility acceptance matrix.
+            const sessionCookies = await context.cookies()
+            const violations: Awaited<ReturnType<typeof scanAccessibility>> = []
+            for (const colorScheme of ['light', 'dark'] as const) {
+                // Each theme has fresh browser storage and the same synthetic authenticated actor.
+                await env.DB.prepare('DELETE FROM rate_limit').run()
+                const auditContext = await browser.newContext({
+                    colorScheme,
+                    viewport: { width: 1280, height: 900 },
+                })
+                await auditContext.route('**/*', (route) =>
+                    new URL(route.request().url()).origin === url.origin
+                        ? route.continue()
+                        : route.abort(),
+                )
+                await auditContext.addCookies(sessionCookies)
+                const auditPage = await auditContext.newPage()
+                observeErrors(auditPage)
+                await auditPage.route('**/api/admin/posts/proofread', (route) =>
+                    route.fulfill({
+                        contentType: 'application/json',
+                        body: JSON.stringify({
+                            body: 'A corrected synthetic article.',
+                        }),
+                    }),
+                )
+                const visit = async (path: string) => {
+                    await auditPage.goto(new URL(path, url).href)
+                    await auditPage.waitForFunction(
+                        () =>
+                            (document.querySelector('#__nuxt') as any)?.__vue_app__?.config
+                                .globalProperties.$nuxt?.isHydrating === false,
+                    )
+                    const applicationError = await auditPage.evaluate(() => {
+                        const error = (document.querySelector('#__nuxt') as any)?.__vue_app__
+                            ?.config.globalProperties.$nuxt?.payload.error
+                        return (
+                            error && {
+                                message: error.message,
+                                statusCode: error.statusCode,
+                                stack: error.stack,
+                                data: error.data,
+                                cause: String(error.cause),
+                            }
+                        )
+                    })
+                    assert(
+                        !applicationError,
+                        `Application failed at ${path}: ${JSON.stringify(applicationError)}`,
+                    )
+                    await auditPage.waitForFunction(
+                        (theme) => document.documentElement.classList.contains(theme),
+                        colorScheme,
+                    )
+                }
+                const scan = async (state: string) => {
+                    violations.push(
+                        ...(await scanAccessibility(
+                            auditPage,
+                            `${colorScheme}-${auditPage.viewportSize()!.width}-${state}`,
+                        )),
+                    )
+                }
+                const artViewer = async () => {
+                    await auditPage
+                        .getByRole('button', { name: 'View Accessibility artwork' })
+                        .click()
+                    await auditPage
+                        .getByRole('dialog')
+                        .getByRole('heading', { name: 'Accessibility artwork', level: 1 })
+                        .waitFor()
+                    await scan('arts-viewer')
+                    assert(
+                        await auditPage
+                            .getByRole('dialog', { name: 'Accessibility artwork', exact: true })
+                            .evaluate((element) => {
+                                const bounds = element.getBoundingClientRect()
+                                return (
+                                    bounds.left >= 0 &&
+                                    bounds.right <= innerWidth &&
+                                    element.scrollWidth <= element.clientWidth
+                                )
+                            }),
+                        'The artwork dialog stays within the viewport',
+                    )
+                    await auditPage
+                        .getByRole('dialog', { name: 'Accessibility artwork', exact: true })
+                        .getByRole('button', { name: 'Enlarge image', exact: true })
+                        .click()
+                    const imageDialog = auditPage.getByRole('dialog', {
+                        name: 'Image preview',
+                        exact: true,
+                    })
+                    await imageDialog.waitFor()
+                    await scan('image-viewer')
+                    await auditPage.keyboard.press('Escape')
+                    await imageDialog.waitFor({ state: 'hidden' })
+                }
+                await visit('/')
+                await auditPage.getByRole('button', { name: /VALORANT Act/ }).waitFor()
+                await scan('home')
+                await auditPage.getByRole('button', { name: /VALORANT Act/ }).click()
+                await auditPage.getByRole('dialog').getByRole('table').waitFor()
+                await scan('game-stats-dialog')
+                await visit('/arts')
+                await auditPage
+                    .getByRole('button', { name: 'View Accessibility artwork' })
+                    .waitFor()
+                await scan('arts')
+                await artViewer()
+                await visit('/works')
+                await auditPage.getByRole('heading', { name: 'Accessibility large work' }).waitFor()
+                await scan('works')
+                for (const path of ['/posts', '/posts/synthetic-game-mention']) {
+                    await visit(path)
+                    await auditPage.getByRole('heading').filter({ hasText: 'Played' }).waitFor()
+                    await scan(path)
+                }
+                await auditContext.clearCookies()
+                await visit('/login')
+                await auditPage
+                    .getByRole('button', { name: 'Pocket ID でサインイン', exact: true })
+                    .waitFor()
+                await scan('login')
+                await auditContext.addCookies(sessionCookies)
+                await visit('/admin')
+                await scan('admin')
+                await visit('/admin/data')
+                await auditPage.getByRole('textbox', { name: 'Content request' }).waitFor()
+                await auditPage.locator('[data-model="skills"] article').first().waitFor()
+                await scan('admin-data')
+                await auditPage
+                    .locator('[data-model="skills"]')
+                    .getByRole('button', { name: 'Edit', exact: true })
+                    .first()
+                    .click()
+                await auditPage.getByRole('dialog').getByLabel('Name', { exact: true }).waitFor()
+                await scan('entry-edit-dialog')
+                await visit('/admin/users')
+                await auditPage
+                    .getByRole('link', { name: 'Synthetic admin', exact: true })
+                    .waitFor()
+                await scan('admin-users')
+                await visit('/admin/settings')
+                await auditPage.getByText('Current session', { exact: true }).waitFor()
+                await scan('admin-settings')
+                await visit('/admin/posts/new')
+                const titleInput = auditPage.getByLabel('Title', { exact: true })
+                const contentInput = auditPage.getByLabel('Content', { exact: true })
+                await titleInput.waitFor()
+                await scan('post-editor')
+                await titleInput.fill('Synthetic accessibility article')
+                await contentInput.fill('An uncorrected synthetic article.')
+                const slugInput = auditPage.getByLabel('Slug', { exact: true })
+                await slugInput.fill('invalid/slug')
+                await auditPage.getByRole('button', { name: 'Save Draft', exact: true }).click()
+                await slugInput.locator('..').locator('[aria-invalid="true"]').waitFor()
+                await scan('post-validation')
+                await slugInput.fill('synthetic-accessibility-article')
+                await auditPage
+                    .getByRole('button', { name: 'Proofread Content', exact: true })
+                    .click()
+                await auditPage.getByRole('region', { name: 'Proofreading suggestion' }).waitFor()
+                await scan('proofreading-review')
+
+                await auditPage.setViewportSize({ width: 390, height: 844 })
+                await visit('/')
+                await auditPage.getByRole('button', { name: /VALORANT Act/ }).waitFor()
+                await scan('home')
+                await visit('/arts')
+                await artViewer()
+                await visit('/posts/synthetic-game-mention')
+                await auditPage.getByRole('heading').filter({ hasText: 'Played' }).waitFor()
+                await scan('post-detail')
+                await visit('/admin/posts/new')
+                await titleInput.waitFor()
+                await scan('post-editor')
+                await auditPage.getByRole('button', { name: 'Open sidebar', exact: true }).click()
+                await auditPage.getByRole('dialog', { name: 'Admin navigation' }).waitFor()
+                await scan('admin-navigation')
+                await auditContext.close()
+            }
+            for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+                const motionContext = await browser.newContext({
+                    reducedMotion,
+                    viewport: { width: 1280, height: 900 },
+                })
+                await motionContext.route('**/*', (route) =>
+                    new URL(route.request().url()).origin === url.origin
+                        ? route.continue()
+                        : route.abort(),
+                )
+                await motionContext.addCookies(sessionCookies)
+                const motionPage = await motionContext.newPage()
+                observeErrors(motionPage, `${reducedMotion} `)
+                const settled = async (path: string) => {
+                    await motionPage.waitForURL(new URL(path, url).href)
+                    await motionPage.waitForFunction(() => {
+                        const nuxt = (document.querySelector('#__nuxt') as any)?.__vue_app__?.config
+                            .globalProperties.$nuxt
+                        return nuxt?.isHydrating === false && !nuxt['~transitionPromise']
+                    })
+                    const error = await motionPage.evaluate(
+                        () =>
+                            (document.querySelector('#__nuxt') as any)?.__vue_app__?.config
+                                .globalProperties.$nuxt?.payload.error,
+                    )
+                    assert(
+                        !error,
+                        `${reducedMotion} navigation failed at ${path}: ${JSON.stringify(error)}`,
+                    )
+                }
+                await motionPage.goto(new URL('/arts', url).href)
+                await settled('/arts')
+                const artworkCard = motionPage.getByRole('button', {
+                    name: 'View Accessibility artwork',
+                    exact: true,
+                })
+                await artworkCard.focus()
+                await artworkCard.press('Enter')
+                const artworkDialog = motionPage.getByRole('dialog', {
+                    name: 'Accessibility artwork',
+                    exact: true,
+                })
+                await artworkDialog.waitFor()
+                const enlarge = artworkDialog.getByRole('button', {
+                    name: 'Enlarge image',
+                    exact: true,
+                })
+                await enlarge.focus()
+                await enlarge.press('Enter')
+                const imageDialog = motionPage.getByRole('dialog', {
+                    name: 'Image preview',
+                    exact: true,
+                })
+                await imageDialog.waitFor()
+                await motionPage.keyboard.press('Escape')
+                await imageDialog.waitFor({ state: 'hidden' })
+                await motionPage.waitForFunction(
+                    () => document.activeElement?.getAttribute('aria-label') === 'Enlarge image',
+                )
+                await artworkDialog.getByRole('button', { name: 'Close', exact: true }).click()
+                await artworkDialog.waitFor({ state: 'hidden' })
+                await motionPage.waitForFunction(
+                    () =>
+                        document.activeElement?.getAttribute('aria-label') ===
+                        'View Accessibility artwork',
+                )
+
+                await motionPage.goto(new URL('/arts?open=accessibility-artwork', url).href)
+                await settled('/arts?open=accessibility-artwork')
+                await artworkDialog.waitFor()
+                await motionPage.evaluate(() => history.back())
+                await artworkDialog.waitFor({ state: 'hidden' })
+                await motionPage.evaluate(() =>
+                    (
+                        document.querySelector('#__nuxt') as any
+                    ).__vue_app__.config.globalProperties.$nuxt.$router.push('/admin'),
+                )
+                await settled('/admin')
+                await motionPage.getByRole('link', { name: 'Back to site', exact: true }).click()
+                await settled('/')
+                await motionPage.getByRole('button', { name: /VALORANT Act/ }).waitFor()
+                await motionPage.goBack()
+                await settled('/admin')
+                await motionPage.getByRole('link', { name: 'Back to site', exact: true }).waitFor()
+                await motionPage.goForward()
+                await settled('/')
+                await motionPage.getByRole('button', { name: /VALORANT Act/ }).waitFor()
+                await motionContext.close()
+            }
+            assert.deepEqual(violations, [], 'WCAG 2.2 A/AA violations; see .tmp/accessibility')
             assert.deepEqual(errors, [])
         } catch (error) {
             server.debug()
-            const page = browser?.contexts()[0]?.pages()[0]
+            const page = browser?.contexts().at(-1)?.pages().at(-1)
             if (page) {
                 await page.screenshot({ path: '.tmp/composer-error.png', fullPage: true })
+                await mkdir('.tmp/accessibility', { recursive: true })
+                await page.screenshot({
+                    path: '.tmp/accessibility/browser-error.png',
+                    fullPage: true,
+                })
+                await writeFile(
+                    '.tmp/accessibility/browser-error.json',
+                    JSON.stringify(
+                        {
+                            url: page.url(),
+                            error: String(error),
+                            browserErrors: errors,
+                            consoleDiagnostics,
+                            images: await page.locator('img').evaluateAll((images) =>
+                                images.map((image) => ({
+                                    src: image.src,
+                                    currentSrc: image.currentSrc,
+                                    naturalWidth: image.naturalWidth,
+                                })),
+                            ),
+                        },
+                        null,
+                        2,
+                    ),
+                )
                 console.log((await page.locator('body').innerText()).slice(0, 3000))
                 console.log(
                     await page.locator('input,textarea').evaluateAll((inputs) =>
@@ -1227,5 +1667,5 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
             await app.close()
         }
     },
-    180000,
+    600000,
 )

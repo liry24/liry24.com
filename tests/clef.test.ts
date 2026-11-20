@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest'
 
-import { evaluateClef } from '../server/utils/clef'
+import { evaluateClef } from '../packages/admin-composer/server/utils/clef'
 
 test('The native Workers AI binding uses Clef-flash, passes cancellation and rejects missing or unoffered choices', async () => {
     const ai = { run: vi.fn() }

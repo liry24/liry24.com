@@ -3,7 +3,7 @@ import { parseMarkdown } from 'comark/parse'
 import summary from 'comark/plugins/summary'
 import type { Entry } from 'liti/types'
 
-import { postMarkdownSecurity } from './postMarkdown.js'
+import { postMarkdownSecurity } from '../../packages/game-mentions/shared/utils/postMarkdown.js'
 
 export async function postCards(entries: Entry<'posts'>[]) {
     return await Promise.all(

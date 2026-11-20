@@ -87,21 +87,11 @@ export default defineEventHandler(async (event) => {
             accountId: '456',
             accessToken: 'SECRET_LINK',
         })
-        await db.insert(schema.passkey).values({
-            id: 'synthetic-passkey',
-            userId: input.userId,
-            name: 'Original',
-            publicKey: 'synthetic-key',
-            credentialID: 'synthetic-credential',
-            counter: 0,
-            deviceType: 'singleDevice',
-            backedUp: false,
-        })
         return { accountId: account.id }
     }
     if (input.action === 'failActivity') {
         sqlite.exec(
-            "CREATE TRIGGER fail_activity BEFORE INSERT ON admin_events BEGIN SELECT RAISE(FAIL, 'synthetic storage failure'); END",
+            "CREATE TRIGGER fail_activity BEFORE INSERT ON admin_event BEGIN SELECT RAISE(FAIL, 'synthetic storage failure'); END",
         )
         return { ok: true }
     }

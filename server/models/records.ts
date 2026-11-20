@@ -4,10 +4,10 @@ import { image } from '@vite-hub/blob/reference'
 import { optional } from '@vite-hub/content/collections'
 import { z } from 'zod'
 
+import { modelActivity } from '../../packages/admin-activity/server/utils/modelActivity.js'
 import { gameSlugPattern, gameColorPattern } from '../../shared/utils/games.js'
 import { socialSlug } from '../../shared/utils/socials.js'
 import { imageSchema } from '../utils/imageSchema.js'
-import { modelActivity } from '../utils/modelActivity.js'
 import {
     modelAuthorization,
     validateGameRecord,

@@ -6,9 +6,12 @@ import {
 } from '@litijs/model'
 import { eq } from 'drizzle-orm'
 
+import {
+    gameTitleParts,
+    postGameSlugs,
+} from '../../packages/game-mentions/shared/utils/gameMentions.js'
 import type { GameMetric, GameValue } from '../../shared/types/games.js'
 import { adminRoles, modelAccess } from '../../shared/utils/authAccess.js'
-import { gameTitleParts, postGameSlugs } from '../../shared/utils/gameMentions.js'
 import { gameValueIssues } from '../../shared/utils/games.js'
 
 export const modelAuthorization = ({ actor, model, action }: AuthorizationContext) => {

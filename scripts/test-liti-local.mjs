@@ -103,7 +103,7 @@ try {
     const signed = encodeURIComponent(
         token + '.' + createHmac('sha256', env.BETTER_AUTH_SECRET).update(token).digest('base64'),
     )
-    const cookie = 'better-auth.session_token=' + signed
+    const cookie = 'liry24-pocket.session_token=' + signed
     child = spawn(
         process.execPath,
         [
@@ -267,7 +267,7 @@ try {
     const context = await browser.newContext()
     await context.addCookies([
         {
-            name: 'better-auth.session_token',
+            name: 'liry24-pocket.session_token',
             value: signed,
             domain: '127.0.0.1',
             path: '/',

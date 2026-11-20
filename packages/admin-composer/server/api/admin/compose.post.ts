@@ -3,8 +3,8 @@ import { z } from 'zod'
 
 import runtime from '#liti/runtime'
 
+import { listAdminEntries } from '../../../../../server/utils/entryList'
 import { evaluateClef, type ComposerInference } from '../../utils/clef'
-import { listAdminEntries } from '../../utils/entryList'
 
 export default defineEventHandler(async (event) => {
     const started = performance.now()

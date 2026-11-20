@@ -68,8 +68,7 @@ test('native Env keeps credential declarations on the server', () => {
     for (const key of [
         'BETTER_AUTH_SECRET',
         'NUXT_APP_SECRET',
-        'GITHUB_CLIENT_SECRET',
-        'VERCEL_CLIENT_SECRET',
+        'POCKET_ID_CLIENT_SECRET',
         'OPENAI_API_KEY',
     ])
         expect(native[1].env.server[key]?.secret).toBe(true)

@@ -69,18 +69,18 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           BETTER_AUTH_SECRET: ${{ secrets.PREVIEW_BETTER_AUTH_SECRET }}
           NUXT_APP_SECRET: ${{ secrets.PREVIEW_NUXT_APP_SECRET }}
-          GITHUB_CLIENT_ID: ${{ secrets.PREVIEW_GITHUB_CLIENT_ID }}
-          GITHUB_CLIENT_SECRET: ${{ secrets.PREVIEW_GITHUB_CLIENT_SECRET }}
-          PREVIEW_GITHUB_TOKEN: ${{ secrets.PREVIEW_GITHUB_TOKEN }}
         run: |
           node --input-type=module <<'NODE'
           import { execFileSync } from 'node:child_process'
-          const keys = ['BETTER_AUTH_SECRET', 'NUXT_APP_SECRET', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'PREVIEW_GITHUB_TOKEN']
+          const keys = ['BETTER_AUTH_SECRET', 'NUXT_APP_SECRET']
           for (const name of keys) if (!process.env[name]) throw new Error('Missing Preview secret: ' + name)
           execFileSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'secret', 'bulk', '--config', '.output/server/wrangler.json'], {
             input: JSON.stringify(Object.fromEntries(keys.map((name) => [name, process.env[name]]))),
             stdio: ['pipe', 'inherit', 'inherit'],
           })
+          const configured = JSON.parse(execFileSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'secret', 'list', '--config', '.output/server/wrangler.json'], { encoding: 'utf8' }))
+          for (const key of ['POCKET_ID_CLIENT_ID', 'POCKET_ID_CLIENT_SECRET'])
+            if (!configured.some(secret => secret.name === key)) throw new Error('Missing provisioned Pocket ID secret: ' + key)
           NODE
       - name: Deploy native dev Worker
         run: bun run deploy
