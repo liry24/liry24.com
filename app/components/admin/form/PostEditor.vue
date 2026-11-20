@@ -150,6 +150,8 @@ onBeforeRouteLeave(
             role="alert"
             :title="failure || adminErrorMessage(error, 'The operation failed.')"
             color="error"
+            variant="subtle"
+            :ui="{ title: 'text-red-700 dark:text-red-400' }"
         />
         <UAlert
             v-for="warning in warnings"
