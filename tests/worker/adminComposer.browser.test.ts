@@ -1498,7 +1498,10 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 const slugInput = auditPage.getByLabel('Slug', { exact: true })
                 await slugInput.fill('invalid/slug')
                 await auditPage.getByRole('button', { name: 'Save Draft', exact: true }).click()
-                await slugInput.locator('..').locator('[aria-invalid="true"]').waitFor()
+                await auditPage
+                    .getByRole('alert')
+                    .filter({ hasText: 'Model validation failed.' })
+                    .waitFor()
                 await scan('post-validation')
                 await slugInput.fill('synthetic-accessibility-article')
                 await auditPage

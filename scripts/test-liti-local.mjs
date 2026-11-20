@@ -82,7 +82,13 @@ try {
     assert.ok(!existsSync(sqlite))
     run(process.execPath, ['node_modules/liti/dist/cli/index.js', 'generate'])
     assert.ok(!existsSync(sqlite), 'Generation must not create or migrate the local database')
-    run(process.execPath, ['node_modules/vite-hub/dist/bin.js', 'db', 'migrate'])
+    // The Pocket ID migration drops the unused passkey table in this fresh test database.
+    run(process.execPath, [
+        'node_modules/vite-hub/dist/bin.js',
+        'db',
+        'migrate',
+        '--allow-data-loss',
+    ])
     assert.ok(existsSync(sqlite), 'Use the local SQLite target owned by the native Nuxt dev CLI')
     database = new DatabaseSync(sqlite)
     const now = Date.now(),

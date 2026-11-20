@@ -145,7 +145,12 @@ onBeforeRouteLeave(
                     @click="composerProposal = null"
             /></template>
         </UAlert>
-        <UAlert v-if="failure || error" :title="failure || String(error)" color="error" />
+        <UAlert
+            v-if="failure || error"
+            role="alert"
+            :title="failure || adminErrorMessage(error, 'The operation failed.')"
+            color="error"
+        />
         <UAlert
             v-for="warning in warnings"
             :key="warning.code"
