@@ -1483,9 +1483,7 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 await auditPage.getByRole('dialog').getByLabel('Name', { exact: true }).waitFor()
                 await scan('entry-edit-dialog')
                 await visit('/admin/users')
-                await auditPage
-                    .getByRole('link', { name: 'Synthetic admin', exact: true })
-                    .waitFor()
+                await auditPage.getByRole('link', { name: 'composer-admin', exact: true }).waitFor()
                 await scan('admin-users')
                 await visit('/admin/settings')
                 await auditPage.getByText('Current session', { exact: true }).waitFor()
