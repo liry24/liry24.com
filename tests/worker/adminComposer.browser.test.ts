@@ -1522,7 +1522,9 @@ test.runIf(process.env.LIRY24_TEST_ADMIN_COMPOSER_BROWSER === 'true')(
                 await visit('/admin/posts/new')
                 await titleInput.waitFor()
                 await scan('post-editor')
-                await auditPage.getByRole('button', { name: 'Open sidebar', exact: true }).click()
+                await auditPage
+                    .getByRole('button', { name: /^(Open sidebar|サイドバーを開く)$/ })
+                    .click()
                 await auditPage.getByRole('dialog', { name: 'Admin navigation' }).waitFor()
                 await scan('admin-navigation')
                 await auditContext.close()
