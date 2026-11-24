@@ -1,5 +1,6 @@
 import { chartCurves } from '@nuxt/ui/utils/chart'
-import { areaY, defineChart, dot, lineY, type ChartMark, type SceneNode } from '@tanstack/charts'
+import { areaY, defineChart, dot, lineY } from '@tanstack/charts'
+import type { ChartMark, SceneNode } from '@tanstack/charts'
 import { crosshair } from '@tanstack/charts/crosshair'
 import { decorative } from '@tanstack/charts/mark/decorative'
 import { scaleLinear } from '@tanstack/charts/scales/linear'
@@ -16,16 +17,17 @@ const horizontalGradient = (mark: ChartMark): ChartMark => ({
             render(context) {
                 const scene = initialized.render(context)
                 const paint = (node: SceneNode): SceneNode => {
-                    if (node.kind === 'group')
+                    if (node.kind === 'group') {
                         return { ...node, children: node.children.map(paint) }
-                    if (
-                        node.kind !== 'polyline' ||
-                        node.points.length < 2 ||
-                        !node.points.every((point) => point[1] === node.points[0]![1])
-                    )
+                    }
+                    if (node.kind !== 'polyline' || node.points.length < 2) {
                         return node
-                    const first = node.points[0]!,
-                        last = node.points.at(-1)!
+                    }
+                    const first = node.points[0]
+                    const last = node.points.at(-1)
+                    if (!first || !last || !node.points.every((point) => point[1] === first[1])) {
+                        return node
+                    }
                     return {
                         kind: 'group',
                         key: `${node.key}-flat`,
@@ -50,20 +52,24 @@ const horizontalGradient = (mark: ChartMark): ChartMark => ({
     },
 })
 
-export function gameChart(periods: GamePeriod[], metric: GameMetric, id: string) {
+export function gameChart(periods: Array<GamePeriod>, metric: GameMetric, id: string) {
     const ordered = [...periods].sort((a, b) => a.order - b.order)
-    const runs: RankPoint[][] = []
-    let run: RankPoint[] = []
+    const runs: Array<Array<RankPoint>> = []
+    let run: Array<RankPoint> = []
     for (const period of ordered) {
         const record = period.values.find((value) => value.key === metric.key)
         if (!record) {
-            if (run.length) runs.push(run)
+            if (run.length) {
+                runs.push(run)
+            }
             run = []
             continue
         }
         run.push({ x: period.periodKey, value: record.value, record, period })
     }
-    if (run.length) runs.push(run)
+    if (run.length) {
+        runs.push(run)
+    }
     const gradients = runs.map((points, index) => ({
         id: `${id}-${index}`,
         x1: 0,
@@ -78,7 +84,8 @@ export function gameChart(periods: GamePeriod[], metric: GameMetric, id: string)
     return defineChart({
         marks: [
             ...runs.flatMap((points, index) => {
-                const paint = `url(#${gradients[index]!.id})`
+                const gradient = gradients[index]
+                const paint = gradient ? `url(#${gradient.id})` : '#94a3b8'
                 return [
                     decorative(
                         areaY(points, {

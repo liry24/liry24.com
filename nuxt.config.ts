@@ -1,5 +1,3 @@
-import { fileURLToPath } from 'node:url'
-
 import { defineNuxtConfig } from 'nuxt/config'
 import { parseURL } from 'ufo'
 import viteHub from 'vite-hub/nuxt'
@@ -9,7 +7,7 @@ import { serverEnv } from './env.ts'
 const isPreview = process.env.APP_ENV !== 'production'
 const baseURL =
     process.env.NUXT_PUBLIC_SITE_URL ||
-    (isPreview ? 'https://liry24-com-dev.liry.workers.dev' : 'https://liry24.com')
+    (isPreview ? 'https://dev.liry24.com' : 'https://liry24.com')
 const imagesDomain = isPreview ? baseURL : 'https://images.liry24.com'
 const title = 'Liry24'
 
@@ -26,69 +24,56 @@ export default defineNuxtConfig({
 
     modules: [
         '@nuxt/fonts',
-        '@comark/nuxt',
         '@nuxt/ui',
+        '@comark/vue',
+        [
+            viteHub,
+            {
+                host: process.env.LIRY24_HOST === 'node' ? 'node' : 'cloudflare',
+                name: process.env.LIRY24_WORKER_NAME || 'liry24-com',
+                publicUrl: baseURL,
+                auth: true,
+                console: false,
+                env: { server: serverEnv },
+                database: {
+                    driver: 'cloudflare',
+                    binding: 'DB',
+                    databaseName: process.env.LIRY24_DATABASE_NAME || 'liry24-com',
+                    databaseId:
+                        process.env.LIRY24_DATABASE_ID || '227d818f-cd40-4fca-9710-b57273be94ca',
+                    previewDatabaseId:
+                        process.env.LIRY24_PREVIEW_DATABASE_ID ||
+                        '3c7c6179-12d0-4108-9eea-b3e20d394cef',
+                },
+                blob: {
+                    driver: 'cloudflare',
+                    binding: 'STORAGE',
+                    bucketName: process.env.LIRY24_STORAGE_BUCKET || 'liry24-com',
+                    serve: { access: 'public', route: '/media' },
+                },
+                schedule: {
+                    providerOutput: process.env.LIRY24_DISABLE_CRON === 'true' ? false : 'nitro',
+                },
+                observability: {
+                    service: 'liry24-com',
+                    evlog: {},
+                    browserErrors: true,
+                },
+                agent: {
+                    invocations: 'database',
+                },
+            },
+        ],
         '@nuxt/image',
         '@vueuse/nuxt',
         '@nuxt/hints',
         '@nuxt/a11y',
-        '@nuxtjs/i18n',
         'nuxt-site-config',
         '@nuxtjs/sitemap',
         '@nuxtjs/robots',
         'nuxt-schema-org',
         'nuxt-og-image',
         'nuxt-seo-utils',
-        [
-            viteHub,
-            {
-                preset: process.env.LIRY24_PRESET === 'node' ? 'node' : 'cloudflare',
-                name: process.env.LIRY24_WORKER_NAME || 'liry24-vitehub-synthetic',
-                auth: true,
-                env: { server: serverEnv },
-                schedule: {
-                    providerOutput:
-                        process.env.APP_ENV === 'production' ||
-                        process.env.LIRY24_TEST_CRON === 'true'
-                            ? 'nitro'
-                            : false,
-                },
-                publicUrl: baseURL,
-                console: {
-                    auth: 'app',
-                    authorize: fileURLToPath(
-                        new URL('./server/console-authorize.ts', import.meta.url),
-                    ),
-                },
-                database: {
-                    driver: 'd1',
-                    binding: 'DB',
-                    databaseName: process.env.LIRY24_DATABASE_NAME || 'liry24-vitehub-synthetic',
-                    databaseId:
-                        process.env.LIRY24_DATABASE_ID || '00000000-0000-4000-8000-000000000100',
-                },
-                blob: {
-                    stores: {
-                        default: {
-                            driver: 'cloudflare-r2',
-                            binding: 'MEDIA',
-                            bucketName:
-                                process.env.LIRY24_MEDIA_BUCKET || 'liry24-vitehub-synthetic-media',
-                        },
-                        content: {
-                            driver: 'cloudflare-r2',
-                            binding: 'CONTENT',
-                            bucketName:
-                                process.env.LIRY24_CONTENT_BUCKET ||
-                                'liry24-vitehub-synthetic-content',
-                        },
-                    },
-                    serve: { route: '/media', store: 'default' },
-                },
-            },
-        ],
-        'liti/nuxt',
-        '@litijs/blog/nuxt',
         [
             'nuxt-llms',
             {
@@ -121,15 +106,18 @@ export default defineNuxtConfig({
         prefetchPreloadTags: true,
     },
 
+    build: {
+        transpile: ['@vite-hub/ui'],
+    },
+
     vite: {
+        ssr: {
+            noExternal: ['@vite-hub/ui', /@vite-hub[/\\]ui/],
+        },
         optimizeDeps: {
-            // Nuxt 4.6 module entries expose virtual #components imports to Vite's dependency scanner.
             noDiscovery: true,
             include: [
                 '@unhead/schema-org/vue',
-                '@better-auth/passkey/client',
-                'better-auth/client/plugins',
-                'better-auth/plugins',
                 '@comark/vue',
                 '@formkit/drag-and-drop',
                 '@formkit/drag-and-drop/vue',
@@ -160,18 +148,42 @@ export default defineNuxtConfig({
     },
 
     nitro: {
-        // Passkey certificate verification needs this polyfill before tsyringe initializes.
-        moduleSideEffects: ['reflect-metadata'],
         compressPublicAssets: true,
         experimental: { asyncContext: true },
         cloudflare: {
             wrangler: {
-                vars: { APP_ENV: process.env.APP_ENV || 'dev' },
-                ...(process.env.LIRY24_TEST_LOCAL === 'true' ? {} : { ai: { binding: 'AI' } }),
-                triggers: { crons: process.env.APP_ENV === 'production' ? ['* * * * *'] : [] },
+                observability: { enabled: true },
+                vars: { APP_ENV: process.env.APP_ENV || 'production' },
+                routes: [
+                    {
+                        pattern: 'liry24.com',
+                        custom_domain: true,
+                        previews_enabled: true,
+                    },
+                ],
+                workers_dev: false,
+                preview_urls: true,
+                previews: {
+                    vars: {
+                        APP_ENV: 'dev',
+                        NUXT_PUBLIC_SITE_URL: 'https://dev.liry24.com',
+                    },
+                    d1_databases: [
+                        {
+                            binding: 'DB',
+                            database_name: 'liry24-com-dev',
+                            database_id: '3c7c6179-12d0-4108-9eea-b3e20d394cef',
+                        },
+                    ],
+                    r2_buckets: [
+                        {
+                            binding: 'STORAGE',
+                            bucket_name: 'liry24-com-dev-storage',
+                        },
+                    ],
+                },
             },
         },
-
         prerender: {
             crawlLinks: false,
             failOnError: true,
@@ -183,17 +195,6 @@ export default defineNuxtConfig({
             compilerOptions: {
                 noUncheckedIndexedAccess: true,
                 types: ['@cloudflare/workers-types'],
-            },
-        },
-        nodeTsConfig: {
-            compilerOptions: {
-                paths: {
-                    // Nuxt 4.6 typechecks this file with moduleResolution nodenext and maps
-                    // nitropack/types onto a concrete declaration. nitropack's presets entry
-                    // re-exports without a file extension, so nodenext drops preset keys such
-                    // as cloudflare. Load the declaration that defines those keys.
-                    'nitropack/presets': ['../node_modules/nitropack/dist/presets/_types.gen.d.ts'],
-                },
             },
         },
     },
@@ -229,7 +230,10 @@ export default defineNuxtConfig({
         name: title,
     },
 
-    ui: { experimental: { componentDetection: true } },
+    ui: {
+        fonts: false,
+        experimental: { componentDetection: true },
+    },
 
     icon: {
         clientBundle: {
@@ -248,34 +252,29 @@ export default defineNuxtConfig({
         },
     },
 
-    liti: { workspace: 'content' },
-
-    i18n: {
-        locales: ['ja'],
-        defaultLocale: 'ja',
-        strategy: 'no_prefix',
-    },
-
     sitemap: {
         exclude: ['/admin', '/admin/**', '/login'],
         sources: ['/api/sitemap/posts'],
     },
 
     robots: {
-        disallow: ['/admin', '/api/admin', '/api/_liti/manage', '/_vitehub', '/login'],
+        disallow: ['/admin', '/api/admin', '/_vitehub', '/login'],
     },
 
     $development: {
-        // Background SSR warmup discovers OG font weights and restarts Nitro during requests.
         vite: { warmupEntry: false },
         runtimeConfig: { public: { siteUrl: '' } },
+        vitehub: { logs: true },
     },
 
     $production: {
         image: {
             provider: isPreview ? 'none' : 'cloudflare',
             cloudflare: { baseURL },
-            domains: [parseURL(imagesDomain).host!, 'avatars.githubusercontent.com'],
+            domains: (() => {
+                const host = parseURL(imagesDomain).host
+                return host ? [host] : []
+            })(),
         },
     },
 })

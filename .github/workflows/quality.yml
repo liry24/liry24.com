@@ -35,16 +35,15 @@ jobs:
       - run: bun run format:check
       - run: bun run lint
       - run: bun run typecheck
+      - run: bun x tsc --noEmit -p tsconfig.tests.json
       - run: bun run test
       - run: bun run build
         env:
-          LIRY24_TEST_LOCAL: 'true'
-          LIRY24_TEST_CRON: 'true'
           APP_ENV: test
-      - run: bun x playwright-core install --with-deps chromium
-      - run: bun x vitest run tests/worker/built-app.test.ts tests/worker/native-app.test.ts tests/worker/adminComposer.browser.test.ts tests/worker/passkey.browser.test.ts
+          LIRY24_TEST_LOCAL: 'true'
+          LIRY24_DISABLE_CRON: 'true'
+          BETTER_AUTH_SECRET: synthetic-ci-build-secret-0123456789
+      - run: bun x wrangler deploy --dry-run --config .output/server/wrangler.json
+      - run: bun x vitest run tests/worker/built-app.test.ts tests/worker/pocket-id.test.ts
         env:
           LIRY24_TEST_BUILT_WORKER: 'true'
-          LIRY24_TEST_ADMIN_COMPOSER_BROWSER: 'true'
-      - name: Check native ViteHub development
-        run: node scripts/test-liti-local.mjs

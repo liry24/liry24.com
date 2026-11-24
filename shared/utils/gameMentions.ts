@@ -3,21 +3,76 @@ import { parseMarkdown } from 'comark/parse'
 
 import { gameSlugPattern } from './games.js'
 
-type TitlePart = { text: string; slug?: string }
+interface TitlePart {
+    text: string
+    slug?: string
+}
 
-export const gameMentionRule: MarkdownItPlugin = (parser) => {
+interface InlineStateLike {
+    src: string
+    pos: number
+    linkLevel?: number
+    push: (
+        type: string,
+        tag: string,
+        nesting: number,
+    ) => { content: string; attrSet: (name: string, value: string) => void }
+}
+
+interface InlineParserLike {
+    inline: {
+        ruler: {
+            before: (
+                beforeName: string,
+                ruleName: string,
+                rule: (state: InlineStateLike, silent: boolean) => boolean,
+            ) => void
+        }
+    }
+}
+
+function registerGameMentionRule(parser: InlineParserLike) {
     parser.inline.ruler.before('autolink', 'game-mention', (state, silent) => {
-        if (state.src[state.pos] !== '<') return false
+        if (state.src[state.pos] !== '<') {
+            return false
+        }
         const match = /^<game:([^>\n]*)>/.exec(state.src.slice(state.pos))
-        if (!match) return false
+        const slug = match?.[1]
+        if (!match || slug === undefined) {
+            return false
+        }
         if (!silent) {
-            if (gameSlugPattern.test(match[1]!) && 'linkLevel' in state && state.linkLevel === 0)
-                state.push('mdc_inline_component', 'game-mention', 0).attrSet('slug', match[1]!)
-            else state.push('text', '', 0).content = match[0]
+            const linkLevel = state.linkLevel ?? 0
+            if (gameSlugPattern.test(slug) && linkLevel === 0) {
+                state.push('mdc_inline_component', 'game-mention', 0).attrSet('slug', slug)
+            } else {
+                state.push('text', '', 0).content = match[0]
+            }
         }
         state.pos += match[0].length
         return true
     })
+}
+
+function isInlineParser(value: unknown): value is InlineParserLike {
+    return (
+        typeof value === 'object' &&
+        value !== null &&
+        'inline' in value &&
+        typeof value.inline === 'object' &&
+        value.inline !== null &&
+        'ruler' in value.inline &&
+        typeof value.inline.ruler === 'object' &&
+        value.inline.ruler !== null &&
+        'before' in value.inline.ruler &&
+        typeof value.inline.ruler.before === 'function'
+    )
+}
+
+export const gameMentionRule: MarkdownItPlugin = (parser: unknown) => {
+    if (isInlineParser(parser)) {
+        registerGameMentionRule(parser)
+    }
 }
 
 export const gameMentionPlugin: ComarkPlugin = {
@@ -25,12 +80,14 @@ export const gameMentionPlugin: ComarkPlugin = {
     markdownItPlugins: [gameMentionRule],
 }
 
-export function gameTitleParts(title: string): TitlePart[] {
-    const parts: TitlePart[] = []
-    let text = '',
-        position = 0
+export function gameTitleParts(title: string): Array<TitlePart> {
+    const parts: Array<TitlePart> = []
+    let text = ''
+    let position = 0
     const flush = () => {
-        if (text) parts.push({ text })
+        if (text) {
+            parts.push({ text })
+        }
         text = ''
     }
     while (position < title.length) {
@@ -40,43 +97,55 @@ export function gameTitleParts(title: string): TitlePart[] {
             continue
         }
         if (title[position] === '`') {
-            const run = /^`+/.exec(title.slice(position))![0]
+            const runMatch = /^`+/.exec(title.slice(position))
+            const run = runMatch?.[0] ?? '`'
             const closing = /`+/g
             closing.lastIndex = position + run.length
             let match = closing.exec(title)
-            while (match && match[0].length !== run.length) match = closing.exec(title)
+            while (match && match[0].length !== run.length) {
+                match = closing.exec(title)
+            }
             const end = match ? match.index + run.length : position + run.length
             text += title.slice(position, end)
             position = end
             continue
         }
         const match = /^<game:([^>]+)>/.exec(title.slice(position))
-        if (match && gameSlugPattern.test(match[1]!)) {
+        const slug = match?.[1]
+        if (match && slug && gameSlugPattern.test(slug)) {
             flush()
-            parts.push({ text: match[0], slug: match[1] })
+            parts.push({ text: match[0], slug })
             position += match[0].length
-        } else text += title[position++]
+        } else {
+            text += title[position++]
+        }
     }
     flush()
     return parts
 }
 
-export async function postGameSlugs(title: string, content: string): Promise<string[]> {
+export async function postGameSlugs(title: string, content: string): Promise<Array<string>> {
     const slugs = gameTitleParts(title).flatMap((part) => (part.slug ? [part.slug] : []))
     const document = await parseMarkdown(content, {
         plugins: [gameMentionPlugin],
         autoClose: false,
     })
-    const visit = (nodes: Node[]) => {
+    const visit = (nodes: Array<Node>) => {
         for (const node of nodes) {
-            if (typeof node === 'string') continue
+            if (typeof node === 'string' || node[0] === null) {
+                continue
+            }
+            const [tag, attrs, ...children] = node
             if (
-                node[0] === 'game-mention' &&
-                typeof node[1].slug === 'string' &&
-                gameSlugPattern.test(node[1].slug)
-            )
-                slugs.push(node[1].slug)
-            if (!['code', 'pre'].includes(node[0] ?? '')) visit(node.slice(2) as Node[])
+                tag === 'game-mention' &&
+                typeof attrs.slug === 'string' &&
+                gameSlugPattern.test(attrs.slug)
+            ) {
+                slugs.push(attrs.slug)
+            }
+            if (!['code', 'pre'].includes(tag)) {
+                visit(children)
+            }
         }
     }
     visit(document.nodes)
@@ -85,6 +154,13 @@ export async function postGameSlugs(title: string, content: string): Promise<str
 
 export function gameMentionQuery(value: string, caret: number) {
     const match = /<game:([a-zA-Z0-9 -]*)$/.exec(value.slice(0, caret))
-    if (!match || (match.index > 0 && value.charCodeAt(match.index - 1) === 92)) return null
-    return { start: match.index, end: caret, query: match[1]! }
+    const query = match?.[1]
+    if (
+        !match ||
+        query === undefined ||
+        (match.index > 0 && value.charCodeAt(match.index - 1) === 92)
+    ) {
+        return null
+    }
+    return { start: match.index, end: caret, query }
 }

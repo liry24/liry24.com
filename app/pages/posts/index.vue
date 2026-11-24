@@ -13,7 +13,9 @@ const { data, error } = await useFetch<PostCardsPage>('/api/posts/cards', {
         offset: (page.value - 1) * 20,
     })),
 })
-if (error.value) throw error.value
+if (error.value) {
+    throw error.value
+}
 const filtered = computed(() => data.value?.items ?? [])
 watch(
     () => route.query.game,

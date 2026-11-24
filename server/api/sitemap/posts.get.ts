@@ -1,19 +1,20 @@
 import { defineEventHandler } from 'nuxt/server'
 
-import runtime from '#liti/runtime'
+import content from '../../content.js'
+import { listAllCollectionItems } from '../../utils/content.js'
 
 export default defineEventHandler(async () => {
-    const urls: { loc: string; lastmod?: string }[] = []
-    for (let offset = 0; ; offset += 1000) {
-        const page = await runtime.content.query('posts', { locale: 'ja', limit: 1000, offset })
-        for (const entry of page.items)
-            if (entry.url)
-                urls.push({
-                    loc: entry.url,
-                    ...(entry.publication?.updatedAt
-                        ? { lastmod: entry.publication.updatedAt }
-                        : {}),
-                })
-        if (offset + page.items.length >= page.total) return urls
+    const posts = await listAllCollectionItems(content.collection('posts'), 'published')
+    const urls: Array<{ loc: string; lastmod?: string }> = []
+    for (const doc of posts) {
+        if (!doc.url) {
+            continue
+        }
+        if (doc.data.authoredAt) {
+            urls.push({ loc: doc.url, lastmod: doc.data.authoredAt })
+        } else {
+            urls.push({ loc: doc.url })
+        }
     }
+    return urls
 })

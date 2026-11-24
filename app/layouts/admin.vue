@@ -1,8 +1,6 @@
 <script setup lang="ts">
-const { user, load } = useAppSession()
+const { user, load, signOut } = useAppSession()
 await load()
-const { data: permissions } = await useAdminPermissions()
-const { open, busy } = useAdminComposer()
 
 const sidebarCollapsed = ref(false)
 const navigation = computed(() => [
@@ -13,33 +11,63 @@ const navigation = computed(() => [
             to: '/admin',
         },
         {
-            label: 'Data',
-            icon: 'mingcute:storage-fill',
-            to: '/admin/data',
+            label: 'Posts',
+            icon: 'mingcute:document-2-fill',
+            to: '/admin/posts',
+        },
+        {
+            label: 'Assistant',
+            icon: 'mingcute:sparkles-2-fill',
+            to: '/admin/assistant',
         },
     ],
     [
-        ...(permissions.value?.users
-            ? [
-                  {
-                      label: 'Users',
-                      icon: 'mingcute:group-2-fill',
-                      to: '/admin/users',
-                  },
-              ]
-            : []),
+        {
+            label: 'Works',
+            icon: 'mingcute:briefcase-fill',
+            to: '/admin/works',
+        },
+        {
+            label: 'Arts',
+            icon: 'mingcute:palette-fill',
+            to: '/admin/arts',
+        },
+        {
+            label: 'Careers',
+            icon: 'mingcute:building-2-fill',
+            to: '/admin/careers',
+        },
+        {
+            label: 'Skills',
+            icon: 'mingcute:tool-fill',
+            to: '/admin/skills',
+        },
+        {
+            label: 'Games',
+            icon: 'mingcute:game-2-fill',
+            to: '/admin/games',
+        },
+        {
+            label: 'Game Stats',
+            icon: 'mingcute:chart-line-fill',
+            to: '/admin/gameStats',
+        },
+        {
+            label: 'Ranks',
+            icon: 'mingcute:trophy-fill',
+            to: '/admin/ranks',
+        },
+        {
+            label: 'Socials',
+            icon: 'mingcute:link-2-fill',
+            to: '/admin/socials',
+        },
+    ],
+    [
         {
             label: 'Settings',
             icon: 'mingcute:settings-1-fill',
             to: '/admin/settings',
-        },
-    ],
-    [
-        {
-            label: 'GitHub',
-            icon: 'mingcute:github-fill',
-            to: 'https://github.com/Liry24/liry24.com',
-            target: '_blank',
         },
         {
             label: 'Back to site',
@@ -48,15 +76,6 @@ const navigation = computed(() => [
         },
     ],
 ])
-
-defineShortcuts({
-    meta_k: {
-        usingInput: true,
-        handler: () => {
-            if (permissions.value?.compose && !busy.value) open.value = !open.value
-        },
-    },
-})
 
 useHead({ titleTemplate: '%s | Liry24 Admin' })
 </script>
@@ -76,7 +95,7 @@ useHead({ titleTemplate: '%s | Liry24 Admin' })
                 }"
                 :ui="{
                     root: 'min-h-[calc(100svh-0.5rem)]',
-                    footer: 'lg:border-t lg:border-default p-1',
+                    footer: 'lg:border-t lg:border-default p-2',
                 }"
             >
                 <template #header="{ collapsed }">
@@ -98,6 +117,7 @@ useHead({ titleTemplate: '%s | Liry24 Admin' })
                             size="sm"
                             class="text-highlighted gap-1.5 p-0 text-base font-extralight"
                         />
+
                         <UButton
                             aria-label="Toggle sidebar"
                             :icon="
@@ -129,29 +149,35 @@ useHead({ titleTemplate: '%s | Liry24 Admin' })
                 </template>
 
                 <template #footer="{ collapsed }">
-                    <div
-                        aria-label="Account menu"
-                        class="hover:bg-muted w-full cursor-pointer rounded-lg p-2"
-                    >
+                    <div class="flex w-full items-center justify-between gap-2">
                         <UAvatar
                             v-if="collapsed"
                             :src="user?.image || undefined"
-                            :alt="user?.name"
+                            :alt="user?.name || 'Admin'"
                             icon="mingcute:user-3-fill"
                             size="sm"
                         />
-                        <UUser
-                            v-else
-                            :name="user?.name"
-                            :description="user?.email"
-                            :avatar="{
-                                src: user?.image || undefined,
-                                alt: user?.name,
-                                icon: 'mingcute:user-3-fill',
-                            }"
-                            size="sm"
-                            class="text-left"
-                        />
+                        <template v-else>
+                            <UUser
+                                :name="user?.name || 'Admin'"
+                                :description="user?.email || ''"
+                                :avatar="{
+                                    src: user?.image || undefined,
+                                    alt: user?.name || 'Admin',
+                                    icon: 'mingcute:user-3-fill',
+                                }"
+                                size="sm"
+                                class="min-w-0 flex-1 text-left"
+                            />
+                            <UButton
+                                icon="mingcute:exit-line"
+                                aria-label="Sign out"
+                                variant="ghost"
+                                color="neutral"
+                                size="sm"
+                                @click="signOut()"
+                            />
+                        </template>
                     </div>
                 </template>
             </UDashboardSidebar>
@@ -160,18 +186,5 @@ useHead({ titleTemplate: '%s | Liry24 Admin' })
                 <slot />
             </main>
         </UDashboardGroup>
-
-        <UModal
-            v-if="permissions?.compose"
-            v-model:open="open"
-            :dismissible="!busy"
-            :close="!busy"
-            title="Compose content"
-            :ui="{ content: 'sm:max-w-3xl', body: 'bg-elevated/40' }"
-        >
-            <template #content>
-                <div class="p-6"><AdminComposerPanel v-if="open" /></div>
-            </template>
-        </UModal>
     </div>
 </template>

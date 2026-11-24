@@ -1,9 +1,9 @@
 <script setup lang="ts">
-definePageMeta({ key: (route) => route.path })
-
-const id = String(useRoute().params.id)
+const route = useRoute()
+const id = computed(() => String(route.params.id ?? ''))
+useHead({ title: 'Edit Post' })
 </script>
 
 <template>
-    <AdminFormPostEditor :key="id" :id />
+    <AdminPostEditor :key="id" :id="id" />
 </template>

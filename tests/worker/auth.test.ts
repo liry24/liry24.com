@@ -1,10 +1,10 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { createAuthEndpoint } from 'better-auth/api'
-import { drizzle } from 'drizzle-orm/sqlite-proxy'
+import { drizzle } from 'drizzle-orm/node-sqlite'
 import { expect, test } from 'vitest'
 
-import * as schema from '../../server/database/auth-schema'
+import { authSqliteSchema as schema } from '../../.vitehub/auth/schema'
 import { openTestDatabase } from '../helpers/database'
 
 test('auth counters bound unknown paths and dynamic routes while preserving ingress rules', async () => {
@@ -14,24 +14,10 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
         const auth = betterAuth({
             baseURL: 'https://auth.invalid',
             secret: 'test-only-auth-secret-not-for-deployment',
-            database: drizzleAdapter(
-                drizzle(
-                    async (query, params, method) => {
-                        const statement = db.prepare(query)
-                        statement.setReturnArrays(true)
-                        return {
-                            rows:
-                                method === 'run'
-                                    ? (statement.run(...params), [])
-                                    : method === 'get'
-                                      ? (statement.get(...params) ?? [])
-                                      : statement.all(...params),
-                        }
-                    },
-                    { schema },
-                ),
-                { provider: 'sqlite', schema },
-            ),
+            database: drizzleAdapter(drizzle({ client: db }), {
+                provider: 'sqlite',
+                schema,
+            }),
             rateLimit: {
                 enabled: true,
                 storage: 'database',
@@ -52,15 +38,17 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
                         ),
                     },
                     onRequest: async (req) => {
-                        if (new URL(req.url).pathname.startsWith('/api/auth/rewrite-'))
+                        if (new URL(req.url).pathname.startsWith('/api/auth/rewrite-')) {
                             return {
                                 request: new Request(
                                     'https://auth.invalid/api/auth/probe/rewritten',
                                     req,
                                 ),
                             }
-                        if (new URL(req.url).pathname.startsWith('/api/auth/early-'))
+                        }
+                        if (new URL(req.url).pathname.startsWith('/api/auth/early-')) {
                             return { response: new Response('early') }
+                        }
                     },
                 },
             ],
@@ -72,26 +60,32 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
                     headers: { 'cf-connecting-ip': ip },
                 }),
             )
-        for (const path of ['/missing-a', '/missing-b?x=1', '/%67et-session'])
+        for (const path of ['/missing-a', '/missing-b?x=1', '/%67et-session']) {
             expect((await request(path)).status).toBe(404)
+        }
         expect(db.prepare('SELECT COUNT(*) n FROM rate_limit').get()?.n).toBe(1)
         expect((await request('/missing-c')).status).toBe(429)
         expect((await request('/missing-c', '198.51.100.21')).status).toBe(404)
 
-        for (const path of ['/probe/a', '/probe/a%2Fb', '/probe/%41?x=1'])
+        for (const path of ['/probe/a', '/probe/a%2Fb', '/probe/%41?x=1']) {
             expect((await request(path)).status).toBe(200)
+        }
         expect((await request('/probe/next')).status).toBe(429)
         expect((await request('/probe/strict')).status).toBe(429)
         expect(db.prepare('SELECT COUNT(*) n FROM rate_limit').get()?.n).toBe(3)
-        for (let i = 0; i < 4; i++) expect((await request('/get-session')).status).toBe(200)
+        for (let i = 0; i < 4; i++) {
+            expect((await request('/get-session')).status).toBe(200)
+        }
         expect((await request('/get-session')).status).toBe(429)
 
-        for (const [path, method] of [
+        const invalidPaths: ReadonlyArray<readonly [string, string]> = [
             ['/probe/id', 'HEAD'],
             ['/probe//id', 'GET'],
             ['/probe/id/', 'GET'],
-        ])
-            expect((await request(path!, '198.51.100.22', method!)).status).toBe(404)
+        ]
+        for (const [path, method] of invalidPaths) {
+            expect((await request(path, '198.51.100.22', method)).status).toBe(404)
+        }
         expect((await request('/rewrite-first', '198.51.100.23')).status).toBe(200)
         expect((await request('/early-second', '198.51.100.23')).status).toBe(200)
         expect((await request('/rewrite-third', '198.51.100.23')).status).toBe(200)

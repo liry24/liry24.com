@@ -1,14 +1,40 @@
+import cloudflareConfig from '@cloudflare/oxlint-config'
 import { defineConfig } from 'oxlint'
 
+const strippedPrefixes = ['react/', 'jsx-a11y/']
+const strippedRules = new Set(['@nkzw/require-use-effect-arguments'])
+
+const baseRules = Object.fromEntries(
+    Object.entries(cloudflareConfig.rules ?? {}).filter(
+        ([name]) =>
+            !strippedRules.has(name) && !strippedPrefixes.some((prefix) => name.startsWith(prefix)),
+    ),
+)
+
 export default defineConfig({
-    plugins: ['import'],
-    categories: {
-        correctness: 'error',
-    },
-    options: {
-        typeAware: true,
-    },
+    ...cloudflareConfig,
+    plugins: (cloudflareConfig.plugins ?? []).filter(
+        (plugin) => plugin !== 'react' && plugin !== 'jsx-a11y',
+    ),
+    ignorePatterns: [
+        '.nuxt/**',
+        'tests/fixtures/runtime/.nuxt/**',
+        '.output/**',
+        '.vitehub/**',
+        '.wrangler/**',
+        '.tmp/**',
+        'node_modules/**',
+        'patches/**',
+    ],
+    rules: baseRules,
     overrides: [
+        ...(cloudflareConfig.overrides ?? []),
+        {
+            files: ['**/*.vue'],
+            rules: {
+                'no-undef': 'off',
+            },
+        },
         {
             files: ['app/**/*.ts', 'app/**/*.vue', 'server/**/*.ts', 'tests/nuxt/**/*.ts'],
             rules: {
@@ -26,21 +52,22 @@ export default defineConfig({
             },
         },
         {
-            // These configuration dependencies also run directly in schema tooling.
             files: [
-                'server/models/*.ts',
-                'server/utils/authOptions.ts',
-                'server/utils/modelValidation.ts',
-                'server/utils/modelActivity.ts',
-                'server/utils/adminActivity.ts',
+                'server/content.ts',
+                'server/auth.ts',
+                'server/forms/**/*.ts',
+                'server/utils/gameValidation.ts',
             ],
-            rules: { 'no-restricted-imports': 'off' },
+            rules: {
+                'no-restricted-imports': 'off',
+            },
+        },
+        {
+            files: ['**/*.{ts,tsx,mts,cts,vue}'],
+            rules: {
+                'typescript/no-explicit-any': 'error',
+                '@typescript-eslint/no-explicit-any': 'error',
+            },
         },
     ],
-    env: {
-        builtin: true,
-        browser: true,
-        es2024: true,
-        node: true,
-    },
 })

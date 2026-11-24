@@ -6,17 +6,41 @@ interface Props {
 const { src, alt } = defineProps<Props>()
 
 const open = defineModel<boolean>('open', { default: false })
+let returnFocus: FocusableElement | null = null
+watch(
+    open,
+    (value) => {
+        if (value && import.meta.client) {
+            returnFocus = captureActiveFocus()
+        }
+    },
+    { immediate: true },
+)
+const restoreFocus = (event: Event) => {
+    if (returnFocus?.isConnected) {
+        event.preventDefault()
+        returnFocus.focus()
+    }
+}
 </script>
 
 <template>
-    <UModal v-model:open="open" fullscreen :ui="{ content: 'bg-transparent' }">
+    <UModal
+        v-model:open="open"
+        fullscreen
+        :title="alt || 'Image preview'"
+        :content="{ onCloseAutoFocus: restoreFocus }"
+        :ui="{ content: 'bg-transparent' }"
+    >
         <template #content>
-            <img
-                :src
-                :alt
-                class="size-full max-h-full max-w-full object-contain"
+            <button
+                type="button"
+                aria-label="Close image preview"
+                class="size-full focus-visible:outline-2 focus-visible:outline-offset-[-4px]"
                 @click="open = false"
-            />
+            >
+                <img :src :alt class="size-full max-h-full max-w-full object-contain" />
+            </button>
         </template>
     </UModal>
 </template>

@@ -1,6 +1,32 @@
-import { createIgdbClient, eq, type IgdbClient } from '@liry24/igdb'
+import { createIgdbClient, eq } from '@liry24/igdb'
+import type { IgdbClient } from '@liry24/igdb'
 import { createError } from 'nuxt/server'
+import { useServerEnv } from 'vite-hub/env'
 import { z } from 'zod'
+
+import { readSecretValue } from './secret.js'
+
+interface IgdbCredentials {
+    client?: string
+    secret?: string
+}
+
+function readIgdbCredentials(): IgdbCredentials {
+    try {
+        const env = useServerEnv()
+        const client =
+            typeof env.IGDB_CLIENT_ID === 'string' && env.IGDB_CLIENT_ID
+                ? env.IGDB_CLIENT_ID
+                : process.env.IGDB_CLIENT_ID
+        const secret = readSecretValue(env.IGDB_CLIENT_SECRET) ?? process.env.IGDB_CLIENT_SECRET
+        return { client, secret }
+    } catch {
+        return {
+            client: process.env.IGDB_CLIENT_ID,
+            secret: process.env.IGDB_CLIENT_SECRET,
+        }
+    }
+}
 
 const result = z.array(
     z.object({
@@ -15,15 +41,15 @@ let cached: { clientId: string; clientSecret: string; client: IgdbClient } | und
 
 export async function queryIgdb(
     query: { search: string } | { id: number },
-): Promise<GameSearchResult[]> {
-    const client = process.env.IGDB_CLIENT_ID,
-        secret = process.env.IGDB_CLIENT_SECRET
+): Promise<Array<GameSearchResult>> {
+    const { client, secret } = readIgdbCredentials()
 
-    if (!client || !secret)
+    if (!client || !secret) {
         throw createError({
             status: 503,
             statusText: 'IGDB search is not configured. Saved games are still available.',
         })
+    }
 
     try {
         if (!cached || cached.clientId !== client || cached.clientSecret !== secret) {

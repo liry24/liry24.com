@@ -2,7 +2,7 @@
 const { slug } = defineProps<{ slug: string }>()
 
 const fallback = computed(() => '<game:' + slug + '>')
-const { data } = await useLitiQuery('games')
+const { data } = await usePortfolioData('games')
 const game = computed(() => data.value?.find((entry) => entry.data.slug === slug)?.data)
 </script>
 
@@ -18,7 +18,7 @@ const game = computed(() => data.value?.find((entry) => entry.data.slug === slug
             alt=""
             class="relative top-[0.13em] inline-block size-[1em] shrink-0 rounded-sm object-cover"
         />
-        <span class="">{{ game.name }}</span>
+        <span>{{ game.name }}</span>
     </NuxtLink>
 
     <span v-else>{{ fallback }}</span>

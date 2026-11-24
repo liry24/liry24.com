@@ -1,9 +1,9 @@
-import type { BlobReference } from '@vite-hub/blob/reference'
+import type { MediaReference } from '../schemas/content.js'
 
 export type GamePosition = {
     value: number
     label: string
-    image?: BlobReference | null
+    image?: MediaReference | null
     color?: string | null
 }
 
@@ -12,14 +12,14 @@ export type GameMetric = {
     label: string
     format: 'integer' | 'decimal' | 'percent'
     unit?: string | null
-    positions?: GamePosition[] | null
+    positions?: Array<GamePosition> | null
 }
 
 export type GameValue = {
     key: string
     value: number
     label?: string | null
-    image?: BlobReference | null
+    image?: MediaReference | null
     color?: string | null
 }
 
@@ -28,9 +28,9 @@ export type GameData = {
     igdbId: number
     name: string
     cover?: string | null
-    icon?: BlobReference | null
+    icon?: MediaReference | null
     primaryMetric?: string | null
-    metrics?: GameMetric[] | null
+    metrics?: Array<GameMetric> | null
 }
 
 export type GameSearchResult = Pick<GameData, 'igdbId' | 'slug' | 'name' | 'cover'> & {
@@ -41,6 +41,6 @@ export type GamePeriod = {
     period: string
     periodKey: string
     order: number
-    values: GameValue[]
+    values: Array<GameValue>
     href?: string | null
 }

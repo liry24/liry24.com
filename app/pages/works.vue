@@ -7,7 +7,7 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
     { key: 'whatsapp', width: 800, height: 800 },
 ])
 
-const entries = await usePortfolioQuery('works')
+const entries = await usePortfolioData('works')
 const data = computed(() =>
     (entries.data.value ?? []).map((entry) => ({
         ...entry.data,

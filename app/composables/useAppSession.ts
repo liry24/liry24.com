@@ -1,43 +1,33 @@
-import { useUserSession } from 'vite-hub/auth/vue'
+import { authClient as client, useUserSession } from 'vite-hub/auth/vue'
 
 export function useAppSession() {
     const nuxt = useNuxtApp()
-    const native = useUserSession(authClient)
-    type Session = typeof authClient.$Infer.Session
-    const state = useState<Session | null>('app:session', () => null)
-    const request = useRequestFetch()
-    const resource = useAsyncData('app:session:request', async () => {
-        state.value = await request<Session | null>('/api/auth/get-session')
-        return { loaded: true }
-    })
-    watch(
-        [native.ready, native.data],
-        ([ready, data]) => {
-            if (ready) state.value = data
-        },
-        { immediate: true },
-    )
-    const refresh = async () => {
-        await native.refresh()
-        await resource.refresh()
-    }
+    const native = useUserSession()
+    const isAdmin = computed(() => native.user.value?.role === 'admin')
+
     return {
         load: async () => {
-            await resource
-            if (resource.error.value) throw resource.error.value
+            if (!native.ready.value) {
+                await native.refresh()
+            }
         },
-        user: computed(() => state.value?.user ?? null),
-        session: computed(() => state.value?.session ?? null),
-        loggedIn: computed(() => Boolean(state.value)),
-        refresh,
+        user: native.user,
+        session: native.session,
+        loggedIn: native.loggedIn,
+        pending: native.pending,
+        ready: native.ready,
+        isAdmin,
+        refresh: async () => {
+            await native.refresh()
+        },
         signOut: async () => {
-            const result = await authClient.signOut()
-            if (result.error) throw result.error
-            state.value = null
-            nuxt.runWithContext(() =>
-                clearNuxtData((key) => key.startsWith('admin-') || key.startsWith('liti:private:')),
-            )
-            await nuxt.runWithContext(() => navigateTo('/'))
+            const result = await client.signOut()
+            if (result.error) {
+                throw new Error(result.error.message || 'Could not sign out.')
+            }
+            await nuxt.runWithContext(() => clearNuxtData((key) => key.startsWith('admin-')))
+            await native.refresh()
+            await nuxt.runWithContext(() => navigateTo('/login'))
         },
     }
 }

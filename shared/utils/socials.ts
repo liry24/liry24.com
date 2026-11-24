@@ -13,10 +13,20 @@ const reserved = new Set([
     'llms-full.txt',
 ])
 
+const hasControlOrWhitespace = (value: string): boolean => {
+    for (const char of value) {
+        if ((char.codePointAt(0) ?? 0) <= 0x20) {
+            return true
+        }
+    }
+    return false
+}
+
 export const socialSlug = (value: string) =>
     value.length > 0 &&
     value.length <= 200 &&
-    !/[\\/#?\u0000-\u0020]/u.test(value) &&
+    !hasControlOrWhitespace(value) &&
+    !/[\\/#?]/u.test(value) &&
     !value.startsWith('_') &&
     !['.', '..'].includes(value) &&
     !reserved.has(value.toLowerCase())

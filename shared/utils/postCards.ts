@@ -1,11 +1,10 @@
-import { articleDates } from '@litijs/blog'
 import { parseMarkdown } from 'comark/parse'
 import summary from 'comark/plugins/summary'
-import type { Entry } from 'liti/types'
 
+import type { PostItem } from '../schemas/content.js'
 import { postMarkdownSecurity } from './postMarkdown.js'
 
-export async function postCards(entries: Entry<'posts'>[]) {
+export async function postCards(entries: Array<PostItem>) {
     return await Promise.all(
         entries.map(async (entry) => {
             const document = await parseMarkdown(entry.data.summary || entry.body, {
@@ -23,10 +22,11 @@ export async function postCards(entries: Entry<'posts'>[]) {
                 ...data,
                 id: entry.id,
                 url: entry.url,
-                date: articleDates(entry).date,
+                date: entry.data.authoredAt ?? entry.publishedAt ?? entry.updatedAt ?? null,
                 excerpt: { nodes, frontmatter: {}, meta: {} },
             }
         }),
     )
 }
+
 export type PostCardsPage = { items: Awaited<ReturnType<typeof postCards>>; total: number }

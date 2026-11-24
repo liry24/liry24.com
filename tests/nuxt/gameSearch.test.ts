@@ -9,7 +9,7 @@ mockNuxtImport('useAppSession', () => sessionBoundary)
 
 const { fetchBoundary } = vi.hoisted(() => ({ fetchBoundary: vi.fn() }))
 mockNuxtImport('$fetch', () => fetchBoundary)
-const scopes: ReturnType<typeof effectScope>[] = []
+const scopes: Array<ReturnType<typeof effectScope>> = []
 afterEach(() => {
     scopes.splice(0).forEach((scope) => scope.stop())
     vi.useRealTimers()

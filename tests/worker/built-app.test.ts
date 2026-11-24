@@ -2,300 +2,385 @@ import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 import { expect, test } from 'vitest'
+import { z } from 'zod'
 
 import { builtWorker } from '../helpers/builtWorker'
 
+const uploadedMediaSchema = z.object({
+    pathname: z.string(),
+    contentType: z.string().optional(),
+    size: z.number().optional(),
+})
+
+const adminListSchema = z.object({
+    items: z.array(z.object({ id: z.string(), title: z.string() })),
+})
+
+const publishScheduleSchema = z.object({
+    ok: z.boolean(),
+    schedule: z.object({ id: z.string() }).optional(),
+})
+
+const evlogAuthFailureSchema = z.object({
+    status: z.number(),
+    path: z.string(),
+})
+
+const expectedAdminGatePaths = new Set([
+    '/api/admin/content/posts',
+    '/api/admin/content/publish',
+    '/api/admin/media',
+])
+
+function isExpectedHttpErrorLog(message: string): boolean {
+    try {
+        const parsed = evlogAuthFailureSchema.safeParse(JSON.parse(message))
+        if (!parsed.success) {
+            return false
+        }
+        if (
+            (parsed.data.status === 401 || parsed.data.status === 403) &&
+            expectedAdminGatePaths.has(parsed.data.path)
+        ) {
+            return true
+        }
+        return parsed.data.status === 404 && parsed.data.path === '/api/posts/built-worker-post'
+    } catch {
+        return false
+    }
+}
+
+async function multipartRequest(
+    form: FormData,
+    headers: Record<string, string>,
+): Promise<{ headers: Record<string, string>; body: Uint8Array }> {
+    const serialized = new Request('http://multipart.invalid', { method: 'POST', body: form })
+    const contentType = serialized.headers.get('content-type')
+    return {
+        headers: contentType ? { ...headers, 'content-type': contentType } : headers,
+        body: new Uint8Array(await serialized.arrayBuffer()),
+    }
+}
+
 test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
-    'the emitted native Worker preserves commit activity, account isolation, article identity and OG assets',
+    'the emitted Worker enforces auth gates, serves public/media/content routes, runs mock assistant chat, and keeps preview isolation',
     async () => {
         const app = await builtWorker()
         try {
-            const admin = await app.session('activity-admin')
-            const owner = await app.session('activity-owner', 'user')
-            const manage = (input: Record<string, unknown>, headers = admin) =>
-                app.server.fetch('/api/_liti/manage', {
-                    method: 'POST',
-                    headers: {
-                        origin: app.url.origin,
-                        ...headers,
-                        'content-type': 'application/json',
-                    },
-                    body: JSON.stringify(input),
-                })
-            const ok = async (input: Record<string, unknown>) => {
-                const response = await manage(input),
-                    text = await response.text()
-                expect(response.status, text).toBe(200)
-                return JSON.parse(text)
-            }
-            const activity = async () => {
-                const response = await app.server.fetch(
-                    '/api/admin/users/~activity-admin/activity',
-                    { headers: admin },
-                )
-                expect(response.status, await response.clone().text()).toBe(200)
-                expect(response.headers.get('cache-control')).toBe('private, no-store')
-                return await response.json<{
-                    items: { action: string; label: string; actorId: string }[]
-                    total: number
-                }>()
-            }
-            const compose = (headers: Record<string, string> = {}) =>
-                app.server.fetch('/api/admin/compose', {
-                    method: 'POST',
-                    headers: {
-                        origin: app.url.origin,
-                        ...headers,
-                        'content-type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        prompt: 'new post',
-                        locale: 'ja',
-                        timeZone: 'Asia/Tokyo',
-                    }),
-                })
-            const missingOrigin = await app.server.fetch('/api/admin/compose', { method: 'POST' })
-            expect(missingOrigin.status).toBe(403)
-            expect((await compose({ origin: 'https://untrusted.invalid' })).status).toBe(403)
-            const anonymous = await compose()
-            expect(anonymous.status, await anonymous.clone().text()).toBe(401)
-            expect((await compose(owner)).status).toBe(403)
-            const invalid = await app.server.fetch('/api/admin/compose', {
-                method: 'POST',
-                headers: { ...admin, 'content-type': 'application/json' },
-                body: JSON.stringify({ prompt: '' }),
+            const admin = await app.session('built-admin', 'admin', 'owner@example.invalid')
+            const viewer = await app.session('built-viewer', 'user', 'viewer@example.invalid')
+            const jsonHeaders = (headers?: { cookie: string; origin: string }) => ({
+                'content-type': 'application/json',
+                ...(headers ?? { origin: app.url.origin }),
             })
-            expect(invalid.status).toBe(400)
 
-            for (const path of ['/favicon.ico', '/login'])
-                expect((await app.server.fetch(path)).status).toBe(200)
+            for (const path of [
+                '/',
+                '/login',
+                '/favicon.ico',
+                '/api/posts/cards',
+                '/api/portfolio/works',
+            ]) {
+                expect((await app.server.fetch(path)).status, path).toBe(200)
+            }
             expect(await (await app.server.fetch('/api/auth/get-session')).text()).toBe('null')
-            expect(
-                (await manage({ action: 'models' }, { origin: app.url.origin, cookie: '' })).status,
-            ).toBe(401)
-            expect((await app.server.fetch('/admin/works', { redirect: 'manual' })).status).toBe(
-                302,
-            )
 
-            const first = await ok({
-                action: 'save',
-                model: 'posts',
-                id: 'activity-post',
-                locale: 'ja',
-                ifDigest: null,
-                data: { title: 'Activity snapshot', slug: 'activity-check', tags: [] },
-                body: 'PRIVATE CONTENT',
-            })
-            const updated = await ok({
-                action: 'save',
-                model: 'posts',
-                id: first.id,
-                locale: 'ja',
-                ifDigest: first.digest,
-                data: { title: 'Changed title', slug: 'activity-check', tags: [] },
-                body: 'PRIVATE CONTENT',
-            })
-            await ok({
-                action: 'publish',
-                model: 'posts',
-                id: first.id,
-                digests: { ja: updated.digest },
-            })
-            const inspected = await ok({
-                action: 'inspect',
-                model: 'posts',
-                id: first.id,
-                locale: 'ja',
-            })
-            await ok({
-                action: 'unpublish',
-                model: 'posts',
-                id: first.id,
-                ifHead: inspected.publishedHead,
-            })
-            const scheduled = await ok({
-                action: 'schedule',
-                model: 'posts',
-                id: first.id,
-                digests: { ja: updated.digest },
-                at: new Date(Date.now() + 86400000).toISOString(),
-            })
-            await ok({
-                action: 'cancelSchedule',
-                model: 'posts',
-                id: first.id,
-                schedule: scheduled.id,
-            })
-            const restored = await ok({
-                action: 'restore',
-                model: 'posts',
-                id: first.id,
-                locale: 'ja',
-                ifDigest: updated.digest,
-                revision: first.revision,
-            })
-            const beforeFailures = (await activity()).total
-            expect(
-                (
-                    await manage({
-                        action: 'save',
-                        model: 'posts',
-                        id: first.id,
-                        locale: 'ja',
-                        ifDigest: restored.digest,
-                        data: { title: '', tags: [] },
-                    })
-                ).status,
-            ).toBe(400)
-            expect(
-                (
-                    await manage({
-                        action: 'save',
-                        model: 'posts',
-                        id: first.id,
-                        locale: 'ja',
-                        ifDigest: null,
-                        data: { title: 'Stale', tags: [] },
-                    })
-                ).status,
-            ).toBe(409)
-            expect((await activity()).total).toBe(beforeFailures)
-            await ok({
-                action: 'remove',
-                model: 'posts',
-                id: first.id,
-                locale: 'ja',
-                ifDigest: restored.digest,
-            })
-            const social = await ok({
-                action: 'save',
-                model: 'socials',
-                id: 'activity-social',
-                ifVersion: null,
-                data: {
-                    label: 'Sort snapshot',
-                    slug: 'sort-snapshot',
-                    href: 'https://example.invalid',
-                    icon: '',
-                },
-            })
-            const order = await app.server.fetch('/api/admin/reorder', {
-                method: 'POST',
-                headers: { ...admin, 'content-type': 'application/json' },
-                body: JSON.stringify({
-                    model: 'socials',
-                    revision: null,
-                    entries: [{ id: social.id, version: social.version }],
-                }),
-            })
-            expect(order.status, await order.clone().text()).toBe(200)
-            const events = await activity()
-            expect(events.items.map((event) => event.action)).toEqual(
-                expect.arrayContaining([
-                    'content.create',
-                    'content.update',
-                    'content.publish',
-                    'content.unpublish',
-                    'content.schedule',
-                    'content.cancelSchedule',
-                    'content.restore',
-                    'content.delete',
-                    'content.sort',
-                ]),
-            )
-            expect(events.items.find((event) => event.action === 'content.delete')).toMatchObject({
-                label: 'Activity snapshot',
-                actorId: 'activity-admin',
-            })
-            expect(JSON.stringify(events)).not.toContain('PRIVATE CONTENT')
-            expect(JSON.stringify(events)).not.toContain(admin.cookie)
-
-            await app.env.DB.prepare(
-                'INSERT INTO admin_event (id,actor_id,action,target_id,label,created_at) VALUES (?,?,?,?,?,?)',
-            )
-                .bind(
-                    'private-event',
-                    'activity-owner',
-                    'session.revoke',
-                    'private-session',
-                    'Private session activity',
-                    Date.now(),
+            for (const path of ['/admin', '/admin/works']) {
+                expect((await app.server.fetch(path, { redirect: 'manual' })).status, path).toBe(
+                    302,
                 )
-                .run()
-            for (const headers of [owner, admin]) {
-                const response = await app.server.fetch(
-                    '/api/admin/users/~activity-owner/activity',
-                    { headers },
-                )
-                expect(response.status).toBe(200)
-                expect(await response.json()).toMatchObject({
-                    items: [{ action: 'session.revoke', label: 'Private session activity' }],
-                })
             }
+
+            expect((await app.server.fetch('/api/admin/content/posts')).status).toBe(401)
             expect(
                 (
-                    await app.server.fetch('/api/admin/users/~activity-admin/activity', {
-                        headers: owner,
+                    await app.server.fetch('/_vitehub/forms/post', {
+                        method: 'POST',
+                        headers: jsonHeaders(),
+                        body: JSON.stringify({}),
+                    })
+                ).status,
+            ).toBe(401)
+            expect(
+                (
+                    await app.server.fetch('/api/admin/content/publish', {
+                        method: 'POST',
+                        headers: jsonHeaders(),
+                        body: JSON.stringify({}),
+                    })
+                ).status,
+            ).toBe(401)
+            expect(
+                (
+                    await app.server.fetch('/api/admin/media', {
+                        method: 'POST',
+                        ...(await multipartRequest(new FormData(), { origin: app.url.origin })),
+                    })
+                ).status,
+            ).toBe(401)
+            expect(
+                (
+                    await app.server.fetch('/_vitehub/agents/assistant/chat', {
+                        method: 'POST',
+                        headers: jsonHeaders(),
+                        body: JSON.stringify({ messages: [] }),
+                    })
+                ).status,
+            ).toBe(401)
+
+            expect(
+                (await app.server.fetch('/api/admin/content/posts', { headers: viewer })).status,
+            ).toBe(403)
+            expect(
+                (
+                    await app.server.fetch('/_vitehub/forms/post', {
+                        method: 'POST',
+                        headers: jsonHeaders(viewer),
+                        body: JSON.stringify({}),
                     })
                 ).status,
             ).toBe(403)
-            expect((await app.server.fetch('/admin/users', { headers: owner })).status).toBe(403)
-            await app.env.DB.prepare("UPDATE user SET role = 'editor' WHERE id = ?")
-                .bind('activity-admin')
-                .run()
-            const denied = await app.server.fetch('/api/admin/users/~activity-owner/activity', {
-                headers: admin,
-            })
-            expect(denied.status).toBe(403)
-            expect(await denied.text()).not.toContain('Private session activity')
-            await app.env.DB.prepare("UPDATE user SET role = 'user' WHERE id = ?")
-                .bind('activity-admin')
-                .run()
             expect(
                 (
-                    await app.server.fetch('/api/admin/users/~activity-admin/activity', {
-                        headers: admin,
+                    await app.server.fetch('/api/admin/content/publish', {
+                        method: 'POST',
+                        headers: jsonHeaders(viewer),
+                        body: JSON.stringify({}),
                     })
                 ).status,
-            ).toBe(200)
-            const spoof = await app.server.fetch('/api/auth/admin/has-permission', {
-                method: 'POST',
-                headers: { ...admin, 'content-type': 'application/json' },
-                body: JSON.stringify({ role: 'admin', permissions: { activity: ['readAny'] } }),
-            })
-            expect(await spoof.json()).toMatchObject({ success: false })
-            await app.env.DB.prepare("UPDATE user SET role = 'admin' WHERE id = ?")
-                .bind('activity-admin')
-                .run()
-            await app.env.DB.prepare('UPDATE session SET expires_at = ? WHERE user_id = ?')
-                .bind(Date.now() - 1, 'activity-admin')
-                .run()
-            expect((await compose(admin)).status).toBe(401)
+            ).toBe(403)
+            expect(
+                (
+                    await app.server.fetch('/api/admin/media', {
+                        method: 'POST',
+                        ...(await multipartRequest(new FormData(), viewer)),
+                    })
+                ).status,
+            ).toBe(403)
+            expect(
+                (
+                    await app.server.fetch('/_vitehub/agents/assistant/chat', {
+                        method: 'POST',
+                        headers: jsonHeaders(viewer),
+                        body: JSON.stringify({ messages: [] }),
+                    })
+                ).status,
+            ).toBe(403)
 
-            const server = resolve('.output/server')
-            const files = (await readdir(server, { recursive: true })).filter((path) =>
+            const fixtureBytes = await readFile(resolve('tests/fixtures/accessibility-artwork.png'))
+            const mediaForm = new FormData()
+            mediaForm.append(
+                'file',
+                new File([new Uint8Array(fixtureBytes)], 'sample.png', { type: 'image/png' }),
+            )
+            mediaForm.append('folder', 'posts')
+            const uploadResponse = await app.server.fetch('/api/admin/media', {
+                method: 'POST',
+                ...(await multipartRequest(mediaForm, admin)),
+            })
+            expect(uploadResponse.status, await uploadResponse.clone().text()).toBe(200)
+            const uploaded = uploadedMediaSchema.parse(await uploadResponse.json())
+            expect(uploaded.pathname).toMatch(/^posts\/.+\.png$/u)
+
+            const mediaGet = await app.server.fetch(
+                `/media/${uploaded.pathname.split('/').map(encodeURIComponent).join('/')}`,
+            )
+            expect(mediaGet.status).toBe(200)
+            expect(new Uint8Array(await mediaGet.arrayBuffer())).toEqual(
+                new Uint8Array(fixtureBytes),
+            )
+
+            const saveResponse = await app.server.fetch('/_vitehub/forms/post', {
+                method: 'POST',
+                headers: jsonHeaders(admin),
+                body: JSON.stringify({
+                    id: 'built-worker-post',
+                    data: {
+                        title: 'Built Worker Post',
+                        plainTitle: 'Built Worker Post',
+                        slug: 'built-worker-post',
+                        tags: ['vitehub'],
+                        gameMentions: [],
+                        order: 0,
+                    },
+                    body: 'Introduction\n\n<!-- more -->\n\nPRIVATE_DRAFT_BODY',
+                }),
+            })
+            expect(saveResponse.status, await saveResponse.clone().text()).toBe(201)
+
+            const beforePublishCards = await (await app.server.fetch('/api/posts/cards')).text()
+            expect(beforePublishCards).not.toContain('built-worker-post')
+            expect(beforePublishCards).not.toContain('PRIVATE_DRAFT_BODY')
+
+            const adminPostsResponse = await app.server.fetch('/api/admin/content/posts', {
+                headers: admin,
+            })
+            expect(adminPostsResponse.status).toBe(200)
+            expect(adminPostsResponse.headers.get('cache-control')).toBe('private, no-store')
+            const adminPosts = adminListSchema.parse(await adminPostsResponse.json())
+            expect(adminPosts.items.some((item) => item.id === 'built-worker-post')).toBe(true)
+
+            const publishResponse = await app.server.fetch('/api/admin/content/publish', {
+                method: 'POST',
+                headers: jsonHeaders(admin),
+                body: JSON.stringify({
+                    action: 'publish',
+                    collection: 'posts',
+                    id: 'built-worker-post',
+                }),
+            })
+            expect(publishResponse.status, await publishResponse.clone().text()).toBe(200)
+
+            const afterPublishCards = await (await app.server.fetch('/api/posts/cards')).text()
+            expect(afterPublishCards).toContain('built-worker-post')
+            expect(afterPublishCards).toContain('Introduction')
+            expect(afterPublishCards).not.toContain('PRIVATE_DRAFT_BODY')
+
+            const postDetail = await app.server.fetch('/api/posts/built-worker-post')
+            expect(postDetail.status).toBe(200)
+            expect(await postDetail.text()).toContain('PRIVATE_DRAFT_BODY')
+
+            const scheduledDraftResponse = await app.server.fetch('/_vitehub/forms/post', {
+                method: 'POST',
+                headers: jsonHeaders(admin),
+                body: JSON.stringify({
+                    id: 'built-worker-post',
+                    data: {
+                        title: 'Built Worker Post',
+                        plainTitle: 'Built Worker Post',
+                        slug: 'built-worker-post',
+                        tags: ['vitehub'],
+                        gameMentions: [],
+                        order: 0,
+                    },
+                    body: 'Introduction\n\n<!-- more -->\n\nSCHEDULED_DRAFT_UPDATE',
+                }),
+            })
+            expect(scheduledDraftResponse.status, await scheduledDraftResponse.clone().text()).toBe(
+                201,
+            )
+            expect(
+                await (await app.server.fetch('/api/posts/built-worker-post')).text(),
+            ).not.toContain('SCHEDULED_DRAFT_UPDATE')
+
+            const scheduleResponse = await app.server.fetch('/api/admin/content/publish', {
+                method: 'POST',
+                headers: jsonHeaders(admin),
+                body: JSON.stringify({
+                    action: 'schedule',
+                    collection: 'posts',
+                    id: 'built-worker-post',
+                    at: new Date(Date.now() + 86_400_000).toISOString(),
+                }),
+            })
+            expect(scheduleResponse.status, await scheduleResponse.clone().text()).toBe(200)
+            const schedulePayload = publishScheduleSchema.parse(await scheduleResponse.json())
+            expect(schedulePayload.schedule?.id).toBeTruthy()
+
+            if (schedulePayload.schedule?.id) {
+                const unscheduleResponse = await app.server.fetch('/api/admin/content/publish', {
+                    method: 'POST',
+                    headers: jsonHeaders(admin),
+                    body: JSON.stringify({
+                        action: 'unschedule',
+                        scheduleId: schedulePayload.schedule.id,
+                    }),
+                })
+                expect(unscheduleResponse.status, await unscheduleResponse.clone().text()).toBe(200)
+            }
+
+            const deleteResponse = await app.server.fetch(
+                '/api/admin/content/posts/built-worker-post?publish=true',
+                {
+                    method: 'DELETE',
+                    headers: admin,
+                },
+            )
+            expect(deleteResponse.status, await deleteResponse.clone().text()).toBe(200)
+            expect((await app.server.fetch('/api/posts/built-worker-post')).status).toBe(404)
+
+            const chatResponse = await app.server.fetch('/_vitehub/agents/assistant/chat', {
+                method: 'POST',
+                headers: jsonHeaders(admin),
+                body: JSON.stringify({
+                    id: 'test-assistant-chat',
+                    messages: [
+                        {
+                            id: 'msg-1',
+                            role: 'user',
+                            parts: [{ type: 'text', text: 'Hello' }],
+                        },
+                    ],
+                    trigger: 'submit-message',
+                }),
+            })
+            expect(chatResponse.status, await chatResponse.clone().text()).toBe(200)
+            expect(await chatResponse.text()).toContain('Content assistant ready')
+
+            const emittedWrangler: unknown = JSON.parse(
+                await readFile(resolve('.output/server/wrangler.json'), 'utf8'),
+            )
+            expect(emittedWrangler).toMatchObject({
+                name: 'liry24-com',
+                preview_urls: true,
+                routes: [
+                    {
+                        pattern: 'liry24.com',
+                        custom_domain: true,
+                        previews_enabled: true,
+                    },
+                ],
+                r2_buckets: [{ binding: 'STORAGE', bucket_name: 'liry24-com' }],
+                previews: {
+                    vars: {
+                        APP_ENV: 'dev',
+                        NUXT_PUBLIC_SITE_URL: 'https://dev.liry24.com',
+                    },
+                    d1_databases: [
+                        {
+                            binding: 'DB',
+                            database_name: 'liry24-com-dev',
+                            database_id: '3c7c6179-12d0-4108-9eea-b3e20d394cef',
+                        },
+                    ],
+                    r2_buckets: [
+                        {
+                            binding: 'STORAGE',
+                            bucket_name: 'liry24-com-dev-storage',
+                        },
+                    ],
+                },
+            })
+
+            const serverDir = resolve('.output/server')
+            const files = (await readdir(serverDir, { recursive: true })).filter((path) =>
                 path.endsWith('.mjs'),
             )
             const output = (
-                await Promise.all(files.map((path) => readFile(resolve(server, path), 'utf8')))
+                await Promise.all(files.map((path) => readFile(resolve(serverDir, path), 'utf8')))
             ).join('\n')
-            for (const family of ['Special Gothic Expanded One', 'Geist Mono'])
+            for (const family of ['Special Gothic Expanded One', 'Geist Mono']) {
                 expect(output).toContain(family)
+            }
             for (const marker of [
                 'openDevelopmentDB',
                 'LIRY24_DEV_DB_PATH',
                 '.data/development/sqlite.db',
                 'drizzle-orm/node-sqlite',
-                'node-sqlite/migrator',
                 '@litijs/void',
-                'void/ai',
-            ])
+            ]) {
                 expect(output).not.toContain(marker)
+            }
         } finally {
-            for (const log of app.server.getLogs().filter((log) => log.level === 'error'))
-                console.error(log.message)
+            const errorLogs = app.server
+                .getLogs()
+                .filter(
+                    (entry) => entry.level === 'error' && !isExpectedHttpErrorLog(entry.message),
+                )
+                .map((entry) => entry.message)
             await app.close()
+            expect(errorLogs).toEqual([])
         }
     },
-    180000,
+    180_000,
 )

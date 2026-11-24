@@ -90,28 +90,31 @@ export const postMarkdownSecurity: ComarkPlugin = {
         await proseSecurity.post?.(state)
         // Prose components consume props such as to/as/copy after URL/tag validation.
         // Accept prose attributes only; arbitrary bindings can also resolve after validation.
-        const filter = (nodes: Node[]) => {
+        const filter = (nodes: Array<Node>) => {
             for (const node of nodes) {
-                if (typeof node === 'string') continue
+                if (typeof node === 'string' || node[0] === null) {
+                    continue
+                }
                 if (node[0] === 'game-mention') {
                     const slug = node[1].slug
                     node[1] = typeof slug === 'string' && gameSlugPattern.test(slug) ? { slug } : {}
                     node.splice(2, node.length - 2, typeof slug === 'string' ? slug : '')
                     continue
                 }
+                const [tag, attrs, ...children] = node
                 node[1] = Object.fromEntries(
-                    Object.entries(node[1]).filter(
+                    Object.entries(attrs).filter(
                         ([name, value]) =>
                             proseAttributes.has(name) ||
                             /^(aria|data)-[\w-]+$/.test(name) ||
                             (name === 'style' &&
-                                ['th', 'td'].includes(node[0] ?? '') &&
+                                ['th', 'td'].includes(tag) &&
                                 /^text-align:(left|center|right)$/.test(String(value))) ||
                             ([':checked', ':disabled', ':open', ':reversed'].includes(name) &&
                                 (value === 'true' || value === 'false')),
                     ),
                 )
-                filter(node.slice(2) as Node[])
+                filter(children)
             }
         }
         filter(state.tree.nodes)

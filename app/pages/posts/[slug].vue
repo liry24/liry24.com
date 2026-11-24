@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { articleDates } from '@litijs/blog'
 const route = useRoute()
 const location = useBrowserLocation()
 const { isSupported: isShareSupported, share } = useShare(() => ({
@@ -8,39 +7,55 @@ const { isSupported: isShareSupported, share } = useShare(() => ({
 }))
 const { isSupported: isCopySupported, copy, copied } = useClipboard()
 
-const { data: entry, error } = await useLitiQuery('posts', {
-    mode: 'one',
-    path: () => route.path,
-})
-if (error.value) throw error.value
+const slugParam = computed(() => String(route.params.slug ?? ''))
+const { data: entry, error } = await useFetch<PostItem>(
+    () => `/api/posts/${encodeURIComponent(slugParam.value)}`,
+)
+if (error.value) {
+    throw error.value
+}
+
 const data = computed(() =>
     entry.value
         ? {
               ...entry.value.data,
-              slug: entry.value.data.slug,
-              date: articleDates(entry.value).date,
+              date: entry.value.data.authoredAt ?? entry.value.publishedAt ?? entry.value.updatedAt,
               body: entry.value.body,
           }
         : null,
 )
 
-if (entry.value?.url && entry.value.url !== route.path)
+if (!data.value) {
+    throw createError({ status: 404, statusText: 'Post not found' })
+}
+
+if (entry.value?.url && entry.value.url !== route.path) {
     await navigateTo(entry.value.url, { redirectCode: 301 })
-useLitiSeo(
-    () =>
-        entry.value
-            ? {
-                  url: entry.value.url,
-                  title: entry.value.data.plainTitle || entry.value.data.title,
-                  description: entry.value.data.summary,
-                  image: mediaUrl(entry.value.data.cover),
-                  publication: entry.value.publication,
-              }
-            : null,
-    { origin: String(useRuntimeConfig().public.siteUrl) || useRequestURL().origin },
+}
+
+const siteOrigin = String(useRuntimeConfig().public.siteUrl || useRequestURL().origin).replace(
+    /\/+$/,
+    '',
+)
+const canonicalUrl = computed(() =>
+    entry.value?.url ? `${siteOrigin}${entry.value.url}` : undefined,
 )
 
-if (!data.value) throw createError({ status: 404, statusText: 'Post not found' })
+useSeoMeta({
+    title: () => data.value?.plainTitle || data.value?.title || 'Post',
+    description: () => data.value?.summary || undefined,
+    ogTitle: () => data.value?.plainTitle || data.value?.title || 'Post',
+    ogDescription: () => data.value?.summary || undefined,
+    ogType: 'article',
+    ogUrl: () => canonicalUrl.value,
+    ogImage: () => mediaUrl(data.value?.cover),
+    articlePublishedTime: () => data.value?.date ?? undefined,
+    articleModifiedTime: () => entry.value?.updatedAt ?? undefined,
+})
+
+useHead({
+    link: () => (canonicalUrl.value ? [{ rel: 'canonical', href: canonicalUrl.value }] : []),
+})
 </script>
 
 <template>
