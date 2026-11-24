@@ -1,5 +1,5 @@
 import { createIgdbClient, eq, IgdbError } from '@liry24/igdb'
-import type { IgdbClient, IgdbClientOptions } from '@liry24/igdb'
+import type { IgdbClientOptions } from '@liry24/igdb'
 import { log } from 'evlog'
 import { createError } from 'nuxt/server'
 import { useServerEnv } from 'vite-hub/env'
@@ -12,7 +12,16 @@ interface IgdbCredentials {
     secret?: string
 }
 
+interface CachedIgdbToken {
+    clientId: string
+    clientSecret: string
+    accessToken: string
+    expiresAt: number
+}
+
 type IgdbFetch = NonNullable<IgdbClientOptions['fetch']>
+
+const IGDB_TIMEOUT_MS = 5000
 
 function readIgdbCredentials(): IgdbCredentials {
     try {
@@ -31,20 +40,25 @@ function readIgdbCredentials(): IgdbCredentials {
     }
 }
 
-function createIgdbFetch(): IgdbFetch {
-    return async (input, init) => {
-        const rejectRedirects = init?.redirect === 'error'
-        const nextInit = rejectRedirects ? { ...init, redirect: 'manual' as const } : init
-        const response = await globalThis.fetch(input, nextInit)
-        // workerd throws TypeError on redirect: "error", so reject 3xx responses under manual mode.
-        if (rejectRedirects && response.status >= 300 && response.status < 400) {
-            if (response.body) {
-                await response.body.cancel().catch(() => undefined)
-            }
-            throw new TypeError('IGDB upstream returned an unexpected redirect.')
+async function fetchWithoutRedirects(
+    input: RequestInfo | URL,
+    init?: RequestInit,
+): Promise<Response> {
+    const rejectRedirects = init?.redirect === 'error'
+    const nextInit = rejectRedirects ? { ...init, redirect: 'manual' as const } : init
+    const response = await globalThis.fetch(input, nextInit)
+    // workerd throws TypeError on redirect: "error", so reject 3xx responses under manual mode.
+    if (rejectRedirects && response.status >= 300 && response.status < 400) {
+        if (response.body) {
+            await response.body.cancel().catch(() => undefined)
         }
-        return response
+        throw new TypeError('IGDB upstream returned an unexpected redirect.')
     }
+    return response
+}
+
+function createIgdbFetch(): IgdbFetch {
+    return (input, init) => fetchWithoutRedirects(input, init)
 }
 
 function logIgdbFailure(error: unknown, credentials: { client: string; secret: string }): void {
@@ -69,6 +83,11 @@ function logIgdbFailure(error: unknown, credentials: { client: string; secret: s
     })
 }
 
+const twitchTokenSchema = z.object({
+    access_token: z.string().refine((value) => value.trim().length > 0 && !/[\r\n]/.test(value)),
+    expires_in: z.number().finite().positive(),
+})
+
 const result = z.array(
     z.object({
         id: z.number().int().positive(),
@@ -78,7 +97,123 @@ const result = z.array(
     }),
 )
 
-let cached: { clientId: string; clientSecret: string; client: IgdbClient } | undefined
+// Cache only plain token data across requests; never store Promises or stateful clients across requests in workerd.
+let cachedToken: CachedIgdbToken | undefined
+
+async function fetchTwitchAccessToken(
+    clientId: string,
+    clientSecret: string,
+): Promise<CachedIgdbToken> {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), IGDB_TIMEOUT_MS)
+    try {
+        let response: Response
+        try {
+            response = await fetchWithoutRedirects('https://id.twitch.tv/oauth2/token', {
+                method: 'POST',
+                body: new URLSearchParams({
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    grant_type: 'client_credentials',
+                }),
+                redirect: 'error',
+                signal: controller.signal,
+            })
+        } catch {
+            throw new IgdbError(controller.signal.aborted ? 'TIMEOUT' : 'NETWORK_ERROR', 'auth')
+        }
+
+        if (!response.ok) {
+            if (response.body) {
+                await response.body.cancel().catch(() => undefined)
+            }
+            throw new IgdbError('HTTP_ERROR', 'auth', { status: response.status })
+        }
+
+        let payload: unknown
+        try {
+            payload = await response.json()
+        } catch {
+            throw new IgdbError(controller.signal.aborted ? 'TIMEOUT' : 'INVALID_RESPONSE', 'auth')
+        }
+
+        const parsed = twitchTokenSchema.safeParse(payload)
+        if (!parsed.success) {
+            throw new IgdbError('INVALID_RESPONSE', 'auth')
+        }
+
+        const expiresMs = parsed.data.expires_in * 1000
+        return {
+            clientId,
+            clientSecret,
+            accessToken: parsed.data.access_token,
+            expiresAt: Date.now() + expiresMs - Math.min(60_000, expiresMs / 10),
+        }
+    } finally {
+        clearTimeout(timer)
+    }
+}
+
+async function resolveIgdbAccessToken(
+    clientId: string,
+    clientSecret: string,
+    forceRefresh = false,
+): Promise<{ token: string; fromCache: boolean }> {
+    if (
+        !forceRefresh &&
+        cachedToken &&
+        cachedToken.clientId === clientId &&
+        cachedToken.clientSecret === clientSecret &&
+        cachedToken.expiresAt > Date.now()
+    ) {
+        return { token: cachedToken.accessToken, fromCache: true }
+    }
+    const fresh = await fetchTwitchAccessToken(clientId, clientSecret)
+    cachedToken = fresh
+    return { token: fresh.accessToken, fromCache: false }
+}
+
+async function runIgdbQuery(
+    clientId: string,
+    accessToken: string,
+    query: { search: string } | { id: number },
+): Promise<Array<unknown>> {
+    const client = createIgdbClient({
+        clientId,
+        accessToken,
+        timeoutMs: IGDB_TIMEOUT_MS,
+        fetch: createIgdbFetch(),
+    })
+    const games = client.query('games').fields('id', 'slug', 'name', 'cover.image_id')
+    return await ('id' in query
+        ? games.where((game) => eq(game.id, query.id)).limit(1)
+        : games.search(query.search).limit(10))
+}
+
+async function executeIgdbQuery(
+    clientId: string,
+    clientSecret: string,
+    query: { search: string } | { id: number },
+): Promise<Array<unknown>> {
+    const { token, fromCache } = await resolveIgdbAccessToken(clientId, clientSecret)
+    try {
+        return await runIgdbQuery(clientId, token, query)
+    } catch (error) {
+        if (
+            fromCache &&
+            error instanceof IgdbError &&
+            error.code === 'HTTP_ERROR' &&
+            error.status === 401
+        ) {
+            if (cachedToken?.accessToken === token) {
+                cachedToken = undefined
+            }
+            const refreshed = await resolveIgdbAccessToken(clientId, clientSecret, true)
+            return await runIgdbQuery(clientId, refreshed.token, query)
+        }
+        throw error
+    }
+}
 
 export async function queryIgdb(
     query: { search: string } | { id: number },
@@ -99,22 +234,7 @@ export async function queryIgdb(
 
     let response: Array<unknown>
     try {
-        if (!cached || cached.clientId !== client || cached.clientSecret !== secret) {
-            cached = {
-                clientId: client,
-                clientSecret: secret,
-                client: createIgdbClient({
-                    clientId: client,
-                    clientSecret: secret,
-                    timeoutMs: 5000,
-                    fetch: createIgdbFetch(),
-                }),
-            }
-        }
-        const games = cached.client.query('games').fields('id', 'slug', 'name', 'cover.image_id')
-        response = await ('id' in query
-            ? games.where((game) => eq(game.id, query.id)).limit(1)
-            : games.search(query.search).limit(10))
+        response = await executeIgdbQuery(client, secret, query)
     } catch (error) {
         logIgdbFailure(error, { client, secret })
         throw createError({

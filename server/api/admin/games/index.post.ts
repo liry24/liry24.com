@@ -4,7 +4,6 @@ import { z } from 'zod'
 import { gameFieldsSchema } from '../../../../shared/schemas/content.js'
 import content from '../../../content.js'
 import { requireAdminSession } from '../../../utils/auth.js'
-import { queryIgdb } from '../../../utils/igdb.js'
 
 const importPayloadSchema = z.object({
     igdbId: z.number().int().positive(),
