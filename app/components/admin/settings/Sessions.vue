@@ -8,7 +8,7 @@ const devices = computed(() =>
 
 <template>
     <UCard :ui="{ body: 'flex flex-col items-start gap-3' }" class="divide-none">
-        <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex w-full flex-wrap items-center justify-between gap-2">
             <h2 class="text-title">Sessions</h2>
             <UButton
                 icon="mingcute:refresh-2-line"
@@ -21,7 +21,7 @@ const devices = computed(() =>
         </div>
 
         <UAlert v-if="failure" :title="failure" color="error" class="mb-4" />
-        <p class="text-muted mb-5 text-sm">
+        <p class="text-muted mb-2 text-sm">
             Updated shows when the session was renewed, not your last activity.
         </p>
         <p v-if="busy && !sessions.length" class="text-muted text-sm">Loading sessions…</p>
@@ -29,7 +29,7 @@ const devices = computed(() =>
             No active sessions.
         </p>
 
-        <ul class="divide-muted divide-y">
+        <ul class="divide-muted w-full divide-y">
             <li
                 v-for="item in devices"
                 :key="item.session.id"
@@ -84,7 +84,7 @@ const devices = computed(() =>
                 </div>
                 <UButton
                     v-if="item.session.id === current?.id"
-                    label="Logout"
+                    label="Sign out"
                     variant="subtle"
                     color="neutral"
                     :disabled="busy"
@@ -102,7 +102,7 @@ const devices = computed(() =>
         </ul>
 
         <UButton
-            label="Logout Other Sessions"
+            label="Revoke Other Sessions"
             variant="subtle"
             color="neutral"
             :disabled="busy || !sessions.some((item) => item.id !== current?.id)"

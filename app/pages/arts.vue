@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { MasonryWall } from '@yeger/vue-masonry-wall'
 
-import { ArtViewer } from '#components'
+import { LazyArtViewer } from '#components'
 
 useSeoMeta({ title: 'Arts', description: 'A collection of artworks by Liry24.' })
 defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'arts' }, [
@@ -12,16 +12,16 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'arts' }, [
 const route = useRoute()
 const overlay = useOverlay()
 
-const { data } = await usePortfolioQuery('arts')
+const { data } = await usePortfolioData('arts')
 
-const modalArtViewer = overlay.create(ArtViewer)
+const modalArtViewer = overlay.create(LazyArtViewer)
 
 onMounted(() => {
-    if (
-        route.query.open &&
-        data.value?.map((i) => i.data.slug).includes(route.query.open as string)
-    )
-        modalArtViewer.open({ item: data.value.find((i) => i.data.slug === route.query.open)! })
+    const slug = typeof route.query.open === 'string' ? route.query.open : undefined
+    const matched = slug ? data.value?.find((entry) => entry.data.slug === slug) : undefined
+    if (matched) {
+        modalArtViewer.open({ item: matched })
+    }
 })
 </script>
 

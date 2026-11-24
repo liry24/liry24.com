@@ -3,7 +3,7 @@ import type { Session } from 'better-auth'
 export function useAdminSessions() {
     const client = authClient
     const { user, session, signOut } = useAppSession()
-    const sessions = ref<Session[]>([])
+    const sessions = ref<Array<Session>>([])
     const busy = ref(false)
     const failure = ref('')
     const owner = computed(() => `${user.value?.id ?? ''}:${session.value?.id ?? ''}`)
@@ -17,29 +17,44 @@ export function useAdminSessions() {
     )
 
     async function run(token?: string, all = false) {
-        if (busy.value) return
+        if (busy.value) {
+            return
+        }
         const scope = owner.value
         busy.value = true
         failure.value = ''
         try {
-            if (!client) throw new Error('Authentication client is unavailable')
-            if (token || all) {
-                const result = all
-                    ? await client.revokeOtherSessions()
-                    : await client.revokeSession({ token: token! })
-                if (result.error) throw result.error
+            if (all) {
+                const result = await client.revokeOtherSessions()
+                if (result.error) {
+                    throw new Error(result.error.message || 'Could not revoke sessions.')
+                }
+            } else if (token) {
+                const result = await client.revokeSession({ token })
+                if (result.error) {
+                    throw new Error(result.error.message || 'Could not revoke session.')
+                }
             }
             const result = await client.listSessions()
-            if (result.error) throw result.error
-            if (scope === owner.value) sessions.value = result.data ?? []
+            if (result.error) {
+                throw new Error(result.error.message || 'Could not list sessions.')
+            }
+            if (scope === owner.value) {
+                sessions.value = result.data ?? []
+            }
         } catch {
-            if (scope === owner.value)
+            if (scope === owner.value) {
                 failure.value = 'Could not update sessions. Please try again.'
+            }
         } finally {
             busy.value = false
         }
     }
-    onMounted(() => run())
+
+    onMounted(() => {
+        void run()
+    })
+
     return {
         sessions,
         busy,

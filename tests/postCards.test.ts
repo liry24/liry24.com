@@ -1,17 +1,21 @@
-import type { Entry } from 'liti/types'
 import { expect, test } from 'vitest'
 
+import type { PostItem } from '../shared/types/content'
 import { postCards } from '../shared/utils/postCards'
 
-const entry = (body: string): Entry<'posts'> => ({
+const entry = (body: string): PostItem => ({
     id: 'synthetic-post',
-    model: 'posts',
-    locale: 'ja',
-    translated: false,
-    order: 0,
     url: '/posts/synthetic',
-    publication: { firstPublishedAt: '2020-01-01T00:00:00Z', updatedAt: '2020-01-02T00:00:00Z' },
-    data: { title: 'Title', slug: 'synthetic', plainTitle: 'Title', gameMentions: [], tags: [] },
+    publishedAt: '2020-01-01T00:00:00Z',
+    updatedAt: '2020-01-02T00:00:00Z',
+    data: {
+        title: 'Title',
+        plainTitle: 'Title',
+        slug: 'synthetic',
+        tags: [],
+        gameMentions: [],
+        order: 0,
+    },
     body,
 })
 
@@ -26,6 +30,7 @@ test('post cards keep a safe introduction and exclude later body content', async
         expect(card?.date).toBe('2020-01-01T00:00:00Z')
     }
 })
+
 test('explicit card summaries use the same component and HTML security policy', async () => {
     const post = entry('FULL_BODY_SENTINEL')
     post.data.summary =

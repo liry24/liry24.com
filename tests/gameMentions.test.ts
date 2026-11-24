@@ -34,7 +34,7 @@ test('titles support only literal text and mentions; code and escaped tokens rem
         query: 'valo',
     })
     expect(gameMentionQuery('hi <game:valorant>', 18)).toBeNull()
-    expect(gameMentionQuery('\\<game:valo', 11)).toBeNull()
+    expect(gameMentionQuery(String.raw`\<game:valo`, 11)).toBeNull()
 })
 
 test('titles use matching backtick runs and consume unmatched opening runs together', async () => {

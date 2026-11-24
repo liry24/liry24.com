@@ -15,12 +15,12 @@ const overlay = useOverlay()
 const modalStacks = overlay.create(LazyStacksModal)
 const MotionUSeparator = motion.create('hr')
 
-const arts = usePortfolioQuery('arts')
-const socials = usePortfolioQuery('socials')
-const careers = usePortfolioQuery('careers')
-const ranks = usePortfolioQuery('ranks')
-const games = usePortfolioQuery('games')
-const gameStats = usePortfolioQuery('gameStats')
+const arts = usePortfolioData('arts')
+const socials = usePortfolioData('socials')
+const careers = usePortfolioData('careers')
+const ranks = usePortfolioData('ranks')
+const games = usePortfolioData('games')
+const gameStats = usePortfolioData('gameStats')
 const posts = useFetch<PostCardsPage>('/api/posts/cards', { query: { limit: 10 } })
 await Promise.all([arts, socials, careers, ranks, games, gameStats, posts])
 const data = computed(() => ({
@@ -58,9 +58,11 @@ const legacyRanks = computed(() =>
     ),
 )
 
-const rotateArray = <T>(arr: T[], n: number): T[] => {
+const rotateArray = <T>(arr: Array<T>, n: number): Array<T> => {
     const len = arr.length
-    if (len === 0) return arr
+    if (len === 0) {
+        return arr
+    }
 
     const shift = n % len
 

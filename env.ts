@@ -1,19 +1,15 @@
 import { env } from 'vite-hub/env'
 
-const production = process.env.APP_ENV === 'production'
 const synthetic = process.env.LIRY24_TEST_LOCAL === 'true' || process.env.APP_ENV === 'test'
-const secret = (required = true) => env({ secret: true, required })
 
 export const serverEnv = {
-    BETTER_AUTH_SECRET: secret(),
-    NUXT_APP_SECRET: secret(),
-    GITHUB_CLIENT_ID: env({ required: !synthetic }),
-    GITHUB_CLIENT_SECRET: secret(!synthetic),
-    PREVIEW_GITHUB_TOKEN: secret(!production && !synthetic),
-    VERCEL_CLIENT_ID: env({ required: production && !synthetic }),
-    VERCEL_CLIENT_SECRET: secret(production && !synthetic),
-    IGDB_CLIENT_ID: env({ required: false }),
-    IGDB_CLIENT_SECRET: secret(false),
-    OPENAI_API_KEY: secret(false),
-    OPENAI_BASE_URL: secret(false),
+    BETTER_AUTH_SECRET: env({ secret: true }),
+    POCKET_ID_CLIENT_ID: env(synthetic ? { optional: true } : {}),
+    POCKET_ID_CLIENT_SECRET: env(synthetic ? { secret: true, optional: true } : { secret: true }),
+    POCKET_ID_ISSUER: env({ default: 'https://sso.liry24.com' }),
+    POCKET_ID_ADMIN_EMAIL: env({ optional: true }),
+    POCKET_ID_ADMIN_SUB: env({ optional: true }),
+    IGDB_CLIENT_ID: env({ optional: true }),
+    IGDB_CLIENT_SECRET: env({ secret: true, optional: true }),
+    GOOGLE_GENERATIVE_AI_API_KEY: env({ secret: true, optional: true }),
 }

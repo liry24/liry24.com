@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import type { BlobReference } from '@vite-hub/blob/reference'
-
-import { ImageViewer } from '#components'
+import { LazyImageViewer } from '#components'
+import type { MediaReference } from '#shared/schemas/content'
 
 const { data } = defineProps<{
-    data: BlobReference[]
+    data: Array<MediaReference>
 }>()
 
 const overlay = useOverlay()
-
-const imageViewer = overlay.create(ImageViewer)
+const imageViewer = overlay.create(LazyImageViewer)
 
 const carousel = useTemplateRef('carousel')
 const activeIndex = ref(0)
@@ -26,7 +24,6 @@ const onSelect = (index: number) => {
 
 const select = (index: number) => {
     activeIndex.value = index
-
     carousel.value?.emblaApi?.scrollTo(index)
 }
 </script>
@@ -43,17 +40,19 @@ const select = (index: number) => {
             class="mx-auto w-full"
             @select="onSelect"
         >
-            <NuxtImg
-                :src="mediaUrl(item)"
-                :alt="''"
-                class="max-h-[70svh] rounded-lg"
+            <button
+                type="button"
+                aria-label="Enlarge image"
+                class="block rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4"
                 @click="
                     imageViewer.open({
                         src: mediaUrl(item),
                         alt: '',
                     })
                 "
-            />
+            >
+                <NuxtImg :src="mediaUrl(item)" alt="" class="max-h-[70svh] rounded-lg" />
+            </button>
         </UCarousel>
 
         <div class="mx-auto flex gap-2">
@@ -69,7 +68,7 @@ const select = (index: number) => {
             >
                 <NuxtImg
                     :src="mediaUrl(item)"
-                    :alt="''"
+                    alt=""
                     :width="48"
                     :height="48"
                     class="size-12 cursor-pointer rounded-lg object-cover"

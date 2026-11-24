@@ -1,10 +1,12 @@
-import { validateData, type ContentEntry } from '@litijs/model'
 import { createError, defineEventHandler, getQuery } from 'nuxt/server'
 import { z } from 'zod'
 
-import runtime from '#liti/runtime'
+import type { PostItem } from '../../../shared/schemas/content.js'
+import content from '../../content.js'
+import { listAllCollectionItems } from '../../utils/content.js'
 
-import { posts } from '../../models/content'
+const postTimestamp = (entry: PostItem) =>
+    Date.parse(String(entry.data.authoredAt ?? entry.publishedAt ?? '')) || 0
 
 export default defineEventHandler(async (event) => {
     const parsed = z
@@ -14,38 +16,50 @@ export default defineEventHandler(async (event) => {
             offset: z.coerce.number().int().nonnegative().default(0),
         })
         .safeParse(getQuery(event))
-    if (!parsed.success) throw createError({ status: 400, statusText: 'Invalid post query' })
-    const input = parsed.data
-    const entries: ContentEntry[] = []
-    for (let offset = 0; ; offset += 1000) {
-        const page = await runtime.content.query('posts', { locale: 'ja', limit: 1000, offset })
-        entries.push(...page.items)
-        if (offset + page.items.length >= page.total) break
+    if (!parsed.success) {
+        throw createError({ status: 400, statusText: 'Invalid post query' })
     }
-    const game = input.game
-        ? (await runtime.records.query('games', { filter: { slug: input.game }, limit: 1 }))
-              .items[0]
-        : null
+    const input = parsed.data
+
+    const collection = content.collection('posts')
+    const summaries = await listAllCollectionItems(collection, 'published')
+    const fullDocs = await Promise.all(
+        summaries.map((summary) => collection.get(summary.id, { ref: 'published' })),
+    )
+    const entries: Array<PostItem> = []
+    for (const full of fullDocs) {
+        if (!full) {
+            continue
+        }
+        entries.push({
+            id: full.id,
+            url: full.url ?? null,
+            data: full.data,
+            body: full.body,
+            publishedAt: full.data.authoredAt,
+            updatedAt: full.data.authoredAt,
+        })
+    }
+
+    let gameId: string | undefined
+    if (input.game) {
+        const games = await listAllCollectionItems(content.collection('games'), 'published')
+        gameId = games.find((doc) => doc.data.slug === input.game)?.id
+    }
+
     const selected = entries.filter(
         (entry) =>
             !input.game ||
-            (game &&
+            (typeof gameId === 'string' &&
                 Array.isArray(entry.data.gameMentions) &&
-                entry.data.gameMentions.includes(game.id)),
+                entry.data.gameMentions.includes(gameId)),
     )
-    const date = (entry: ContentEntry) =>
-        Date.parse(String(entry.data.authoredAt ?? entry.publication?.firstPublishedAt ?? '')) || 0
-    selected.sort((a, b) => date(b) - date(a) || a.id.localeCompare(b.id))
+
+    selected.sort((a, b) => postTimestamp(b) - postTimestamp(a) || a.id.localeCompare(b.id))
+
     const page = selected.slice(input.offset, input.offset + input.limit)
     return {
-        items: await postCards(
-            await Promise.all(
-                page.map(async (entry) => ({
-                    ...entry,
-                    data: await validateData(posts.fields, entry.data),
-                })),
-            ),
-        ),
+        items: await postCards(page),
         total: selected.length,
     }
 })

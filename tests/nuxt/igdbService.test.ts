@@ -34,7 +34,7 @@ test('IGDB keeps exact identity, validates images and caches OAuth credentials w
     ])
     await queryIgdb({ id: 1 })
     expect(fetch).toHaveBeenCalledTimes(3)
-    expect(fetch.mock.calls[1]![1].body).toContain('search "a\\"; where id = 2;";')
+    expect(fetch.mock.calls[1]![1].body).toContain(String.raw`search "a\"; where id = 2;";`)
     expect(fetch.mock.calls[1]![1]).toMatchObject({
         method: 'POST',
         headers: { 'Client-ID': 'synthetic-client', Authorization: 'Bearer synthetic-token' },

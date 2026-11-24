@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 
 import type { GameMetric } from '../shared/types/games'
 import { gameValueIssues, formatGameValue } from '../shared/utils/games'
-const metrics: GameMetric[] = [
+const metrics: Array<GameMetric> = [
     {
         key: 'peakRank',
         label: 'Highest rank',
@@ -29,8 +29,9 @@ test('game stats validate configured metrics and preserve zero separately from m
             { key: 'kd', value: 1 },
             { key: 'kd', value: 2 },
         ],
-    ])
+    ]) {
         expect(gameValueIssues(metrics, values).length).toBeGreaterThan(0)
+    }
     expect(formatGameValue(undefined)).toBe('—')
     expect(formatGameValue({ key: 'winRate', value: 0 }, metrics[1])).toBe('0%')
     expect(

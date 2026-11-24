@@ -1,4 +1,5 @@
-import { createChartScene, renderChartSvg, type SceneNode } from '@tanstack/charts'
+import { createChartScene, renderChartSvg } from '@tanstack/charts'
+import type { SceneNode } from '@tanstack/charts'
 import { expect, test } from 'vitest'
 
 import { gameChart } from '../app/utils/gameChart'
@@ -23,7 +24,7 @@ const period = (
     order: index,
     values: value === undefined ? [] : [{ key: 'peakRank', value, label, color }],
 })
-const flatten = (nodes: readonly SceneNode[]): SceneNode[] =>
+const flatten = (nodes: ReadonlyArray<SceneNode>): Array<SceneNode> =>
     nodes.flatMap((node) => (node.kind === 'group' ? [node, ...flatten(node.children)] : [node]))
 test('area and line use the same monotone path, numeric ordering, rank colors and hidden x labels', () => {
     const definition = gameChart(
@@ -44,9 +45,12 @@ test('area and line use the same monotone path, numeric ordering, rank colors an
         const line = nodes.find((node) => node.kind === 'polyline')
         expect(line?.kind === 'polyline' && line.path).toContain('C')
         expect(
-            area?.kind === 'area' && line?.kind === 'polyline' && area.path?.startsWith(line.path!),
+            area?.kind === 'area' &&
+                line?.kind === 'polyline' &&
+                typeof line.path === 'string' &&
+                Boolean(area.path?.startsWith(line.path)),
         ).toBe(true)
-        expect(scene.points.map((point) => point.datum.record.label)).toContain('Saved rank')
+        expect(scene.points.map((point) => pointLabel(point.datum))).toContain('Saved rank')
         expect(renderChartSvg(scene, { ariaLabel: 'Ranks', idPrefix: 'first' })).toContain(
             'first-ranks-0',
         )
@@ -55,6 +59,17 @@ test('area and line use the same monotone path, numeric ordering, rank colors an
         )
     }
 })
+
+function pointLabel(datum: unknown): string | undefined {
+    if (typeof datum !== 'object' || datum === null || !('record' in datum)) {
+        return undefined
+    }
+    const { record } = datum
+    if (typeof record !== 'object' || record === null || !('label' in record)) {
+        return undefined
+    }
+    return typeof record.label === 'string' ? record.label : undefined
+}
 test('flat paths remain painted with different recorded colors and equal values retain distinct labels', () => {
     const scene = createChartScene(
         gameChart(
@@ -67,7 +82,7 @@ test('flat paths remain painted with different recorded colors and equal values 
     expect(flatten(scene.nodes)).toContainEqual(
         expect.objectContaining({ kind: 'rect', height: 2, style: { fill: 'url(#flat-0)' } }),
     )
-    expect(scene.points.map((point) => point.datum.record.label)).toEqual(['Ascendant', 'Immortal'])
+    expect(scene.points.map((point) => pointLabel(point.datum))).toEqual(['Ascendant', 'Immortal'])
 })
 test('missing periods split runs, zero is a value and a single point renders without NaN', () => {
     for (const periods of [[period(1, 2000), period(2), period(3, 2100)], [period(1, 0)], []]) {

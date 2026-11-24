@@ -1,47 +1,70 @@
-import { validateData } from '@litijs/model'
-import { defineEventHandler, readBody, createError } from 'nuxt/server'
+import { createError, defineEventHandler, readBody } from 'nuxt/server'
 import { z } from 'zod'
 
-import runtime from '#liti/runtime'
+import { gameFieldsSchema } from '../../../../shared/schemas/content.js'
+import content from '../../../content.js'
+import { requireAdminSession } from '../../../utils/auth.js'
 
-import { games } from '../../../models/records'
+const importPayloadSchema = z.object({
+    igdbId: z.number().int().positive(),
+    publish: z.boolean().optional().default(false),
+})
 
 export default defineEventHandler(async (event) => {
-    const session = await requireAdminPermission(event, { 'liti:model:games': ['create'] })
-    if (!event.req.headers.get('content-type')?.startsWith('application/json'))
+    const session = await requireAdminSession(event)
+    if (!event.req.headers.get('content-type')?.startsWith('application/json')) {
         throw createError({ status: 415, statusText: 'JSON required' })
-    const records = runtime.records
-    const input = z.object({ igdbId: z.number().int().positive() }).safeParse(await readBody(event))
-    if (!input.success) throw createError({ status: 400, statusText: 'Choose an IGDB game' })
+    }
+    const input = importPayloadSchema.safeParse(await readBody(event))
+    if (!input.success) {
+        throw createError({ status: 400, statusText: 'Choose an IGDB game' })
+    }
     event.res.headers.set('Cache-Control', 'private, no-store')
+
     const id = `igdb-${input.data.igdbId}`
-    const saved = () => records.readDraft('games', id, { actor: session.user })
-    const existing = await saved()
+    const games = content.collection('games')
+    const existing = await games.get(id, { ref: 'draft' })
     if (existing) {
-        const data = await validateData(games.fields, existing.data)
+        const parsedExisting = gameFieldsSchema.parse(existing.data)
         return {
             id: existing.id,
-            igdbId: data.igdbId,
-            slug: data.slug,
-            name: data.name,
-            cover: data.cover,
+            igdbId: parsedExisting.igdbId,
+            slug: parsedExisting.slug,
+            name: parsedExisting.name,
+            cover: parsedExisting.cover ?? null,
         }
     }
-    const game = (await queryIgdb({ id: input.data.igdbId })).find(
-        (game) => game.igdbId === input.data.igdbId,
-    )
-    if (!game) throw createError({ status: 404, statusText: 'Game not found in IGDB' })
-    try {
-        await records.save(
-            'games',
-            id,
-            { ...game, cover: game.cover ?? undefined, order: 0, metrics: [] },
-            { actor: session.user, ifVersion: null },
-        )
-    } catch (error) {
-        // Deterministic entry IDs make simultaneous imports idempotent.
-        const existing = await saved()
-        if (existing?.data.igdbId !== game.igdbId) throw error
+
+    const remoteGames = await queryIgdb({ id: input.data.igdbId })
+    const game = remoteGames.find((entry) => entry.igdbId === input.data.igdbId)
+    if (!game) {
+        throw createError({ status: 404, statusText: 'Game not found in IGDB' })
     }
+
+    try {
+        const saved = await games.save(id, {
+            data: {
+                igdbId: game.igdbId,
+                slug: game.slug,
+                name: game.name,
+                cover: game.cover ?? undefined,
+                order: 0,
+                metrics: [],
+            },
+        })
+        if (input.data.publish && saved.digest) {
+            await content.publish({
+                expect: [{ collection: 'games', id, digest: saved.digest }],
+                metadata: { actorUserId: session.user.id },
+            })
+        }
+    } catch (error) {
+        // Deterministic entry IDs make concurrent imports idempotent.
+        const fallback = await games.get(id, { ref: 'draft' })
+        if (!fallback || Number(fallback.data.igdbId) !== game.igdbId) {
+            throw error
+        }
+    }
+
     return { ...game, id }
 })

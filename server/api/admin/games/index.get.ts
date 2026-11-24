@@ -1,58 +1,68 @@
-import { validateData } from '@litijs/model'
-import { sql } from 'drizzle-orm'
-import { defineEventHandler, getQuery, createError } from 'nuxt/server'
-import { db } from 'vite-hub/database/drizzle'
+import { createError, defineEventHandler, getQuery } from 'nuxt/server'
 
-import { tables } from '../../../database/records'
-import { games as definition } from '../../../models/records'
+import { gameFieldsSchema } from '../../../../shared/schemas/content.js'
+import content from '../../../content.js'
+import { requireAdminSession } from '../../../utils/auth.js'
+import { listAllCollectionItems } from '../../../utils/content.js'
+import { queryIgdb } from '../../../utils/igdb.js'
+
+const gameSearchItemSchema = gameFieldsSchema.pick({
+    igdbId: true,
+    slug: true,
+    name: true,
+    cover: true,
+})
 
 export default defineEventHandler(async (event) => {
-    await requireAdminPermission(event, { 'liti:model:games': ['readDraft'] })
+    await requireAdminSession(event)
     const query = String(getQuery(event).q ?? '').trim()
-    if (query.length > 100) throw createError({ status: 400, statusText: 'Search is too long' })
+    if (query.length > 100) {
+        throw createError({ status: 400, statusText: 'Search is too long' })
+    }
     event.res.headers.set('Cache-Control', 'private, no-store')
-    const table = tables.games
-    const pattern = '%' + query.replace(/[\\%_]/g, '\\$&').toLowerCase() + '%'
-    const rows = await db
-        .select({
-            id: table.id,
-            igdbId: table.igdbId,
-            slug: table.slug,
-            name: table.name,
-            cover: table.cover,
+
+    const docs = await listAllCollectionItems(content.collection('games'), 'draft')
+    const lowerQuery = query.toLowerCase()
+    const games: Array<GameSearchResult> = []
+
+    for (const doc of docs) {
+        const parsed = gameSearchItemSchema.safeParse(doc.data)
+        if (!parsed.success) {
+            continue
+        }
+        if (
+            query &&
+            !parsed.data.name.toLowerCase().includes(lowerQuery) &&
+            !parsed.data.slug.toLowerCase().includes(lowerQuery)
+        ) {
+            continue
+        }
+        games.push({
+            id: doc.id,
+            igdbId: parsed.data.igdbId,
+            slug: parsed.data.slug,
+            name: parsed.data.name,
+            cover: parsed.data.cover ?? null,
         })
-        .from(table)
-        .where(
-            query
-                ? sql`lower(${table.name}) LIKE ${pattern} ESCAPE ${'\\'} OR lower(${table.slug}) LIKE ${pattern} ESCAPE ${'\\'}`
-                : undefined,
-        )
-        .limit(100)
-    const games = await Promise.all(
-        rows.map(async (row) => ({
-            id: row.id,
-            cover: row.cover,
-            ...(await validateData(
-                {
-                    igdbId: definition.fields.igdbId,
-                    slug: definition.fields.slug,
-                    name: definition.fields.name,
-                },
-                { igdbId: row.igdbId, slug: row.slug, name: row.name },
-            )),
-        })),
-    )
-    if (!query) return { games, warning: '' }
+    }
+
+    games.sort((a, b) => a.name.localeCompare(b.name))
+    const limited = games.slice(0, 100)
+    if (!query) {
+        return { games: limited, warning: '' }
+    }
+
     try {
         const remote = await queryIgdb({ search: query })
+        const existingIgdbIds = new Set(limited.map((item) => item.igdbId))
         return {
-            games: [
-                ...games,
-                ...remote.filter((game) => !games.some((local) => local.igdbId === game.igdbId)),
-            ],
+            games: [...limited, ...remote.filter((game) => !existingIgdbIds.has(game.igdbId))],
             warning: '',
         }
     } catch {
-        return { games, warning: 'IGDB search is unavailable. Saved games are still available.' }
+        return {
+            games: limited,
+            warning: 'IGDB search is unavailable. Saved games are still available.',
+        }
     }
 })
