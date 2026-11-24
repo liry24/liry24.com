@@ -6,7 +6,7 @@
 - **Platform packages**: `@vite-hub/auth`, `@vite-hub/blob`, `@vite-hub/cms`, `@vite-hub/content`, `@vite-hub/database`, `@vite-hub/forms`, `@vite-hub/schedule`, `@vite-hub/workspace`. Use `vite-hub/*` public subpaths and generated `.nuxt` / `.vitehub` types; keep `@cloudflare/oxlint-config@0.2.0` (`any` is strictly forbidden) and `oxfmt` clean across all app, server, shared, and test files.
 - **Database & storage**: Single Cloudflare D1 binding (`DB`) and single public R2 binding (`STORAGE` served at `/media`) shared between `@vite-hub/cms` media and `@vite-hub/content` workspace storage (unpublished draft/revision blobs are not isolated in a separate private bucket). Published, scheduled, and current draft revisions remain separate.
 - **Scheduled publishing**: `server/schedules/content-publish.ts` runs `content.publishDue()` on `* * * * *` via `@vite-hub/schedule` (Nitro `providerOutput: 'nitro'`, disabled during CI test builds with `LIRY24_DISABLE_CRON=true`).
-- **Observability**: `@vite-hub/observability` with `evlog` structured wide events (`observability: { service: 'liry24-com', evlog: {}, browserErrors: true }`).
+- **Observability**: `@vite-hub/observability` with cost-controlled `evlog` (`browserErrors: false`, static/media routes excluded, `info` sampled at `1%`, `warn`/`error` at `100%`, tail-sampling keeps `status >= 500`, `duration >= 2000`, `/api/admin/**`, and `/_vitehub/agents/**`) paired with Cloudflare Wrangler `observability` (`invocation_logs: false`, `redact_query_string: true`, `traces.enabled: false`, `issues.enabled: false`).
 
 ## Authentication & secrets
 

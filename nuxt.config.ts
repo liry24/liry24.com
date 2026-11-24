@@ -57,8 +57,31 @@ export default defineNuxtConfig({
                 },
                 observability: {
                     service: 'liry24-com',
-                    evlog: {},
-                    browserErrors: true,
+                    browserErrors: false,
+                    evlog: {
+                        minLevel: 'info',
+                        exclude: [
+                            '/_nuxt/**',
+                            '/favicon.ico',
+                            '/robots.txt',
+                            '/sitemap.xml',
+                            '/media/**',
+                        ],
+                        sampling: {
+                            rates: {
+                                debug: 0,
+                                info: 1,
+                                warn: 100,
+                                error: 100,
+                            },
+                            keep: [
+                                { status: 500 },
+                                { duration: 2000 },
+                                { path: '/api/admin/**' },
+                                { path: '/_vitehub/agents/**' },
+                            ],
+                        },
+                    },
                 },
                 agent: {
                     invocations: 'database',
@@ -153,7 +176,21 @@ export default defineNuxtConfig({
         experimental: { asyncContext: true },
         cloudflare: {
             wrangler: {
-                observability: { enabled: true },
+                observability: {
+                    enabled: true,
+                    redact_query_string: true,
+                    logs: {
+                        enabled: true,
+                        invocation_logs: false,
+                        head_sampling_rate: 1,
+                    },
+                    traces: {
+                        enabled: false,
+                    },
+                    issues: {
+                        enabled: false,
+                    },
+                },
                 vars: { APP_ENV: process.env.APP_ENV || 'production' },
                 routes: [
                     {

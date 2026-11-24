@@ -1,6 +1,8 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import type { GoogleGenerativeAIProviderSettings } from '@ai-sdk/google'
 import type { LanguageModel } from 'ai'
 import { convertArrayToReadableStream, MockLanguageModelV4 } from 'ai/test'
+import { log } from 'evlog'
 import { defineAgent } from 'vite-hub/agent'
 import { content } from 'vite-hub/agent/capabilities'
 import { webChat } from 'vite-hub/agent/channels'
@@ -57,6 +59,40 @@ function readGoogleApiKey(): string | undefined {
     return typeof processValue === 'string' && processValue ? processValue : undefined
 }
 
+function createGoogleDiagnosticFetch(
+    apiKey: string,
+): NonNullable<GoogleGenerativeAIProviderSettings['fetch']> {
+    return async (input, init) => {
+        try {
+            const response = await globalThis.fetch(input, init)
+            if (!response.ok) {
+                const detail = await response
+                    .clone()
+                    .text()
+                    .then((body) => body.slice(0, 1024).replaceAll(apiKey, '[redacted]'))
+                    .catch(() => '')
+                log.error({
+                    event: 'assistant.google.http_error',
+                    status: response.status,
+                    statusText: response.statusText,
+                    detail,
+                })
+            }
+            return response
+        } catch (error) {
+            log.error({
+                event: 'assistant.google.fetch_failed',
+                name: error instanceof Error ? error.name : 'UnknownError',
+                message: (error instanceof Error ? error.message : String(error)).replaceAll(
+                    apiKey,
+                    '[redacted]',
+                ),
+            })
+            throw error
+        }
+    }
+}
+
 async function resolveAdminSession(request: Request) {
     const session = await useAuth(request).api.getSession({ headers: request.headers })
     if (!session?.user) {
@@ -99,6 +135,7 @@ export default defineAgent({
         ].join('\n'),
         execution: {
             callSettings: {
+                maxRetries: 1,
                 providerOptions: {
                     google: {
                         thinkingConfig: {
@@ -115,7 +152,10 @@ export default defineAgent({
             if (synthetic || !apiKey) {
                 return createOfflineMockModel()
             }
-            const google = createGoogleGenerativeAI({ apiKey })
+            const google = createGoogleGenerativeAI({
+                apiKey,
+                fetch: createGoogleDiagnosticFetch(apiKey),
+            })
             return google(GEMINI_MODEL_ID)
         },
     },

@@ -339,6 +339,21 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 )
                 expect(emittedWrangler).toMatchObject({
                     name: 'liry24-com',
+                    observability: {
+                        enabled: true,
+                        redact_query_string: true,
+                        logs: {
+                            enabled: true,
+                            invocation_logs: false,
+                            head_sampling_rate: 1,
+                        },
+                        traces: {
+                            enabled: false,
+                        },
+                        issues: {
+                            enabled: false,
+                        },
+                    },
                     preview_urls: true,
                     routes: [
                         {

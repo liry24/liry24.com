@@ -81,7 +81,31 @@ test('ViteHub configuration defines isolated preview resources, single public R2
             },
             observability: {
                 service: 'liry24-com',
-                browserErrors: true,
+                browserErrors: false,
+                evlog: {
+                    minLevel: 'info',
+                    exclude: [
+                        '/_nuxt/**',
+                        '/favicon.ico',
+                        '/robots.txt',
+                        '/sitemap.xml',
+                        '/media/**',
+                    ],
+                    sampling: {
+                        rates: {
+                            debug: 0,
+                            info: 1,
+                            warn: 100,
+                            error: 100,
+                        },
+                        keep: [
+                            { status: 500 },
+                            { duration: 2000 },
+                            { path: '/api/admin/**' },
+                            { path: '/_vitehub/agents/**' },
+                        ],
+                    },
+                },
             },
             agent: {
                 invocations: 'database',
@@ -89,7 +113,21 @@ test('ViteHub configuration defines isolated preview resources, single public R2
         })
 
         expect(config.nitro?.cloudflare?.wrangler).toMatchObject({
-            observability: { enabled: true },
+            observability: {
+                enabled: true,
+                redact_query_string: true,
+                logs: {
+                    enabled: true,
+                    invocation_logs: false,
+                    head_sampling_rate: 1,
+                },
+                traces: {
+                    enabled: false,
+                },
+                issues: {
+                    enabled: false,
+                },
+            },
             workers_dev: false,
             preview_urls: true,
             routes: [
