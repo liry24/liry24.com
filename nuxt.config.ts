@@ -191,7 +191,10 @@ export default defineNuxtConfig({
                         enabled: false,
                     },
                 },
-                vars: { APP_ENV: process.env.APP_ENV || 'production' },
+                vars: {
+                    APP_ENV: process.env.APP_ENV || 'production',
+                    IGDB_CLIENT_ID: process.env.IGDB_CLIENT_ID || '907z6pjakj7oiu1oyqhnepvktcw10p',
+                },
                 routes: [
                     {
                         pattern: 'liry24.com',
@@ -203,6 +206,8 @@ export default defineNuxtConfig({
                 previews: {
                     vars: {
                         APP_ENV: 'dev',
+                        IGDB_CLIENT_ID:
+                            process.env.IGDB_CLIENT_ID || '907z6pjakj7oiu1oyqhnepvktcw10p',
                         NUXT_PUBLIC_SITE_URL: 'https://dev-liry24-com.liry.workers.dev',
                         NUXT_PUBLIC_IMAGES_DOMAIN: 'https://dev-liry24-com.liry.workers.dev',
                     },
