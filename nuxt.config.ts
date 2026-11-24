@@ -3,6 +3,7 @@ import { parseURL } from 'ufo'
 import viteHub from 'vite-hub/nuxt'
 
 import { serverEnv } from './env.ts'
+import { liriaIconCollection } from './layers/icons/liria.ts'
 
 const isPreview = process.env.APP_ENV !== 'production'
 const baseURL =
@@ -248,7 +249,7 @@ export default defineNuxtConfig({
             includeCustomCollections: true,
         },
         serverBundle: {
-            collections: [{ prefix: 'liria', fetchEndpoint: 'https://icons.liria.me/liria.json' }],
+            collections: [liriaIconCollection],
         },
     },
 
