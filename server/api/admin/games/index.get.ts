@@ -13,6 +13,16 @@ const gameSearchItemSchema = gameFieldsSchema.pick({
     cover: true,
 })
 
+function isUnconfiguredIgdbError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+        return false
+    }
+    if ('status' in error && error.status === 503) {
+        return true
+    }
+    return 'statusCode' in error && error.statusCode === 503
+}
+
 export default defineEventHandler(async (event) => {
     await requireAdminSession(event)
     const query = String(getQuery(event).q ?? '').trim()
@@ -59,10 +69,12 @@ export default defineEventHandler(async (event) => {
             games: [...limited, ...remote.filter((game) => !existingIgdbIds.has(game.igdbId))],
             warning: '',
         }
-    } catch {
+    } catch (error) {
         return {
             games: limited,
-            warning: 'IGDB search is unavailable. Saved games are still available.',
+            warning: isUnconfiguredIgdbError(error)
+                ? 'IGDB search is not configured. Saved games are still available.'
+                : 'IGDB search is unavailable. Saved games are still available.',
         }
     }
 })

@@ -78,3 +78,33 @@ test('credential rotation recreates the IGDB client instead of reusing its cache
         fetch.mock.calls.filter(([url]) => url === 'https://id.twitch.tv/oauth2/token'),
     ).toHaveLength(2)
 })
+
+test('Cloudflare Workers redirect: error workaround uses manual mode and blocks 3xx responses', async () => {
+    const cancelSpy = vi.fn(async () => undefined)
+    let shouldRedirectApi = false
+    const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.redirect === 'error') {
+            throw new TypeError('Invalid redirect value, must be one of "follow" or "manual"')
+        }
+        if (url === 'https://id.twitch.tv/oauth2/token') {
+            return Response.json({ access_token: 'synthetic-token', expires_in: 3600 })
+        }
+        if (shouldRedirectApi) {
+            return new Response(new ReadableStream({ cancel: cancelSpy }), { status: 302 })
+        }
+        return Response.json([{ id: 42, slug: 'zelda', name: 'Zelda' }])
+    })
+    vi.stubGlobal('fetch', fetch)
+    const { queryIgdb } = await import('../../server/utils/igdb')
+
+    expect(await queryIgdb({ search: 'zelda' })).toEqual([
+        { igdbId: 42, slug: 'zelda', name: 'Zelda', cover: null },
+    ])
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch.mock.calls[0]?.[1]).toMatchObject({ redirect: 'manual' })
+    expect(fetch.mock.calls[1]?.[1]).toMatchObject({ redirect: 'manual' })
+
+    shouldRedirectApi = true
+    await expect(queryIgdb({ search: 'zelda' })).rejects.toMatchObject({ status: 502 })
+    expect(cancelSpy).toHaveBeenCalledTimes(1)
+})
