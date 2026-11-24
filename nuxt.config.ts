@@ -8,7 +8,7 @@ import { liriaIconCollection } from './layers/icons/liria.ts'
 const isPreview = process.env.APP_ENV !== 'production'
 const baseURL =
     process.env.NUXT_PUBLIC_SITE_URL ||
-    (isPreview ? 'https://dev.liry24.com' : 'https://liry24.com')
+    (isPreview ? 'https://dev-liry24-com.liry.workers.dev' : 'https://liry24.com')
 const imagesDomain = isPreview ? baseURL : 'https://images.liry24.com'
 const title = 'Liry24'
 
@@ -159,7 +159,6 @@ export default defineNuxtConfig({
                     {
                         pattern: 'liry24.com',
                         custom_domain: true,
-                        previews_enabled: true,
                     },
                 ],
                 workers_dev: false,
@@ -167,7 +166,8 @@ export default defineNuxtConfig({
                 previews: {
                     vars: {
                         APP_ENV: 'dev',
-                        NUXT_PUBLIC_SITE_URL: 'https://dev.liry24.com',
+                        NUXT_PUBLIC_SITE_URL: 'https://dev-liry24-com.liry.workers.dev',
+                        NUXT_PUBLIC_IMAGES_DOMAIN: 'https://dev-liry24-com.liry.workers.dev',
                     },
                     d1_databases: [
                         {

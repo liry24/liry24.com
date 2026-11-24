@@ -11,7 +11,7 @@
 ## Authentication & secrets
 
 - **Single-owner Pocket ID OIDC**: Configured in `server/auth.ts` with `better-auth@1.7.27` (`admin`, `genericOAuth`, `providerId: 'pocket-id'`, PKCE, `requireIdTokenVerification: true`), callback path `/api/auth/callback/pocket-id`, cookie prefix `liry24-pocket`, and owner gates `POCKET_ID_ADMIN_EMAIL` / `POCKET_ID_ADMIN_SUB` + `account` (`providerId`, `accountId`, `issuer`) enforcement. Passwordless/username/link-account endpoints and legacy providers stay disabled.
-- **Origin handling**: `resolveAuthBaseUrl` in `server/auth.ts` uses an explicit allowlist (`https://liry24.com`, `https://dev.liry24.com`, `*.workers.dev` when non-production, and loopback HTTP only when `LIRY24_TEST_LOCAL=true` or `APP_ENV=test`) rather than `@vite-hub/runtime`'s build-time `publicUrl`.
+- **Origin handling**: `resolveAuthBaseUrl` in `server/auth.ts` uses an explicit allowlist (`https://liry24.com`, `https://dev-liry24-com.liry.workers.dev`, `*.workers.dev` when non-production, and loopback HTTP only when `LIRY24_TEST_LOCAL=true` or `APP_ENV=test`) rather than `@vite-hub/runtime`'s build-time `publicUrl`.
 - **Drizzle v1 compatibility**: Do NOT enable `advanced.database.joins` in `server/auth.ts`; `@better-auth/drizzle-adapter` default export targets Drizzle v0 relational filters while `@vite-hub/database` uses `drizzle-orm@1.0.0-rc.5` (`relationsFilterToSQL` throws on v0 `SQL` filters).
 - **Secret unsealing**: Always declare server env keys in `env.ts` (never add test-only flags there) and unseal `{ secret: true }` values with `readSecretValue` from `server/utils/secret.ts` (because ViteHub wraps runtime secrets in `SecretEnv`).
 
@@ -23,9 +23,9 @@
 
 ## Deployment, Previews & patches
 
-- **Nitro-generated Wrangler config**: `nuxt.config.ts` emits `.output/server/wrangler.json` (and `.wrangler/deploy/config.json`) with production bindings (`DB` `227d818f-cd40-4fca-9710-b57273be94ca`, `STORAGE` `liry24-com`, route `liry24.com` with `previews_enabled: true`) and Method B `previews` (`APP_ENV: 'dev'`, `NUXT_PUBLIC_SITE_URL: 'https://dev.liry24.com'`, D1 `liry24-com-dev` `3c7c6179-12d0-4108-9eea-b3e20d394cef`, R2 `liry24-com-dev-storage`).
+- **Nitro-generated Wrangler config**: `nuxt.config.ts` emits `.output/server/wrangler.json` (and `.wrangler/deploy/config.json`) with production bindings (`DB` `227d818f-cd40-4fca-9710-b57273be94ca`, `STORAGE` `liry24-com`, route `liry24.com` production-only with `previews_enabled` omitted so `*.liry24.com` never intercepts `sso.liry24.com`, `memo.liry24.com`, or `images.liry24.com`) and Method B `previews` (`APP_ENV: 'dev'`, `NUXT_PUBLIC_SITE_URL: 'https://dev-liry24-com.liry.workers.dev'`, `NUXT_PUBLIC_IMAGES_DOMAIN: 'https://dev-liry24-com.liry.workers.dev'`, D1 `liry24-com-dev` `3c7c6179-12d0-4108-9eea-b3e20d394cef`, R2 `liry24-com-dev-storage`).
 - **Root patches (`patchedDependencies`)**: Keep `patches/vite-hub@0.4.1.patch`, `patches/better-auth@1.7.27.patch`, and `patches/better-call@1.4.6.patch` (re-verify `tests/worker/auth.test.ts` rate-limit counter bounding on every upgrade).
-- **Production freeze**: Never modify `main`, production D1 (`227d818f-cd40-4fca-9710-b57273be94ca`), production R2 (`liry24-com`), or Cloudflare Workers Builds `production_settings` without explicit user approval after `dev.liry24.com` verification.
+- **Production freeze**: Never modify `main`, production D1 (`227d818f-cd40-4fca-9710-b57273be94ca`), production R2 (`liry24-com`), or Cloudflare Workers Builds `production_settings` without explicit user approval after `https://dev-liry24-com.liry.workers.dev` verification.
 
 ## Verification commands
 

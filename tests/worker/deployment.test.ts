@@ -96,13 +96,13 @@ test('ViteHub configuration defines isolated preview resources, single public R2
                 {
                     pattern: 'liry24.com',
                     custom_domain: true,
-                    previews_enabled: true,
                 },
             ],
             previews: {
                 vars: {
                     APP_ENV: 'dev',
-                    NUXT_PUBLIC_SITE_URL: 'https://dev.liry24.com',
+                    NUXT_PUBLIC_SITE_URL: 'https://dev-liry24-com.liry.workers.dev',
+                    NUXT_PUBLIC_IMAGES_DOMAIN: 'https://dev-liry24-com.liry.workers.dev',
                 },
                 d1_databases: [
                     {
@@ -119,6 +119,9 @@ test('ViteHub configuration defines isolated preview resources, single public R2
                 ],
             },
         })
+        expect(config.nitro?.cloudflare?.wrangler?.routes?.[0]).not.toHaveProperty(
+            'previews_enabled',
+        )
         expect(config.nitro?.cloudflare?.wrangler?.ai).toBeUndefined()
     } finally {
         vi.unstubAllEnvs()

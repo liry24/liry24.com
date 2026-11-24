@@ -19,7 +19,7 @@ function resolveAuthBaseUrl(
     isSynthetic: boolean,
     appEnv: string | undefined,
 ): string {
-    if (origin === 'https://liry24.com' || origin === 'https://dev.liry24.com') {
+    if (origin === 'https://liry24.com' || origin === 'https://dev-liry24-com.liry.workers.dev') {
         return origin
     }
     try {
@@ -89,7 +89,7 @@ export default defineAuth(({ env, requestOrigin }) => {
             'http://localhost:3100',
             'http://127.0.0.1:3100',
             'https://liry24.com',
-            'https://dev.liry24.com',
+            'https://dev-liry24-com.liry.workers.dev',
             authBaseUrl,
         ]),
     )
