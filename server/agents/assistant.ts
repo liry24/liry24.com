@@ -5,12 +5,13 @@ import { convertArrayToReadableStream, MockLanguageModelV4 } from 'ai/test'
 import { log } from 'evlog'
 import { defineAgent } from 'vite-hub/agent'
 import { content } from 'vite-hub/agent/capabilities'
-import { webChat } from 'vite-hub/agent/channels'
 import { authenticated } from 'vite-hub/auth/agent'
 import { useAuth } from 'vite-hub/auth/server'
+import { webChat } from 'vite-hub/channels/adapters'
 import { useServerEnv } from 'vite-hub/env'
 
 import { isAdminUser } from '../utils/auth.js'
+import { readProcessEnv } from '../utils/processEnv.js'
 import { readSecretValue } from '../utils/secret.js'
 
 const GEMINI_MODEL_ID = 'gemini-4-hydrogen'
@@ -55,8 +56,7 @@ function readGoogleApiKey(): string | undefined {
     } catch {
         // Fallback when running outside generated Nitro/Vite env bridge.
     }
-    const processValue = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-    return typeof processValue === 'string' && processValue ? processValue : undefined
+    return readProcessEnv('GOOGLE_GENERATIVE_AI_API_KEY') || undefined
 }
 
 function createGoogleDiagnosticFetch(
@@ -147,7 +147,8 @@ export default defineAgent({
         },
         model: (): LanguageModel => {
             const synthetic =
-                process.env.LIRY24_TEST_LOCAL === 'true' || process.env.APP_ENV === 'test'
+                readProcessEnv('LIRY24_TEST_LOCAL') === 'true' ||
+                readProcessEnv('APP_ENV') === 'test'
             const apiKey = readGoogleApiKey()
             if (synthetic || !apiKey) {
                 return createOfflineMockModel()

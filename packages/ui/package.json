@@ -9,7 +9,7 @@
         "./styles.css": "./styles.css"
     },
     "dependencies": {
-        "@lezer/markdown": "1.8.1",
+        "@lezer/markdown": "1.8.2",
         "@ui-sdk/core": "0.1.0-beta.17",
         "@ui-sdk/vue": "0.1.0-beta.17"
     },

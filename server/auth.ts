@@ -2,6 +2,7 @@ import { admin, genericOAuth } from 'better-auth/plugins'
 import { defineAuth } from 'vite-hub/auth'
 import { authDatabase } from 'vite-hub/auth/database'
 
+import { readProcessEnv } from './utils/processEnv.js'
 import { readSecretValue } from './utils/secret.js'
 
 const parseList = (value: string | undefined): Array<string> =>
@@ -45,17 +46,17 @@ function resolveAuthBaseUrl(
 }
 
 export default defineAuth(({ env, requestOrigin }) => {
-    const appEnv = typeof env.APP_ENV === 'string' ? env.APP_ENV : process.env.APP_ENV
+    const appEnv = typeof env.APP_ENV === 'string' ? env.APP_ENV : readProcessEnv('APP_ENV')
     const testLocal =
         typeof env.LIRY24_TEST_LOCAL === 'string'
             ? env.LIRY24_TEST_LOCAL
-            : process.env.LIRY24_TEST_LOCAL
+            : readProcessEnv('LIRY24_TEST_LOCAL')
     const synthetic = testLocal === 'true' || appEnv === 'test'
     const testIssuer =
         synthetic && typeof env.POCKET_ID_TEST_ISSUER === 'string' && env.POCKET_ID_TEST_ISSUER
             ? env.POCKET_ID_TEST_ISSUER
             : synthetic
-              ? process.env.POCKET_ID_TEST_ISSUER
+              ? readProcessEnv('POCKET_ID_TEST_ISSUER')
               : undefined
     const issuer = normalizeIssuer(
         testIssuer ?? (typeof env.POCKET_ID_ISSUER === 'string' ? env.POCKET_ID_ISSUER : undefined),
@@ -63,7 +64,7 @@ export default defineAuth(({ env, requestOrigin }) => {
     const runtimeSiteUrl =
         typeof env.NUXT_PUBLIC_SITE_URL === 'string' && env.NUXT_PUBLIC_SITE_URL
             ? env.NUXT_PUBLIC_SITE_URL
-            : process.env.NUXT_PUBLIC_SITE_URL || undefined
+            : readProcessEnv('NUXT_PUBLIC_SITE_URL') || undefined
     const authBaseUrl = resolveAuthBaseUrl(requestOrigin, runtimeSiteUrl, synthetic, appEnv)
     const isHttps = authBaseUrl.startsWith('https://')
     const adminEmails = new Set(
