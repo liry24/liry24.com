@@ -1,10 +1,14 @@
 <script setup lang="ts">
 const { slug } = defineProps<{ slug: string }>()
 
-const fallback = computed(() => '<game:' + slug + '>')
-const { data: game } = await useFetch<GameMentionData | null>(
-    () => `/api/posts/game-mentions/${encodeURIComponent(slug)}`,
-)
+const previewGames = inject(postPreviewGamesKey, null)
+const published = previewGames
+    ? null
+    : await useFetch<GameMentionData | null>(
+          () => `/api/posts/game-mentions/${encodeURIComponent(slug)}`,
+      )
+const game = computed(() => published?.data.value)
+const previewGame = computed(() => previewGames?.get(slug))
 </script>
 
 <template>
@@ -22,5 +26,13 @@ const { data: game } = await useFetch<GameMentionData | null>(
         <span>{{ game.name }}</span>
     </NuxtLink>
 
-    <span v-else>{{ fallback }}</span>
+    <span v-else class="bg-muted inline-flex max-w-full items-baseline gap-1 rounded-md px-2">
+        <img
+            v-if="previewGame?.cover"
+            :src="previewGame.cover"
+            alt=""
+            class="relative top-[0.13em] inline-block size-[1em] shrink-0 rounded-sm object-cover"
+        />
+        {{ previewGame?.name ?? slug }}
+    </span>
 </template>

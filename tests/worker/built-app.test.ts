@@ -19,7 +19,12 @@ const adminListSchema = z.object({
 
 const publishScheduleSchema = z.object({
     ok: z.boolean(),
-    schedule: z.object({ id: z.string() }).optional(),
+    schedule: z
+        .object({
+            id: z.string(),
+            expect: z.array(z.object({ collection: z.string(), id: z.string() })),
+        })
+        .optional(),
 })
 
 const evlogAuthFailureSchema = z.object({
@@ -201,20 +206,43 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                     new Uint8Array(fixtureBytes),
                 )
 
+                for (const [igdbId, slug, name] of [
+                    [100, 'first-game', 'First Game'],
+                    [200, 'scheduled-game', 'Scheduled Game'],
+                ] as const) {
+                    await app.env.DB.prepare(
+                        'INSERT INTO game_catalog (id, igdb_id, slug, data) VALUES (?, ?, ?, ?)',
+                    )
+                        .bind(
+                            `igdb-${igdbId}`,
+                            igdbId,
+                            slug,
+                            JSON.stringify({ igdbId, slug, name, order: 0, metrics: [] }),
+                        )
+                        .run()
+                }
+                const gameSearch = await app.server.fetch('/api/admin/games?q=100', {
+                    headers: admin,
+                })
+                expect(await gameSearch.json()).toMatchObject({
+                    games: [{ id: 'igdb-100', igdbId: 100, slug: 'first-game' }],
+                    warning: '',
+                })
+
                 const saveResponse = await app.server.fetch('/_vitehub/forms/post', {
                     method: 'POST',
                     headers: jsonHeaders(admin),
                     body: JSON.stringify({
                         id: 'built-worker-post',
                         data: {
-                            title: 'Built Worker Post',
+                            title: 'Built Worker Post and :game[first-game]',
                             plainTitle: 'Built Worker Post',
                             slug: 'built-worker-post',
                             tags: ['vitehub'],
                             gameMentions: [],
                             order: 0,
                         },
-                        body: 'Introduction\n\n<!-- more -->\n\nPRIVATE_DRAFT_BODY',
+                        body: 'Introduction :game[first-game]\n\n<!-- more -->\n\nPRIVATE_DRAFT_BODY',
                     }),
                 })
                 expect(saveResponse.status, await saveResponse.clone().text()).toBe(201)
@@ -242,14 +270,22 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 })
                 expect(publishResponse.status, await publishResponse.clone().text()).toBe(200)
 
-                const afterPublishCards = await (await app.server.fetch('/api/posts/cards')).text()
+                const afterPublishCards = await (
+                    await app.server.fetch('/api/posts/cards?game=first-game')
+                ).text()
                 expect(afterPublishCards).toContain('built-worker-post')
                 expect(afterPublishCards).toContain('Introduction')
                 expect(afterPublishCards).not.toContain('PRIVATE_DRAFT_BODY')
 
                 const postDetail = await app.server.fetch('/api/posts/built-worker-post')
                 expect(postDetail.status).toBe(200)
-                expect(await postDetail.text()).toContain('PRIVATE_DRAFT_BODY')
+                expect(await postDetail.json()).toMatchObject({
+                    data: {
+                        plainTitle: 'Built Worker Post and First Game',
+                        gameMentions: ['igdb-100'],
+                    },
+                    body: expect.stringContaining('PRIVATE_DRAFT_BODY'),
+                })
 
                 const scheduledDraftResponse = await app.server.fetch('/_vitehub/forms/post', {
                     method: 'POST',
@@ -264,7 +300,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                             gameMentions: [],
                             order: 0,
                         },
-                        body: 'Introduction\n\n<!-- more -->\n\nSCHEDULED_DRAFT_UPDATE',
+                        body: 'Introduction :game[scheduled-game]\n\n<!-- more -->\n\nSCHEDULED_DRAFT_UPDATE',
                     }),
                 })
                 expect(
@@ -288,6 +324,14 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 expect(scheduleResponse.status, await scheduleResponse.clone().text()).toBe(200)
                 const schedulePayload = publishScheduleSchema.parse(await scheduleResponse.json())
                 expect(schedulePayload.schedule?.id).toBeTruthy()
+                expect(schedulePayload.schedule?.expect).toEqual([
+                    { collection: 'posts', id: 'built-worker-post' },
+                ])
+                expect(
+                    await (
+                        await app.server.fetch('/api/posts/game-mentions/scheduled-game')
+                    ).json(),
+                ).toEqual({ name: 'Scheduled Game', slug: 'scheduled-game' })
 
                 if (schedulePayload.schedule?.id) {
                     const unscheduleResponse = await app.server.fetch(

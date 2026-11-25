@@ -20,6 +20,7 @@ interface CachedIgdbToken {
 }
 
 type IgdbFetch = NonNullable<IgdbClientOptions['fetch']>
+type IgdbQuery = { search: string } | { id: number } | { slug: string }
 
 const IGDB_TIMEOUT_MS = 5000
 
@@ -176,7 +177,7 @@ async function resolveIgdbAccessToken(
 async function runIgdbQuery(
     clientId: string,
     accessToken: string,
-    query: { search: string } | { id: number },
+    query: IgdbQuery,
 ): Promise<Array<unknown>> {
     const client = createIgdbClient({
         clientId,
@@ -185,15 +186,19 @@ async function runIgdbQuery(
         fetch: createIgdbFetch(),
     })
     const games = client.query('games').fields('id', 'slug', 'name', 'cover.image_id')
-    return await ('id' in query
-        ? games.where((game) => eq(game.id, query.id)).limit(1)
-        : games.search(query.search).limit(10))
+    if ('id' in query) {
+        return await games.where((game) => eq(game.id, query.id)).limit(1)
+    }
+    if ('slug' in query) {
+        return await games.where((game) => eq(game.slug, query.slug)).limit(1)
+    }
+    return await games.search(query.search).limit(10)
 }
 
 async function executeIgdbQuery(
     clientId: string,
     clientSecret: string,
-    query: { search: string } | { id: number },
+    query: IgdbQuery,
 ): Promise<Array<unknown>> {
     const { token, fromCache } = await resolveIgdbAccessToken(clientId, clientSecret)
     try {
@@ -215,9 +220,7 @@ async function executeIgdbQuery(
     }
 }
 
-export async function queryIgdb(
-    query: { search: string } | { id: number },
-): Promise<Array<GameSearchResult>> {
+export async function queryIgdb(query: IgdbQuery): Promise<Array<GameSearchResult>> {
     const { client, secret } = readIgdbCredentials()
 
     if (!client || !secret) {

@@ -1,6 +1,9 @@
 {
     "name": "liry24-com",
     "private": true,
+    "workspaces": [
+        "packages/*"
+    ],
     "type": "module",
     "scripts": {
         "postinstall": "nuxt prepare",
@@ -25,6 +28,7 @@
         "@iconify-json/mingcute": "^1.2.8",
         "@iconify-json/simple-icons": "^1.2.100",
         "@liry24/igdb": "~4.0.0",
+        "@liry24/ui": "workspace:*",
         "@lucasmarkes/hairline": "^0.5.1",
         "@nuxt/image": "^2.2.1",
         "@nuxt/nitro-v3-server": "4.7.0",
