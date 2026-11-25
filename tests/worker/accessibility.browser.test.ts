@@ -6,6 +6,7 @@ import type { Browser, Cookie, Page } from 'playwright-core'
 import { expect, test } from 'vitest'
 import { z } from 'zod'
 
+import { gameFieldsSchema } from '../../shared/schemas/content'
 import { scanAccessibility } from '../helpers/accessibility'
 import { builtWorker } from '../helpers/builtWorker'
 
@@ -185,33 +186,58 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 return saved.id
             }
 
-            const gameId = await submitAndPublish('game', 'games', {
-                data: {
-                    igdbId: 126_459,
-                    slug: 'valorant',
-                    name: 'VALORANT',
-                    primaryMetric: 'rank',
-                    order: 0,
-                    metrics: [
-                        {
-                            key: 'rank',
-                            label: 'Peak Rank',
-                            format: 'integer',
-                            positions: [
-                                {
-                                    label: 'Immortal',
-                                    value: 2100,
-                                    color: '#FF4655',
-                                },
-                            ],
-                        },
-                    ],
-                },
+            const valorantId = 'igdb-126459'
+            const valorantGame = gameFieldsSchema.parse({
+                igdbId: 126_459,
+                slug: 'valorant',
+                name: 'VALORANT',
+                primaryMetric: 'rank',
+                order: 0,
+                metrics: [
+                    {
+                        key: 'rank',
+                        label: 'Peak Rank',
+                        format: 'integer',
+                        positions: [
+                            {
+                                label: 'Immortal',
+                                value: 2100,
+                                color: '#FF4655',
+                            },
+                        ],
+                    },
+                ],
             })
+            const apexId = 'igdb-114795'
+            const apexGame = gameFieldsSchema.parse({
+                igdbId: 114_795,
+                slug: 'apex-legends',
+                name: 'Apex Legends',
+                primaryMetric: 'rank',
+                order: 1,
+                metrics: [
+                    {
+                        key: 'rank',
+                        label: 'Rank',
+                        format: 'integer',
+                        positions: [],
+                    },
+                ],
+            })
+            for (const [id, game] of [
+                [valorantId, valorantGame],
+                [apexId, apexGame],
+            ] as const) {
+                await app.env.DB.prepare(
+                    'INSERT INTO game_catalog (id, igdb_id, slug, data) VALUES (?, ?, ?, ?)',
+                )
+                    .bind(id, game.igdbId, game.slug, JSON.stringify(game))
+                    .run()
+            }
 
             await submitAndPublish('game-stats', 'gameStats', {
                 data: {
-                    game: gameId,
+                    game: valorantId,
                     periodKey: 'act-1',
                     period: 'Act 1',
                     order: 1,
@@ -224,7 +250,24 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                             color: '#FF4655',
                         },
                     ],
-                    href: 'https://example.invalid/profile',
+                },
+            })
+
+            await submitAndPublish('game-stats', 'gameStats', {
+                data: {
+                    game: apexId,
+                    periodKey: 's23',
+                    period: 'S23',
+                    order: 0,
+                    href: 'https://example.invalid/apex',
+                    values: [
+                        {
+                            key: 'rank',
+                            value: 22,
+                            label: 'Predator',
+                            image: uploadedMedia,
+                        },
+                    ],
                 },
             })
 

@@ -11,10 +11,7 @@ const signingIn = ref(false)
 const { load, isAdmin } = useAppSession()
 await load()
 
-const safeRedirect = computed(() => {
-    const raw = typeof route.query.redirect === 'string' ? route.query.redirect : '/admin'
-    return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/admin'
-})
+const safeRedirect = computed(() => adminRedirect(route.query.redirect))
 
 if (isAdmin.value) {
     await navigateTo(safeRedirect.value, { replace: true })
@@ -40,7 +37,7 @@ const signInWithPocketId = async () => {
         const result = await authClient.signIn.social({
             provider: 'pocket-id',
             callbackURL: safeRedirect.value,
-            errorCallbackURL: '/login?error=oauth',
+            errorCallbackURL: `/login?${new URLSearchParams({ error: 'oauth', redirect: safeRedirect.value })}`,
         })
         if (result.error) {
             throw new Error(result.error.message || 'Sign in failed.')

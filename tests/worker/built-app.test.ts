@@ -210,12 +210,16 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                     [100, 'first-game', 'First Game'],
                     [200, 'scheduled-game', 'Scheduled Game'],
                 ] as const) {
-                    const saved = await app.server.fetch('/_vitehub/forms/game', {
-                        method: 'POST',
-                        headers: jsonHeaders(admin),
-                        body: JSON.stringify({ data: { igdbId, slug, name } }),
-                    })
-                    expect(saved.status, await saved.clone().text()).toBe(201)
+                    await app.env.DB.prepare(
+                        'INSERT INTO game_catalog (id, igdb_id, slug, data) VALUES (?, ?, ?, ?)',
+                    )
+                        .bind(
+                            `igdb-${igdbId}`,
+                            igdbId,
+                            slug,
+                            JSON.stringify({ igdbId, slug, name, order: 0, metrics: [] }),
+                        )
+                        .run()
                 }
                 const gameSearch = await app.server.fetch('/api/admin/games?q=100', {
                     headers: admin,
@@ -320,15 +324,14 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 expect(scheduleResponse.status, await scheduleResponse.clone().text()).toBe(200)
                 const schedulePayload = publishScheduleSchema.parse(await scheduleResponse.json())
                 expect(schedulePayload.schedule?.id).toBeTruthy()
-                expect(schedulePayload.schedule?.expect).toEqual(
-                    expect.arrayContaining([
-                        { collection: 'posts', id: 'built-worker-post' },
-                        { collection: 'games', id: 'igdb-200' },
-                    ]),
-                )
-                expect(await (await app.server.fetch('/api/portfolio/games')).text()).not.toContain(
-                    'scheduled-game',
-                )
+                expect(schedulePayload.schedule?.expect).toEqual([
+                    { collection: 'posts', id: 'built-worker-post' },
+                ])
+                expect(
+                    await (
+                        await app.server.fetch('/api/posts/game-mentions/scheduled-game')
+                    ).json(),
+                ).toEqual({ name: 'Scheduled Game', slug: 'scheduled-game' })
 
                 if (schedulePayload.schedule?.id) {
                     const unscheduleResponse = await app.server.fetch(
