@@ -13,9 +13,20 @@ export default defineEventHandler(async (event) => {
     const path = getRequestURL(event).pathname
     const match = path.match(AVATAR_REGEX)
 
-    if (!match) return
+    if (!match) {
+        return
+    }
 
-    const format = match[1]!.toLowerCase() as AvatarFormat
+    const rawFormat = match[1]?.toLowerCase()
+    if (
+        rawFormat !== 'jpeg' &&
+        rawFormat !== 'jpg' &&
+        rawFormat !== 'png' &&
+        rawFormat !== 'webp'
+    ) {
+        return
+    }
+    const format: AvatarFormat = rawFormat
 
     const query = getQuery(event)
     const rawSize =
@@ -25,7 +36,9 @@ export default defineEventHandler(async (event) => {
               ? query.s
               : undefined
     const size = parseAvatarSize(rawSize)
-    if (!size) throw createError({ status: 400, statusText: 'Bad Request' })
+    if (!size) {
+        throw createError({ status: 400, statusText: 'Bad Request' })
+    }
 
     const params = new URLSearchParams({
         url: 'https://images.liry24.com/avatar.png',

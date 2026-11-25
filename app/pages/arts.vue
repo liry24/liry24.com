@@ -1,21 +1,28 @@
 <script setup lang="ts">
 import { MasonryWall } from '@yeger/vue-masonry-wall'
 
-import { ArtViewer } from '#components'
+import { LazyArtViewer } from '#components'
+
+useSeoMeta({ title: 'Arts', description: 'A collection of artworks by Liry24.' })
+defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'arts' }, [
+    { key: 'og' },
+    { key: 'whatsapp', width: 800, height: 800 },
+])
 
 const route = useRoute()
 const overlay = useOverlay()
 
-const { data } = await useSiteAdminList('arts', { default: () => [] })
+const { data } = await usePortfolioData('arts')
 
-const modalArtViewer = overlay.create(ArtViewer)
+const modalArtViewer = overlay.create(LazyArtViewer)
 
 onMounted(() => {
-    if (route.query.open && data.value?.map((i) => i.slug).includes(route.query.open as string))
-        modalArtViewer.open({ item: data.value.find((i) => i.slug === route.query.open)! })
+    const slug = typeof route.query.open === 'string' ? route.query.open : undefined
+    const matched = slug ? data.value?.find((entry) => entry.data.slug === slug) : undefined
+    if (matched) {
+        modalArtViewer.open({ item: matched })
+    }
 })
-
-useSeo()
 </script>
 
 <template>
@@ -36,7 +43,7 @@ useSeo()
                     @click="modalArtViewer.open({ item })"
                 >
                     <NuxtImg
-                        :src="item.data.images[0]?.url"
+                        :src="mediaUrl(item.data.images[0])"
                         :alt="item.data.title"
                         :width="520"
                         format="webp"

@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import type { SiteAdminPublicModels } from '@liria24/site-admin/client'
-
 const open = defineModel<boolean>('open', { default: false })
 
 const { item } = defineProps<{
-    item: SiteAdminPublicModels['arts']
+    item: PortfolioItem<'arts'>
 }>()
 
 const historyStateAdded = ref(false)
+let returnFocus: FocusableElement | null = null
+const restoreFocus = (event: Event) => {
+    if (returnFocus?.isConnected) {
+        event.preventDefault()
+        returnFocus.focus()
+    }
+}
 
 const onPopState = () => {
     if (open.value) {
@@ -19,8 +24,9 @@ const onPopState = () => {
 watch(
     open,
     (val) => {
-        if (import.meta.client)
+        if (import.meta.client) {
             if (val) {
+                returnFocus = captureActiveFocus()
                 history.pushState(null, '')
                 historyStateAdded.value = true
                 window.addEventListener('popstate', onPopState)
@@ -31,12 +37,15 @@ watch(
                     historyStateAdded.value = false
                 }
             }
+        }
     },
     { immediate: true },
 )
 
 onUnmounted(() => {
-    if (import.meta.client) window.removeEventListener('popstate', onPopState)
+    if (import.meta.client) {
+        window.removeEventListener('popstate', onPopState)
+    }
 })
 </script>
 
@@ -45,6 +54,7 @@ onUnmounted(() => {
         v-model:open="open"
         scrollable
         :title="item.data.title"
+        :content="{ onCloseAutoFocus: restoreFocus }"
         :ui="{
             content: 'max-w-full h-[calc(100dvh-4rem)] w-[calc(100dvw-4rem)] rounded-2xl',
         }"
@@ -52,21 +62,23 @@ onUnmounted(() => {
         <slot />
 
         <template #content>
-            <div class="grid grid-cols-3 gap-12 p-16">
-                <div class="col-span-2 flex h-full flex-col gap-4">
+            <div class="grid gap-6 p-4 md:grid-cols-3 md:gap-12 md:p-16">
+                <div class="flex h-full min-w-0 flex-col gap-4 md:col-span-2">
                     <ArtCarousel :data="item.data.images" />
                 </div>
 
-                <div class="flex flex-col gap-4">
+                <div class="flex min-w-0 flex-col gap-4">
                     <div class="flex items-start justify-between gap-2">
-                        <h1 class="text-4xl font-bold">{{ item.data.title }}</h1>
+                        <h1 class="min-w-0 text-2xl font-bold wrap-break-word md:text-4xl">
+                            {{ item.data.title }}
+                        </h1>
 
                         <UButton
                             aria-label="Close"
                             icon="mingcute:close-fill"
                             variant="ghost"
                             size="lg"
-                            class="ml-auto"
+                            class="ml-auto shrink-0"
                             @click="open = false"
                         />
                     </div>

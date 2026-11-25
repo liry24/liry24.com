@@ -1,21 +1,83 @@
 <script setup lang="ts">
-const { signOut, user } = useUserSession()
+const { user, load, signOut } = useAppSession()
+await load()
+
 const sidebarCollapsed = ref(false)
+const navigation = computed(() => [
+    [
+        {
+            label: 'Dashboard',
+            icon: 'mingcute:chart-bar-fill',
+            to: '/admin',
+        },
+        {
+            label: 'Posts',
+            icon: 'mingcute:document-2-fill',
+            to: '/admin/posts',
+        },
+        {
+            label: 'Assistant',
+            icon: 'mingcute:sparkles-2-fill',
+            to: '/admin/assistant',
+        },
+    ],
+    [
+        {
+            label: 'Works',
+            icon: 'mingcute:briefcase-fill',
+            to: '/admin/works',
+        },
+        {
+            label: 'Arts',
+            icon: 'mingcute:palette-fill',
+            to: '/admin/arts',
+        },
+        {
+            label: 'Careers',
+            icon: 'mingcute:building-2-fill',
+            to: '/admin/careers',
+        },
+        {
+            label: 'Skills',
+            icon: 'mingcute:tool-fill',
+            to: '/admin/skills',
+        },
+        {
+            label: 'Games',
+            icon: 'mingcute:game-2-fill',
+            to: '/admin/games',
+        },
+        {
+            label: 'Game Stats',
+            icon: 'mingcute:chart-line-fill',
+            to: '/admin/gameStats',
+        },
+        {
+            label: 'Ranks',
+            icon: 'mingcute:trophy-fill',
+            to: '/admin/ranks',
+        },
+        {
+            label: 'Socials',
+            icon: 'mingcute:link-2-fill',
+            to: '/admin/socials',
+        },
+    ],
+    [
+        {
+            label: 'Settings',
+            icon: 'mingcute:settings-1-fill',
+            to: '/admin/settings',
+        },
+        {
+            label: 'Back to site',
+            icon: 'mingcute:arrow-left-line',
+            to: '/',
+        },
+    ],
+])
+
 useHead({ titleTemplate: '%s | Liry24 Admin' })
-const links = Object.entries(adminModels).map(([name, model]) => ({
-    label: model.label,
-    icon: model.icon,
-    to: `/admin/${name}`,
-}))
-const extraLinks = [
-    {
-        to: 'https://github.com/Liry24/liry24.com',
-        target: '_blank',
-        icon: 'mingcute:github-fill',
-        label: 'GitHub',
-    },
-    { to: '/', icon: 'mingcute:arrow-left-line', label: 'Back to site' },
-]
 </script>
 
 <template>
@@ -33,7 +95,7 @@ const extraLinks = [
                 }"
                 :ui="{
                     root: 'min-h-[calc(100svh-0.5rem)]',
-                    footer: 'lg:border-t lg:border-default p-1',
+                    footer: 'lg:border-t lg:border-default p-2',
                 }"
             >
                 <template #header="{ collapsed }">
@@ -55,6 +117,7 @@ const extraLinks = [
                             size="sm"
                             class="text-highlighted gap-1.5 p-0 text-base font-extralight"
                         />
+
                         <UButton
                             aria-label="Toggle sidebar"
                             :icon="
@@ -69,64 +132,59 @@ const extraLinks = [
                         />
                     </div>
                 </template>
-                <template #default="{ collapsed }">
-                    <AdminNav
-                        :links="links.filter((link) => link.to !== '/admin/posts')"
-                        :collapsed
+
+                <template #default="sidebar">
+                    <UNavigationMenu
+                        :collapsed="sidebar.collapsed"
+                        :items="navigation"
+                        orientation="vertical"
+                        tooltip
+                        popover
+                        color="neutral"
+                        :ui="{
+                            link: 'gap-2.5',
+                            linkLeadingIcon: 'text-dimmed group-hover:text-dimmed',
+                        }"
                     />
-                    <AdminNavSection title="Blogs" icon="mingcute:book-3-fill" :collapsed>
-                        <AdminNav
-                            :links="links.filter((link) => link.to === '/admin/posts')"
-                            :collapsed
-                        />
-                    </AdminNavSection>
-                    <AdminNav :links="extraLinks" :collapsed class="mt-auto" />
                 </template>
+
                 <template #footer="{ collapsed }">
-                    <UDropdownMenu
-                        :content="{ align: 'start', side: 'right' }"
-                        :items="[
-                            {
-                                to: '/admin/settings',
-                                label: 'Settings',
-                                icon: 'mingcute:settings-1-fill',
-                            },
-                            {
-                                label: 'Logout',
-                                icon: 'mingcute:exit-fill',
-                                onClick: () => signOut(),
-                            },
-                        ]"
-                    >
-                        <button
-                            type="button"
-                            aria-label="Account menu"
-                            class="hover:bg-muted w-full cursor-pointer rounded-lg p-2"
-                        >
-                            <UAvatar
-                                v-if="collapsed"
-                                :src="user?.image || undefined"
-                                :alt="user?.name"
-                                icon="mingcute:user-3-fill"
-                                size="sm"
-                            />
+                    <div class="flex w-full items-center justify-between gap-2">
+                        <UAvatar
+                            v-if="collapsed"
+                            :src="user?.image || undefined"
+                            :alt="user?.name || 'Admin'"
+                            icon="mingcute:user-3-fill"
+                            size="sm"
+                        />
+                        <template v-else>
                             <UUser
-                                v-else
-                                :name="user?.name"
-                                :description="user?.email"
+                                :name="user?.name || 'Admin'"
+                                :description="user?.email || ''"
                                 :avatar="{
                                     src: user?.image || undefined,
-                                    alt: user?.name,
+                                    alt: user?.name || 'Admin',
                                     icon: 'mingcute:user-3-fill',
                                 }"
                                 size="sm"
-                                class="text-left"
+                                class="min-w-0 flex-1 text-left"
                             />
-                        </button>
-                    </UDropdownMenu>
+                            <UButton
+                                icon="mingcute:exit-line"
+                                aria-label="Sign out"
+                                variant="ghost"
+                                color="neutral"
+                                size="sm"
+                                @click="signOut()"
+                            />
+                        </template>
+                    </div>
                 </template>
             </UDashboardSidebar>
-            <main class="h-full min-w-0 flex-1 overflow-hidden"><slot /></main>
+
+            <main class="h-full min-w-0 flex-1 overflow-hidden">
+                <slot />
+            </main>
         </UDashboardGroup>
     </div>
 </template>

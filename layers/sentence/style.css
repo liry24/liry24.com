@@ -1,0 +1,19 @@
+@layer base {
+    html {
+        text-autospace: normal;
+        text-spacing-trim: trim-start;
+        line-break: strict;
+    }
+    :where(
+        pre,
+        code,
+        kbd,
+        samp,
+        [contenteditable]:not([contenteditable='false']),
+        [data-typography='raw']
+    ) {
+        text-autospace: no-autospace;
+        text-spacing-trim: space-all;
+        line-break: auto;
+    }
+}

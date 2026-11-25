@@ -1,0 +1,14 @@
+{
+    "extends": "./.nuxt/tsconfig.app.json",
+    "compilerOptions": {
+        "types": ["node"]
+    },
+    "include": [
+        ".nuxt/nuxt.d.ts",
+        ".nuxt/nuxt.server.d.ts",
+        ".nuxt/nuxt.node.d.ts",
+        ".vitehub/types.d.ts",
+        "tests/**/*.ts"
+    ],
+    "exclude": ["tests/nuxt/**/*.ts"]
+}

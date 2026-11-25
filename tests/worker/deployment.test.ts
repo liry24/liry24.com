@@ -1,103 +1,261 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { expect, test, vi } from 'vitest'
 
-import { build, createNitro, prepare } from 'nitropack'
-import { expect, test } from 'vitest'
-import type { Unstable_RawConfig } from 'wrangler'
-
+import { serverEnv } from '../../env'
 import nuxtConfig from '../../nuxt.config'
 
-test('the generated auth provider stays inline on POSIX and Windows paths', () => {
-    const inline = nuxtConfig.nitro!.externals!.inline!.find(
-        (rule) => typeof rule === 'function',
-    ) as (id: string) => boolean
-    expect(inline('/app/.nuxt/better-auth/database.mjs')).toBe(true)
-    expect(inline('C:\\app\\.nuxt\\better-auth\\database.mjs')).toBe(true)
-    expect(inline('/app/.nuxt/site-admin/better-auth-server-plugin.mjs')).toBe(true)
-    expect(inline('C:\\app\\.nuxt\\site-admin\\better-auth-server-plugin.mjs')).toBe(true)
-    expect(inline('/app/node_modules/better-auth/dist/index.mjs')).toBe(false)
-})
+interface EnvModuleShape {
+    server?: object
+    public?: object
+}
 
-test('Nitro owns production settings and preserves infrastructure and required secret bindings', () => {
-    const rawConfig = nuxtConfig.nitro!.cloudflare!.wrangler! as Unstable_RawConfig
-    expect(rawConfig.name).toBe('liry24-com')
-    expect(rawConfig.compatibility_date).toBe('2026-07-30')
-    expect(rawConfig.compatibility_flags).toEqual([
-        'nodejs_compat_v2',
-        'enable_nodejs_process_v2',
-        'nodejs_compat_populate_process_env',
-    ])
-    expect(rawConfig.workers_dev).toBe(false)
-    expect(rawConfig.preview_urls).toBe(true)
-    expect(rawConfig.routes).toEqual([{ pattern: 'liry24.com', custom_domain: true }])
-    expect(rawConfig.triggers?.crons).toEqual(['* * * * *'])
-    expect(rawConfig.d1_databases).toEqual([
-        {
-            binding: 'DB',
-            database_name: 'liry24-com',
-            database_id: '227d818f-cd40-4fca-9710-b57273be94ca',
-        },
-    ])
-    expect(rawConfig.r2_buckets).toEqual([{ binding: 'R2', bucket_name: 'liry24-com' }])
-    expect(rawConfig.ai).toBeUndefined()
-    expect(rawConfig.secrets?.required).toEqual([
-        'BETTER_AUTH_SECRET',
-        'NUXT_APP_SECRET',
-        'GITHUB_CLIENT_ID',
-        'GITHUB_CLIENT_SECRET',
-        'VERCEL_CLIENT_ID',
-        'VERCEL_CLIENT_SECRET',
-    ])
-    for (const name of rawConfig.secrets!.required!) expect(rawConfig.vars).not.toHaveProperty(name)
-})
+interface ViteHubOptionsShape {
+    host?: string
+    name?: string
+    publicUrl?: string
+    auth?: boolean
+    console?: boolean
+    env?: EnvModuleShape
+    database?: object
+    blob?: object
+    schedule?: object
+    observability?: object
+    agent?: object
+}
 
-test('native Nitro generation preserves settings and v2 without an input Wrangler file', async () => {
-    const rootDir = await mkdtemp(join(tmpdir(), 'liry24-nitro-config-'))
-    const cloudflare = nuxtConfig.nitro!.cloudflare!
-    const nitro = await createNitro({
-        rootDir,
-        preset: 'cloudflare_module',
-        compatibilityDate: '2026-07-30',
-        nodeModulesDirs: [resolve('node_modules')],
-        cloudflare,
-    })
-    try {
-        await prepare(nitro)
-        await build(nitro)
-        const output = JSON.parse(
-            await readFile(join(rootDir, '.output/server/wrangler.json'), 'utf8'),
-        ) as Unstable_RawConfig
-        const input = cloudflare.wrangler as Unstable_RawConfig
-        for (const key of [
-            'name',
-            'account_id',
-            'compatibility_date',
-            'compatibility_flags',
-            'workers_dev',
-            'preview_urls',
-            'routes',
-            'triggers',
-            'vars',
-            'secrets',
-            'd1_databases',
-            'r2_buckets',
-            'ai',
-            'observability',
-        ] as const)
-            expect(output[key]).toEqual(input[key])
-        expect(output.main).toBe('index.mjs')
-        expect(output.assets).toMatchObject({
-            binding: 'ASSETS',
-            not_found_handling: '404-page',
-        })
-        expect(output.assets.directory.replaceAll('\\', '/')).toBe('../public')
-        const redirect = JSON.parse(
-            await readFile(join(rootDir, '.wrangler/deploy/config.json'), 'utf8'),
-        )
-        expect(redirect.configPath.replaceAll('\\', '/')).toBe('../../.output/server/wrangler.json')
-    } finally {
-        await nitro.close()
-        await rm(rootDir, { recursive: true, force: true })
+function isViteHubOptions(value: unknown): value is ViteHubOptionsShape {
+    return (
+        typeof value === 'object' && value !== null && !Array.isArray(value) && 'database' in value
+    )
+}
+
+function getViteHubOptions(config: { modules?: Array<unknown> }): ViteHubOptionsShape {
+    for (const entry of config.modules ?? []) {
+        if (Array.isArray(entry) && entry.length >= 2 && isViteHubOptions(entry[1])) {
+            return entry[1]
+        }
     }
-}, 60_000)
+    throw new Error('ViteHub module options were not found in nuxt.config.ts')
+}
+
+test('ViteHub configuration defines isolated preview resources, single public R2 bucket, and cron schedule', async () => {
+    expect(nuxtConfig.nitro?.preset).toBeUndefined()
+    try {
+        for (const key of [
+            'LIRY24_HOST',
+            'LIRY24_WORKER_NAME',
+            'LIRY24_DATABASE_NAME',
+            'LIRY24_DATABASE_ID',
+            'LIRY24_PREVIEW_DATABASE_ID',
+            'LIRY24_STORAGE_BUCKET',
+            'LIRY24_DISABLE_CRON',
+            'NUXT_PUBLIC_SITE_URL',
+            'WORKERS_CI_BRANCH',
+        ]) {
+            vi.stubEnv(key, '')
+        }
+        vi.stubEnv('APP_ENV', 'production')
+        vi.resetModules()
+        const { default: config } = await import('../../nuxt.config')
+        const viteHub = getViteHubOptions(config)
+
+        expect(viteHub).toMatchObject({
+            host: 'cloudflare',
+            name: 'liry24-com',
+            publicUrl: 'https://liry24.com',
+            auth: true,
+            console: false,
+            database: {
+                driver: 'cloudflare',
+                binding: 'DB',
+                databaseName: 'liry24-com',
+                databaseId: '227d818f-cd40-4fca-9710-b57273be94ca',
+                previewDatabaseId: '3c7c6179-12d0-4108-9eea-b3e20d394cef',
+            },
+            blob: {
+                driver: 'cloudflare',
+                binding: 'STORAGE',
+                bucketName: 'liry24-com',
+                serve: { access: 'public', route: '/media' },
+            },
+            schedule: {
+                providerOutput: 'nitro',
+            },
+            observability: {
+                service: 'liry24-com',
+                browserErrors: false,
+                evlog: {
+                    minLevel: 'info',
+                    exclude: [
+                        '/_nuxt/**',
+                        '/favicon.ico',
+                        '/robots.txt',
+                        '/sitemap.xml',
+                        '/media/**',
+                    ],
+                    sampling: {
+                        rates: {
+                            debug: 0,
+                            info: 1,
+                            warn: 100,
+                            error: 100,
+                        },
+                        keep: [
+                            { status: 500 },
+                            { duration: 2000 },
+                            { path: '/api/admin/**' },
+                            { path: '/_vitehub/agents/**' },
+                        ],
+                    },
+                },
+            },
+            agent: {
+                invocations: 'database',
+            },
+        })
+
+        expect(config.nitro?.cloudflare?.wrangler).toMatchObject({
+            observability: {
+                enabled: true,
+                redact_query_string: true,
+                logs: {
+                    enabled: true,
+                    invocation_logs: false,
+                    head_sampling_rate: 1,
+                },
+                traces: {
+                    enabled: false,
+                },
+                issues: {
+                    enabled: false,
+                },
+            },
+            workers_dev: false,
+            preview_urls: true,
+            routes: [
+                {
+                    pattern: 'liry24.com',
+                    custom_domain: true,
+                },
+            ],
+            previews: {
+                vars: {
+                    APP_ENV: 'dev',
+                    NUXT_PUBLIC_SITE_URL: 'https://dev-liry24-com.liry.workers.dev',
+                    NUXT_PUBLIC_IMAGES_DOMAIN: 'https://dev-liry24-com.liry.workers.dev',
+                },
+                d1_databases: [
+                    {
+                        binding: 'DB',
+                        database_name: 'liry24-com-dev',
+                        database_id: '3c7c6179-12d0-4108-9eea-b3e20d394cef',
+                    },
+                ],
+                r2_buckets: [
+                    {
+                        binding: 'STORAGE',
+                        bucket_name: 'liry24-com-dev-storage',
+                    },
+                ],
+            },
+        })
+        expect(config.nitro?.cloudflare?.wrangler?.routes?.[0]).not.toHaveProperty(
+            'previews_enabled',
+        )
+        expect(config.nitro?.cloudflare?.wrangler?.ai).toBeUndefined()
+    } finally {
+        vi.unstubAllEnvs()
+        vi.resetModules()
+    }
+})
+
+test('ViteHub configuration supports synthetic overrides, disables AI gateway, and keeps server secrets off the client', async () => {
+    const viteHub = getViteHubOptions(nuxtConfig)
+    expect(viteHub.env?.public).toBeUndefined()
+
+    expect(serverEnv.BETTER_AUTH_SECRET).toMatchObject({ secret: true })
+    expect(serverEnv.POCKET_ID_CLIENT_SECRET).toMatchObject({ secret: true })
+    expect(serverEnv.IGDB_CLIENT_SECRET).toMatchObject({ secret: true })
+    expect(serverEnv.GOOGLE_GENERATIVE_AI_API_KEY).toMatchObject({ secret: true })
+
+    expect('OPENAI_API_KEY' in serverEnv).toBe(false)
+    expect('AI_GATEWAY_ID' in serverEnv).toBe(false)
+
+    try {
+        vi.stubEnv('APP_ENV', 'test')
+        vi.stubEnv('LIRY24_HOST', 'node')
+        vi.stubEnv('LIRY24_WORKER_NAME', 'liry24-synthetic')
+        vi.stubEnv('LIRY24_DATABASE_NAME', 'synthetic-db')
+        vi.stubEnv('LIRY24_DATABASE_ID', '00000000-0000-4000-8000-000000000200')
+        vi.stubEnv('LIRY24_STORAGE_BUCKET', 'synthetic-storage')
+        vi.stubEnv('LIRY24_DISABLE_CRON', 'true')
+        vi.resetModules()
+
+        const { default: config } = await import('../../nuxt.config')
+        const overridden = getViteHubOptions(config)
+        expect(overridden).toMatchObject({
+            host: 'node',
+            name: 'liry24-synthetic',
+            database: expect.objectContaining({
+                databaseName: 'synthetic-db',
+                databaseId: '00000000-0000-4000-8000-000000000200',
+            }),
+            blob: expect.objectContaining({
+                bucketName: 'synthetic-storage',
+            }),
+            schedule: {
+                providerOutput: false,
+            },
+        })
+    } finally {
+        vi.unstubAllEnvs()
+        vi.resetModules()
+    }
+})
+
+test('admin routes use the admin middleware, layout, and private caching', () => {
+    expect(nuxtConfig.routeRules?.['/admin/**']).toMatchObject({
+        appMiddleware: 'admin',
+        appLayout: 'admin',
+        headers: { 'cache-control': 'private, no-store' },
+    })
+})
+
+test('Cloudflare Workers Builds treats main branch as production when APP_ENV is unset', async () => {
+    try {
+        vi.stubEnv('APP_ENV', '')
+        vi.stubEnv('NUXT_PUBLIC_SITE_URL', '')
+        vi.stubEnv('WORKERS_CI_BRANCH', 'main')
+        vi.resetModules()
+
+        const { default: prodConfig } = await import('../../nuxt.config')
+        const prodViteHub = getViteHubOptions(prodConfig)
+        expect(prodViteHub.publicUrl).toBe('https://liry24.com')
+        expect(prodConfig.runtimeConfig).toMatchObject({
+            public: {
+                siteUrl: 'https://liry24.com',
+                imagesDomain: 'https://images.liry24.com',
+                preview: false,
+            },
+        })
+        expect(prodConfig.nitro?.cloudflare?.wrangler?.vars).toMatchObject({
+            APP_ENV: 'production',
+        })
+
+        vi.stubEnv('WORKERS_CI_BRANCH', 'dev')
+        vi.resetModules()
+
+        const { default: devConfig } = await import('../../nuxt.config')
+        const devViteHub = getViteHubOptions(devConfig)
+        expect(devViteHub.publicUrl).toBe('https://dev-liry24-com.liry.workers.dev')
+        expect(devConfig.runtimeConfig).toMatchObject({
+            public: {
+                siteUrl: 'https://dev-liry24-com.liry.workers.dev',
+                imagesDomain: 'https://dev-liry24-com.liry.workers.dev',
+                preview: true,
+            },
+        })
+    } finally {
+        vi.unstubAllEnvs()
+        vi.resetModules()
+    }
+})

@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      NODE_OPTIONS: --max-old-space-size=4096
+      NODE_OPTIONS: --max-old-space-size=6144
       NUXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -35,25 +35,15 @@ jobs:
       - run: bun run format:check
       - run: bun run lint
       - run: bun run typecheck
+      - run: bun x tsc --noEmit -p tsconfig.tests.json
       - run: bun run test
       - run: bun run build
-      - name: Check local SQLite development
         env:
-          BETTER_AUTH_SECRET: test-only-local-ci-secret-0123456789abcdef
-          NUXT_APP_SECRET: test-only-local-ci-app-secret-0123456789abcdef
-          LIRY24_DEV_DB_PATH: ${{ runner.temp }}/liry24-local-test/database.sqlite
-        run: |
-          node node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port 3101 > "$RUNNER_TEMP/nuxt-local.log" 2>&1 &
-          dev_pid=$!
-          trap 'kill "$dev_pid" 2>/dev/null || true; wait "$dev_pid" 2>/dev/null || true; cat "$RUNNER_TEMP/nuxt-local.log"' EXIT
-          ready=false
-          for attempt in $(seq 1 90); do
-            if curl --fail --silent http://127.0.0.1:3101/api/auth/get-session > /dev/null; then
-              ready=true
-              break
-            fi
-            kill -0 "$dev_pid" || exit 1
-            sleep 1
-          done
-          test "$ready" = true
-          node scripts/test-site-admin-local.mjs http://127.0.0.1:3101
+          APP_ENV: test
+          LIRY24_TEST_LOCAL: 'true'
+          LIRY24_DISABLE_CRON: 'true'
+          BETTER_AUTH_SECRET: synthetic-ci-build-secret-0123456789
+      - run: bun x wrangler deploy --dry-run --config .output/server/wrangler.json
+      - run: bun x vitest run tests/worker/built-app.test.ts tests/worker/pocket-id.test.ts
+        env:
+          LIRY24_TEST_BUILT_WORKER: 'true'

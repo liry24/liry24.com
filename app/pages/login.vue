@@ -3,58 +3,80 @@ definePageMeta({
     layout: 'minimal',
 })
 
-const toast = useToast()
-const passkey = useSignIn('passkey')
-const social = useSignIn('social')
-const isPreview = String(useRuntimeConfig().public.preview) === 'true'
+useHead({ title: 'Login' })
 
-const signInWithPasskey = async () => {
-    await passkey.execute()
-    if (passkey.error.value) {
-        toast.add({
-            title: 'Passkeyでログインできませんでした',
-            description: passkey.error.value.message,
-            color: 'error',
-        })
-        return
-    }
+const route = useRoute()
+const toast = useToast()
+const signingIn = ref(false)
+const { load, isAdmin } = useAppSession()
+await load()
+
+const safeRedirect = computed(() => {
+    const raw = typeof route.query.redirect === 'string' ? route.query.redirect : '/admin'
+    return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/admin'
+})
+
+if (isAdmin.value) {
+    await navigateTo(safeRedirect.value, { replace: true })
 }
 
-const signInWithGitHub = () => social.execute({ provider: 'github' })
-const signInWithVercel = () => social.execute({ provider: 'vercel' })
+const errorMessage = computed(() => {
+    const code = typeof route.query.error === 'string' ? route.query.error : ''
+    if (!code) {
+        return ''
+    }
+    if (code === 'forbidden') {
+        return 'This account does not have administrator access.'
+    }
+    return 'Could not sign in with Pocket ID. Please try again.'
+})
+
+const signInWithPocketId = async () => {
+    if (signingIn.value) {
+        return
+    }
+    signingIn.value = true
+    try {
+        const result = await authClient.signIn.social({
+            provider: 'pocket-id',
+            callbackURL: safeRedirect.value,
+            errorCallbackURL: '/login?error=oauth',
+        })
+        if (result.error) {
+            throw new Error(result.error.message || 'Sign in failed.')
+        }
+    } catch (error) {
+        toast.add({
+            title: 'Sign in failed',
+            description: Error.isError(error) ? error.message : 'Please try again.',
+            color: 'error',
+        })
+    } finally {
+        signingIn.value = false
+    }
+}
 </script>
 
 <template>
     <div class="grid grow items-center">
-        <UAuthForm
-            title="Admin Console"
-            :providers="[
-                ...(!isPreview
-                    ? [
-                          {
-                              icon: 'mingcute:key-2-fill',
-                              label: 'Passkey',
-                              onClick: signInWithPasskey,
-                          },
-                      ]
-                    : []),
-                {
-                    icon: 'mingcute:github-fill',
-                    label: 'GitHub',
-                    onClick: signInWithGitHub,
-                },
-                ...(!isPreview
-                    ? [
-                          {
-                              icon: 'mingcute:triangle-fill',
-                              label: 'Vercel',
-                              onClick: signInWithVercel,
-                          },
-                      ]
-                    : []),
-            ]"
-            :ui="{ title: 'font-extralight text-4xl' }"
-            class="mx-auto max-w-sm"
-        />
+        <UCard class="mx-auto w-full max-w-sm">
+            <div class="flex flex-col gap-5">
+                <div class="space-y-1 text-center">
+                    <h1 class="text-2xl font-extralight">Admin Console</h1>
+                    <p class="text-muted text-sm">Single-owner authentication via Pocket ID</p>
+                </div>
+
+                <UAlert v-if="errorMessage" :title="errorMessage" color="error" variant="subtle" />
+
+                <UButton
+                    block
+                    size="lg"
+                    icon="mingcute:shield-shape-fill"
+                    label="Sign in with Pocket ID"
+                    :loading="signingIn"
+                    @click="signInWithPocketId"
+                />
+            </div>
+        </UCard>
     </div>
 </template>
