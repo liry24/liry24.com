@@ -16,7 +16,9 @@
         "format": "oxfmt . --write",
         "format:check": "oxfmt . --check",
         "test": "vitest run",
-        "test:mutation": "node node_modules/@mizchi/mutator/dist/cli.js"
+        "test:mutation": "node node_modules/@mizchi/mutator/dist/cli.js",
+        "dev:inspect": "NUXT_DIAGNOSTICS=1 nuxt dev",
+        "test:a11y": "LIRY24_TEST_ACCESSIBILITY_BROWSER=true vitest run tests/worker/accessibility.browser.test.ts"
     },
     "dependencies": {
         "@ai-sdk/google": "4.0.125",

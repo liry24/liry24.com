@@ -26,11 +26,6 @@ interface NuxtRootElement extends Element {
     }
 }
 
-function getNuxtInstance(): NuxtGlobalInstance | undefined {
-    const root: NuxtRootElement | null = document.querySelector('#__nuxt')
-    return root?.__vue_app__?.config?.globalProperties?.$nuxt
-}
-
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 const wcagRules = Object.fromEntries(
     axe
@@ -87,8 +82,8 @@ export async function scanAccessibility(page: Page, state: string) {
             )
         })
         const applicationError = await page.evaluate(() => {
-            const nuxt = getNuxtInstance()
-            return nuxt?.payload?.error
+            const root: NuxtRootElement | null = document.querySelector('#__nuxt')
+            return root?.__vue_app__?.config?.globalProperties?.$nuxt?.payload?.error
         })
         if (applicationError) {
             throw new Error(

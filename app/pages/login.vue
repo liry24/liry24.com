@@ -63,7 +63,14 @@ const signInWithPocketId = async () => {
                     <p class="text-muted text-sm">Single-owner authentication via Pocket ID</p>
                 </div>
 
-                <UAlert v-if="errorMessage" :title="errorMessage" color="error" variant="subtle" />
+                <UAlert
+                    v-if="errorMessage"
+                    role="alert"
+                    :title="errorMessage"
+                    color="error"
+                    variant="subtle"
+                    :ui="{ title: 'text-red-700 dark:text-red-400' }"
+                />
 
                 <UButton
                     block

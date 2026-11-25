@@ -41,6 +41,19 @@ const stateColor = (state: string | undefined) => {
     return 'neutral'
 }
 
+const stateContrastClass = (state: string | undefined) => {
+    if (state === 'published') {
+        return 'text-green-800 dark:text-green-300'
+    }
+    if (state === 'changed' || state === 'draft') {
+        return 'text-amber-800 dark:text-amber-300'
+    }
+    if (state === 'deleted') {
+        return 'text-red-700 dark:text-red-400'
+    }
+    return ''
+}
+
 const publishPost = async (item: PostListItem) => {
     busyId.value = item.id
     try {
@@ -175,14 +188,22 @@ const deletePost = async (item: PostListItem) => {
         <template #body>
             <UAlert
                 v-if="error"
+                role="alert"
                 :title="adminErrorMessage(error, 'Failed to load posts.')"
                 color="error"
                 variant="subtle"
+                :ui="{ title: 'text-red-700 dark:text-red-400' }"
             />
 
-            <p v-if="!pending && posts.length === 0" class="text-muted text-sm">
-                No posts yet. Create one or ask the assistant to draft one.
-            </p>
+            <div
+                v-if="!pending && !error && posts.length === 0"
+                class="mx-auto flex w-full max-w-sm flex-col items-center gap-3 py-8 text-center"
+            >
+                <AdminHairlineDrawer label="No posts" class="max-w-xs" />
+                <p class="text-muted text-sm">
+                    No posts yet. Create one or ask the assistant to draft one.
+                </p>
+            </div>
 
             <div class="flex flex-col gap-3">
                 <UCard v-for="item in posts" :key="item.id">
@@ -199,6 +220,7 @@ const deletePost = async (item: PostListItem) => {
                                     v-if="item.status?.state"
                                     :label="item.status.state"
                                     :color="stateColor(item.status.state)"
+                                    :class="stateContrastClass(item.status.state)"
                                     variant="subtle"
                                     size="sm"
                                 />
@@ -206,6 +228,7 @@ const deletePost = async (item: PostListItem) => {
                                     v-if="item.schedule"
                                     :label="`Scheduled ${item.schedule.at}`"
                                     color="info"
+                                    class="text-blue-800 dark:text-blue-300"
                                     variant="subtle"
                                     size="sm"
                                 />
@@ -245,6 +268,7 @@ const deletePost = async (item: PostListItem) => {
                                 size="xs"
                                 variant="soft"
                                 color="warning"
+                                class="text-amber-800 dark:text-amber-300"
                                 :loading="busyId === item.id"
                                 @click="unschedulePost(item.schedule.id, item.id)"
                             />
@@ -253,6 +277,7 @@ const deletePost = async (item: PostListItem) => {
                                 size="xs"
                                 variant="ghost"
                                 color="error"
+                                class="text-red-700 dark:text-red-400"
                                 :loading="busyId === item.id"
                                 @click="deletePost(item)"
                             />
