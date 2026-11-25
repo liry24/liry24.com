@@ -2,7 +2,7 @@
 
 ## Stack & runtime architecture
 
-- **Framework & SDK**: `nuxt@4.7.0` with `future: { compatibilityVersion: 5 }`, `@nuxt/nitro-v3-server@4.7.0` (Nitro 3), `vite-hub@0.4.1`, `@nuxt/ui` (primary UI) + `@vite-hub/ui` (`Chat` / `PromptInput` for `/admin` assistant).
+- **Framework & SDK**: `nuxt@4.7.0` with `future: { compatibilityVersion: 5 }`, `@nuxt/nitro-v3-server@4.7.0` (Nitro 3), `vite-hub@0.5.1`, `@nuxt/ui` (primary UI) + `@vite-hub/ui` (`Chat` / `PromptInput` for `/admin` assistant).
 - **Platform packages**: `@vite-hub/auth`, `@vite-hub/blob`, `@vite-hub/cms`, `@vite-hub/content`, `@vite-hub/database`, `@vite-hub/forms`, `@vite-hub/schedule`, `@vite-hub/workspace`. Use `vite-hub/*` public subpaths and generated `.nuxt` / `.vitehub` types.
 - **Database & storage**: Single Cloudflare D1 binding (`DB`) and single public R2 binding (`STORAGE` served at `/media`) shared between `@vite-hub/cms` media and `@vite-hub/content` workspace storage (unpublished draft/revision blobs are not isolated in a separate private bucket). Published, scheduled, and current draft revisions remain separate.
 - **Scheduled publishing**: `server/schedules/content-publish.ts` runs `content.publishDue()` on `* * * * *` via `@vite-hub/schedule` (Nitro `providerOutput: 'nitro'`, disabled during CI test builds with `LIRY24_DISABLE_CRON=true`).
@@ -24,7 +24,7 @@
 ## Deployment, Previews & patches
 
 - **Nitro-generated Wrangler config**: `nuxt.config.ts` emits `.output/server/wrangler.json` (and `.wrangler/deploy/config.json`) with production bindings (`DB` `227d818f-cd40-4fca-9710-b57273be94ca`, `STORAGE` `liry24-com`, route `liry24.com` production-only with `previews_enabled` omitted so `*.liry24.com` never intercepts `sso.liry24.com`, `memo.liry24.com`, or `images.liry24.com`) and Method B `previews` (`APP_ENV: 'dev'`, `NUXT_PUBLIC_SITE_URL: 'https://dev-liry24-com.liry.workers.dev'`, `NUXT_PUBLIC_IMAGES_DOMAIN: 'https://dev-liry24-com.liry.workers.dev'`, D1 `liry24-com-dev` `3c7c6179-12d0-4108-9eea-b3e20d394cef`, R2 `liry24-com-dev-storage`).
-- **Root patches (`patchedDependencies`)**: Keep `patches/vite-hub@0.4.1.patch`, `patches/better-auth@1.7.27.patch`, and `patches/better-call@1.4.6.patch` (re-verify `tests/worker/auth.test.ts` rate-limit counter bounding on every upgrade).
+- **Root patches (`patchedDependencies`)**: Keep `patches/better-auth@1.7.27.patch` and `patches/better-call@1.4.6.patch` (re-verify `tests/worker/auth.test.ts` rate-limit counter bounding on every upgrade).
 - **Production freeze**: Never modify `main`, production D1 (`227d818f-cd40-4fca-9710-b57273be94ca`), production R2 (`liry24-com`), or Cloudflare Workers Builds `production_settings` without explicit user approval after `https://dev-liry24-com.liry.workers.dev` verification.
 
 ## Verification commands

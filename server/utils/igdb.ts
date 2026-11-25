@@ -5,6 +5,7 @@ import { createError } from 'nuxt/server'
 import { useServerEnv } from 'vite-hub/env'
 import { z } from 'zod'
 
+import { readProcessEnv } from './processEnv.js'
 import { readSecretValue } from './secret.js'
 
 interface IgdbCredentials {
@@ -30,13 +31,14 @@ function readIgdbCredentials(): IgdbCredentials {
         const client =
             typeof env.IGDB_CLIENT_ID === 'string' && env.IGDB_CLIENT_ID
                 ? env.IGDB_CLIENT_ID
-                : process.env.IGDB_CLIENT_ID
-        const secret = readSecretValue(env.IGDB_CLIENT_SECRET) ?? process.env.IGDB_CLIENT_SECRET
+                : readProcessEnv('IGDB_CLIENT_ID')
+        const secret =
+            readSecretValue(env.IGDB_CLIENT_SECRET) ?? readProcessEnv('IGDB_CLIENT_SECRET')
         return { client, secret }
     } catch {
         return {
-            client: process.env.IGDB_CLIENT_ID,
-            secret: process.env.IGDB_CLIENT_SECRET,
+            client: readProcessEnv('IGDB_CLIENT_ID'),
+            secret: readProcessEnv('IGDB_CLIENT_SECRET'),
         }
     }
 }
