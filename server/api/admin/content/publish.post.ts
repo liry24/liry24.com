@@ -1,10 +1,7 @@
-import { createError, defineEventHandler, readBody } from 'nuxt/server'
 import { z } from 'zod'
 
-import { contentCollectionNames } from '../../../../shared/schemas/content.js'
-import content from '../../../content.js'
-import { requireAdminSession } from '../../../utils/auth.js'
-import { gameCatalog } from '../../../utils/gameCatalog.js'
+import content from '#server/content'
+import { contentCollectionNames } from '#shared/schemas/content'
 
 const collectionSchema = z.enum(contentCollectionNames)
 

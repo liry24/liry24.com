@@ -1,4 +1,3 @@
-import { createError, defineEventHandler, readBody } from 'nuxt/server'
 import { contentSchedulesRef } from 'vite-hub/content'
 import { isWorkspaceConflict } from 'vite-hub/workspace'
 import { useWorkspaceFiles } from 'vite-hub/workspace/files'
@@ -6,9 +5,6 @@ import { z } from 'zod'
 
 import { contentCollectionNames } from '../../../shared/schemas/content.js'
 import content from '../../content.js'
-import { requireAdminSession } from '../../utils/auth.js'
-import { listAdminCollection } from '../../utils/content.js'
-import { gameCatalog } from '../../utils/gameCatalog.js'
 
 const payloadSchema = z.object({
     model: z.enum([...contentCollectionNames.filter((name) => name !== 'posts'), 'games']),

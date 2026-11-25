@@ -1,9 +1,3 @@
-import { createError, defineEventHandler, getQuery } from 'nuxt/server'
-
-import { requireAdminSession } from '../../../utils/auth.js'
-import { gameCatalog } from '../../../utils/gameCatalog.js'
-import { queryIgdb } from '../../../utils/igdb.js'
-
 function isUnconfiguredIgdbError(error: unknown): boolean {
     if (!error || typeof error !== 'object') {
         return false

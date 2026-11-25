@@ -1,7 +1,4 @@
-import { defineEventHandler, sendRedirect } from 'nuxt/server'
-
-import content from '../content.js'
-import { listAllCollectionItems } from '../utils/content.js'
+import content from '#server/content'
 
 export default defineEventHandler(async (event) => {
     if (!['GET', 'HEAD'].includes(event.req.method)) {

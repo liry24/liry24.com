@@ -13,6 +13,7 @@
         "deploy": "wrangler deploy --config .output/server/wrangler.json --keep-vars",
         "typecheck": "nuxt typecheck",
         "lint": "oxlint",
+        "check:doctor": "vite-doctor . --format text --rules nuxt/fetch/no-raw-fetch-in-setup,nuxt/routing/prefer-nuxt-useroute,nuxt-image/prefer-responsive-dimensions",
         "format": "oxfmt . --write",
         "format:check": "oxfmt . --check",
         "test": "vitest run",
@@ -74,8 +75,8 @@
         "zod": "^4.6.7"
     },
     "devDependencies": {
-        "@cloudflare/oxlint-config": "0.2.0",
         "@cloudflare/workers-types": "^5.20261124.1",
+        "@liry24/oxlint-config": "workspace:*",
         "@mizchi/mutator": "0.5.5",
         "@nuxt/a11y": "^1.0.0-alpha.1",
         "@nuxt/fonts": "1.2.0",
@@ -94,6 +95,7 @@
         "taze": "^21.3.0",
         "tsrs": "7.1.0-beta.tsrs5",
         "typescript": "npm:typescript-native-bridge@6.0.3-bridge.19.tsgo.7.0.2",
+        "vite-doctor": "0.1.5",
         "vitest": "^5.1.1",
         "vue-tsc": "^3.3.14",
         "wrangler": "^4.152.0"

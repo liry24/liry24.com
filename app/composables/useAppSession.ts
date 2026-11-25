@@ -1,4 +1,4 @@
-import { authClient as client, useUserSession } from 'vite-hub/auth/vue'
+import { authClient as client } from 'vite-hub/auth/vue'
 
 export function useAppSession() {
     const nuxt = useNuxtApp()
