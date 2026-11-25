@@ -1,13 +1,13 @@
 import { parseMarkdown } from 'comark/parse'
 import { expect, test } from 'vitest'
 
-import { gameTitleParts, postGameSlugs, gameMentionQuery } from '../shared/utils/gameMentions'
+import { gameTitleParts, postGameSlugs } from '../shared/utils/gameMentions'
 import { postMarkdownSecurity } from '../shared/utils/postMarkdown'
 
 test('the inline rule keeps exact IGDB slugs and excludes code, escapes, unsafe attributes and linked labels', async () => {
     const source =
-        'Before <game:valorant> and <game:exact--igdb-slug>\n\n`<game:inline-code>`\n\n```html\n<game:block-code>\n```\n\n\\<game:escaped> [<game:linked>](https://example.invalid) <game:bad_slug>'
-    expect(await postGameSlugs('Title <game:valorant>', source)).toEqual([
+        'Before :game[valorant] and <game:exact--igdb-slug>\n\n`:game[inline-code]`\n\n```html\n<game:block-code>\n```\n\n\\:game[escaped] [:game[linked]](https://example.invalid) <game:bad_slug>'
+    expect(await postGameSlugs('Title :game[valorant]', source)).toEqual([
         'valorant',
         'exact--igdb-slug',
     ])
@@ -22,19 +22,12 @@ test('the inline rule keeps exact IGDB slugs and excludes code, escapes, unsafe 
     expect(nodes).toContain('<game:bad_slug>')
 })
 test('titles support only literal text and mentions; code and escaped tokens remain literal', () => {
-    const title = '**Literal** <game:valorant> `<game:code>` \\<game:escaped>'
+    const title = '**Literal** :game[valorant] `<game:code>` \\<game:escaped>'
     const parts = gameTitleParts(title)
     expect(parts.filter((part) => part.slug)).toEqual([
-        { text: '<game:valorant>', slug: 'valorant' },
+        { text: ':game[valorant]', slug: 'valorant' },
     ])
     expect(parts.map((part) => part.text).join('')).toBe(title)
-    expect(gameMentionQuery('hi <game:valo trailing', 13)).toEqual({
-        start: 3,
-        end: 13,
-        query: 'valo',
-    })
-    expect(gameMentionQuery('hi <game:valorant>', 18)).toBeNull()
-    expect(gameMentionQuery(String.raw`\<game:valo`, 11)).toBeNull()
 })
 
 test('titles use matching backtick runs and consume unmatched opening runs together', async () => {

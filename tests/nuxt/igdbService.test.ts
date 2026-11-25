@@ -33,7 +33,8 @@ test('IGDB keeps exact identity, validates images and caches OAuth credentials w
         },
     ])
     await queryIgdb({ id: 1 })
-    expect(fetch).toHaveBeenCalledTimes(3)
+    await queryIgdb({ slug: 'exact-igdb-slug' })
+    expect(fetch).toHaveBeenCalledTimes(4)
     expect(fetch.mock.calls[1]![1].body).toContain(String.raw`search "a\"; where id = 2;";`)
     expect(fetch.mock.calls[1]![1]).toMatchObject({
         method: 'POST',
@@ -41,6 +42,7 @@ test('IGDB keeps exact identity, validates images and caches OAuth credentials w
         body: expect.stringContaining('limit 10;'),
     })
     expect(fetch.mock.calls[2]![1].body).toContain('where id = 1; limit 1;')
+    expect(fetch.mock.calls[3]![1].body).toContain('where slug = "exact-igdb-slug"; limit 1;')
 })
 test('unavailable credentials, malformed results and network failures return safe errors', async () => {
     const fetch = vi
