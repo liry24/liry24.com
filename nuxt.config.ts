@@ -147,8 +147,6 @@ export default defineNuxtConfig({
             include: [
                 '@unhead/schema-org/vue',
                 '@comark/vue',
-                '@formkit/drag-and-drop',
-                '@formkit/drag-and-drop/vue',
                 '@yeger/vue-masonry-wall',
                 '@tanstack/charts',
                 '@tanstack/charts/vue',

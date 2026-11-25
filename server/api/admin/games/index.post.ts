@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { gameFieldsSchema } from '../../../../shared/schemas/content.js'
 import { requireAdminSession } from '../../../utils/auth.js'
+import { appendOrder } from '../../../utils/content.js'
 import { gameCatalog } from '../../../utils/gameCatalog.js'
 import { queryIgdb } from '../../../utils/igdb.js'
 
@@ -41,7 +42,11 @@ export default defineEventHandler(async (event) => {
         throw createError({ status: 404, statusText: 'Game not found in IGDB' })
     }
 
-    await games.insert(id, gameFieldsSchema.parse({ ...game, cover: game.cover ?? undefined }))
+    const order = appendOrder(await games.list())
+    await games.insert(
+        id,
+        gameFieldsSchema.parse({ ...game, cover: game.cover ?? undefined, order }),
+    )
     const saved = await games.byIgdbId(game.igdbId)
     if (!saved) {
         throw createError({ status: 409, statusText: 'The game changed. Reload and try again.' })
