@@ -1,9 +1,3 @@
-import { createError, defineEventHandler, getQuery } from 'nuxt/server'
-import { blob } from 'vite-hub/blob'
-
-import type { MediaReference } from '../../../shared/schemas/content.js'
-import { requireAdminSession } from '../../utils/auth.js'
-
 function extensionForMime(mimeType: string): string | undefined {
     switch (mimeType) {
         case 'image/png': {
@@ -27,7 +21,7 @@ function extensionForMime(mimeType: string): string | undefined {
     }
 }
 
-const allowedFolders = new Set(['posts', 'works', 'arts', 'games', 'ranks', 'uploads'])
+const allowedFolders = new Set(['posts', 'works', 'arts', 'games', 'uploads'])
 const maxFileBytes = 10 * 1024 * 1024
 
 interface UploadLikeFile {

@@ -35,6 +35,9 @@ export function normalizeDocumentId(raw: string | undefined, fallback: string): 
 
 function extractErrorStatus(error: unknown): number {
     if (error && typeof error === 'object') {
+        if ('code' in error && error.code === 'WORKSPACE_CONFLICT') {
+            return 409
+        }
         if ('status' in error && typeof error.status === 'number') {
             return error.status
         }

@@ -43,19 +43,9 @@ const navigation = computed(() => [
             to: '/admin/skills',
         },
         {
-            label: 'Games',
-            icon: 'mingcute:game-2-fill',
-            to: '/admin/games',
-        },
-        {
             label: 'Game Stats',
             icon: 'mingcute:chart-line-fill',
             to: '/admin/gameStats',
-        },
-        {
-            label: 'Ranks',
-            icon: 'mingcute:trophy-fill',
-            to: '/admin/ranks',
         },
         {
             label: 'Socials',

@@ -1,9 +1,7 @@
-import { createError, defineEventHandler, readBody } from 'nuxt/server'
 import { z } from 'zod'
 
-import { contentCollectionNames } from '../../../../shared/schemas/content.js'
-import content from '../../../content.js'
-import { requireAdminSession } from '../../../utils/auth.js'
+import content from '#server/content'
+import { contentCollectionNames } from '#shared/schemas/content'
 
 const collectionSchema = z.enum(contentCollectionNames)
 
@@ -54,6 +52,27 @@ function rethrowContentError(error: unknown): never {
     throw createError({ status: 500, statusText: message, message, cause: error })
 }
 
+async function validatePostGameReferences(id: string, digest: string) {
+    const post = await content.collection('posts').get(id, { ref: 'draft' })
+    if (post?.digest !== digest) {
+        throw createError({
+            status: 409,
+            statusText: 'The post draft changed. Save it again before publishing.',
+        })
+    }
+
+    if (!post.data.gameMentions?.length) {
+        return
+    }
+    const gameIds = new Set((await gameCatalog().list()).map((game) => game.id))
+    if (post.data.gameMentions.some((gameId) => !gameIds.has(gameId))) {
+        throw createError({
+            status: 400,
+            statusText: 'Import every mentioned game before publishing.',
+        })
+    }
+}
+
 export default defineEventHandler(async (event) => {
     const session = await requireAdminSession(event)
     const parsed = publishPayloadSchema.safeParse(await readBody(event))
@@ -83,9 +102,14 @@ export default defineEventHandler(async (event) => {
             digest = status.draft
         }
 
+        const expect = [{ collection: input.collection, id: input.id, digest }]
+        if (input.collection === 'posts' && digest) {
+            await validatePostGameReferences(input.id, digest)
+        }
+
         if (input.action === 'publish') {
             const result = await content.publish({
-                expect: [{ collection: input.collection, id: input.id, digest }],
+                expect,
                 message: input.message,
                 metadata: { actorUserId: session.user.id },
             })
@@ -94,7 +118,7 @@ export default defineEventHandler(async (event) => {
 
         const schedule = await content.schedule({
             at: input.at,
-            expect: [{ collection: input.collection, id: input.id, digest }],
+            expect,
             message: input.message,
             metadata: { actorUserId: session.user.id },
         })

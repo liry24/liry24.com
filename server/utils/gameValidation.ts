@@ -6,6 +6,7 @@ import { gameTitleParts, postGameSlugs } from '../../shared/utils/gameMentions.j
 import { gameValueIssues } from '../../shared/utils/games.js'
 import content from '../content.js'
 import { listAllCollectionItems } from './content.js'
+import { gameCatalog } from './gameCatalog.js'
 
 function invalidField(message: string): never {
     throw createError({ status: 400, statusText: message, message })
@@ -18,10 +19,8 @@ export async function preparePostData(input: {
     actorUserId?: string
 }): Promise<PostData> {
     const slugs = await postGameSlugs(input.data.title, input.body)
-    const gameDocs = slugs.length
-        ? await listAllCollectionItems(content.collection('games'), 'draft')
-        : []
-    const bySlug = new Map(gameDocs.map((doc) => [String(doc.data.slug ?? ''), doc]))
+    const gameDocs = slugs.length ? await gameCatalog().list() : []
+    const bySlug = new Map(gameDocs.map((doc) => [doc.data.slug, doc]))
     const matchedIds: Array<string> = []
     for (const slug of slugs) {
         const doc = bySlug.get(slug)
@@ -36,7 +35,7 @@ export async function preparePostData(input: {
                 return part.text
             }
             const matchedDoc = bySlug.get(part.slug)
-            return matchedDoc ? String(matchedDoc.data.name ?? part.text) : part.text
+            return matchedDoc?.data.name ?? part.text
         })
         .join('')
     return {
@@ -50,7 +49,7 @@ export async function preparePostData(input: {
 export async function validateGameSave(options: {
     id: string
     data: GameRecordData
-    previous?: GameRecordData
+    previous: GameRecordData
 }) {
     const { id, data, previous } = options
     const metricKeys = new Set(data.metrics.map((item) => item.key))
@@ -70,22 +69,6 @@ export async function validateGameSave(options: {
         }
     }
 
-    const existing = await listAllCollectionItems(content.collection('games'), 'draft')
-    for (const doc of existing) {
-        if (doc.id === id) {
-            continue
-        }
-        if (doc.data.igdbId === data.igdbId) {
-            invalidField('A game with this IGDB ID already exists.')
-        }
-        if (doc.data.slug === data.slug) {
-            invalidField('A game with this slug already exists.')
-        }
-    }
-
-    if (!previous) {
-        return
-    }
     if (
         previous.igdbId !== data.igdbId ||
         previous.slug !== data.slug ||
@@ -94,7 +77,7 @@ export async function validateGameSave(options: {
         invalidField('IGDB identity cannot be edited. Import the game from search.')
     }
 
-    const stats = await listAllCollectionItems(content.collection('gameStats'), 'draft')
+    const stats = await gameStatsEntries()
     const recordedKeys = new Set(
         stats
             .filter((doc) => doc.data.game === id)
@@ -124,12 +107,15 @@ export async function validateGameSave(options: {
     }
 }
 
-export async function validateGameStatsSave(options: { id: string; data: GameStatsRecordData }) {
+export async function validateGameStatsSave(options: {
+    id: string
+    data: Omit<GameStatsRecordData, 'order'>
+}) {
     const { id, data } = options
     if (data.start && data.end && Date.parse(data.start) > Date.parse(data.end)) {
         invalidField('End must follow start.')
     }
-    const game = await content.collection('games').get(data.game, { ref: 'draft' })
+    const game = await gameCatalog().get(data.game)
     if (!game) {
         invalidField('Choose a saved game.')
     }
@@ -149,6 +135,30 @@ export async function validateGameStatsSave(options: { id: string; data: GameSta
         if (doc.data.game === data.game && doc.data.periodKey === data.periodKey) {
             invalidField('A stat period with this game and periodKey already exists.')
         }
+    }
+}
+
+async function gameStatsEntries() {
+    const stats = content.collection('gameStats')
+    const [draft, published] = await Promise.all([
+        listAllCollectionItems(stats, 'draft'),
+        listAllCollectionItems(stats, 'published'),
+    ])
+    return [...draft, ...published]
+}
+
+export async function validateGameRemoval(id: string) {
+    const posts = content.collection('posts')
+    const [stats, draftPosts, publishedPosts] = await Promise.all([
+        gameStatsEntries(),
+        listAllCollectionItems(posts, 'draft'),
+        listAllCollectionItems(posts, 'published'),
+    ])
+    if (
+        stats.some((item) => item.data.game === id) ||
+        [...draftPosts, ...publishedPosts].some((item) => item.data.gameMentions?.includes(id))
+    ) {
+        throw createError({ status: 409, statusText: 'Game is referenced by Game Stats or Posts' })
     }
 }
 

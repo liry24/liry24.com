@@ -1,13 +1,16 @@
-import type { ContentDocumentStatus, ContentRef, ContentSchedule } from '@vite-hub/content'
+import type {
+    ContentDocumentStatus,
+    ContentRef,
+    ContentSchedule,
+    ContentWriteOptions,
+} from '@vite-hub/content'
 
 import type {
     ArtData,
     CareerData,
     ContentCollectionName,
-    GameRecordData,
     GameStatsRecordData,
     PostData,
-    RankData,
     SkillData,
     SocialData,
     WorkData,
@@ -20,9 +23,7 @@ export type CollectionDocumentData =
     | ArtData
     | CareerData
     | SkillData
-    | GameRecordData
     | GameStatsRecordData
-    | RankData
     | SocialData
 
 export interface CollectionDocumentItem<TData = CollectionDocumentData> {
@@ -52,6 +53,37 @@ interface ListableCollection<TData> {
         items: Array<{ id: string; url?: string | null; data: TData }>
         nextCursor: string | null
     }>
+}
+
+export function appendOrder(items: Array<{ data: { order?: number } }>) {
+    const last = items.reduce((current, { data }) => Math.max(current, data.order ?? 0), -1)
+    return last < Number.MAX_SAFE_INTEGER ? Math.floor(last) + 1 : last
+}
+
+export async function saveOrderedDraft<TData extends { order?: number }>(
+    collection: ListableCollection<{ order?: number }> & {
+        get: (
+            id: string,
+            options: { ref: 'draft' },
+        ) => Promise<{ data: { order?: number }; digest: string } | null>
+        save: (
+            id: string,
+            input: { data: TData & { order: number } },
+            options?: ContentWriteOptions,
+        ) => Promise<{ digest: string }>
+    },
+    id: string,
+    data: TData,
+) {
+    if (data.order !== undefined) {
+        await collection.save(id, { data: { ...data, order: data.order } })
+        return
+    }
+    const previous = await collection.get(id, { ref: 'draft' })
+    const order = previous
+        ? (previous.data.order ?? 0)
+        : appendOrder(await listAllCollectionItems(collection, 'draft'))
+    await collection.save(id, { data: { ...data, order } }, { ifDigest: previous?.digest ?? null })
 }
 
 export async function listAllCollectionItems<TData>(
@@ -94,14 +126,8 @@ async function listCollectionByName(
         case 'skills': {
             return await listAllCollectionItems(content.collection('skills'), ref)
         }
-        case 'games': {
-            return await listAllCollectionItems(content.collection('games'), ref)
-        }
         case 'gameStats': {
             return await listAllCollectionItems(content.collection('gameStats'), ref)
-        }
-        case 'ranks': {
-            return await listAllCollectionItems(content.collection('ranks'), ref)
         }
         case 'socials': {
             return await listAllCollectionItems(content.collection('socials'), ref)

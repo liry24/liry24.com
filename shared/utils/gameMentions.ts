@@ -33,25 +33,32 @@ interface InlineParserLike {
 
 function registerGameMentionRule(parser: InlineParserLike) {
     parser.inline.ruler.before('autolink', 'game-mention', (state, silent) => {
-        if (state.src[state.pos] !== '<') {
-            return false
-        }
-        const match = /^<game:([^>\n]*)>/.exec(state.src.slice(state.pos))
-        const slug = match?.[1]
-        if (!match || slug === undefined) {
+        const match = readGameMention(state.src, state.pos)
+        if (!match) {
             return false
         }
         if (!silent) {
             const linkLevel = state.linkLevel ?? 0
-            if (gameSlugPattern.test(slug) && linkLevel === 0) {
-                state.push('mdc_inline_component', 'game-mention', 0).attrSet('slug', slug)
+            if (gameSlugPattern.test(match.slug) && linkLevel === 0) {
+                state.push('mdc_inline_component', 'game-mention', 0).attrSet('slug', match.slug)
             } else {
-                state.push('text', '', 0).content = match[0]
+                state.push('text', '', 0).content = match.text
             }
         }
-        state.pos += match[0].length
+        state.pos += match.text.length
         return true
     })
+}
+
+export function readGameMention(input: string, position: number) {
+    const opener = input[position]
+    if (opener !== '<' && opener !== ':') {
+        return undefined
+    }
+    const pattern = opener === '<' ? /<game:([^>\r\n]*)>/y : /:game\[([^\]\r\n]*)\]/y
+    pattern.lastIndex = position
+    const match = pattern.exec(input)
+    return match?.[1] === undefined ? undefined : { text: match[0], slug: match[1] }
 }
 
 function isInlineParser(value: unknown): value is InlineParserLike {
@@ -110,12 +117,11 @@ export function gameTitleParts(title: string): Array<TitlePart> {
             position = end
             continue
         }
-        const match = /^<game:([^>]+)>/.exec(title.slice(position))
-        const slug = match?.[1]
-        if (match && slug && gameSlugPattern.test(slug)) {
+        const match = readGameMention(title, position)
+        if (match && gameSlugPattern.test(match.slug)) {
             flush()
-            parts.push({ text: match[0], slug })
-            position += match[0].length
+            parts.push(match)
+            position += match.text.length
         } else {
             text += title[position++]
         }
@@ -143,24 +149,11 @@ export async function postGameSlugs(title: string, content: string): Promise<Arr
             ) {
                 slugs.push(attrs.slug)
             }
-            if (!['code', 'pre'].includes(tag)) {
+            if (!['a', 'code', 'pre'].includes(tag)) {
                 visit(children)
             }
         }
     }
     visit(document.nodes)
     return [...new Set(slugs)]
-}
-
-export function gameMentionQuery(value: string, caret: number) {
-    const match = /<game:([a-zA-Z0-9 -]*)$/.exec(value.slice(0, caret))
-    const query = match?.[1]
-    if (
-        !match ||
-        query === undefined ||
-        (match.index > 0 && value.charCodeAt(match.index - 1) === 92)
-    ) {
-        return null
-    }
-    return { start: match.index, end: caret, query }
 }

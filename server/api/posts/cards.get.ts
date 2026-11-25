@@ -1,9 +1,6 @@
-import { createError, defineEventHandler, getQuery } from 'nuxt/server'
 import { z } from 'zod'
 
-import type { PostItem } from '../../../shared/schemas/content.js'
-import content from '../../content.js'
-import { listAllCollectionItems } from '../../utils/content.js'
+import content from '#server/content'
 
 const postTimestamp = (entry: PostItem) =>
     Date.parse(String(entry.data.authoredAt ?? entry.publishedAt ?? '')) || 0
@@ -41,11 +38,7 @@ export default defineEventHandler(async (event) => {
         })
     }
 
-    let gameId: string | undefined
-    if (input.game) {
-        const games = await listAllCollectionItems(content.collection('games'), 'published')
-        gameId = games.find((doc) => doc.data.slug === input.game)?.id
-    }
+    const gameId = input.game ? (await gameCatalog().bySlug(input.game))?.id : undefined
 
     const selected = entries.filter(
         (entry) =>

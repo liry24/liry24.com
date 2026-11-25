@@ -1,30 +1,16 @@
 <script setup lang="ts">
+import { UiReorderList } from '@liry24/ui'
 import type { ContentDocumentStatus, ContentSchedule } from '@vite-hub/content'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 
-import { gameFieldsSchema, gameStatsFieldsSchema } from '../../../shared/schemas/content'
+import { gameFieldsSchema, gameStatsFieldsSchema } from '#shared/schemas/content'
 import type {
-    ArtData,
-    CareerData,
     GameRecordData,
-    GameStatsRecordData,
     MediaReference,
     PortfolioCollectionName,
-    RankData,
-    SkillData,
-    SocialData,
-    WorkData,
-} from '../../../shared/schemas/content'
+} from '#shared/schemas/content'
 
-type FormEndpointName =
-    | 'work'
-    | 'art'
-    | 'career'
-    | 'skill'
-    | 'game'
-    | 'game-stats'
-    | 'rank'
-    | 'social'
+type FormEndpointName = 'work' | 'art' | 'career' | 'skill' | 'game' | 'game-stats' | 'social'
 
 interface CollectionMeta {
     title: string
@@ -32,14 +18,15 @@ interface CollectionMeta {
     formName: FormEndpointName
 }
 
-const metaByModel: Record<PortfolioCollectionName, CollectionMeta> = {
+type AdminModel = PortfolioCollectionName | 'games'
+
+const metaByModel: Record<AdminModel, CollectionMeta> = {
     works: { title: 'Works', icon: 'mingcute:briefcase-fill', formName: 'work' },
     arts: { title: 'Arts', icon: 'mingcute:palette-fill', formName: 'art' },
     careers: { title: 'Careers', icon: 'mingcute:building-2-fill', formName: 'career' },
     skills: { title: 'Skills', icon: 'mingcute:tool-fill', formName: 'skill' },
-    games: { title: 'Games', icon: 'mingcute:game-2-fill', formName: 'game' },
+    games: { title: 'Game settings', icon: 'mingcute:game-2-fill', formName: 'game' },
     gameStats: { title: 'Game Stats', icon: 'mingcute:chart-line-fill', formName: 'game-stats' },
-    ranks: { title: 'Ranks', icon: 'mingcute:trophy-fill', formName: 'rank' },
     socials: { title: 'Socials', icon: 'mingcute:link-2-fill', formName: 'social' },
 }
 
@@ -47,10 +34,10 @@ const route = useRoute()
 const toast = useToast()
 
 const modelParam = String(route.params.model ?? '')
-if (!(modelParam in metaByModel)) {
+if (!Object.hasOwn(metaByModel, modelParam)) {
     throw createError({ status: 404, statusText: 'Model not found' })
 }
-const model = modelParam as PortfolioCollectionName
+const model = modelParam as AdminModel
 const meta = metaByModel[model]
 useHead({ title: meta.title })
 
@@ -74,18 +61,15 @@ interface AdminEditableFields {
     game?: string
     periodKey?: string
     values?: Array<GameValue>
-    rank?: string
-    season?: string
     label?: string
     order?: number
 }
 
 interface AdminItem {
     id: string
-    title: string
     data: AdminEditableFields
-    status: ContentDocumentStatus | null
-    schedule: ContentSchedule | null
+    status?: ContentDocumentStatus | null
+    schedule?: ContentSchedule | null
 }
 
 type ModelFormSubmission = {
@@ -108,18 +92,18 @@ type AdminStringKey =
     | 'primaryMetric'
     | 'game'
     | 'periodKey'
-    | 'rank'
-    | 'season'
     | 'label'
 
-const { data, pending, error, refresh } = await useFetch<{
-    items: Array<AdminItem>
-}>(`/api/admin/content/${encodeURIComponent(model)}`)
+const listUrl = model === 'games' ? '/api/admin/games/catalog' : `/api/admin/content/${model}`
+const { data, pending, error, refresh } = await useFetch<{ items: Array<AdminItem> }>(listUrl, {
+    key: `admin-model:${model}`,
+})
 
-const { data: savedGamesData, refresh: refreshGames } = await useFetch<{
+const { data: savedGamesData } = await useFetch<{
     items: Array<{ id: string; data: GameRecordData }>
-}>('/api/admin/content/games', {
-    immediate: model === 'gameStats' || model === 'games',
+}>('/api/admin/games/catalog', {
+    key: 'admin-game-selection',
+    immediate: model === 'gameStats',
 })
 
 const items = computed(() => data.value?.items ?? [])
@@ -135,6 +119,22 @@ const errors = ref<Record<string, string>>({})
 const editingId = ref('')
 const formData = ref<AdminEditableFields>({})
 const jsonExtraText = ref('')
+const reorderButtonId = useId()
+const reorderFrom = ref<Array<string> | null>(null)
+const orderDraft = ref<Array<string>>([])
+const savingOrder = ref(false)
+const reorderError = ref('')
+const reordering = computed(() => reorderFrom.value !== null)
+const currentOrder = computed(() => items.value.map((item) => item.id))
+const visibleOrder = computed({
+    get: () => (reordering.value ? orderDraft.value : currentOrder.value),
+    set: (value) => {
+        orderDraft.value = value
+    },
+})
+const orderChanged = computed(() =>
+    reorderFrom.value?.some((id, index) => id !== orderDraft.value[index]),
+)
 
 // IGDB search state for games
 const igdbQuery = ref('')
@@ -166,88 +166,102 @@ function setStringField(key: AdminStringKey, value: string | number) {
     formData.value = next
 }
 
-function setOrderField(value: string | number) {
-    formData.value = {
-        ...formData.value,
-        order: Number(value) || 0,
+function beginReorder() {
+    reorderFrom.value = currentOrder.value
+    orderDraft.value = currentOrder.value
+    reorderError.value = ''
+}
+
+async function endReorder() {
+    reorderFrom.value = null
+    await nextTick()
+    document.getElementById(reorderButtonId)?.focus()
+}
+
+function cancelReorder() {
+    reorderError.value = ''
+    void endReorder()
+}
+
+async function saveOrder() {
+    const from = reorderFrom.value
+    if (!from || !orderChanged.value || savingOrder.value) {
+        return
+    }
+    savingOrder.value = true
+    reorderError.value = ''
+    let resetOrder = false
+    try {
+        await $fetch('/api/admin/reorder', {
+            method: 'POST',
+            body: { model, from, to: orderDraft.value },
+        })
+        await refresh()
+        toast.add({
+            title: model === 'games' ? 'Saved order' : 'Saved order as draft',
+            color: 'success',
+        })
+        resetOrder = true
+    } catch (error_) {
+        if (error_ && typeof error_ === 'object' && 'status' in error_ && error_.status === 409) {
+            await refresh()
+            resetOrder =
+                currentOrder.value.length !== from.length ||
+                currentOrder.value.some((id, index) => id !== from[index])
+        }
+        reorderError.value = adminErrorMessage(error_, 'Could not save order.')
+    } finally {
+        savingOrder.value = false
+        if (resetOrder) {
+            await endReorder()
+        }
     }
 }
 
 function defaultRecord(): AdminEditableFields {
     if (model === 'works') {
-        const entry: WorkData = {
+        return {
             title: '',
             slug: '',
             style: 'small',
-            order: 0,
         }
-        return entry
     }
     if (model === 'arts') {
-        const entry: ArtData = {
+        return {
             title: '',
             slug: '',
             images: [],
-            order: 0,
         }
-        return entry
     }
     if (model === 'careers') {
-        const entry: CareerData = {
+        return {
             company: '',
             slug: '',
             period: '',
             position: '',
-            order: 0,
         }
-        return entry
     }
     if (model === 'skills') {
-        const entry: SkillData = {
+        return {
             name: '',
             slug: '',
             icon: '',
-            order: 0,
         }
-        return entry
-    }
-    if (model === 'games') {
-        const entry: GameRecordData = {
-            igdbId: 1,
-            slug: '',
-            name: '',
-            order: 0,
-            metrics: [],
-        }
-        return entry
     }
     if (model === 'gameStats') {
-        const entry: GameStatsRecordData = {
+        return {
             game: savedGames.value[0]?.id ?? '',
             periodKey: '',
             period: '',
-            order: 0,
             values: [],
         }
-        return entry
     }
-    if (model === 'ranks') {
-        const entry: RankData = {
-            game: '',
-            rank: '',
-            image: { pathname: '' },
-            order: 0,
-        }
-        return entry
-    }
-    const entry: SocialData = {
+    return {
         label: '',
         slug: '',
         href: 'https://liry24.com',
         icon: '',
-        order: 0,
     }
-    return entry
 }
 
 const openCreate = () => {
@@ -324,13 +338,12 @@ const saveRecord = async () => {
                 JSON.parse(jsonExtraText.value || '[]'),
             )
         } else if (model === 'gameStats') {
+            payloadData.href = payloadData.href?.trim() || undefined
             payloadData.values = gameStatsFieldsSchema.shape.values.parse(
                 JSON.parse(jsonExtraText.value || '[]'),
             )
         }
-        if (payloadData.order !== undefined) {
-            payloadData.order = Number(payloadData.order) || 0
-        }
+        delete payloadData.order
 
         const payload: ModelFormSubmission = editingId.value
             ? { id: editingId.value, data: payloadData }
@@ -343,7 +356,7 @@ const saveRecord = async () => {
             return
         }
 
-        toast.add({ title: 'Saved draft', color: 'success' })
+        toast.add({ title: model === 'games' ? 'Saved game' : 'Saved draft', color: 'success' })
         editorOpen.value = false
         await refresh()
     } catch (error_) {
@@ -358,11 +371,13 @@ const handleImportGame = async (game: GameSearchResult) => {
     if (saved) {
         toast.add({ title: `Imported ${saved.name}`, color: 'success' })
         await refresh()
-        await refreshGames()
     }
 }
 
 const publishItem = async (item: AdminItem) => {
+    if (model === 'games') {
+        return
+    }
     busyId.value = item.id
     try {
         await $fetch('/api/admin/content/publish', {
@@ -390,13 +405,15 @@ const publishItem = async (item: AdminItem) => {
 const deleteItem = async (item: AdminItem) => {
     busyId.value = item.id
     try {
-        await $fetch(
-            `/api/admin/content/${encodeURIComponent(model)}/${encodeURIComponent(item.id)}`,
-            {
+        const id = encodeURIComponent(item.id)
+        if (model === 'games') {
+            await $fetch(`/api/admin/games/${id}`, { method: 'DELETE' })
+        } else {
+            await $fetch(`/api/admin/content/${model}/${id}`, {
                 method: 'DELETE',
                 query: { publish: 'true' },
-            },
-        )
+            })
+        }
         toast.add({ title: 'Deleted item', color: 'neutral' })
         await refresh()
     } catch (error_) {
@@ -434,17 +451,35 @@ const itemLabel = (item: AdminItem) =>
             <UDashboardNavbar :title="meta.title" :icon="meta.icon">
                 <template #right>
                     <UButton
+                        v-if="model === 'gameStats'"
+                        to="/admin/games"
+                        label="Game settings"
+                        icon="mingcute:settings-1-line"
+                        variant="outline"
+                        color="neutral"
+                    />
+                    <UButton
+                        v-else-if="model === 'games'"
+                        to="/admin/gameStats"
+                        label="Game Stats"
+                        icon="mingcute:chart-line-fill"
+                        variant="outline"
+                        color="neutral"
+                    />
+                    <UButton
                         icon="mingcute:refresh-2-line"
                         aria-label="Refresh items"
                         variant="ghost"
                         color="neutral"
                         :loading="pending"
+                        :disabled="reordering"
                         @click="refresh()"
                     />
                     <UButton
                         v-if="model !== 'games'"
                         label="Add"
                         icon="mingcute:add-line"
+                        :disabled="reordering"
                         @click="openCreate"
                     />
                 </template>
@@ -454,9 +489,20 @@ const itemLabel = (item: AdminItem) =>
         <template #body>
             <UAlert
                 v-if="error"
+                role="alert"
                 :title="adminErrorMessage(error, `Failed to load ${meta.title}.`)"
                 color="error"
                 variant="subtle"
+                :ui="{ title: 'text-red-700 dark:text-red-400' }"
+            />
+
+            <UAlert
+                v-if="reorderError"
+                role="alert"
+                :title="reorderError"
+                color="error"
+                variant="subtle"
+                :ui="{ title: 'text-red-700 dark:text-red-400' }"
             />
 
             <UCard v-if="model === 'games'">
@@ -469,9 +515,11 @@ const itemLabel = (item: AdminItem) =>
                     />
                     <UAlert
                         v-if="igdbWarning"
+                        role="status"
                         :title="igdbWarning"
                         color="warning"
                         variant="subtle"
+                        :ui="{ title: 'text-amber-800 dark:text-amber-300' }"
                     />
                     <div
                         v-for="result in igdbResults"
@@ -481,7 +529,7 @@ const itemLabel = (item: AdminItem) =>
                         <span>{{ result.name }} ({{ result.slug }})</span>
                         <UButton
                             :label="result.id ? 'Imported' : 'Import'"
-                            :disabled="Boolean(result.id)"
+                            :disabled="Boolean(result.id) || reordering"
                             :loading="igdbImporting"
                             size="xs"
                             @click="handleImportGame(result)"
@@ -490,56 +538,101 @@ const itemLabel = (item: AdminItem) =>
                 </div>
             </UCard>
 
-            <p v-if="!pending && items.length === 0" class="text-muted text-sm">
-                No {{ meta.title.toLowerCase() }} entries yet.
-            </p>
+            <div
+                v-if="!pending && !error && items.length === 0"
+                class="mx-auto flex w-full max-w-sm flex-col items-center gap-3 py-8 text-center"
+            >
+                <AdminHairlineDrawer
+                    :label="`No ${meta.title.toLowerCase()} entries`"
+                    class="max-w-xs"
+                />
+                <p class="text-muted text-sm">No {{ meta.title.toLowerCase() }} entries yet.</p>
+            </div>
 
-            <div class="flex flex-col gap-3">
-                <UCard v-for="item in items" :key="item.id">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="min-w-0 flex-1">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="font-medium">{{ itemLabel(item) }}</span>
-                                <UBadge
-                                    v-if="item.status?.state"
-                                    :label="item.status.state"
-                                    :color="
-                                        item.status.state === 'published' ? 'success' : 'warning'
-                                    "
-                                    variant="subtle"
-                                    size="sm"
+            <div
+                v-if="items.length > 1 || reordering"
+                class="flex flex-wrap items-center justify-end gap-2"
+            >
+                <UButton
+                    :id="reorderButtonId"
+                    :label="reordering ? 'Cancel' : 'Reorder'"
+                    :icon="reordering ? undefined : 'lucide:list-ordered'"
+                    color="neutral"
+                    variant="outline"
+                    :disabled="pending || !!busyId || igdbImporting || savingOrder"
+                    @click="reordering ? cancelReorder() : beginReorder()"
+                />
+                <UButton
+                    v-if="reordering"
+                    label="Save order"
+                    :loading="savingOrder"
+                    :disabled="!orderChanged"
+                    @click="saveOrder"
+                />
+            </div>
+
+            <UiReorderList
+                v-model="visibleOrder"
+                :items="items"
+                :active="reordering"
+                :disabled="savingOrder"
+                :label="itemLabel"
+            >
+                <template #default="{ item }">
+                    <UCard>
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="font-medium">{{ itemLabel(item) }}</span>
+                                    <UBadge
+                                        v-if="item.status?.state"
+                                        :label="item.status.state"
+                                        :color="
+                                            item.status.state === 'published'
+                                                ? 'success'
+                                                : 'warning'
+                                        "
+                                        :class="
+                                            item.status.state === 'published'
+                                                ? 'text-green-800 dark:text-green-300'
+                                                : 'text-amber-800 dark:text-amber-300'
+                                        "
+                                        variant="subtle"
+                                        size="sm"
+                                    />
+                                </div>
+                                <p class="text-muted mt-1 font-mono text-xs">{{ item.id }}</p>
+                            </div>
+
+                            <div v-if="!reordering" class="flex flex-wrap items-center gap-2">
+                                <UButton
+                                    label="Edit"
+                                    size="xs"
+                                    variant="outline"
+                                    color="neutral"
+                                    @click="openEdit(item)"
+                                />
+                                <UButton
+                                    v-if="model !== 'games' && item.status?.state !== 'published'"
+                                    label="Publish"
+                                    size="xs"
+                                    :loading="busyId === item.id"
+                                    @click="publishItem(item)"
+                                />
+                                <UButton
+                                    label="Delete"
+                                    size="xs"
+                                    variant="ghost"
+                                    color="error"
+                                    class="text-red-700 dark:text-red-400"
+                                    :loading="busyId === item.id"
+                                    @click="deleteItem(item)"
                                 />
                             </div>
-                            <p class="text-muted mt-1 font-mono text-xs">{{ item.id }}</p>
                         </div>
-
-                        <div class="flex flex-wrap items-center gap-2">
-                            <UButton
-                                label="Edit"
-                                size="xs"
-                                variant="outline"
-                                color="neutral"
-                                @click="openEdit(item)"
-                            />
-                            <UButton
-                                v-if="item.status?.state !== 'published'"
-                                label="Publish"
-                                size="xs"
-                                :loading="busyId === item.id"
-                                @click="publishItem(item)"
-                            />
-                            <UButton
-                                label="Delete"
-                                size="xs"
-                                variant="ghost"
-                                color="error"
-                                :loading="busyId === item.id"
-                                @click="deleteItem(item)"
-                            />
-                        </div>
-                    </div>
-                </UCard>
-            </div>
+                    </UCard>
+                </template>
+            </UiReorderList>
 
             <UModal
                 v-model:open="editorOpen"
@@ -549,9 +642,11 @@ const itemLabel = (item: AdminItem) =>
                     <div class="flex flex-col gap-4">
                         <UAlert
                             v-if="formError"
+                            role="alert"
                             :title="formError"
                             color="error"
                             variant="subtle"
+                            :ui="{ title: 'text-red-700 dark:text-red-400' }"
                         />
 
                         <template v-if="model === 'works'">
@@ -771,33 +866,10 @@ const itemLabel = (item: AdminItem) =>
                             <UFormField label="Values JSON" :error="errors['data.values']">
                                 <UTextarea v-model="jsonExtraText" :rows="6" class="font-mono" />
                             </UFormField>
-                        </template>
-
-                        <template v-else-if="model === 'ranks'">
-                            <UFormField label="Game" :error="errors['data.game']" required>
+                            <UFormField label="Profile URL" :error="errors['data.href']">
                                 <UInput
-                                    :model-value="stringField('game')"
-                                    @update:model-value="(val) => setStringField('game', val)"
-                                />
-                            </UFormField>
-                            <UFormField label="Rank" :error="errors['data.rank']" required>
-                                <UInput
-                                    :model-value="stringField('rank')"
-                                    @update:model-value="(val) => setStringField('rank', val)"
-                                />
-                            </UFormField>
-                            <UFormField label="Season">
-                                <UInput
-                                    :model-value="stringField('season')"
-                                    @update:model-value="(val) => setStringField('season', val)"
-                                />
-                            </UFormField>
-                            <UFormField label="Image" :error="errors['data.image']" required>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    :disabled="uploading"
-                                    @change="(ev) => uploadImage(ev, 'single')"
+                                    :model-value="stringField('href')"
+                                    @update:model-value="(val) => setStringField('href', val)"
                                 />
                             </UFormField>
                         </template>
@@ -829,14 +901,6 @@ const itemLabel = (item: AdminItem) =>
                             </UFormField>
                         </template>
 
-                        <UFormField label="Order">
-                            <UInput
-                                type="number"
-                                :model-value="Number(formData.order ?? 0)"
-                                @update:model-value="(val) => setOrderField(val)"
-                            />
-                        </UFormField>
-
                         <div class="flex justify-end gap-2">
                             <UButton
                                 label="Cancel"
@@ -844,7 +908,11 @@ const itemLabel = (item: AdminItem) =>
                                 color="neutral"
                                 @click="editorOpen = false"
                             />
-                            <UButton label="Save draft" :loading="saving" @click="saveRecord" />
+                            <UButton
+                                :label="model === 'games' ? 'Save game' : 'Save draft'"
+                                :loading="saving"
+                                @click="saveRecord"
+                            />
                         </div>
                     </div>
                 </template>

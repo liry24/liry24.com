@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { PromptInputSubmit } from '@vite-hub/ui'
-import { useAgent, useChat } from 'vite-hub/agent/vue'
 
 useHead({ title: 'Assistant' })
 
@@ -69,17 +68,26 @@ const resetConversation = async () => {
         <template #body>
             <UAlert
                 v-if="error"
+                role="alert"
                 :title="error.message || 'Assistant request failed.'"
                 color="error"
                 variant="subtle"
+                :ui="{ title: 'text-red-700 dark:text-red-400' }"
                 close
                 @update:open="clearError"
             />
 
             <div class="border-default min-h-0 flex-1 overflow-y-auto rounded-lg border p-4">
-                <p v-if="messages.length === 0" class="text-muted text-sm">
-                    Ask Gemini 4 Hydrogen to inspect collections, draft posts, or prepare updates.
-                </p>
+                <div
+                    v-if="messages.length === 0"
+                    class="mx-auto flex min-h-full w-full max-w-sm flex-col items-center justify-center gap-3 py-8 text-center"
+                >
+                    <AdminHairlineRiffle label="Editorial assistant ready" class="max-w-xs" />
+                    <p class="text-muted text-sm">
+                        Ask Gemini 4 Hydrogen to inspect collections, draft posts, or prepare
+                        updates.
+                    </p>
+                </div>
                 <Chat v-else :messages="messages" :status="status" />
             </div>
 

@@ -10,7 +10,6 @@ export type {
     PortfolioItem,
     PostData,
     PostItem,
-    RankData,
     SkillData,
     SocialData,
     WorkData,

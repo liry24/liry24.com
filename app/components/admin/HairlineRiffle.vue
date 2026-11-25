@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import type { Figure } from '@lucasmarkes/hairline'
+import type { Figure, HairlineOptions } from '@lucasmarkes/hairline'
 
 interface Props {
     intensity?: number
     play?: boolean
+    theme?: HairlineOptions['theme']
+    label?: string
 }
-const { intensity = 0.5, play = true } = defineProps<Props>()
+const { intensity = 0.5, play = true, theme = 'auto', label } = defineProps<Props>()
 
 const element = ref<HTMLElement | null>(null)
 let instance: Figure | undefined
@@ -21,15 +23,19 @@ onMounted(async () => {
     instance = riffle(element.value, {
         intensity,
         play,
+        theme,
+        label,
     })
 })
 
 watch(
-    () => [intensity, play] as const,
-    ([newIntensity, newPlay]) => {
+    () => [intensity, play, theme, label] as const,
+    ([newIntensity, newPlay, newTheme, newLabel]) => {
         instance?.update({
             intensity: newIntensity,
             play: newPlay,
+            theme: newTheme,
+            label: newLabel,
         })
     },
 )
@@ -41,5 +47,5 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div ref="element" class="w-full" />
+    <div ref="element" class="aspect-5/4 w-full" />
 </template>

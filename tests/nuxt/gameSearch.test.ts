@@ -1,8 +1,5 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 import { afterEach, expect, test, vi } from 'vitest'
-import { effectScope, ref } from 'vue'
-
-import { useGameSearch } from '../../app/composables/useGameSearch'
 
 const { sessionBoundary } = vi.hoisted(() => ({ sessionBoundary: vi.fn() }))
 mockNuxtImport('useAppSession', () => sessionBoundary)

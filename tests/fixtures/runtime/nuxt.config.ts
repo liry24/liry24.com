@@ -19,6 +19,10 @@ export default defineNuxtConfig({
     },
     alias: { '~~': root, '~': `${root}app` },
     imports: {
+        presets: [
+            { from: 'cn', imports: ['cn'] },
+            { from: 'vite-hub/auth/vue', imports: ['useUserSession'] },
+        ],
         dirs: [
             `${root}app/composables`,
             `${root}app/utils`,

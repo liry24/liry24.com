@@ -13,37 +13,145 @@ concurrency:
   group: quality-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NODE_OPTIONS: --max-old-space-size=6144
+  NUXT_TELEMETRY_DISABLED: '1'
+
 jobs:
-  quality:
+  checks:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      NODE_OPTIONS: --max-old-space-size=6144
-      NUXT_TELEMETRY_DISABLED: '1'
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Format
+            command: bun run format:check
+            prepare: 'false'
+          - name: Lint
+            command: bun run lint
+            prepare: 'true'
+          - name: Typecheck (Nuxt)
+            command: bun run typecheck
+            prepare: 'true'
+          - name: Typecheck (tests)
+            command: bun x tsc --noEmit -p tsconfig.tests.json
+            prepare: 'true'
+          - name: Vitest (Node)
+            command: node node_modules/vitest/vitest.mjs run --project node --exclude 'tests/worker/**'
+            prepare: 'true'
+          - name: Vitest (Nuxt)
+            command: node node_modules/vitest/vitest.mjs run --project nuxt
+            prepare: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: ./.github/actions/setup-quality
         with:
-          node-version: '24'
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+          prepare: ${{ matrix.prepare }}
+      - run: ${{ matrix.command }}
+
+  worker-build:
+    name: Worker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          bun-version-file: package.json
-      - run: bun --no-env-file install --frozen-lockfile --ignore-scripts
-      - run: bun run postinstall
-      - run: bun run format:check
-      - run: bun run lint
-      - run: bun run typecheck
-      - run: bun x tsc --noEmit -p tsconfig.tests.json
-      - run: bun run test
+          persist-credentials: false
+      - uses: ./.github/actions/setup-quality
       - run: bun run build
         env:
           APP_ENV: test
           LIRY24_TEST_LOCAL: 'true'
           LIRY24_DISABLE_CRON: 'true'
           BETTER_AUTH_SECRET: synthetic-ci-build-secret-0123456789
-      - run: bun x wrangler deploy --dry-run --config .output/server/wrangler.json
-      - run: bun x vitest run tests/worker/built-app.test.ts tests/worker/pocket-id.test.ts
+      - run: tar -czf worker-build.tar.gz .output
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: worker-build
+          path: worker-build.tar.gz
+          if-no-files-found: error
+          retention-days: 2
+
+  worker-checks:
+    name: ${{ matrix.name }}
+    needs: worker-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Wrangler dry-run
+            command: bun x wrangler deploy --dry-run --config .output/server/wrangler.json
+            prepare: 'false'
+          - name: Worker tests
+            command: node node_modules/vitest/vitest.mjs run tests/worker/
+            prepare: 'true'
+    env:
+      LIRY24_TEST_BUILT_WORKER: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-quality
+        with:
+          prepare: ${{ matrix.prepare }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: worker-build
+      - run: tar -xzf worker-build.tar.gz
+      - run: ${{ matrix.command }}
+
+  mutation:
+    name: Mutation (diff pilot)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-quality
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .mutator
+          key: mutator-${{ runner.os }}-${{ github.base_ref }}-${{ hashFiles('bun.lock', '*mutator.config.ts') }}-${{ github.sha }}
+          restore-keys: |
+            mutator-${{ runner.os }}-${{ github.base_ref }}-${{ hashFiles('bun.lock', '*mutator.config.ts') }}-
+      - run: bun run test:mutation --since "$BASE_SHA" --include-test-changes --time-budget 300
         env:
-          LIRY24_TEST_BUILT_WORKER: 'true'
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+  accessibility:
+    name: Accessibility audit
+    needs: worker-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LIRY24_TEST_ACCESSIBILITY_BROWSER: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-quality
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: worker-build
+      - run: tar -xzf worker-build.tar.gz
+      - run: bun x playwright-core install --with-deps chromium
+      - run: node node_modules/vitest/vitest.mjs run tests/worker/accessibility.browser.test.ts
+      - name: Upload accessibility reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: accessibility-reports
+          path: .tmp/accessibility
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14

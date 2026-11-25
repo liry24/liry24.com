@@ -119,16 +119,6 @@ export const gameStatsFieldsSchema = z.object({
     href: z.httpUrl().optional(),
 })
 
-export const rankFieldsSchema = z.object({
-    game: z.string().min(1),
-    image: mediaReferenceSchema,
-    slug: z.string().optional(),
-    season: z.string().optional(),
-    rank: z.string().min(1),
-    href: z.httpUrl().optional(),
-    order: z.number().finite().default(0),
-})
-
 export const socialFieldsSchema = z.object({
     label: z.string().min(1),
     slug: z.string().refine(socialSlug, 'Choose an unreserved URL segment.'),
@@ -143,9 +133,7 @@ export const contentCollectionNames = [
     'arts',
     'careers',
     'skills',
-    'games',
     'gameStats',
-    'ranks',
     'socials',
 ] as const
 
@@ -160,7 +148,6 @@ export type CareerData = z.infer<typeof careerFieldsSchema>
 export type SkillData = z.infer<typeof skillFieldsSchema>
 export type GameRecordData = z.infer<typeof gameFieldsSchema>
 export type GameStatsRecordData = z.infer<typeof gameStatsFieldsSchema>
-export type RankData = z.infer<typeof rankFieldsSchema>
 export type SocialData = z.infer<typeof socialFieldsSchema>
 
 export type PortfolioDataMap = {
@@ -168,9 +155,7 @@ export type PortfolioDataMap = {
     arts: ArtData
     careers: CareerData
     skills: SkillData
-    games: GameRecordData
     gameStats: GameStatsRecordData
-    ranks: RankData
     socials: SocialData
 }
 

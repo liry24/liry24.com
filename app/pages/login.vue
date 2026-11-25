@@ -11,10 +11,7 @@ const signingIn = ref(false)
 const { load, isAdmin } = useAppSession()
 await load()
 
-const safeRedirect = computed(() => {
-    const raw = typeof route.query.redirect === 'string' ? route.query.redirect : '/admin'
-    return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/admin'
-})
+const safeRedirect = computed(() => adminRedirect(route.query.redirect))
 
 if (isAdmin.value) {
     await navigateTo(safeRedirect.value, { replace: true })
@@ -40,7 +37,7 @@ const signInWithPocketId = async () => {
         const result = await authClient.signIn.social({
             provider: 'pocket-id',
             callbackURL: safeRedirect.value,
-            errorCallbackURL: '/login?error=oauth',
+            errorCallbackURL: `/login?${new URLSearchParams({ error: 'oauth', redirect: safeRedirect.value })}`,
         })
         if (result.error) {
             throw new Error(result.error.message || 'Sign in failed.')
@@ -66,7 +63,14 @@ const signInWithPocketId = async () => {
                     <p class="text-muted text-sm">Single-owner authentication via Pocket ID</p>
                 </div>
 
-                <UAlert v-if="errorMessage" :title="errorMessage" color="error" variant="subtle" />
+                <UAlert
+                    v-if="errorMessage"
+                    role="alert"
+                    :title="errorMessage"
+                    color="error"
+                    variant="subtle"
+                    :ui="{ title: 'text-red-700 dark:text-red-400' }"
+                />
 
                 <UButton
                     block

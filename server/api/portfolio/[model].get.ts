@@ -1,25 +1,20 @@
-import { createError, defineEventHandler, getRouterParam } from 'nuxt/server'
-
-import type { PortfolioCollectionName, PortfolioItem } from '../../../shared/schemas/content.js'
-import content from '../../content.js'
-import { listAllCollectionItems } from '../../utils/content.js'
+import content from '#server/content'
 
 const portfolioModels = [
     'works',
     'arts',
     'careers',
     'skills',
-    'games',
-    'gameStats',
-    'ranks',
     'socials',
 ] as const satisfies ReadonlyArray<PortfolioCollectionName>
 
-function parsePortfolioModel(raw: string | undefined): PortfolioCollectionName | undefined {
+function parsePortfolioModel(raw: string | undefined) {
     return portfolioModels.find((entry) => entry === raw)
 }
 
-async function listModelItems(name: PortfolioCollectionName): Promise<Array<PortfolioItem>> {
+async function listModelItems(
+    name: (typeof portfolioModels)[number],
+): Promise<Array<PortfolioItem>> {
     switch (name) {
         case 'works': {
             return await listAllCollectionItems(content.collection('works'), 'published')
@@ -32,15 +27,6 @@ async function listModelItems(name: PortfolioCollectionName): Promise<Array<Port
         }
         case 'skills': {
             return await listAllCollectionItems(content.collection('skills'), 'published')
-        }
-        case 'games': {
-            return await listAllCollectionItems(content.collection('games'), 'published')
-        }
-        case 'gameStats': {
-            return await listAllCollectionItems(content.collection('gameStats'), 'published')
-        }
-        case 'ranks': {
-            return await listAllCollectionItems(content.collection('ranks'), 'published')
         }
         case 'socials': {
             return await listAllCollectionItems(content.collection('socials'), 'published')
