@@ -11,4 +11,5 @@ export type {
     TriggerMenuSelectDetails,
 } from '@ui-sdk/vue/trigger-menu'
 export { default as UiField } from './UiField.vue'
+export { default as UiReorderList } from './UiReorderList.vue'
 export { default as UiSlashEditor } from './UiSlashEditor.vue'

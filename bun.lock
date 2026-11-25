@@ -9,7 +9,6 @@
         "@comark/html": "0.9.2",
         "@comark/vue": "0.9.2",
         "@formisch/vue": "1.2.0",
-        "@formkit/drag-and-drop": "^0.6.1",
         "@iconify-json/lucide": "^1.2.158",
         "@iconify-json/mingcute": "^1.2.8",
         "@iconify-json/simple-icons": "^1.2.100",
@@ -352,8 +351,6 @@
     "@floating-ui/vue": ["@floating-ui/vue@2.0.1", "", { "dependencies": { "@floating-ui/dom": "^1.8.0", "@floating-ui/utils": "^0.2.12" }, "peerDependencies": { "vue": ">=3.3.0" } }, "sha512-043dyEKD9TDSfz080YH2vobubgg+NIo/9Fw4RAl7sEMpD8Am1DNrrSTl/GpMBjyGHoD/FbJY2QLawY+HSQsEIA=="],
 
     "@formisch/vue": ["@formisch/vue@1.2.0", "", { "peerDependencies": { "typescript": ">=5 <8", "valibot": ">=1.4.1 <2", "vue": ">=3.3 <4" }, "optionalPeers": ["typescript"] }, "sha512-KAdH8JHbiRbAY/Iroelo3A0sHh3nMuwiUoETx3QtG7g5Kd31fQQUkiRF7vy699CudKwW2pMvELOqDOVTqsudMw=="],
-
-    "@formkit/drag-and-drop": ["@formkit/drag-and-drop@0.6.1", "", { "peerDependencies": { "@marko/runtime-tags": ">=6.0.166" }, "optionalPeers": ["@marko/runtime-tags"] }, "sha512-DNKoPqdg9RW7k0zZlF2FH636Cc16V3tuGDVKWNHpSXr3amF4nmQZfieoLNVRxqWxXVFJq2DY+vf8SCD10JyjAA=="],
 
     "@henrygd/queue": ["@henrygd/queue@1.2.0", "", {}, "sha512-jW/BLSTpcvExDhqJGxtIPgGr2O0IFF8XUNDwEbfCfhrXT8a4xztQ9Lv6U/vbYzYC0xVWn+3zv6YnLUh3bEFUKA=="],
 

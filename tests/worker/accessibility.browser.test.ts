@@ -304,6 +304,15 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 },
             })
 
+            await submitAndPublish('skill', 'skills', {
+                data: {
+                    name: 'Vue',
+                    slug: 'vue',
+                    icon: 'simple-icons:vuedotjs',
+                    category: 'Framework',
+                },
+            })
+
             await submitAndPublish('post', 'posts', {
                 id: 'synthetic-game-mention',
                 data: {
@@ -466,6 +475,78 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await scan('entry-edit-dialog')
                 await auditPage.keyboard.press('Escape')
                 await auditPage.getByRole('dialog').waitFor({ state: 'hidden' })
+
+                await auditPage.getByRole('button', { name: 'Add', exact: true }).click()
+                const addDialog = auditPage.getByRole('dialog')
+                await addDialog.getByLabel('Name', { exact: true }).waitFor()
+                expect(await addDialog.getByLabel('Order', { exact: true }).count()).toBe(0)
+                await auditPage.keyboard.press('Escape')
+                await addDialog.waitFor({ state: 'hidden' })
+
+                const reorder = auditPage.getByRole('button', { name: 'Reorder', exact: true })
+                await reorder.click()
+                await scan('admin-skills-reorder')
+                const skillOrder = () => auditPage.getByText(/^(TypeScript|Vue)$/).allTextContents()
+                const [firstSkill, secondSkill] = await skillOrder()
+                if (!firstSkill || !secondSkill) {
+                    throw new Error('Missing skills to reorder')
+                }
+                const initialOrder = [firstSkill, secondSkill]
+                const reverseOrder = [secondSkill, firstSkill]
+                const firstHandle = auditPage.getByRole('button', {
+                    name: `Reorder ${firstSkill}`,
+                })
+                const secondHandle = auditPage.getByRole('button', {
+                    name: `Reorder ${secondSkill}`,
+                })
+                await firstHandle.focus()
+                await auditPage.keyboard.press('Space')
+                await auditPage.keyboard.press('ArrowDown')
+                await expect.poll(skillOrder).toEqual(reverseOrder)
+                await auditPage.keyboard.press('Escape')
+                await expect.poll(skillOrder).toEqual(initialOrder)
+                await expect
+                    .poll(() => firstHandle.evaluate((el) => el === document.activeElement))
+                    .toBe(true)
+
+                await auditPage.getByRole('button', { name: `Move ${secondSkill} up` }).click()
+                await expect.poll(skillOrder).toEqual(reverseOrder)
+                await secondHandle.scrollIntoViewIfNeeded()
+                await firstHandle.scrollIntoViewIfNeeded()
+                const source = await secondHandle.boundingBox()
+                const target = await auditPage
+                    .getByRole('listitem')
+                    .filter({ has: firstHandle })
+                    .boundingBox()
+                if (!source || !target) {
+                    throw new Error('Missing drag handles')
+                }
+                await auditPage.mouse.move(
+                    source.x + source.width / 2,
+                    source.y + source.height / 2,
+                )
+                await auditPage.mouse.down()
+                await auditPage.mouse.move(
+                    source.x + source.width / 2,
+                    target.y + target.height * 0.75,
+                    {
+                        steps: 12,
+                    },
+                )
+                await expect.poll(() => secondHandle.getAttribute('aria-pressed')).toBe('true')
+                await auditPage.mouse.up()
+                await expect.poll(skillOrder).toEqual(initialOrder)
+
+                await firstHandle.focus()
+                await auditPage.keyboard.press('Space')
+                await auditPage.keyboard.press('ArrowDown')
+                await auditPage.keyboard.press('Space')
+                await expect.poll(skillOrder).toEqual(reverseOrder)
+                await auditPage.getByRole('button', { name: 'Save order', exact: true }).click()
+                await reorder.waitFor()
+                await auditPage.reload()
+                await waitForNuxtReady(auditPage)
+                await expect.poll(skillOrder).toEqual(reverseOrder)
 
                 await visit('/admin/careers')
                 await auditPage.getByText('No careers entries yet.', { exact: true }).waitFor()
