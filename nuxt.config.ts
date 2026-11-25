@@ -133,12 +133,12 @@ export default defineNuxtConfig({
     },
 
     build: {
-        transpile: ['@vite-hub/ui'],
+        transpile: ['@liry24/ui', '@vite-hub/ui'],
     },
 
     vite: {
         ssr: {
-            noExternal: ['@vite-hub/ui', /@vite-hub[/\\]ui/],
+            noExternal: ['@liry24/ui', '@vite-hub/ui', /@liry24[/\\]ui/, /@vite-hub[/\\]ui/],
         },
         optimizeDeps: {
             noDiscovery: true,
