@@ -1,9 +1,5 @@
-import { createError, defineEventHandler, getQuery, getRouterParam } from 'nuxt/server'
-
-import { contentCollectionNames } from '../../../../../shared/schemas/content.js'
-import type { ContentCollectionName } from '../../../../../shared/schemas/content.js'
-import content from '../../../../content.js'
-import { requireAdminSession } from '../../../../utils/auth.js'
+import content from '#server/content'
+import { contentCollectionNames } from '#shared/schemas/content'
 
 const validCollections = new Set<string>(contentCollectionNames)
 

@@ -1,8 +1,4 @@
-import { defineEventHandler } from 'nuxt/server'
-
-import content from '../../content.js'
-import { listAllCollectionItems } from '../../utils/content.js'
-import { gameCatalog } from '../../utils/gameCatalog.js'
+import content from '#server/content'
 
 export default defineEventHandler(async (): Promise<GameStatsPage> => {
     const items = await listAllCollectionItems(content.collection('gameStats'), 'published')

@@ -1,9 +1,5 @@
 import { expect, test } from 'vitest'
 
-import { useRuntimeConfig } from '#imports'
-
-import { mediaUrl } from '../../app/utils/mediaUrl'
-
 test('native Blob paths retain encoding and switch between app and image domain', () => {
     const config = useRuntimeConfig()
     config.public.imagesDomain = ''

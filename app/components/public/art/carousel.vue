@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { LazyImageViewer } from '#components'
-import type { MediaReference } from '#shared/schemas/content'
 
 const { data } = defineProps<{
     data: Array<MediaReference>

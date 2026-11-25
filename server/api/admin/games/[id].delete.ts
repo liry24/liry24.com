@@ -1,9 +1,3 @@
-import { createError, defineEventHandler, getRouterParam } from 'nuxt/server'
-
-import { requireAdminSession } from '../../../utils/auth.js'
-import { gameCatalog } from '../../../utils/gameCatalog.js'
-import { validateGameRemoval } from '../../../utils/gameValidation.js'
-
 export default defineEventHandler(async (event) => {
     await requireAdminSession(event)
     const id = getRouterParam(event, 'id')
