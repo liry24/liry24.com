@@ -10,21 +10,12 @@ import type {
     GameStatsRecordData,
     MediaReference,
     PortfolioCollectionName,
-    RankData,
     SkillData,
     SocialData,
     WorkData,
 } from '../../../shared/schemas/content'
 
-type FormEndpointName =
-    | 'work'
-    | 'art'
-    | 'career'
-    | 'skill'
-    | 'game'
-    | 'game-stats'
-    | 'rank'
-    | 'social'
+type FormEndpointName = 'work' | 'art' | 'career' | 'skill' | 'game' | 'game-stats' | 'social'
 
 interface CollectionMeta {
     title: string
@@ -32,14 +23,15 @@ interface CollectionMeta {
     formName: FormEndpointName
 }
 
-const metaByModel: Record<PortfolioCollectionName, CollectionMeta> = {
+type AdminModel = PortfolioCollectionName | 'games'
+
+const metaByModel: Record<AdminModel, CollectionMeta> = {
     works: { title: 'Works', icon: 'mingcute:briefcase-fill', formName: 'work' },
     arts: { title: 'Arts', icon: 'mingcute:palette-fill', formName: 'art' },
     careers: { title: 'Careers', icon: 'mingcute:building-2-fill', formName: 'career' },
     skills: { title: 'Skills', icon: 'mingcute:tool-fill', formName: 'skill' },
-    games: { title: 'Games', icon: 'mingcute:game-2-fill', formName: 'game' },
+    games: { title: 'Game settings', icon: 'mingcute:game-2-fill', formName: 'game' },
     gameStats: { title: 'Game Stats', icon: 'mingcute:chart-line-fill', formName: 'game-stats' },
-    ranks: { title: 'Ranks', icon: 'mingcute:trophy-fill', formName: 'rank' },
     socials: { title: 'Socials', icon: 'mingcute:link-2-fill', formName: 'social' },
 }
 
@@ -47,10 +39,10 @@ const route = useRoute()
 const toast = useToast()
 
 const modelParam = String(route.params.model ?? '')
-if (!(modelParam in metaByModel)) {
+if (!Object.hasOwn(metaByModel, modelParam)) {
     throw createError({ status: 404, statusText: 'Model not found' })
 }
-const model = modelParam as PortfolioCollectionName
+const model = modelParam as AdminModel
 const meta = metaByModel[model]
 useHead({ title: meta.title })
 
@@ -74,18 +66,15 @@ interface AdminEditableFields {
     game?: string
     periodKey?: string
     values?: Array<GameValue>
-    rank?: string
-    season?: string
     label?: string
     order?: number
 }
 
 interface AdminItem {
     id: string
-    title: string
     data: AdminEditableFields
-    status: ContentDocumentStatus | null
-    schedule: ContentSchedule | null
+    status?: ContentDocumentStatus | null
+    schedule?: ContentSchedule | null
 }
 
 type ModelFormSubmission = {
@@ -108,18 +97,18 @@ type AdminStringKey =
     | 'primaryMetric'
     | 'game'
     | 'periodKey'
-    | 'rank'
-    | 'season'
     | 'label'
 
-const { data, pending, error, refresh } = await useFetch<{
-    items: Array<AdminItem>
-}>(`/api/admin/content/${encodeURIComponent(model)}`)
+const listUrl = model === 'games' ? '/api/admin/games/catalog' : `/api/admin/content/${model}`
+const { data, pending, error, refresh } = await useFetch<{ items: Array<AdminItem> }>(listUrl, {
+    key: `admin-model:${model}`,
+})
 
-const { data: savedGamesData, refresh: refreshGames } = await useFetch<{
+const { data: savedGamesData } = await useFetch<{
     items: Array<{ id: string; data: GameRecordData }>
-}>('/api/admin/content/games', {
-    immediate: model === 'gameStats' || model === 'games',
+}>('/api/admin/games/catalog', {
+    key: 'admin-game-selection',
+    immediate: model === 'gameStats',
 })
 
 const items = computed(() => data.value?.items ?? [])
@@ -231,15 +220,6 @@ function defaultRecord(): AdminEditableFields {
         }
         return entry
     }
-    if (model === 'ranks') {
-        const entry: RankData = {
-            game: '',
-            rank: '',
-            image: { pathname: '' },
-            order: 0,
-        }
-        return entry
-    }
     const entry: SocialData = {
         label: '',
         slug: '',
@@ -324,6 +304,7 @@ const saveRecord = async () => {
                 JSON.parse(jsonExtraText.value || '[]'),
             )
         } else if (model === 'gameStats') {
+            payloadData.href = payloadData.href?.trim() || undefined
             payloadData.values = gameStatsFieldsSchema.shape.values.parse(
                 JSON.parse(jsonExtraText.value || '[]'),
             )
@@ -343,7 +324,7 @@ const saveRecord = async () => {
             return
         }
 
-        toast.add({ title: 'Saved draft', color: 'success' })
+        toast.add({ title: model === 'games' ? 'Saved game' : 'Saved draft', color: 'success' })
         editorOpen.value = false
         await refresh()
     } catch (error_) {
@@ -358,11 +339,13 @@ const handleImportGame = async (game: GameSearchResult) => {
     if (saved) {
         toast.add({ title: `Imported ${saved.name}`, color: 'success' })
         await refresh()
-        await refreshGames()
     }
 }
 
 const publishItem = async (item: AdminItem) => {
+    if (model === 'games') {
+        return
+    }
     busyId.value = item.id
     try {
         await $fetch('/api/admin/content/publish', {
@@ -390,13 +373,15 @@ const publishItem = async (item: AdminItem) => {
 const deleteItem = async (item: AdminItem) => {
     busyId.value = item.id
     try {
-        await $fetch(
-            `/api/admin/content/${encodeURIComponent(model)}/${encodeURIComponent(item.id)}`,
-            {
+        const id = encodeURIComponent(item.id)
+        if (model === 'games') {
+            await $fetch(`/api/admin/games/${id}`, { method: 'DELETE' })
+        } else {
+            await $fetch(`/api/admin/content/${model}/${id}`, {
                 method: 'DELETE',
                 query: { publish: 'true' },
-            },
-        )
+            })
+        }
         toast.add({ title: 'Deleted item', color: 'neutral' })
         await refresh()
     } catch (error_) {
@@ -433,6 +418,22 @@ const itemLabel = (item: AdminItem) =>
         <template #header>
             <UDashboardNavbar :title="meta.title" :icon="meta.icon">
                 <template #right>
+                    <UButton
+                        v-if="model === 'gameStats'"
+                        to="/admin/games"
+                        label="Game settings"
+                        icon="mingcute:settings-1-line"
+                        variant="outline"
+                        color="neutral"
+                    />
+                    <UButton
+                        v-else-if="model === 'games'"
+                        to="/admin/gameStats"
+                        label="Game Stats"
+                        icon="mingcute:chart-line-fill"
+                        variant="outline"
+                        color="neutral"
+                    />
                     <UButton
                         icon="mingcute:refresh-2-line"
                         aria-label="Refresh items"
@@ -522,7 +523,7 @@ const itemLabel = (item: AdminItem) =>
                                 @click="openEdit(item)"
                             />
                             <UButton
-                                v-if="item.status?.state !== 'published'"
+                                v-if="model !== 'games' && item.status?.state !== 'published'"
                                 label="Publish"
                                 size="xs"
                                 :loading="busyId === item.id"
@@ -771,33 +772,10 @@ const itemLabel = (item: AdminItem) =>
                             <UFormField label="Values JSON" :error="errors['data.values']">
                                 <UTextarea v-model="jsonExtraText" :rows="6" class="font-mono" />
                             </UFormField>
-                        </template>
-
-                        <template v-else-if="model === 'ranks'">
-                            <UFormField label="Game" :error="errors['data.game']" required>
+                            <UFormField label="Profile URL" :error="errors['data.href']">
                                 <UInput
-                                    :model-value="stringField('game')"
-                                    @update:model-value="(val) => setStringField('game', val)"
-                                />
-                            </UFormField>
-                            <UFormField label="Rank" :error="errors['data.rank']" required>
-                                <UInput
-                                    :model-value="stringField('rank')"
-                                    @update:model-value="(val) => setStringField('rank', val)"
-                                />
-                            </UFormField>
-                            <UFormField label="Season">
-                                <UInput
-                                    :model-value="stringField('season')"
-                                    @update:model-value="(val) => setStringField('season', val)"
-                                />
-                            </UFormField>
-                            <UFormField label="Image" :error="errors['data.image']" required>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    :disabled="uploading"
-                                    @change="(ev) => uploadImage(ev, 'single')"
+                                    :model-value="stringField('href')"
+                                    @update:model-value="(val) => setStringField('href', val)"
                                 />
                             </UFormField>
                         </template>
@@ -844,7 +822,11 @@ const itemLabel = (item: AdminItem) =>
                                 color="neutral"
                                 @click="editorOpen = false"
                             />
-                            <UButton label="Save draft" :loading="saving" @click="saveRecord" />
+                            <UButton
+                                :label="model === 'games' ? 'Save game' : 'Save draft'"
+                                :loading="saving"
+                                @click="saveRecord"
+                            />
                         </div>
                     </div>
                 </template>

@@ -1,10 +1,10 @@
-import type { ContentPublishExpectation } from '@vite-hub/content'
 import { createError, defineEventHandler, readBody } from 'nuxt/server'
 import { z } from 'zod'
 
 import { contentCollectionNames } from '../../../../shared/schemas/content.js'
 import content from '../../../content.js'
 import { requireAdminSession } from '../../../utils/auth.js'
+import { gameCatalog } from '../../../utils/gameCatalog.js'
 
 const collectionSchema = z.enum(contentCollectionNames)
 
@@ -55,10 +55,7 @@ function rethrowContentError(error: unknown): never {
     throw createError({ status: 500, statusText: message, message, cause: error })
 }
 
-async function postGameExpectations(
-    id: string,
-    digest: string,
-): Promise<Array<ContentPublishExpectation>> {
+async function validatePostGameReferences(id: string, digest: string) {
     const post = await content.collection('posts').get(id, { ref: 'draft' })
     if (post?.digest !== digest) {
         throw createError({
@@ -67,23 +64,16 @@ async function postGameExpectations(
         })
     }
 
-    const games = content.collection('games')
-    const dependencies = await Promise.all(
-        [...new Set(post.data.gameMentions)].map(async (gameId) => {
-            const game = await games.status(gameId)
-            if (game?.published) {
-                return []
-            }
-            if (!game?.draft) {
-                throw createError({
-                    status: 400,
-                    statusText: 'Import every mentioned game before publishing.',
-                })
-            }
-            return [{ collection: 'games', id: gameId, digest: game.draft }]
-        }),
-    )
-    return dependencies.flat()
+    if (!post.data.gameMentions?.length) {
+        return
+    }
+    const gameIds = new Set((await gameCatalog().list()).map((game) => game.id))
+    if (post.data.gameMentions.some((gameId) => !gameIds.has(gameId))) {
+        throw createError({
+            status: 400,
+            statusText: 'Import every mentioned game before publishing.',
+        })
+    }
 }
 
 export default defineEventHandler(async (event) => {
@@ -115,11 +105,9 @@ export default defineEventHandler(async (event) => {
             digest = status.draft
         }
 
-        const expect: Array<ContentPublishExpectation> = [
-            { collection: input.collection, id: input.id, digest },
-        ]
+        const expect = [{ collection: input.collection, id: input.id, digest }]
         if (input.collection === 'posts' && digest) {
-            expect.push(...(await postGameExpectations(input.id, digest)))
+            await validatePostGameReferences(input.id, digest)
         }
 
         if (input.action === 'publish') {
