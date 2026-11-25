@@ -9,7 +9,7 @@ import { validateGameSave } from '../utils/gameValidation.js'
 
 const gameFormSchema = z.object({
     id: z.string().min(1),
-    data: gameFieldsSchema,
+    data: gameFieldsSchema.extend({ order: z.number().finite().optional() }),
 })
 
 export default defineForm({
@@ -21,11 +21,15 @@ export default defineForm({
     maxBytes: 262_144,
     onSubmit: async (submission) => {
         try {
-            const { id, data } = submission.data
+            const { id } = submission.data
             const games = gameCatalog()
             const existing = await games.get(id)
             if (!existing) {
                 throw createError({ status: 404, statusText: 'Import the game from IGDB first.' })
+            }
+            const data = {
+                ...submission.data.data,
+                order: submission.data.data.order ?? existing.data.order ?? 0,
             }
             await validateGameSave({ id, data, previous: existing.data })
             if (!(await games.update(id, existing.data, data))) {

@@ -1,8 +1,14 @@
 <script setup lang="ts">
+import { UiReorderList } from '@liry24/ui'
 import type { ContentDocumentStatus, ContentSchedule } from '@vite-hub/content'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 
 import { gameFieldsSchema, gameStatsFieldsSchema } from '#shared/schemas/content'
+import type {
+    GameRecordData,
+    MediaReference,
+    PortfolioCollectionName,
+} from '#shared/schemas/content'
 
 type FormEndpointName = 'work' | 'art' | 'career' | 'skill' | 'game' | 'game-stats' | 'social'
 
@@ -113,6 +119,22 @@ const errors = ref<Record<string, string>>({})
 const editingId = ref('')
 const formData = ref<AdminEditableFields>({})
 const jsonExtraText = ref('')
+const reorderButtonId = useId()
+const reorderFrom = ref<Array<string> | null>(null)
+const orderDraft = ref<Array<string>>([])
+const savingOrder = ref(false)
+const reorderError = ref('')
+const reordering = computed(() => reorderFrom.value !== null)
+const currentOrder = computed(() => items.value.map((item) => item.id))
+const visibleOrder = computed({
+    get: () => (reordering.value ? orderDraft.value : currentOrder.value),
+    set: (value) => {
+        orderDraft.value = value
+    },
+})
+const orderChanged = computed(() =>
+    reorderFrom.value?.some((id, index) => id !== orderDraft.value[index]),
+)
 
 // IGDB search state for games
 const igdbQuery = ref('')
@@ -144,79 +166,102 @@ function setStringField(key: AdminStringKey, value: string | number) {
     formData.value = next
 }
 
-function setOrderField(value: string | number) {
-    formData.value = {
-        ...formData.value,
-        order: Number(value) || 0,
+function beginReorder() {
+    reorderFrom.value = currentOrder.value
+    orderDraft.value = currentOrder.value
+    reorderError.value = ''
+}
+
+async function endReorder() {
+    reorderFrom.value = null
+    await nextTick()
+    document.getElementById(reorderButtonId)?.focus()
+}
+
+function cancelReorder() {
+    reorderError.value = ''
+    void endReorder()
+}
+
+async function saveOrder() {
+    const from = reorderFrom.value
+    if (!from || !orderChanged.value || savingOrder.value) {
+        return
+    }
+    savingOrder.value = true
+    reorderError.value = ''
+    let resetOrder = false
+    try {
+        await $fetch('/api/admin/reorder', {
+            method: 'POST',
+            body: { model, from, to: orderDraft.value },
+        })
+        await refresh()
+        toast.add({
+            title: model === 'games' ? 'Saved order' : 'Saved order as draft',
+            color: 'success',
+        })
+        resetOrder = true
+    } catch (error_) {
+        if (error_ && typeof error_ === 'object' && 'status' in error_ && error_.status === 409) {
+            await refresh()
+            resetOrder =
+                currentOrder.value.length !== from.length ||
+                currentOrder.value.some((id, index) => id !== from[index])
+        }
+        reorderError.value = adminErrorMessage(error_, 'Could not save order.')
+    } finally {
+        savingOrder.value = false
+        if (resetOrder) {
+            await endReorder()
+        }
     }
 }
 
 function defaultRecord(): AdminEditableFields {
     if (model === 'works') {
-        const entry: WorkData = {
+        return {
             title: '',
             slug: '',
             style: 'small',
-            order: 0,
         }
-        return entry
     }
     if (model === 'arts') {
-        const entry: ArtData = {
+        return {
             title: '',
             slug: '',
             images: [],
-            order: 0,
         }
-        return entry
     }
     if (model === 'careers') {
-        const entry: CareerData = {
+        return {
             company: '',
             slug: '',
             period: '',
             position: '',
-            order: 0,
         }
-        return entry
     }
     if (model === 'skills') {
-        const entry: SkillData = {
+        return {
             name: '',
             slug: '',
             icon: '',
-            order: 0,
         }
-        return entry
-    }
-    if (model === 'games') {
-        const entry: GameRecordData = {
-            igdbId: 1,
-            slug: '',
-            name: '',
-            order: 0,
-            metrics: [],
-        }
-        return entry
     }
     if (model === 'gameStats') {
-        const entry: GameStatsRecordData = {
+        return {
             game: savedGames.value[0]?.id ?? '',
             periodKey: '',
             period: '',
-            order: 0,
             values: [],
         }
-        return entry
     }
-    const entry: SocialData = {
+    return {
         label: '',
         slug: '',
         href: 'https://liry24.com',
         icon: '',
-        order: 0,
     }
-    return entry
 }
 
 const openCreate = () => {
@@ -298,9 +343,7 @@ const saveRecord = async () => {
                 JSON.parse(jsonExtraText.value || '[]'),
             )
         }
-        if (payloadData.order !== undefined) {
-            payloadData.order = Number(payloadData.order) || 0
-        }
+        delete payloadData.order
 
         const payload: ModelFormSubmission = editingId.value
             ? { id: editingId.value, data: payloadData }
@@ -429,12 +472,14 @@ const itemLabel = (item: AdminItem) =>
                         variant="ghost"
                         color="neutral"
                         :loading="pending"
+                        :disabled="reordering"
                         @click="refresh()"
                     />
                     <UButton
                         v-if="model !== 'games'"
                         label="Add"
                         icon="mingcute:add-line"
+                        :disabled="reordering"
                         @click="openCreate"
                     />
                 </template>
@@ -446,6 +491,15 @@ const itemLabel = (item: AdminItem) =>
                 v-if="error"
                 role="alert"
                 :title="adminErrorMessage(error, `Failed to load ${meta.title}.`)"
+                color="error"
+                variant="subtle"
+                :ui="{ title: 'text-red-700 dark:text-red-400' }"
+            />
+
+            <UAlert
+                v-if="reorderError"
+                role="alert"
+                :title="reorderError"
                 color="error"
                 variant="subtle"
                 :ui="{ title: 'text-red-700 dark:text-red-400' }"
@@ -475,7 +529,7 @@ const itemLabel = (item: AdminItem) =>
                         <span>{{ result.name }} ({{ result.slug }})</span>
                         <UButton
                             :label="result.id ? 'Imported' : 'Import'"
-                            :disabled="Boolean(result.id)"
+                            :disabled="Boolean(result.id) || reordering"
                             :loading="igdbImporting"
                             size="xs"
                             @click="handleImportGame(result)"
@@ -495,58 +549,90 @@ const itemLabel = (item: AdminItem) =>
                 <p class="text-muted text-sm">No {{ meta.title.toLowerCase() }} entries yet.</p>
             </div>
 
-            <div class="flex flex-col gap-3">
-                <UCard v-for="item in items" :key="item.id">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="min-w-0 flex-1">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="font-medium">{{ itemLabel(item) }}</span>
-                                <UBadge
-                                    v-if="item.status?.state"
-                                    :label="item.status.state"
-                                    :color="
-                                        item.status.state === 'published' ? 'success' : 'warning'
-                                    "
-                                    :class="
-                                        item.status.state === 'published'
-                                            ? 'text-green-800 dark:text-green-300'
-                                            : 'text-amber-800 dark:text-amber-300'
-                                    "
-                                    variant="subtle"
-                                    size="sm"
+            <div
+                v-if="items.length > 1 || reordering"
+                class="flex flex-wrap items-center justify-end gap-2"
+            >
+                <UButton
+                    :id="reorderButtonId"
+                    :label="reordering ? 'Cancel' : 'Reorder'"
+                    :icon="reordering ? undefined : 'lucide:list-ordered'"
+                    color="neutral"
+                    variant="outline"
+                    :disabled="pending || !!busyId || igdbImporting || savingOrder"
+                    @click="reordering ? cancelReorder() : beginReorder()"
+                />
+                <UButton
+                    v-if="reordering"
+                    label="Save order"
+                    :loading="savingOrder"
+                    :disabled="!orderChanged"
+                    @click="saveOrder"
+                />
+            </div>
+
+            <UiReorderList
+                v-model="visibleOrder"
+                :items="items"
+                :active="reordering"
+                :disabled="savingOrder"
+                :label="itemLabel"
+            >
+                <template #default="{ item }">
+                    <UCard>
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="font-medium">{{ itemLabel(item) }}</span>
+                                    <UBadge
+                                        v-if="item.status?.state"
+                                        :label="item.status.state"
+                                        :color="
+                                            item.status.state === 'published'
+                                                ? 'success'
+                                                : 'warning'
+                                        "
+                                        :class="
+                                            item.status.state === 'published'
+                                                ? 'text-green-800 dark:text-green-300'
+                                                : 'text-amber-800 dark:text-amber-300'
+                                        "
+                                        variant="subtle"
+                                        size="sm"
+                                    />
+                                </div>
+                                <p class="text-muted mt-1 font-mono text-xs">{{ item.id }}</p>
+                            </div>
+
+                            <div v-if="!reordering" class="flex flex-wrap items-center gap-2">
+                                <UButton
+                                    label="Edit"
+                                    size="xs"
+                                    variant="outline"
+                                    color="neutral"
+                                    @click="openEdit(item)"
+                                />
+                                <UButton
+                                    v-if="model !== 'games' && item.status?.state !== 'published'"
+                                    label="Publish"
+                                    size="xs"
+                                    :loading="busyId === item.id"
+                                    @click="publishItem(item)"
+                                />
+                                <UButton
+                                    label="Delete"
+                                    size="xs"
+                                    variant="ghost"
+                                    color="error"
+                                    class="text-red-700 dark:text-red-400"
+                                    :loading="busyId === item.id"
+                                    @click="deleteItem(item)"
                                 />
                             </div>
-                            <p class="text-muted mt-1 font-mono text-xs">{{ item.id }}</p>
                         </div>
-
-                        <div class="flex flex-wrap items-center gap-2">
-                            <UButton
-                                label="Edit"
-                                size="xs"
-                                variant="outline"
-                                color="neutral"
-                                @click="openEdit(item)"
-                            />
-                            <UButton
-                                v-if="model !== 'games' && item.status?.state !== 'published'"
-                                label="Publish"
-                                size="xs"
-                                :loading="busyId === item.id"
-                                @click="publishItem(item)"
-                            />
-                            <UButton
-                                label="Delete"
-                                size="xs"
-                                variant="ghost"
-                                color="error"
-                                class="text-red-700 dark:text-red-400"
-                                :loading="busyId === item.id"
-                                @click="deleteItem(item)"
-                            />
-                        </div>
-                    </div>
-                </UCard>
-            </div>
+                    </UCard>
+                </template>
+            </UiReorderList>
 
             <UModal
                 v-model:open="editorOpen"
@@ -814,14 +900,6 @@ const itemLabel = (item: AdminItem) =>
                                 />
                             </UFormField>
                         </template>
-
-                        <UFormField label="Order">
-                            <UInput
-                                type="number"
-                                :model-value="Number(formData.order ?? 0)"
-                                @update:model-value="(val) => setOrderField(val)"
-                            />
-                        </UFormField>
 
                         <div class="flex justify-end gap-2">
                             <UButton

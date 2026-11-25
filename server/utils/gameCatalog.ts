@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { useDatabase } from 'vite-hub/database'
 
 import type { GameRecordData } from '../../shared/schemas/content.js'
@@ -10,6 +10,39 @@ export function gameCatalog() {
 
     return {
         list: () => db.select(selection).from(table),
+        async listOrdered() {
+            const items = await db.select(selection).from(table)
+            return items.sort(
+                (a, b) => (a.data.order ?? 0) - (b.data.order ?? 0) || a.id.localeCompare(b.id),
+            )
+        },
+        async reorder(
+            expected: Array<{ id: string; order: number }>,
+            changes: Array<{ id: string; order: number }>,
+        ) {
+            // Check the complete order and patch just the order field in the same statement.
+            const result = await db.all<{ id: string }>(sql`
+                WITH expected AS (
+                    SELECT value ->> 'id' AS id, value ->> 'order' AS rank
+                    FROM json_each(${JSON.stringify(expected)})
+                ), changes AS (
+                    SELECT value ->> 'id' AS id, value ->> 'order' AS rank
+                    FROM json_each(${JSON.stringify(changes)})
+                )
+                UPDATE ${table}
+                SET data = json_set(data, '$.order', (SELECT rank FROM changes WHERE changes.id = ${table.id}))
+                WHERE ${table.id} IN (SELECT id FROM changes)
+                    AND (SELECT count(*) FROM ${table}) = (SELECT count(*) FROM expected)
+                    AND NOT EXISTS (
+                        SELECT 1 FROM expected
+                        LEFT JOIN ${table} AS current ON current.id = expected.id
+                        WHERE current.id IS NULL
+                            OR coalesce(json_extract(current.data, '$.order'), 0) <> expected.rank
+                    )
+                RETURNING id
+            `)
+            return result.length === changes.length
+        },
         async get(id: string) {
             return await db.select(selection).from(table).where(eq(table.id, id)).get()
         },

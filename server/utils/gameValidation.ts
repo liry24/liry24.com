@@ -107,7 +107,10 @@ export async function validateGameSave(options: {
     }
 }
 
-export async function validateGameStatsSave(options: { id: string; data: GameStatsRecordData }) {
+export async function validateGameStatsSave(options: {
+    id: string
+    data: Omit<GameStatsRecordData, 'order'>
+}) {
     const { id, data } = options
     if (data.start && data.end && Date.parse(data.start) > Date.parse(data.end)) {
         invalidField('End must follow start.')
