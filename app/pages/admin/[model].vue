@@ -2,18 +2,7 @@
 import type { ContentDocumentStatus, ContentSchedule } from '@vite-hub/content'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 
-import { gameFieldsSchema, gameStatsFieldsSchema } from '../../../shared/schemas/content'
-import type {
-    ArtData,
-    CareerData,
-    GameRecordData,
-    GameStatsRecordData,
-    MediaReference,
-    PortfolioCollectionName,
-    SkillData,
-    SocialData,
-    WorkData,
-} from '../../../shared/schemas/content'
+import { gameFieldsSchema, gameStatsFieldsSchema } from '#shared/schemas/content'
 
 type FormEndpointName = 'work' | 'art' | 'career' | 'skill' | 'game' | 'game-stats' | 'social'
 

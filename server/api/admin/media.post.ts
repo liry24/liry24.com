@@ -1,9 +1,3 @@
-import { createError, defineEventHandler, getQuery } from 'nuxt/server'
-import { blob } from 'vite-hub/blob'
-
-import type { MediaReference } from '../../../shared/schemas/content.js'
-import { requireAdminSession } from '../../utils/auth.js'
-
 function extensionForMime(mimeType: string): string | undefined {
     switch (mimeType) {
         case 'image/png': {

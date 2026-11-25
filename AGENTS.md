@@ -3,7 +3,7 @@
 ## Stack & runtime architecture
 
 - **Framework & SDK**: `nuxt@4.7.0` with `future: { compatibilityVersion: 5 }`, `@nuxt/nitro-v3-server@4.7.0` (Nitro 3), `vite-hub@0.4.1`, `@nuxt/ui` (primary UI) + `@vite-hub/ui` (`Chat` / `PromptInput` for `/admin` assistant).
-- **Platform packages**: `@vite-hub/auth`, `@vite-hub/blob`, `@vite-hub/cms`, `@vite-hub/content`, `@vite-hub/database`, `@vite-hub/forms`, `@vite-hub/schedule`, `@vite-hub/workspace`. Use `vite-hub/*` public subpaths and generated `.nuxt` / `.vitehub` types; keep `@cloudflare/oxlint-config@0.2.0` (`any` is strictly forbidden) and `oxfmt` clean across all app, server, shared, and test files.
+- **Platform packages**: `@vite-hub/auth`, `@vite-hub/blob`, `@vite-hub/cms`, `@vite-hub/content`, `@vite-hub/database`, `@vite-hub/forms`, `@vite-hub/schedule`, `@vite-hub/workspace`. Use `vite-hub/*` public subpaths and generated `.nuxt` / `.vitehub` types.
 - **Database & storage**: Single Cloudflare D1 binding (`DB`) and single public R2 binding (`STORAGE` served at `/media`) shared between `@vite-hub/cms` media and `@vite-hub/content` workspace storage (unpublished draft/revision blobs are not isolated in a separate private bucket). Published, scheduled, and current draft revisions remain separate.
 - **Scheduled publishing**: `server/schedules/content-publish.ts` runs `content.publishDue()` on `* * * * *` via `@vite-hub/schedule` (Nitro `providerOutput: 'nitro'`, disabled during CI test builds with `LIRY24_DISABLE_CRON=true`).
 - **Observability**: `@vite-hub/observability` with cost-controlled `evlog` (`browserErrors: false`, static/media routes excluded, `info` sampled at `1%`, `warn`/`error` at `100%`, tail-sampling keeps `status >= 500`, `duration >= 2000`, `/api/admin/**`, and `/_vitehub/agents/**`) paired with Cloudflare Wrangler `observability` (`invocation_logs: false`, `redact_query_string: true`, `traces.enabled: false`, `issues.enabled: false`).
@@ -30,4 +30,6 @@
 ## Verification commands
 
 - Standard checks: `bun run format:check`, `bun run lint`, `bun run typecheck`, `bun x tsc --noEmit -p tsconfig.tests.json`, `bun run test`.
+- Put app tests that rely on auto-imports in `tests/nuxt/`. `@nuxt/test-utils` applies the fixture's Nuxt transform there and supports `mockNuxtImport`. Node tests load their dependencies directly and use explicit imports.
+- Optional Nuxt diagnostics: `bun run check:doctor`. Use `--changed` for local edits or `--since origin/dev` for branch changes.
 - Built Worker checks (always run `bun run build` after `server/` edits first): `bun x wrangler deploy --dry-run --config .output/server/wrangler.json` and `LIRY24_TEST_BUILT_WORKER=true bun x vitest run tests/worker/` (always via Node/Vitest, never `bun test`).

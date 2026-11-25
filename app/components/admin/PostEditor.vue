@@ -3,8 +3,6 @@ import { UiButton, UiField, UiFileInput, UiFileInputTrigger, UiInput } from '@li
 import type { ContentDocumentStatus, ContentSchedule } from '@vite-hub/content'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 
-import type { MediaReference } from '../../../shared/schemas/content'
-
 import '@liry24/ui/styles.css'
 
 const props = defineProps<{

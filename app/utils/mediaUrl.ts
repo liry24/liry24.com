@@ -1,5 +1,3 @@
-import type { MediaReference } from '../../shared/schemas/content'
-
 export function mediaUrl(reference: MediaReference): string
 export function mediaUrl(reference: MediaReference | null | undefined): string | undefined
 export function mediaUrl(reference: MediaReference | null | undefined) {
