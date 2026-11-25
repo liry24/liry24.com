@@ -454,9 +454,11 @@ const itemLabel = (item: AdminItem) =>
         <template #body>
             <UAlert
                 v-if="error"
+                role="alert"
                 :title="adminErrorMessage(error, `Failed to load ${meta.title}.`)"
                 color="error"
                 variant="subtle"
+                :ui="{ title: 'text-red-700 dark:text-red-400' }"
             />
 
             <UCard v-if="model === 'games'">
@@ -469,9 +471,11 @@ const itemLabel = (item: AdminItem) =>
                     />
                     <UAlert
                         v-if="igdbWarning"
+                        role="status"
                         :title="igdbWarning"
                         color="warning"
                         variant="subtle"
+                        :ui="{ title: 'text-amber-800 dark:text-amber-300' }"
                     />
                     <div
                         v-for="result in igdbResults"
@@ -490,9 +494,16 @@ const itemLabel = (item: AdminItem) =>
                 </div>
             </UCard>
 
-            <p v-if="!pending && items.length === 0" class="text-muted text-sm">
-                No {{ meta.title.toLowerCase() }} entries yet.
-            </p>
+            <div
+                v-if="!pending && !error && items.length === 0"
+                class="mx-auto flex w-full max-w-sm flex-col items-center gap-3 py-8 text-center"
+            >
+                <AdminHairlineDrawer
+                    :label="`No ${meta.title.toLowerCase()} entries`"
+                    class="max-w-xs"
+                />
+                <p class="text-muted text-sm">No {{ meta.title.toLowerCase() }} entries yet.</p>
+            </div>
 
             <div class="flex flex-col gap-3">
                 <UCard v-for="item in items" :key="item.id">
@@ -505,6 +516,11 @@ const itemLabel = (item: AdminItem) =>
                                     :label="item.status.state"
                                     :color="
                                         item.status.state === 'published' ? 'success' : 'warning'
+                                    "
+                                    :class="
+                                        item.status.state === 'published'
+                                            ? 'text-green-800 dark:text-green-300'
+                                            : 'text-amber-800 dark:text-amber-300'
                                     "
                                     variant="subtle"
                                     size="sm"
@@ -533,6 +549,7 @@ const itemLabel = (item: AdminItem) =>
                                 size="xs"
                                 variant="ghost"
                                 color="error"
+                                class="text-red-700 dark:text-red-400"
                                 :loading="busyId === item.id"
                                 @click="deleteItem(item)"
                             />
@@ -549,9 +566,11 @@ const itemLabel = (item: AdminItem) =>
                     <div class="flex flex-col gap-4">
                         <UAlert
                             v-if="formError"
+                            role="alert"
                             :title="formError"
                             color="error"
                             variant="subtle"
+                            :ui="{ title: 'text-red-700 dark:text-red-400' }"
                         />
 
                         <template v-if="model === 'works'">

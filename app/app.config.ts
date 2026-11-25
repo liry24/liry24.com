@@ -37,6 +37,13 @@ export default defineAppConfig({
                 item: 'md:py-2',
             },
         },
+        dashboardNavbar: {
+            slots: {
+                root: 'max-lg:h-auto max-lg:min-h-(--ui-header-height) max-lg:flex-wrap max-lg:py-2',
+                right: 'max-lg:max-w-full max-lg:flex-wrap',
+                toggle: 'shrink-0',
+            },
+        },
         dashboardPanel: {
             slots: {
                 root: 'lg:not-last:border-0',

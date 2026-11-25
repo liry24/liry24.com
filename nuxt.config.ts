@@ -13,13 +13,16 @@ const baseURL =
     (isPreview ? 'https://dev-liry24-com.liry.workers.dev' : 'https://liry24.com')
 const imagesDomain = isPreview ? baseURL : 'https://images.liry24.com'
 const title = 'Liry24'
+const diagnostics = process.env.NUXT_DIAGNOSTICS === '1'
 
 export default defineNuxtConfig({
     compatibilityDate: '2026-10-13',
 
     future: { compatibilityVersion: 5 },
 
-    devtools: { enabled: true, timeline: { enabled: true } },
+    devtools: { enabled: true, timeline: { enabled: false } },
+
+    a11y: { enabled: false },
 
     css: ['~/assets/css/main.css'],
 
@@ -92,7 +95,6 @@ export default defineNuxtConfig({
         ],
         '@nuxt/image',
         '@vueuse/nuxt',
-        '@nuxt/hints',
         '@nuxt/a11y',
         'nuxt-site-config',
         '@nuxtjs/sitemap',
@@ -148,6 +150,16 @@ export default defineNuxtConfig({
                 '@formkit/drag-and-drop',
                 '@formkit/drag-and-drop/vue',
                 '@yeger/vue-masonry-wall',
+                '@tanstack/charts',
+                '@tanstack/charts/vue',
+                '@tanstack/charts/scales/band',
+                '@tanstack/charts/scales/linear',
+                '@tanstack/charts/scales/ordinal',
+                '@tanstack/charts/scales/point',
+                '@tanstack/charts/crosshair',
+                '@tanstack/charts/mark/decorative',
+                '@tanstack/charts/polar',
+                '@lucasmarkes/hairline',
                 'cn',
             ],
         },
@@ -258,7 +270,8 @@ export default defineNuxtConfig({
     fonts: {
         defaults: { weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
         families: [
-            { name: 'Geist', provider: 'google', preload: true, global: true },
+            { name: 'Inter', provider: 'google', preload: true, global: true },
+            { name: 'Geist', weights: [200], provider: 'google', preload: false, global: true },
             { name: 'Geist Mono', provider: 'google', preload: true, global: true },
             {
                 name: 'Special Gothic Expanded One',
@@ -307,6 +320,9 @@ export default defineNuxtConfig({
     },
 
     $development: {
+        modules: diagnostics ? ['@nuxt/hints'] : [],
+        a11y: { enabled: diagnostics },
+        devtools: { timeline: { enabled: diagnostics } },
         vite: { warmupEntry: false },
         runtimeConfig: { public: { siteUrl: '' } },
         vitehub: { logs: true },

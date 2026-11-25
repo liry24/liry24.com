@@ -47,3 +47,16 @@ jobs:
       - run: bun x vitest run tests/worker/built-app.test.ts tests/worker/pocket-id.test.ts
         env:
           LIRY24_TEST_BUILT_WORKER: 'true'
+      - run: bun x playwright-core install --with-deps chromium
+      - run: bun x vitest run tests/worker/accessibility.browser.test.ts
+        env:
+          LIRY24_TEST_ACCESSIBILITY_BROWSER: 'true'
+      - name: Upload accessibility reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: accessibility-reports
+          path: .tmp/accessibility
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
