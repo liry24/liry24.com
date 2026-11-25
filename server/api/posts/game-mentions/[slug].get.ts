@@ -1,7 +1,3 @@
-import { defineEventHandler, getRouterParam } from 'nuxt/server'
-
-import { gameCatalog } from '../../../utils/gameCatalog.js'
-
 export default defineEventHandler(async (event): Promise<GameMentionData | null> => {
     const slug = getRouterParam(event, 'slug')
     if (!slug || !gameSlugPattern.test(slug)) {

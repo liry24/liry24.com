@@ -1,10 +1,6 @@
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import type { Mock } from 'vitest'
-import type { Ref } from 'vue'
-import { defineComponent, h, ref } from 'vue'
-
-import { adminSessionDevice, useAdminSessions } from '#imports'
 
 interface MockSessionRow {
     id: string

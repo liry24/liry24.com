@@ -1,10 +1,6 @@
-import { createError, defineEventHandler, getQuery } from 'nuxt/server'
 import { z } from 'zod'
 
-import type { PostItem } from '../../../shared/schemas/content.js'
-import content from '../../content.js'
-import { listAllCollectionItems } from '../../utils/content.js'
-import { gameCatalog } from '../../utils/gameCatalog.js'
+import content from '#server/content'
 
 const postTimestamp = (entry: PostItem) =>
     Date.parse(String(entry.data.authoredAt ?? entry.publishedAt ?? '')) || 0

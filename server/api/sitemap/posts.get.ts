@@ -1,7 +1,4 @@
-import { defineEventHandler } from 'nuxt/server'
-
-import content from '../../content.js'
-import { listAllCollectionItems } from '../../utils/content.js'
+import content from '#server/content'
 
 export default defineEventHandler(async () => {
     const posts = await listAllCollectionItems(content.collection('posts'), 'published')

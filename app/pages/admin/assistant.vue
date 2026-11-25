@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { PromptInputSubmit } from '@vite-hub/ui'
-import { useAgent, useChat } from 'vite-hub/agent/vue'
 
 useHead({ title: 'Assistant' })
 

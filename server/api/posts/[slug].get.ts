@@ -1,8 +1,4 @@
-import { createError, defineEventHandler, getRouterParam } from 'nuxt/server'
-
-import type { PostItem } from '../../../shared/schemas/content.js'
-import content from '../../content.js'
-import { listAllCollectionItems } from '../../utils/content.js'
+import content from '#server/content'
 
 export default defineEventHandler(async (event) => {
     const rawSlug = getRouterParam(event, 'slug')

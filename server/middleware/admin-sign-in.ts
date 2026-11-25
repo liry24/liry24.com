@@ -1,8 +1,4 @@
-import { createError, defineEventHandler, sendRedirect } from 'nuxt/server'
-import { useAuth } from 'vite-hub/auth/server'
 import { z } from 'zod'
-
-import { getAppSession, isAdminUser } from '../utils/auth.js'
 
 const signInResult = z.object({ url: z.url({ protocol: /^https?$/u }) })
 
