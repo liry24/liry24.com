@@ -2,8 +2,9 @@
 const { slug } = defineProps<{ slug: string }>()
 
 const fallback = computed(() => '<game:' + slug + '>')
-const { data } = await usePortfolioData('games')
-const game = computed(() => data.value?.find((entry) => entry.data.slug === slug)?.data)
+const { data: game } = await useFetch<GameMentionData | null>(
+    () => `/api/posts/game-mentions/${encodeURIComponent(slug)}`,
+)
 </script>
 
 <template>

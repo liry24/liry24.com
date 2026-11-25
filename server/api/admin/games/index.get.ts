@@ -1,17 +1,8 @@
 import { createError, defineEventHandler, getQuery } from 'nuxt/server'
 
-import { gameFieldsSchema } from '../../../../shared/schemas/content.js'
-import content from '../../../content.js'
 import { requireAdminSession } from '../../../utils/auth.js'
-import { listAllCollectionItems } from '../../../utils/content.js'
+import { gameCatalog } from '../../../utils/gameCatalog.js'
 import { queryIgdb } from '../../../utils/igdb.js'
-
-const gameSearchItemSchema = gameFieldsSchema.pick({
-    igdbId: true,
-    slug: true,
-    name: true,
-    cover: true,
-})
 
 function isUnconfiguredIgdbError(error: unknown): boolean {
     if (!error || typeof error !== 'object') {
@@ -31,28 +22,25 @@ export default defineEventHandler(async (event) => {
     }
     event.res.headers.set('Cache-Control', 'private, no-store')
 
-    const docs = await listAllCollectionItems(content.collection('games'), 'draft')
+    const docs = await gameCatalog().list()
     const lowerQuery = query.toLowerCase()
     const games: Array<GameSearchResult> = []
 
     for (const doc of docs) {
-        const parsed = gameSearchItemSchema.safeParse(doc.data)
-        if (!parsed.success) {
-            continue
-        }
+        const { igdbId, slug, name, cover } = doc.data
         if (
             query &&
-            !parsed.data.name.toLowerCase().includes(lowerQuery) &&
-            !parsed.data.slug.toLowerCase().includes(lowerQuery)
+            !name.toLowerCase().includes(lowerQuery) &&
+            !slug.toLowerCase().includes(lowerQuery)
         ) {
             continue
         }
         games.push({
             id: doc.id,
-            igdbId: parsed.data.igdbId,
-            slug: parsed.data.slug,
-            name: parsed.data.name,
-            cover: parsed.data.cover ?? null,
+            igdbId,
+            slug,
+            name,
+            cover: cover ?? null,
         })
     }
 
@@ -64,7 +52,7 @@ export default defineEventHandler(async (event) => {
 
     try {
         const remote = await queryIgdb({ search: query })
-        const existingIgdbIds = new Set(limited.map((item) => item.igdbId))
+        const existingIgdbIds = new Set(docs.map((item) => item.data.igdbId))
         return {
             games: [...limited, ...remote.filter((game) => !existingIgdbIds.has(game.igdbId))],
             warning: '',

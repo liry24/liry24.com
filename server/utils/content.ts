@@ -4,10 +4,8 @@ import type {
     ArtData,
     CareerData,
     ContentCollectionName,
-    GameRecordData,
     GameStatsRecordData,
     PostData,
-    RankData,
     SkillData,
     SocialData,
     WorkData,
@@ -20,9 +18,7 @@ export type CollectionDocumentData =
     | ArtData
     | CareerData
     | SkillData
-    | GameRecordData
     | GameStatsRecordData
-    | RankData
     | SocialData
 
 export interface CollectionDocumentItem<TData = CollectionDocumentData> {
@@ -94,14 +90,8 @@ async function listCollectionByName(
         case 'skills': {
             return await listAllCollectionItems(content.collection('skills'), ref)
         }
-        case 'games': {
-            return await listAllCollectionItems(content.collection('games'), ref)
-        }
         case 'gameStats': {
             return await listAllCollectionItems(content.collection('gameStats'), ref)
-        }
-        case 'ranks': {
-            return await listAllCollectionItems(content.collection('ranks'), ref)
         }
         case 'socials': {
             return await listAllCollectionItems(content.collection('socials'), ref)

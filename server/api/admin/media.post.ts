@@ -27,7 +27,7 @@ function extensionForMime(mimeType: string): string | undefined {
     }
 }
 
-const allowedFolders = new Set(['posts', 'works', 'arts', 'games', 'ranks', 'uploads'])
+const allowedFolders = new Set(['posts', 'works', 'arts', 'games', 'uploads'])
 const maxFileBytes = 10 * 1024 * 1024
 
 interface UploadLikeFile {

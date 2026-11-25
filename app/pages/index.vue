@@ -18,44 +18,23 @@ const MotionUSeparator = motion.create('hr')
 const arts = usePortfolioData('arts')
 const socials = usePortfolioData('socials')
 const careers = usePortfolioData('careers')
-const ranks = usePortfolioData('ranks')
-const games = usePortfolioData('games')
-const gameStats = usePortfolioData('gameStats')
+const gameStats = useFetch<GameStatsPage>('/api/portfolio/gameStats')
 const posts = useFetch<PostCardsPage>('/api/posts/cards', { query: { limit: 10 } })
-await Promise.all([arts, socials, careers, ranks, games, gameStats, posts])
+await Promise.all([arts, socials, careers, gameStats, posts])
 const data = computed(() => ({
     arts: arts.data.value || [],
     socials: socials.data.value?.map((entry) => entry.data) || [],
     careers: careers.data.value?.map((entry) => entry.data) || [],
-    ranks:
-        ranks.data.value?.map((entry) => ({
-            ...entry.data,
-            entryId: entry.id,
-            imageUrl: mediaUrl(entry.data.image),
-        })) || [],
     posts: posts.data.value?.items ?? [],
 }))
 
 const statGames = computed(() =>
-    (games.data.value ?? [])
-        .map((game) => ({
-            ...game,
-            periods: (gameStats.data.value ?? [])
-                .filter((period) => period.data.game === game.id)
-                .map((period) => period.data),
-        }))
-        .filter((game) => game.periods.length),
-)
-
-// shortcut: retain unmigrated rank cards until the legacy model is retired.
-const legacyRanks = computed(() =>
-    data.value.ranks.filter(
-        (rank) =>
-            !gameStats.data.value?.some((period) => period.id === `legacy-${rank.entryId}`) &&
-            !statGames.value.some(
-                (game) => game.data.name.toLowerCase() === rank.game.toLowerCase(),
-            ),
-    ),
+    (gameStats.data.value?.games ?? []).map((game) => ({
+        ...game,
+        periods: (gameStats.data.value?.items ?? [])
+            .filter((period) => period.data.game === game.id)
+            .map((period) => period.data),
+    })),
 )
 
 const rotateArray = <T>(arr: Array<T>, n: number): Array<T> => {
@@ -245,16 +224,6 @@ useKeyCommand(modalStacks.open)
                     :game="game.data"
                     :periods="game.periods"
                 />
-                <NuxtLink
-                    v-for="(rank, index) in legacyRanks"
-                    :key="`legacy-rank-${index}`"
-                    :to="rank.href || undefined"
-                    target="_blank"
-                    class="hover:bg-muted mx-auto flex items-center gap-1 rounded-xl px-6 py-3 text-2xl"
-                    ><span class="font-bold">{{ rank.game }}</span
-                    ><span class="text-muted font-light">{{ rank.season }}</span
-                    ><NuxtImg :src="rank.imageUrl" :alt="rank.rank" :width="40" :height="40"
-                /></NuxtLink>
             </Motion>
         </div>
 

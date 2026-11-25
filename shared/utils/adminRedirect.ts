@@ -5,7 +5,12 @@ export function isAdminPath(pathname: string) {
 }
 
 export function adminRedirect(value: unknown) {
-    if (typeof value !== 'string' || !value.startsWith('/') || /[\\\s]/u.test(value)) {
+    if (
+        typeof value !== 'string' ||
+        !value.startsWith('/') ||
+        value.startsWith('//') ||
+        /[\\\s]/u.test(value)
+    ) {
         return '/admin'
     }
     const origin = 'https://admin.invalid'

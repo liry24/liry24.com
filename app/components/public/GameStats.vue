@@ -1,6 +1,6 @@
 <script setup lang="ts">
 interface Props {
-    game: GameData
+    game: GameStatsDisplay
     periods: Array<GamePeriod>
 }
 const { game, periods } = defineProps<Props>()

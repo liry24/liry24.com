@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { adminRedirect } from '../../shared/utils/adminRedirect'
-
 definePageMeta({
     layout: 'minimal',
 })

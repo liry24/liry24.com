@@ -2,7 +2,6 @@ import { createError, defineEventHandler, sendRedirect } from 'nuxt/server'
 import { useAuth } from 'vite-hub/auth/server'
 import { z } from 'zod'
 
-import { adminRedirect, isAdminPath } from '../../shared/utils/adminRedirect.js'
 import { getAppSession, isAdminUser } from '../utils/auth.js'
 
 const signInResult = z.object({ url: z.url({ protocol: /^https?$/u }) })
@@ -43,7 +42,7 @@ export default defineEventHandler(async (event) => {
     if (start.status === 429) {
         return start
     }
-    const result = signInResult.safeParse(start.ok ? await start.json() : null)
+    const result = signInResult.safeParse(start.ok ? await start.json().catch(() => null) : null)
     for (const cookie of start.headers.getSetCookie()) {
         event.res.headers.append('Set-Cookie', cookie)
     }
