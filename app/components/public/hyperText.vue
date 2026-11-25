@@ -64,7 +64,9 @@ watch(
     },
 )
 
-if (animateOnLoad) triggerAnimation()
+if (animateOnLoad) {
+    triggerAnimation()
+}
 </script>
 
 <template>

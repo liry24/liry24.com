@@ -1,61 +1,59 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'admin', layout: 'admin' })
-const { user } = useUserSession()
-const isPreview = String(useRuntimeConfig().public.preview) === 'true'
-const failure = ref('')
-async function revokeOthers() {
-    const client = useAuthClient()
-    if (!client) return
-    const result = await client.revokeOtherSessions()
-    failure.value = result.error?.message || ''
-}
+const { signOut, user } = useAppSession()
+useHead({ title: 'Settings' })
 </script>
 
 <template>
-    <AdminResourcePage title="Settings" icon="mingcute:settings-1-fill">
-        <UCard>
-            <template #header>
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <h2 class="my-2 text-xl leading-none font-semibold">Account</h2>
-                    <UBadge
-                        v-if="user?.emailVerified"
-                        label="Email verified"
-                        icon="mingcute:check-line"
-                        variant="soft"
-                        color="success"
-                    />
-                </div>
-            </template>
-            <UUser
-                :name="user?.name"
-                :description="user?.email"
-                :avatar="{ src: user?.image || undefined, icon: 'mingcute:user-3-fill' }"
-            />
-        </UCard>
-        <section v-if="!isPreview" id="passkeys"><AdminSettingsPasskeys /></section>
-        <section id="accounts"><AdminSettingsAccounts /></section>
-        <section id="sessions">
-            <UCard>
-                <template #header
-                    ><h2 class="my-2 text-xl leading-none font-semibold">Sessions</h2></template
-                >
-                <UPageCard
-                    title="Logout Other Sessions"
-                    description="Logout all other sessions."
-                    orientation="horizontal"
-                    variant="naked"
-                >
+    <UDashboardPanel
+        id="settings"
+        :ui="{
+            root: 'h-full min-h-0',
+            body: 'gap-6 p-4 sm:p-6 *:shrink-0',
+        }"
+    >
+        <template #header>
+            <UDashboardNavbar title="Settings" icon="mingcute:settings-1-fill">
+                <template #right>
                     <UButton
-                        label="Logout Other Sessions"
-                        variant="subtle"
+                        label="Sign out"
+                        icon="mingcute:exit-line"
+                        variant="outline"
                         color="neutral"
-                        loading-auto
-                        class="ml-auto w-fit min-w-48"
-                        @click="revokeOthers"
+                        @click="signOut()"
                     />
-                </UPageCard>
+                </template>
+            </UDashboardNavbar>
+        </template>
+
+        <template #body>
+            <UCard :ui="{ body: 'flex flex-col gap-4 items-start' }" class="divide-none">
+                <h2 class="text-title">Account</h2>
+
+                <UUser
+                    :name="user?.name || 'Admin'"
+                    :avatar="{
+                        src: user?.image || undefined,
+                        icon: 'mingcute:user-3-fill',
+                    }"
+                    :ui="{ description: 'flex items-center gap-2' }"
+                >
+                    <template #description>
+                        <span>{{ user?.email }}</span>
+                        <UBadge
+                            v-if="user?.emailVerified"
+                            label="Verified"
+                            icon="mingcute:check-line"
+                            variant="soft"
+                            color="success"
+                            size="sm"
+                        />
+                    </template>
+                </UUser>
             </UCard>
-        </section>
-        <UAlert v-if="failure" :title="failure" color="error" />
-    </AdminResourcePage>
+
+            <section id="sessions">
+                <AdminSettingsSessions />
+            </section>
+        </template>
+    </UDashboardPanel>
 </template>

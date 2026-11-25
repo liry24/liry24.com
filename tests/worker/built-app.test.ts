@@ -1,231 +1,430 @@
-import { createHmac } from 'node:crypto'
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { readFile, readdir } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
-import type { D1Database, R2Bucket } from '@cloudflare/workers-types'
-import { drizzleAdapter } from '@liria24/site-admin/adapters/drizzle'
-import { createSiteAdmin } from '@liria24/site-admin/server'
-import { drizzle } from 'drizzle-orm/d1'
-import { migrate } from 'drizzle-orm/d1/migrator'
 import { expect, test } from 'vitest'
-import { createTestHarness, type Unstable_RawConfig } from 'wrangler'
+import { z } from 'zod'
 
-import * as schema from '../../server/database/schema'
-import siteAdminConfig from '../../site-admin.config'
+import { builtWorker } from '../helpers/builtWorker'
+import { oidcProvider } from '../helpers/oidc'
+
+const uploadedMediaSchema = z.object({
+    pathname: z.string(),
+    contentType: z.string().optional(),
+    size: z.number().optional(),
+})
+
+const adminListSchema = z.object({
+    items: z.array(z.object({ id: z.string(), title: z.string() })),
+})
+
+const publishScheduleSchema = z.object({
+    ok: z.boolean(),
+    schedule: z.object({ id: z.string() }).optional(),
+})
+
+const evlogAuthFailureSchema = z.object({
+    status: z.number(),
+    path: z.string(),
+})
+
+const expectedAdminGatePaths = new Set([
+    '/api/admin/content/posts',
+    '/api/admin/content/publish',
+    '/api/admin/media',
+])
+
+function isExpectedHttpErrorLog(message: string): boolean {
+    try {
+        const parsed = evlogAuthFailureSchema.safeParse(JSON.parse(message))
+        if (!parsed.success) {
+            return false
+        }
+        if (
+            (parsed.data.status === 401 || parsed.data.status === 403) &&
+            expectedAdminGatePaths.has(parsed.data.path)
+        ) {
+            return true
+        }
+        return parsed.data.status === 404 && parsed.data.path === '/api/posts/built-worker-post'
+    } catch {
+        return false
+    }
+}
+
+async function multipartRequest(
+    form: FormData,
+    headers: Record<string, string>,
+): Promise<{ headers: Record<string, string>; body: Uint8Array }> {
+    const serialized = new Request('http://multipart.invalid', { method: 'POST', body: form })
+    const contentType = serialized.headers.get('content-type')
+    return {
+        headers: contentType ? { ...headers, 'content-type': contentType } : headers,
+        body: new Uint8Array(await serialized.arrayBuffer()),
+    }
+}
 
 test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
-    'the emitted v2 Worker uses D1/R2 and wires scheduled publishing without the local SQLite driver',
+    'the emitted Worker enforces auth gates, serves public/media/content routes, runs mock assistant chat, and keeps preview isolation',
     async () => {
-        const root = await mkdtemp(join(tmpdir(), 'liry24-built-worker-'))
-        const generated = JSON.parse(await readFile('.output/server/wrangler.json', 'utf8'))
-        expect(generated.compatibility_flags).toEqual([
-            'nodejs_compat_v2',
-            'enable_nodejs_process_v2',
-            'nodejs_compat_populate_process_env',
-        ])
-        expect(generated.ai).toBeUndefined()
-        const serverDirectory = resolve('.output/server')
-        const chunks = await readdir(serverDirectory, { recursive: true })
-        const ogImageBundle = await readFile(
-            join(serverDirectory, 'chunks/routes/_og/d/image.mjs'),
-            'utf8',
-        )
-        for (const family of ['Special Gothic Expanded One', 'Geist Mono'])
-            expect(ogImageBundle, `OG images retain ${family}`).toMatch(
-                new RegExp(`(?:\\bfamily|"family"):\\s*"${family}"`),
-            )
-        const homeComponentPath = chunks.find((file) =>
-            /[/\\]build[/\\]Home\.takumi-[^/\\]+\.mjs$/.test(file),
-        )
-        expect(homeComponentPath, 'OG home component is emitted').toBeDefined()
-        const homeComponent = await readFile(join(serverDirectory, homeComponentPath!), 'utf8')
-        expect(homeComponent).toMatch(/"font-family":\s*"'Special Gothic Expanded One'"/)
-        for (const file of chunks.filter((file) => file.endsWith('.mjs'))) {
-            const bundle = await readFile(join(serverDirectory, file), 'utf8')
-            for (const marker of [
-                'openDevelopmentDB',
-                'LIRY24_DEV_DB_PATH',
-                '.data/development/sqlite.db',
-                'drizzle-orm/node-sqlite',
-                'node-sqlite/migrator',
-            ])
-                expect(bundle, `${file}: development code ${marker}`).not.toContain(marker)
-        }
-        const isPreview = Boolean(generated.previews)
-        const runtime = isPreview ? generated.previews : generated
-        const config: Unstable_RawConfig = {
-            ...generated,
-            ...runtime,
-            name: 'liry24-built-worker-test',
-            main: resolve('.output/server/index.mjs'),
-            assets: { ...generated.assets, directory: resolve('.output/public') },
-            routes: [],
-            triggers: { crons: [] },
-            d1_databases: [{ binding: 'DB', database_name: 'test-db', database_id: 'test-db' }],
-            r2_buckets: [{ binding: 'R2', bucket_name: 'test-assets' }],
-        }
-        delete config.previews
-        // No inference or remote AI service is available in this synthetic Worker test.
-        delete config.ai
-        const configPath = join(root, 'wrangler.json')
-        await writeFile(configPath, JSON.stringify(config))
-        const secrets = Object.fromEntries(
-            [...generated.secrets.required, 'PREVIEW_GITHUB_TOKEN'].map((name) => [
-                name,
-                `test-only-${name}-0123456789abcdef0123456789abcdef`,
-            ]),
-        )
-        const server = createTestHarness({ workers: [{ configPath, secrets }] })
+        const provider = await oidcProvider()
         try {
-            await server.listen()
-            const worker = server.getWorker<{ DB: D1Database; R2: R2Bucket }>()
-            const env = await worker.getEnv()
-            const orm = drizzle(env.DB)
-            await migrate(orm, { migrationsFolder: 'drizzle' })
-            const admin = createSiteAdmin({
-                config: siteAdminConfig,
-                database: drizzleAdapter(orm, { schema }),
+            const app = await builtWorker({
+                secrets: {
+                    POCKET_ID_TEST_ISSUER: provider.issuer,
+                },
             })
-            await env.R2.put('runtime-binding-probe', 'local-only')
-            expect(await (await env.R2.get('runtime-binding-probe'))?.text()).toBe('local-only')
-            for (const [path, status] of [
-                ['/api/auth/get-session', 200],
-                ['/', 200],
-                ['/works', 200],
-                ['/api/site-admin/models', 401],
-                ['/admin/works', 404],
-                ['/favicon.ico', 200],
-                ['/login', 200],
-            ] as const) {
-                const response = await server.fetch(path)
-                const body = await response.text()
-                expect(response.status, `${path}: ${body.slice(0, 300)}`).toBe(status)
-                if (path === '/' || path === '/works') {
-                    const image = body.match(
-                        /<meta\b[^>]*property="og:image"[^>]*content="([^"]+)"/,
-                    )
-                    expect(image, 'SSR includes an OG image').not.toBeNull()
-                    const url = new URL(image![1]!.replaceAll('&amp;', '&'))
-                    const rendered = await server.fetch(`${url.pathname}${url.search}`)
-                    expect(rendered.status, await rendered.clone().text()).toBe(200)
-                    expect(rendered.headers.get('content-type')).toMatch(/^image\//)
-                    expect((await rendered.arrayBuffer()).byteLength).toBeGreaterThan(1000)
-                }
-                if (path === '/api/auth/get-session') expect(body).toBe('null')
-                if (path === '/login' && isPreview) expect(body).not.toContain('Vercel')
-            }
-            const userId = 'synthetic-built-worker-admin'
-            const token = 'synthetic-built-worker-session'
-            const now = Date.now()
-            await env.DB.prepare(
-                'INSERT INTO users (id,name,email,email_verified,role,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
-            )
-                .bind(
-                    userId,
-                    'Synthetic admin',
-                    'built-admin@example.invalid',
-                    1,
-                    'admin',
-                    now,
-                    now,
-                )
-                .run()
-            await env.DB.prepare(
-                'INSERT INTO sessions (id,token,user_id,expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?)',
-            )
-                .bind('synthetic-built-worker-session', token, userId, now + 3600000, now, now)
-                .run()
-            const signed = encodeURIComponent(
-                `${token}.${createHmac('sha256', secrets.BETTER_AUTH_SECRET!)
-                    .update(token)
-                    .digest('base64')}`,
-            )
-            const authenticated = {
-                cookie: `better-auth.session_token=${signed}; __Secure-better-auth.session_token=${signed}`,
-            }
-            // Auth must initialize independently of CMS access and remain request-local
-            // when authenticated and anonymous requests share the same Worker/database.
-            await Promise.all(
-                Array.from({ length: 8 }, async (_, index) => {
-                    const hasSession = index % 2 === 0
-                    const response = await server.fetch('/api/auth/get-session', {
-                        headers: hasSession ? authenticated : {},
-                    })
-                    expect(response.status).toBe(200)
-                    const session = await response.json()
-                    if (hasSession) expect(session).toMatchObject({ user: { id: userId } })
-                    else expect(session).toBeNull()
-                }),
-            )
-            const models = await server.fetch('/api/site-admin/models', { headers: authenticated })
-            if (isPreview) {
-                // This synthetic session has no GitHub account. Preview authorization
-                // must fail closed without attempting a real repository lookup.
-                expect(models.status).toBe(403)
-                expect(await models.json()).toMatchObject({
-                    error: { code: 'SITE_ADMIN_FORBIDDEN' },
+            try {
+                const admin = await app.session('built-admin', 'admin', 'owner@example.invalid')
+                const viewer = await app.session('built-viewer', 'user', 'viewer@example.invalid')
+                const jsonHeaders = (headers?: { cookie: string; origin: string }) => ({
+                    'content-type': 'application/json',
+                    ...(headers ?? { origin: app.url.origin }),
                 })
-            } else {
-                expect(models.status).toBe(200)
-                expect(Object.keys((await models.json<{ models: object }>()).models)).toHaveLength(
-                    7,
+
+                for (const path of [
+                    '/',
+                    '/login',
+                    '/favicon.ico',
+                    '/api/posts/cards',
+                    '/api/portfolio/works',
+                ]) {
+                    expect((await app.server.fetch(path)).status, path).toBe(200)
+                }
+                expect(await (await app.server.fetch('/api/auth/get-session')).text()).toBe('null')
+
+                for (const path of ['/admin', '/admin/works']) {
+                    expect(
+                        (await app.server.fetch(path, { redirect: 'manual' })).status,
+                        path,
+                    ).toBe(302)
+                }
+
+                expect((await app.server.fetch('/api/admin/content/posts')).status).toBe(401)
+                expect(
+                    (
+                        await app.server.fetch('/_vitehub/forms/post', {
+                            method: 'POST',
+                            headers: jsonHeaders(),
+                            body: JSON.stringify({}),
+                        })
+                    ).status,
+                ).toBe(401)
+                expect(
+                    (
+                        await app.server.fetch('/api/admin/content/publish', {
+                            method: 'POST',
+                            headers: jsonHeaders(),
+                            body: JSON.stringify({}),
+                        })
+                    ).status,
+                ).toBe(401)
+                expect(
+                    (
+                        await app.server.fetch('/api/admin/media', {
+                            method: 'POST',
+                            ...(await multipartRequest(new FormData(), { origin: app.url.origin })),
+                        })
+                    ).status,
+                ).toBe(401)
+                expect(
+                    (
+                        await app.server.fetch('/_vitehub/agents/assistant/chat', {
+                            method: 'POST',
+                            headers: jsonHeaders(),
+                            body: JSON.stringify({ messages: [] }),
+                        })
+                    ).status,
+                ).toBe(401)
+
+                expect(
+                    (await app.server.fetch('/api/admin/content/posts', { headers: viewer }))
+                        .status,
+                ).toBe(403)
+                expect(
+                    (
+                        await app.server.fetch('/_vitehub/forms/post', {
+                            method: 'POST',
+                            headers: jsonHeaders(viewer),
+                            body: JSON.stringify({}),
+                        })
+                    ).status,
+                ).toBe(403)
+                expect(
+                    (
+                        await app.server.fetch('/api/admin/content/publish', {
+                            method: 'POST',
+                            headers: jsonHeaders(viewer),
+                            body: JSON.stringify({}),
+                        })
+                    ).status,
+                ).toBe(403)
+                expect(
+                    (
+                        await app.server.fetch('/api/admin/media', {
+                            method: 'POST',
+                            ...(await multipartRequest(new FormData(), viewer)),
+                        })
+                    ).status,
+                ).toBe(403)
+                expect(
+                    (
+                        await app.server.fetch('/_vitehub/agents/assistant/chat', {
+                            method: 'POST',
+                            headers: jsonHeaders(viewer),
+                            body: JSON.stringify({ messages: [] }),
+                        })
+                    ).status,
+                ).toBe(403)
+
+                const fixtureBytes = await readFile(
+                    resolve('tests/fixtures/accessibility-artwork.png'),
                 )
+                const mediaForm = new FormData()
+                mediaForm.append(
+                    'file',
+                    new File([new Uint8Array(fixtureBytes)], 'sample.png', { type: 'image/png' }),
+                )
+                mediaForm.append('folder', 'posts')
+                const uploadResponse = await app.server.fetch('/api/admin/media', {
+                    method: 'POST',
+                    ...(await multipartRequest(mediaForm, admin)),
+                })
+                expect(uploadResponse.status, await uploadResponse.clone().text()).toBe(200)
+                const uploaded = uploadedMediaSchema.parse(await uploadResponse.json())
+                expect(uploaded.pathname).toMatch(/^posts\/.+\.png$/u)
+
+                const mediaGet = await app.server.fetch(
+                    `/media/${uploaded.pathname.split('/').map(encodeURIComponent).join('/')}`,
+                )
+                expect(mediaGet.status).toBe(200)
+                expect(new Uint8Array(await mediaGet.arrayBuffer())).toEqual(
+                    new Uint8Array(fixtureBytes),
+                )
+
+                const saveResponse = await app.server.fetch('/_vitehub/forms/post', {
+                    method: 'POST',
+                    headers: jsonHeaders(admin),
+                    body: JSON.stringify({
+                        id: 'built-worker-post',
+                        data: {
+                            title: 'Built Worker Post',
+                            plainTitle: 'Built Worker Post',
+                            slug: 'built-worker-post',
+                            tags: ['vitehub'],
+                            gameMentions: [],
+                            order: 0,
+                        },
+                        body: 'Introduction\n\n<!-- more -->\n\nPRIVATE_DRAFT_BODY',
+                    }),
+                })
+                expect(saveResponse.status, await saveResponse.clone().text()).toBe(201)
+
+                const beforePublishCards = await (await app.server.fetch('/api/posts/cards')).text()
+                expect(beforePublishCards).not.toContain('built-worker-post')
+                expect(beforePublishCards).not.toContain('PRIVATE_DRAFT_BODY')
+
+                const adminPostsResponse = await app.server.fetch('/api/admin/content/posts', {
+                    headers: admin,
+                })
+                expect(adminPostsResponse.status).toBe(200)
+                expect(adminPostsResponse.headers.get('cache-control')).toBe('private, no-store')
+                const adminPosts = adminListSchema.parse(await adminPostsResponse.json())
+                expect(adminPosts.items.some((item) => item.id === 'built-worker-post')).toBe(true)
+
+                const publishResponse = await app.server.fetch('/api/admin/content/publish', {
+                    method: 'POST',
+                    headers: jsonHeaders(admin),
+                    body: JSON.stringify({
+                        action: 'publish',
+                        collection: 'posts',
+                        id: 'built-worker-post',
+                    }),
+                })
+                expect(publishResponse.status, await publishResponse.clone().text()).toBe(200)
+
+                const afterPublishCards = await (await app.server.fetch('/api/posts/cards')).text()
+                expect(afterPublishCards).toContain('built-worker-post')
+                expect(afterPublishCards).toContain('Introduction')
+                expect(afterPublishCards).not.toContain('PRIVATE_DRAFT_BODY')
+
+                const postDetail = await app.server.fetch('/api/posts/built-worker-post')
+                expect(postDetail.status).toBe(200)
+                expect(await postDetail.text()).toContain('PRIVATE_DRAFT_BODY')
+
+                const scheduledDraftResponse = await app.server.fetch('/_vitehub/forms/post', {
+                    method: 'POST',
+                    headers: jsonHeaders(admin),
+                    body: JSON.stringify({
+                        id: 'built-worker-post',
+                        data: {
+                            title: 'Built Worker Post',
+                            plainTitle: 'Built Worker Post',
+                            slug: 'built-worker-post',
+                            tags: ['vitehub'],
+                            gameMentions: [],
+                            order: 0,
+                        },
+                        body: 'Introduction\n\n<!-- more -->\n\nSCHEDULED_DRAFT_UPDATE',
+                    }),
+                })
+                expect(
+                    scheduledDraftResponse.status,
+                    await scheduledDraftResponse.clone().text(),
+                ).toBe(201)
+                expect(
+                    await (await app.server.fetch('/api/posts/built-worker-post')).text(),
+                ).not.toContain('SCHEDULED_DRAFT_UPDATE')
+
+                const scheduleResponse = await app.server.fetch('/api/admin/content/publish', {
+                    method: 'POST',
+                    headers: jsonHeaders(admin),
+                    body: JSON.stringify({
+                        action: 'schedule',
+                        collection: 'posts',
+                        id: 'built-worker-post',
+                        at: new Date(Date.now() + 86_400_000).toISOString(),
+                    }),
+                })
+                expect(scheduleResponse.status, await scheduleResponse.clone().text()).toBe(200)
+                const schedulePayload = publishScheduleSchema.parse(await scheduleResponse.json())
+                expect(schedulePayload.schedule?.id).toBeTruthy()
+
+                if (schedulePayload.schedule?.id) {
+                    const unscheduleResponse = await app.server.fetch(
+                        '/api/admin/content/publish',
+                        {
+                            method: 'POST',
+                            headers: jsonHeaders(admin),
+                            body: JSON.stringify({
+                                action: 'unschedule',
+                                scheduleId: schedulePayload.schedule.id,
+                            }),
+                        },
+                    )
+                    expect(unscheduleResponse.status, await unscheduleResponse.clone().text()).toBe(
+                        200,
+                    )
+                }
+
+                const deleteResponse = await app.server.fetch(
+                    '/api/admin/content/posts/built-worker-post?publish=true',
+                    {
+                        method: 'DELETE',
+                        headers: admin,
+                    },
+                )
+                expect(deleteResponse.status, await deleteResponse.clone().text()).toBe(200)
+                expect((await app.server.fetch('/api/posts/built-worker-post')).status).toBe(404)
+
+                const chatResponse = await app.server.fetch('/_vitehub/agents/assistant/chat', {
+                    method: 'POST',
+                    headers: jsonHeaders(admin),
+                    body: JSON.stringify({
+                        id: 'test-assistant-chat',
+                        messages: [
+                            {
+                                id: 'msg-1',
+                                role: 'user',
+                                parts: [{ type: 'text', text: 'Hello' }],
+                            },
+                        ],
+                        trigger: 'submit-message',
+                    }),
+                })
+                expect(chatResponse.status, await chatResponse.clone().text()).toBe(200)
+                expect(await chatResponse.text()).toContain('Content assistant ready')
+
+                const emittedWrangler: unknown = JSON.parse(
+                    await readFile(resolve('.output/server/wrangler.json'), 'utf8'),
+                )
+                expect(emittedWrangler).toMatchObject({
+                    name: 'liry24-com',
+                    observability: {
+                        enabled: true,
+                        redact_query_string: true,
+                        logs: {
+                            enabled: true,
+                            invocation_logs: false,
+                            head_sampling_rate: 1,
+                        },
+                        traces: {
+                            enabled: false,
+                        },
+                        issues: {
+                            enabled: false,
+                        },
+                    },
+                    preview_urls: true,
+                    routes: [
+                        {
+                            pattern: 'liry24.com',
+                            custom_domain: true,
+                        },
+                    ],
+                    r2_buckets: [{ binding: 'STORAGE', bucket_name: 'liry24-com' }],
+                    previews: {
+                        vars: {
+                            APP_ENV: 'dev',
+                            NUXT_PUBLIC_SITE_URL: 'https://dev-liry24-com.liry.workers.dev',
+                            NUXT_PUBLIC_IMAGES_DOMAIN: 'https://dev-liry24-com.liry.workers.dev',
+                        },
+                        d1_databases: [
+                            {
+                                binding: 'DB',
+                                database_name: 'liry24-com-dev',
+                                database_id: '3c7c6179-12d0-4108-9eea-b3e20d394cef',
+                            },
+                        ],
+                        r2_buckets: [
+                            {
+                                binding: 'STORAGE',
+                                bucket_name: 'liry24-com-dev-storage',
+                            },
+                        ],
+                    },
+                })
+                const wranglerRoutesSchema = z.object({
+                    routes: z.array(z.record(z.string(), z.unknown())),
+                })
+                expect(wranglerRoutesSchema.parse(emittedWrangler).routes[0]).not.toHaveProperty(
+                    'previews_enabled',
+                )
+
+                const serverDir = resolve('.output/server')
+                const files = (await readdir(serverDir, { recursive: true })).filter((path) =>
+                    path.endsWith('.mjs'),
+                )
+                const output = (
+                    await Promise.all(
+                        files.map((path) => readFile(resolve(serverDir, path), 'utf8')),
+                    )
+                ).join('\n')
+                for (const family of ['Special Gothic Expanded One', 'Geist Mono']) {
+                    expect(output).toContain(family)
+                }
+                for (const marker of [
+                    'openDevelopmentDB',
+                    'LIRY24_DEV_DB_PATH',
+                    '.data/development/sqlite.db',
+                    'drizzle-orm/node-sqlite',
+                    '@litijs/void',
+                ]) {
+                    expect(output).not.toContain(marker)
+                }
+            } finally {
+                const errorLogs = app.server
+                    .getLogs()
+                    .filter(
+                        (entry) =>
+                            entry.level === 'error' && !isExpectedHttpErrorLog(entry.message),
+                    )
+                    .map((entry) => entry.message)
+                await app.close()
+                expect(errorLogs).toEqual([])
             }
-            expect((await server.fetch('/api/site-admin/models')).status).toBe(401)
-            const deniedAction = await server.fetch('/api/site-admin/ai/actions/proofread', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ props: { content: 'Synthetic anonymous draft' } }),
-            })
-            expect(deniedAction.status).toBe(401)
-            expect(await deniedAction.json()).toMatchObject({
-                error: { code: 'SITE_ADMIN_AUTH_REQUIRED' },
-            })
-            expect(deniedAction.headers.get('cache-control')).toBe('private, no-store')
-            const crossedAction = await server.fetch('/api/site-admin/ai/actions/proofread', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json', origin: 'https://evil.invalid' },
-                body: JSON.stringify({ props: { content: 'Synthetic cross-origin draft' } }),
-            })
-            expect(crossedAction.status).toBe(403)
-            let entry = await admin.createEntry('posts', {
-                slug: 'emitted-scheduled-handler',
-                data: { title: 'A', content: '# A', tags: [] },
-            })
-            entry = await admin.publishEntry(entry.id, { expectedVersion: entry.version })
-            entry = await admin.updateEntry(entry.id, {
-                expectedVersion: entry.version,
-                data: { title: 'B', content: '# B', tags: [] },
-            })
-            const at = new Date(Date.now() + 60_000)
-            entry = await admin.schedulePublish(entry.id, {
-                expectedVersion: entry.version,
-                at: at.toISOString(),
-            })
-            const scheduledRevision = entry.scheduledRevisionId
-            entry = await admin.updateEntry(entry.id, {
-                expectedVersion: entry.version,
-                data: { title: 'C', content: '# C', tags: [] },
-            })
-            const currentRevision = entry.currentRevisionId
-            // Dispatch through the actual emitted Worker entry, not admin.publishDue().
-            expect((await worker.scheduled({ scheduledTime: at, cron: '* * * * *' })).outcome).toBe(
-                'ok',
-            )
-            await expect
-                .poll(async () => (await admin.getEntry(entry.id)).publishedRevisionId)
-                .toBe(scheduledRevision)
-            const published = await admin.getEntry(entry.id)
-            expect(published.scheduledRevisionId).toBeNull()
-            expect(published.currentRevisionId).toBe(currentRevision)
-            expect((await admin.getPublicEntry('posts', entry.slug))?.data.title).toBe('B')
         } finally {
-            for (const log of server.getLogs().filter((log) => log.level === 'error'))
-                console.error(log.message)
-            await server.close()
-            await rm(root, { recursive: true, force: true })
+            await provider.close()
         }
     },
-    60_000,
+    180_000,
 )

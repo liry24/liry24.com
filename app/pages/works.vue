@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { MasonryWall } from '@yeger/vue-masonry-wall'
 
-const { data } = await useSiteAdminList('works', {
-    transform: (entries) =>
-        entries.map((entry) => ({
-            ...entry.data,
-            slug: entry.slug,
-            image: entry.data.image?.url,
-        })),
-})
+useSeoMeta({ title: 'Works', description: 'A collection of works by Liry24.' })
+defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
+    { key: 'og' },
+    { key: 'whatsapp', width: 800, height: 800 },
+])
 
-useSeo()
+const entries = await usePortfolioData('works')
+const data = computed(() =>
+    (entries.data.value ?? []).map((entry) => ({
+        ...entry.data,
+        slug: entry.data.slug,
+        image: mediaUrl(entry.data.image),
+    })),
+)
 </script>
 
 <template>

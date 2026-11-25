@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import type { PublicAsset } from '@liria24/site-admin/client'
-
-import { ImageViewer } from '#components'
+import { LazyImageViewer } from '#components'
+import type { MediaReference } from '#shared/schemas/content'
 
 const { data } = defineProps<{
-    data: PublicAsset[]
+    data: Array<MediaReference>
 }>()
 
 const overlay = useOverlay()
-
-const imageViewer = overlay.create(ImageViewer)
+const imageViewer = overlay.create(LazyImageViewer)
 
 const carousel = useTemplateRef('carousel')
 const activeIndex = ref(0)
@@ -26,7 +24,6 @@ const onSelect = (index: number) => {
 
 const select = (index: number) => {
     activeIndex.value = index
-
     carousel.value?.emblaApi?.scrollTo(index)
 }
 </script>
@@ -43,17 +40,19 @@ const select = (index: number) => {
             class="mx-auto w-full"
             @select="onSelect"
         >
-            <NuxtImg
-                :src="item.url"
-                :alt="item.alt || ''"
-                class="max-h-[70svh] rounded-lg"
+            <button
+                type="button"
+                aria-label="Enlarge image"
+                class="block rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4"
                 @click="
                     imageViewer.open({
-                        src: item.url,
-                        alt: item.alt || '',
+                        src: mediaUrl(item),
+                        alt: '',
                     })
                 "
-            />
+            >
+                <NuxtImg :src="mediaUrl(item)" alt="" class="max-h-[70svh] rounded-lg" />
+            </button>
         </UCarousel>
 
         <div class="mx-auto flex gap-2">
@@ -61,15 +60,15 @@ const select = (index: number) => {
                 v-for="(item, index) in data"
                 :key="index"
                 type="button"
-                :aria-label="`View image ${index + 1}${item.alt ? `: ${item.alt}` : ''}`"
+                :aria-label="`View image ${index + 1}`"
                 :aria-pressed="activeIndex === index"
                 class="rounded-lg opacity-25 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-4"
                 :class="{ 'opacity-100': activeIndex === index }"
                 @click="select(index)"
             >
                 <NuxtImg
-                    :src="item.url"
-                    :alt="item.alt || ''"
+                    :src="mediaUrl(item)"
+                    alt=""
                     :width="48"
                     :height="48"
                     class="size-12 cursor-pointer rounded-lg object-cover"

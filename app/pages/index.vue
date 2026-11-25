@@ -1,42 +1,68 @@
 <script setup lang="ts">
-import { cn } from 'cn'
 import { motion } from 'motion-v'
 
 import { LazyStacksModal } from '#components'
 
 const { app } = useAppConfig()
+useHead({ titleTemplate: null })
+useSeoMeta({ title: 'Liry24', description: 'Personal website of Liry24.' })
+defineOgImage('Home.takumi', { title: 'Liry24' }, [
+    { key: 'og' },
+    { key: 'whatsapp', width: 800, height: 800 },
+])
 const overlay = useOverlay()
 
 const modalStacks = overlay.create(LazyStacksModal)
 const MotionUSeparator = motion.create('hr')
 
-const { data: batch } = await useSiteAdminBatch({
-    arts: { list: 'arts' },
-    socials: { list: 'socials' },
-    careers: { list: 'careers' },
-    ranks: { list: 'ranks' },
-    posts: { list: 'posts', markdown: 'summary' },
-})
+const arts = usePortfolioData('arts')
+const socials = usePortfolioData('socials')
+const careers = usePortfolioData('careers')
+const ranks = usePortfolioData('ranks')
+const games = usePortfolioData('games')
+const gameStats = usePortfolioData('gameStats')
+const posts = useFetch<PostCardsPage>('/api/posts/cards', { query: { limit: 10 } })
+await Promise.all([arts, socials, careers, ranks, games, gameStats, posts])
 const data = computed(() => ({
-    arts: batch.value?.arts.data || [],
-    socials: batch.value?.socials.data?.map((entry) => entry.data) || [],
-    careers: batch.value?.careers.data?.map((entry) => entry.data) || [],
+    arts: arts.data.value || [],
+    socials: socials.data.value?.map((entry) => entry.data) || [],
+    careers: careers.data.value?.map((entry) => entry.data) || [],
     ranks:
-        batch.value?.ranks.data?.map((entry) => ({
+        ranks.data.value?.map((entry) => ({
             ...entry.data,
-            imageUrl: entry.data.image?.url,
+            entryId: entry.id,
+            imageUrl: mediaUrl(entry.data.image),
         })) || [],
-    posts:
-        batch.value?.posts.data?.map((entry) => ({
-            ...entry.data,
-            slug: entry.slug,
-            createdAt: entry.data.createdAt || entry.publishedAt,
-        })) || [],
+    posts: posts.data.value?.items ?? [],
 }))
 
-const rotateArray = <T>(arr: T[], n: number): T[] => {
+const statGames = computed(() =>
+    (games.data.value ?? [])
+        .map((game) => ({
+            ...game,
+            periods: (gameStats.data.value ?? [])
+                .filter((period) => period.data.game === game.id)
+                .map((period) => period.data),
+        }))
+        .filter((game) => game.periods.length),
+)
+
+// shortcut: retain unmigrated rank cards until the legacy model is retired.
+const legacyRanks = computed(() =>
+    data.value.ranks.filter(
+        (rank) =>
+            !gameStats.data.value?.some((period) => period.id === `legacy-${rank.entryId}`) &&
+            !statGames.value.some(
+                (game) => game.data.name.toLowerCase() === rank.game.toLowerCase(),
+            ),
+    ),
+)
+
+const rotateArray = <T>(arr: Array<T>, n: number): Array<T> => {
     const len = arr.length
-    if (len === 0) return arr
+    if (len === 0) {
+        return arr
+    }
 
     const shift = n % len
 
@@ -44,8 +70,6 @@ const rotateArray = <T>(arr: T[], n: number): T[] => {
 }
 
 useKeyCommand(modalStacks.open)
-
-useSeo()
 </script>
 
 <template>
@@ -62,9 +86,9 @@ useSeo()
                 :animate="{ scale: 1, opacity: 1, filter: 'blur(0px)' }"
                 :transition="{ delay: 0.2 + index * 0.1 }"
             >
-                <NuxtLink :to="`/arts?open=${art.slug}`">
+                <NuxtLink :to="`/arts?open=${art.data.slug}`">
                     <NuxtImg
-                        :src="art.data.images[0]?.url"
+                        :src="mediaUrl(art.data.images[0])"
                         :alt="art.data.title"
                         :height="320"
                         format="webp"
@@ -215,24 +239,22 @@ useSeo()
                     Ranks
                 </h2>
 
+                <GameStats
+                    v-for="game in statGames"
+                    :key="game.id"
+                    :game="game.data"
+                    :periods="game.periods"
+                />
                 <NuxtLink
-                    v-for="(rank, index) in data.ranks"
-                    :key="`rank-${index}`"
+                    v-for="(rank, index) in legacyRanks"
+                    :key="`legacy-rank-${index}`"
                     :to="rank.href || undefined"
                     target="_blank"
-                    :class="
-                        cn(
-                            'mx-auto flex items-center gap-1 px-6 py-3 text-2xl leading-none text-nowrap',
-                            rank.href && 'hover:bg-muted rounded-xl transition-colors',
-                        )
-                    "
-                >
-                    <p class="leading-none font-bold">{{ rank.game }}</p>
-                    <p class="text-muted leading-none font-extralight tracking-tight">
-                        {{ rank.season }}
-                    </p>
-                    <NuxtImg :src="rank.imageUrl" :alt="rank.rank" :width="40" :height="40" />
-                </NuxtLink>
+                    class="hover:bg-muted mx-auto flex items-center gap-1 rounded-xl px-6 py-3 text-2xl"
+                    ><span class="font-bold">{{ rank.game }}</span
+                    ><span class="text-muted font-light">{{ rank.season }}</span
+                    ><NuxtImg :src="rank.imageUrl" :alt="rank.rank" :width="40" :height="40"
+                /></NuxtLink>
             </Motion>
         </div>
 
@@ -260,22 +282,23 @@ useSeo()
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <article
                         v-for="post in data.posts.slice(0, 10)"
-                        :key="post.slug"
+                        :key="String(post.slug)"
                         class="hover:bg-muted flex h-fit flex-col gap-3 rounded-xl p-6 transition-colors"
                     >
                         <h2 class="line-clamp-2 text-2xl font-bold">
-                            <NuxtLink :to="`/posts/${post.slug}`">{{ post.title }}</NuxtLink>
+                            <PostTitle :title="post.title" :to="`/posts/${post.slug}`" />
                         </h2>
 
                         <MarkdownDocument
-                            v-if="post.content.nodes.length"
-                            :value="post.content"
-                            class="sentence line-clamp-3 text-sm wrap-break-word *:first:mt-0 *:last:mb-0"
+                            v-if="post.excerpt.nodes.length"
+                            :value="post.excerpt"
+                            class="line-clamp-3 text-sm wrap-break-word *:first:mt-0 *:last:mb-0"
                         />
 
                         <div class="flex flex-wrap items-center gap-2">
                             <NuxtTime
-                                :datetime="post.createdAt"
+                                v-if="post.date"
+                                :datetime="post.date"
                                 date-style="short"
                                 time-style="short"
                                 class="text-muted font-mono text-sm leading-none text-nowrap"
