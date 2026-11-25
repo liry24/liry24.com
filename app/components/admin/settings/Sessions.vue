@@ -20,7 +20,15 @@ const devices = computed(() =>
             />
         </div>
 
-        <UAlert v-if="failure" :title="failure" color="error" class="mb-4" />
+        <UAlert
+            v-if="failure"
+            role="alert"
+            :title="failure"
+            color="error"
+            variant="subtle"
+            :ui="{ title: 'text-red-700 dark:text-red-400' }"
+            class="mb-4"
+        />
         <p class="text-muted mb-2 text-sm">
             Updated shows when the session was renewed, not your last activity.
         </p>
@@ -43,6 +51,7 @@ const devices = computed(() =>
                             v-if="item.session.id === current?.id"
                             label="Current session"
                             color="success"
+                            class="text-green-800 dark:text-green-300"
                             variant="subtle"
                         />
                     </div>
@@ -95,6 +104,7 @@ const devices = computed(() =>
                     label="Revoke"
                     variant="subtle"
                     color="error"
+                    class="text-red-700 dark:text-red-400"
                     :disabled="busy"
                     @click="revoke(item.session.token)"
                 />

@@ -127,3 +127,31 @@ jobs:
       - run: bun run test:mutation --since "$BASE_SHA" --include-test-changes --time-budget 300
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+  accessibility:
+    name: Accessibility audit
+    needs: worker-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LIRY24_TEST_ACCESSIBILITY_BROWSER: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-quality
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: worker-build
+      - run: tar -xzf worker-build.tar.gz
+      - run: bun x playwright-core install --with-deps chromium
+      - run: node node_modules/vitest/vitest.mjs run tests/worker/accessibility.browser.test.ts
+      - name: Upload accessibility reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: accessibility-reports
+          path: .tmp/accessibility
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
