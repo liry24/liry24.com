@@ -4,10 +4,6 @@ import { z } from 'zod'
 import { builtWorker } from '../helpers/builtWorker'
 import { oidcProvider } from '../helpers/oidc'
 
-const startPayloadSchema = z.object({
-    url: z.string(),
-})
-
 const sessionPayloadSchema = z
     .object({
         user: z.object({
@@ -45,23 +41,17 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                     }
                 }
 
-                const start = await app.server.fetch('/api/auth/sign-in/social', {
-                    method: 'POST',
-                    headers: { origin: app.url.origin, 'content-type': 'application/json' },
-                    body: JSON.stringify({
-                        provider: 'pocket-id',
-                        callbackURL: '/admin',
-                        errorCallbackURL: '/login',
-                    }),
+                const start = await app.server.fetch('/admin/works?view=list', {
+                    redirect: 'manual',
                 })
-                expect(start.status, await start.clone().text()).toBe(200)
+                expect(start.status, await start.clone().text()).toBe(302)
+                expect(start.headers.get('cache-control')).toContain('no-store')
                 remember(start)
-                const startJson = startPayloadSchema.parse(await start.json())
-                const authorization = new URL(startJson.url)
+                const authorization = new URL(start.headers.get('location') ?? '/', app.url)
                 expect(authorization.origin).toBe(provider.issuer)
                 expect(authorization.searchParams.get('code_challenge_method')).toBe('S256')
 
-                const login = await fetch(startJson.url, { redirect: 'manual' })
+                const login = await fetch(authorization, { redirect: 'manual' })
                 expect(login.status).toBe(302)
                 const location = login.headers.get('location')
                 if (!location) {
@@ -106,6 +96,8 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                     .map((entry) => entry.message),
             ].join(' | ')
             expect(ownerSignIn.session?.user.role, ownerDiagnostics).toBe('admin')
+            const callback = new URL(ownerSignIn.result.headers.get('location') ?? '/', app.url)
+            expect(callback.pathname + callback.search).toBe('/admin/works?view=list')
             const ownerId = ownerSignIn.session?.user.id
             if (!ownerId) {
                 throw new Error('Missing owner id')

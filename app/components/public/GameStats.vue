@@ -1,6 +1,6 @@
 <script setup lang="ts">
 interface Props {
-    game: GameData
+    game: GameStatsDisplay
     periods: Array<GamePeriod>
 }
 const { game, periods } = defineProps<Props>()
@@ -11,10 +11,27 @@ const metric = computed(() => game.metrics?.find((metric) => metric.key === game
 const representative = computed(() =>
     latest.value?.values.find((value) => value.key === metric.value?.key),
 )
+const badge = computed(() => representative.value?.image)
 </script>
 
 <template>
+    <NuxtLink
+        v-if="latest?.href && badge"
+        :to="latest.href"
+        target="_blank"
+        class="hover:bg-muted mx-auto flex items-center gap-1 rounded-xl px-6 py-3 text-2xl"
+    >
+        <span class="font-bold">{{ game.name.toUpperCase() }}</span
+        ><span class="text-muted font-light">{{ latest.period }}</span
+        ><NuxtImg
+            :src="mediaUrl(badge)"
+            :alt="formatGameValue(representative, metric)"
+            :width="40"
+            :height="40"
+        />
+    </NuxtLink>
     <UModal
+        v-else
         :title="game.name"
         description="Period stats and highest rank history"
         :ui="{ content: 'sm:max-w-4xl' }"

@@ -15,7 +15,8 @@
         "lint": "oxlint",
         "format": "oxfmt . --write",
         "format:check": "oxfmt . --check",
-        "test": "vitest run"
+        "test": "vitest run",
+        "test:mutation": "node node_modules/@mizchi/mutator/dist/cli.js"
     },
     "dependencies": {
         "@ai-sdk/google": "4.0.125",
@@ -74,6 +75,7 @@
     "devDependencies": {
         "@cloudflare/oxlint-config": "0.2.0",
         "@cloudflare/workers-types": "^5.20261124.1",
+        "@mizchi/mutator": "0.5.5",
         "@nuxt/a11y": "^1.0.0-alpha.1",
         "@nuxt/fonts": "1.2.0",
         "@nuxt/hints": "^1.1.6",

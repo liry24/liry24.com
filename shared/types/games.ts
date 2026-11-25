@@ -1,4 +1,4 @@
-import type { MediaReference } from '../schemas/content.js'
+import type { MediaReference, PortfolioItem } from '../schemas/content.js'
 
 export type GamePosition = {
     value: number
@@ -35,6 +35,16 @@ export type GameData = {
 
 export type GameSearchResult = Pick<GameData, 'igdbId' | 'slug' | 'name' | 'cover'> & {
     id?: string
+}
+
+export type GameMentionData = Pick<GameData, 'name' | 'slug' | 'icon' | 'cover'>
+
+export type GameStatsDisplay = Pick<GameData, 'name' | 'slug' | 'primaryMetric' | 'metrics'>
+
+export interface GameStatsPage {
+    items: Array<PortfolioItem<'gameStats'>>
+    total: number
+    games: Array<{ id: string; data: GameStatsDisplay }>
 }
 
 export type GamePeriod = {

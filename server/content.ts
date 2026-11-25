@@ -6,11 +6,9 @@ import { z } from 'zod'
 import {
     artFieldsSchema,
     careerFieldsSchema,
-    gameFieldsSchema,
     gameStatsFieldsSchema,
     mediaReferenceSchema,
     postFieldsSchema,
-    rankFieldsSchema,
     skillFieldsSchema,
     socialFieldsSchema,
     workFieldsSchema,
@@ -57,25 +55,10 @@ export const content = defineContent({
             path: 'content/skills/**/*.json',
             fields: skillFieldsSchema.shape,
         }),
-        games: documents({
-            path: 'content/games/**/*.json',
-            fields: {
-                ...gameFieldsSchema.shape,
-                icon: optional(image()),
-            },
-        }),
         gameStats: documents({
             path: 'content/game-stats/**/*.json',
             titleField: 'period',
             fields: gameStatsFieldsSchema.shape,
-        }),
-        ranks: documents({
-            path: 'content/ranks/**/*.json',
-            titleField: 'game',
-            fields: {
-                ...rankFieldsSchema.shape,
-                image: image(),
-            },
         }),
         socials: documents({
             path: 'content/socials/**/*.json',

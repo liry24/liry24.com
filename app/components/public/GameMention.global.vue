@@ -2,8 +2,12 @@
 const { slug } = defineProps<{ slug: string }>()
 
 const previewGames = inject(postPreviewGamesKey, null)
-const published = previewGames ? null : await usePortfolioData('games')
-const game = computed(() => published?.data.value?.find((entry) => entry.data.slug === slug)?.data)
+const published = previewGames
+    ? null
+    : await useFetch<GameMentionData | null>(
+          () => `/api/posts/game-mentions/${encodeURIComponent(slug)}`,
+      )
+const game = computed(() => published?.data.value)
 const previewGame = computed(() => previewGames?.get(slug))
 </script>
 

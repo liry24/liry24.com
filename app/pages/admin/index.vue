@@ -21,14 +21,12 @@ const collectionLinks = [
     { name: 'arts', label: 'Arts', to: '/admin/arts', icon: 'mingcute:palette-fill' },
     { name: 'careers', label: 'Careers', to: '/admin/careers', icon: 'mingcute:building-2-fill' },
     { name: 'skills', label: 'Skills', to: '/admin/skills', icon: 'mingcute:tool-fill' },
-    { name: 'games', label: 'Games', to: '/admin/games', icon: 'mingcute:game-2-fill' },
     {
         name: 'gameStats',
         label: 'Game Stats',
         to: '/admin/gameStats',
         icon: 'mingcute:chart-line-fill',
     },
-    { name: 'ranks', label: 'Ranks', to: '/admin/ranks', icon: 'mingcute:trophy-fill' },
     { name: 'socials', label: 'Socials', to: '/admin/socials', icon: 'mingcute:link-2-fill' },
 ] as const
 </script>
