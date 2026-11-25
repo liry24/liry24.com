@@ -49,6 +49,7 @@ test('ViteHub configuration defines isolated preview resources, single public R2
             'LIRY24_STORAGE_BUCKET',
             'LIRY24_DISABLE_CRON',
             'NUXT_PUBLIC_SITE_URL',
+            'WORKERS_CI_BRANCH',
         ]) {
             vi.stubEnv(key, '')
         }
@@ -217,4 +218,44 @@ test('admin routes use the admin middleware, layout, and private caching', () =>
         appLayout: 'admin',
         headers: { 'cache-control': 'private, no-store' },
     })
+})
+
+test('Cloudflare Workers Builds treats main branch as production when APP_ENV is unset', async () => {
+    try {
+        vi.stubEnv('APP_ENV', '')
+        vi.stubEnv('NUXT_PUBLIC_SITE_URL', '')
+        vi.stubEnv('WORKERS_CI_BRANCH', 'main')
+        vi.resetModules()
+
+        const { default: prodConfig } = await import('../../nuxt.config')
+        const prodViteHub = getViteHubOptions(prodConfig)
+        expect(prodViteHub.publicUrl).toBe('https://liry24.com')
+        expect(prodConfig.runtimeConfig).toMatchObject({
+            public: {
+                siteUrl: 'https://liry24.com',
+                imagesDomain: 'https://images.liry24.com',
+                preview: false,
+            },
+        })
+        expect(prodConfig.nitro?.cloudflare?.wrangler?.vars).toMatchObject({
+            APP_ENV: 'production',
+        })
+
+        vi.stubEnv('WORKERS_CI_BRANCH', 'dev')
+        vi.resetModules()
+
+        const { default: devConfig } = await import('../../nuxt.config')
+        const devViteHub = getViteHubOptions(devConfig)
+        expect(devViteHub.publicUrl).toBe('https://dev-liry24-com.liry.workers.dev')
+        expect(devConfig.runtimeConfig).toMatchObject({
+            public: {
+                siteUrl: 'https://dev-liry24-com.liry.workers.dev',
+                imagesDomain: 'https://dev-liry24-com.liry.workers.dev',
+                preview: true,
+            },
+        })
+    } finally {
+        vi.unstubAllEnvs()
+        vi.resetModules()
+    }
 })

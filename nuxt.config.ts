@@ -5,7 +5,9 @@ import viteHub from 'vite-hub/nuxt'
 import { serverEnv } from './env.ts'
 import { liriaIconCollection } from './layers/icons/liria.ts'
 
-const isPreview = process.env.APP_ENV !== 'production'
+const appEnv =
+    process.env.APP_ENV || (process.env.WORKERS_CI_BRANCH === 'main' ? 'production' : undefined)
+const isPreview = appEnv !== 'production'
 const baseURL =
     process.env.NUXT_PUBLIC_SITE_URL ||
     (isPreview ? 'https://dev-liry24-com.liry.workers.dev' : 'https://liry24.com')
@@ -192,7 +194,7 @@ export default defineNuxtConfig({
                     },
                 },
                 vars: {
-                    APP_ENV: process.env.APP_ENV || 'production',
+                    APP_ENV: appEnv || 'production',
                     IGDB_CLIENT_ID: process.env.IGDB_CLIENT_ID || '907z6pjakj7oiu1oyqhnepvktcw10p',
                 },
                 routes: [
