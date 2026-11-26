@@ -77,6 +77,152 @@ async function expectFocus(locator: Locator) {
         .toBe(true)
 }
 
+async function expectCenteredDialog(dialog: Locator) {
+    expect(
+        await dialog.evaluate((element) => {
+            const bounds = element.getBoundingClientRect()
+            return (
+                Math.abs(bounds.left - (innerWidth - bounds.right)) < 3 &&
+                Math.abs(bounds.top - (innerHeight - bounds.bottom)) < 3
+            )
+        }),
+    ).toBe(true)
+}
+
+async function exerciseIconPicker(page: Page) {
+    const add = page.getByRole('button', { name: 'Add', exact: true })
+    expect(await add.getAttribute('aria-keyshortcuts')).toBe('N')
+    await page.keyboard.press('n')
+    const entry = page.getByRole('dialog', { name: 'New skill' })
+    const name = entry.getByLabel('Name', { exact: true })
+    await name.waitFor()
+    await name.press('n')
+    expect(await name.inputValue()).toBe('n')
+    const find = entry.getByRole('button', { name: 'Find icon' })
+    await find.click()
+    const picker = page.getByRole('dialog', { name: 'Choose an icon' })
+    await expectCenteredDialog(picker)
+    const keywords: Array<string> = []
+    const iconSearch = 'https://api.iconify.design/search?*'
+    await page.route(iconSearch, (route) => {
+        const word = new URL(route.request().url()).searchParams.get('query') ?? ''
+        keywords.push(word)
+        return route.fulfill({
+            headers: { 'access-control-allow-origin': '*' },
+            json: { icons: word === 'hom' ? ['lucide:house'] : ['mingcute:home-2-line'] },
+        })
+    })
+    try {
+        const weightRequest = page.waitForResponse(
+            (response) => new URL(response.url()).pathname.endsWith('.bin') && response.ok(),
+        )
+        await picker.getByRole('combobox', { name: 'Search Iconify icons' }).fill('hom')
+        await weightRequest
+        const result = picker.getByRole('option', { name: 'mingcute:home-2-line' })
+        await result.waitFor()
+        expect(keywords[0]).toBe('hom')
+        expect(keywords).toContain('house')
+        await result.click()
+        await picker.waitFor({ state: 'hidden' })
+        expect(await entry.getByLabel('Icon', { exact: true }).inputValue()).toBe(
+            'mingcute:home-2-line',
+        )
+        await expectFocus(find)
+    } finally {
+        await page.unroute(iconSearch)
+    }
+    await page.keyboard.press('Escape')
+    await entry.waitFor({ state: 'hidden' })
+    await expectFocus(add)
+}
+
+async function exerciseStatsEditor(page: Page) {
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'New stat period' })
+    const game = dialog.getByLabel('Game', { exact: true })
+    await game.selectOption('igdb-126459')
+    await expectCenteredDialog(dialog)
+    await dialog.getByLabel('Period label', { exact: true }).fill('New synthetic period')
+    await dialog.getByLabel('Period key', { exact: true }).fill('new-synthetic-period')
+
+    const peak = dialog.getByRole('textbox', { name: 'Peak Rank', exact: true })
+    await peak.fill('1.5')
+    const save = dialog.getByRole('button', { name: 'Save draft' })
+    await save.click()
+    await dialog
+        .getByText('Enter a non-negative whole number within the safe integer range.')
+        .waitFor()
+    await peak.fill('0')
+    await game.selectOption('igdb-114795')
+    const rank = dialog.getByRole('textbox', { name: 'Rank', exact: true })
+    expect(await rank.inputValue()).toBe('')
+    await rank.fill('7')
+    await game.selectOption('igdb-126459')
+    expect(await peak.inputValue()).toBe('0')
+
+    const [response] = await Promise.all([
+        page.waitForResponse(
+            (entry) => new URL(entry.url()).pathname === '/_vitehub/forms/game-stats',
+        ),
+        save.click(),
+    ])
+    expect(response.status()).toBe(201)
+    expect(response.request().postDataJSON()).toMatchObject({
+        data: { game: 'igdb-126459', values: [{ key: 'rank', value: 0 }] },
+    })
+    await dialog.waitFor({ state: 'hidden' })
+    const saved = page.locator('[data-item-id="igdb-126459-new-synthetic-period"]')
+    await saved.getByTestId('edit-entry').click()
+    const edit = page.getByRole('dialog', { name: 'Edit stat period' })
+    expect(await edit.getByRole('textbox', { name: 'Peak Rank', exact: true }).inputValue()).toBe(
+        '0',
+    )
+    await page.keyboard.press('Escape')
+    await edit.waitFor({ state: 'hidden' })
+}
+
+async function exerciseArtworkEditor(page: Page, bytes: Buffer) {
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'New artwork' })
+    const upload = '**/api/admin/media'
+    await page.route(upload, (route) =>
+        route.request().postDataBuffer()?.includes('rejected-art.png')
+            ? route.fulfill({ status: 400, json: { message: 'Synthetic upload failure' } })
+            : route.continue(),
+    )
+    try {
+        const files = ['first-art.png', 'rejected-art.png', 'last-art.png']
+        await dialog
+            .locator('input[type=file]')
+            .setInputFiles(files.map((name) => ({ name, mimeType: 'image/png', buffer: bytes })))
+        await dialog
+            .getByRole('alert')
+            .getByText(/rejected-art.png/)
+            .waitFor()
+        const image = dialog.getByRole('img', { name: 'Gallery images 1' })
+        expect(await image.getAttribute('src')).toMatch(/first-art\.png$/u)
+        await dialog.getByRole('button', { name: 'Move image 2 earlier' }).click()
+        expect(await image.getAttribute('src')).toMatch(/last-art\.png$/u)
+        await dialog.getByRole('button', { name: 'Remove image 2' }).click()
+        expect(await dialog.getByRole('img').count()).toBe(1)
+        await dialog.getByRole('textbox', { name: 'Title' }).fill('Synthetic new artwork')
+        await dialog.getByRole('button', { name: 'Use synthetic-new-artwork' }).click()
+        const [saved] = await Promise.all([
+            page.waitForResponse(
+                (entry) => new URL(entry.url()).pathname === '/_vitehub/forms/art',
+            ),
+            dialog.getByRole('button', { name: 'Save draft' }).click(),
+        ])
+        expect(saved.status()).toBe(201)
+        expect(saved.request().postDataJSON()).toMatchObject({
+            data: { images: [{ pathname: expect.stringMatching(/last-art\.png$/u) }] },
+        })
+        await dialog.waitFor({ state: 'hidden' })
+    } finally {
+        await page.unroute(upload)
+    }
+}
+
 async function exerciseReorder(page: Page) {
     const entries = page.getByRole('main').locator('[data-item-id]')
     const order = () =>
@@ -509,11 +655,27 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await scan('entry-edit-dialog')
                 await auditPage.keyboard.press('Escape')
                 await dialog.waitFor({ state: 'hidden' })
+                if (colorScheme === 'light') await exerciseIconPicker(auditPage)
 
                 await auditPage.getByTestId('toggle-reorder').click()
                 await reorderHandle(skill).waitFor()
+                await auditPage.keyboard.press('n')
+                expect(await dialog.isVisible()).toBe(false)
                 await scan('admin-skills-reorder')
                 if (colorScheme === 'light') await exerciseReorder(auditPage)
+
+                await visit('/admin/gameStats')
+                if (colorScheme === 'light') await exerciseStatsEditor(auditPage)
+                await auditPage.getByRole('button', { name: 'Add', exact: true }).click()
+                await dialog.getByLabel('Game', { exact: true }).selectOption('igdb-126459')
+                await scan('admin-stat-editor')
+                await auditPage.keyboard.press('Escape')
+                await dialog.waitFor({ state: 'hidden' })
+
+                if (colorScheme === 'light') {
+                    await visit('/admin/arts')
+                    await exerciseArtworkEditor(auditPage, fixtureBytes)
+                }
 
                 await visit('/admin/careers')
                 await scan('admin-careers-empty')
@@ -527,6 +689,14 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await scan('admin-settings')
 
                 await auditPage.setViewportSize({ width: 390, height: 844 })
+                await visit('/admin/gameStats')
+                await auditPage.getByRole('button', { name: 'Add', exact: true }).click()
+                await dialog.getByLabel('Game', { exact: true }).selectOption('igdb-126459')
+                await expectCenteredDialog(dialog)
+                await scan('admin-stat-editor')
+                await auditPage.keyboard.press('Escape')
+                await dialog.waitFor({ state: 'hidden' })
+
                 await visit('/')
                 await stats.waitFor()
                 await scan('home')
