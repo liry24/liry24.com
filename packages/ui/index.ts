@@ -4,7 +4,6 @@ export {
     FileInputTrigger as UiFileInputTrigger,
 } from '@ui-sdk/vue/file-input'
 export { Input as UiInput } from '@ui-sdk/vue/input'
-export { Textarea as UiTextarea } from '@ui-sdk/vue/textarea'
 export { useShortcut, useShortcutHint } from '@ui-sdk/vue/shortcuts'
 export type { TokenCodec, TokenInputValue, TokenInsert } from '@ui-sdk/vue/token-input'
 export type {
@@ -19,3 +18,5 @@ export { default as UiReorderList } from './UiReorderList.vue'
 export { default as UiSearchPicker } from './UiSearchPicker.vue'
 export { default as UiSelect } from './UiSelect.vue'
 export { default as UiSlashEditor } from './UiSlashEditor.vue'
+export { default as UiTagInput } from './UiTagInput.vue'
+export { default as UiTextarea } from './UiTextarea.vue'

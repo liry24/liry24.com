@@ -44,5 +44,5 @@ export default defineEventHandler(async (event) => {
         const orderB = 'order' in b.data ? Number(b.data.order ?? 0) : 0
         return orderA - orderB || a.id.localeCompare(b.id)
     })
-    return { items, total: items.length }
+    return { items: items.map(({ id, data }) => ({ id, data })), total: items.length }
 })

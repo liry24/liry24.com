@@ -5,7 +5,9 @@ import content from '#server/content'
 
 const gameStatsFormSchema = z.object({
     id: z.string().optional(),
-    data: gameStatsFieldsSchema.extend({ order: z.number().int().optional() }),
+    data: gameStatsFieldsSchema
+        .partial({ periodKey: true })
+        .extend({ order: z.number().int().optional() }),
 })
 
 export default defineForm({
@@ -17,13 +19,18 @@ export default defineForm({
     maxBytes: 262_144,
     onSubmit: async (submission) => {
         try {
-            const id = normalizeDocumentId(
-                submission.data.id,
-                `${submission.data.data.game}-${submission.data.data.periodKey}`,
-            )
-            await validateGameStatsSave({ id, data: submission.data.data })
-            await saveOrderedDraft(content.collection('gameStats'), id, submission.data.data)
-            return Response.json({ id }, { status: 201 })
+            const { id, data } = submission.data
+            const saved = await saveEntryDraft(content.collection('gameStats'), {
+                id,
+                data,
+                key: 'periodKey',
+                fields: (periodKey, order) => ({ ...data, periodKey, order }),
+                label: data.period,
+                idPrefix: `${data.game}-`,
+                sameScope: (entry) => entry.game === data.game,
+                validate: (id, data) => validateGameStatsSave({ id, data }),
+            })
+            return Response.json({ id: saved.id }, { status: 201 })
         } catch (error) {
             return handleFormDomainError(error)
         }

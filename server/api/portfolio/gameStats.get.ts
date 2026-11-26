@@ -13,5 +13,9 @@ export default defineEventHandler(async (): Promise<GameStatsPage> => {
             id,
             data: { slug, name, primaryMetric, metrics },
         }))
-    return { items, total: items.length, games: gameDisplays }
+    return {
+        items: items.map(({ id, data }) => ({ id, data })),
+        total: items.length,
+        games: gameDisplays,
+    }
 })

@@ -21,6 +21,9 @@ const errors = ref<Record<string, string>>({})
 const formError = ref('')
 const summary = useTemplateRef('summary')
 const stats = useTemplateRef('stats')
+const manualSlug = ref(false)
+const slugKey = computed(() => (props.model === 'gameStats' ? 'periodKey' : 'slug'))
+const slugLabel = computed(() => (props.model === 'gameStats' ? 'Period key' : 'Slug'))
 const iconOpen = ref(false)
 const iconTrigger = shallowRef<HTMLElement | null>(null)
 const loadIcons = useAdminIconSearch(() => iconOpen.value)
@@ -30,6 +33,7 @@ const title = computed(() => (props.item ? `Edit ${form.value.label}` : `New ${f
 watch(open, (value) => {
     if (value) {
         data.value = { ...props.item?.data }
+        manualSlug.value = false
         if (props.model === 'works') data.value.style ??= 'small'
         errors.value = {}
         formError.value = ''
@@ -62,6 +66,18 @@ async function save() {
     formError.value = ''
     errors.value = {}
     const payload = { ...data.value }
+    const key = slugKey.value
+    if (manualSlug.value) {
+        const value = payload[key]?.trim()
+        if (!value) {
+            await showErrors('Check the highlighted fields.', {
+                [`data.${key}`]: `Enter a ${slugLabel.value.toLowerCase()}.`,
+            })
+            return
+        }
+        payload[key] = value
+    } else delete payload[key]
+
     if (props.model === 'works' || props.model === 'arts' || props.model === 'gameStats')
         payload.href = payload.href?.trim() || undefined
 
@@ -159,6 +175,14 @@ async function save() {
                 :errors="errors"
                 :busy="busy"
                 @busy="uploading = $event"
+            />
+            <AdminEntrySlug
+                v-model="data[slugKey]"
+                v-model:manual="manualSlug"
+                :label="slugLabel"
+                :name="`data.${slugKey}`"
+                :error="errors[`data.${slugKey}`]"
+                class="mt-5"
             />
         </fieldset>
         <template #overlays>

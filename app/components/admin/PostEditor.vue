@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { UiButton, UiField, UiFileInput, UiFileInputTrigger, UiInput } from '@liry24/ui'
+import {
+    UiButton,
+    UiField,
+    UiFileInput,
+    UiFileInputTrigger,
+    UiFormDialog,
+    UiInput,
+    UiTagInput,
+} from '@liry24/ui'
+import type { DropdownMenuItem } from '@nuxt/ui'
 import type { ContentDocumentStatus, ContentSchedule } from '@vite-hub/content'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 
@@ -13,29 +22,36 @@ const request = useRequestFetch()
 
 const docId = ref(id ?? '')
 const title = ref('')
-const slug = ref('')
-const slugTouched = ref(Boolean(id))
+const slug = ref<string>()
+const manualSlug = ref(false)
 const summary = ref('')
-const tagsText = ref('')
+const tags = ref<Array<string>>([])
 const cover = ref<MediaReference | undefined>(undefined)
 const authoredAtLocal = ref('')
 const order = ref(0)
 const body = ref('')
 const status = ref<ContentDocumentStatus | null>(null)
 const schedules = ref<Array<ContentSchedule>>([])
+const scheduleOpen = ref(false)
 const scheduleAtLocal = ref('')
+const scheduleError = ref('')
+const publishMenuId = useId()
+const focusPublishMenu = () => document.getElementById(publishMenuId)
+const scheduleDateFormat = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+})
+const { data: tagSuggestions } = useLazyFetch('/api/admin/posts/tags', { server: false })
 
-const saving = ref(false)
-const publishing = ref(false)
+type PostAction = 'draft' | 'publish' | 'schedule'
+const pendingAction = ref<PostAction | 'unschedule' | null>(null)
 const uploading = ref(false)
 const formError = ref('')
 const errors = ref<Record<string, string>>({})
 const showPreview = ref(false)
 const games = reactive(new Map<string, GameSearchResult>())
 const pendingGames = ref(0)
-const busy = computed(
-    () => saving.value || publishing.value || uploading.value || pendingGames.value > 0,
-)
+const busy = computed(() => !!pendingAction.value || uploading.value || pendingGames.value > 0)
 const displayTitle = computed(() =>
     gameTitleParts(title.value)
         .map((part) => (part.slug ? (games.get(part.slug)?.name ?? part.slug) : part.text))
@@ -67,7 +83,7 @@ const toIsoWithOffset = (local: string): string | undefined => {
 }
 
 const loadDocument = async () => {
-    if (!id) return
+    if (!docId.value) return
 
     const doc = await request<{
         id: string
@@ -83,7 +99,7 @@ const loadDocument = async () => {
         body: string
         status: ContentDocumentStatus | null
         schedules: Array<ContentSchedule>
-    }>(`/api/admin/content/posts/${encodeURIComponent(id)}`)
+    }>(`/api/admin/content/posts/${encodeURIComponent(docId.value)}`)
 
     const missing = [
         ...new Set(
@@ -109,7 +125,7 @@ const loadDocument = async () => {
     title.value = doc.data.title ?? ''
     slug.value = doc.data.slug ?? doc.id
     summary.value = doc.data.summary ?? ''
-    tagsText.value = (doc.data.tags ?? []).join(', ')
+    tags.value = doc.data.tags ?? []
     cover.value = doc.data.cover
     authoredAtLocal.value = toLocalDatetimeInput(doc.data.authoredAt)
     order.value = doc.data.order ?? 0
@@ -119,10 +135,6 @@ const loadDocument = async () => {
 }
 
 if (id) await loadDocument()
-
-watch(displayTitle, (value) => {
-    if (!slugTouched.value && !id) slug.value = entrySlugSuggestion(value)
-})
 
 const coverFiles = shallowRef<Array<File>>([])
 const uploadCover = async (files: Array<File>) => {
@@ -152,145 +164,110 @@ const uploadCover = async (files: Array<File>) => {
     }
 }
 
-const saveDraft = async (): Promise<string | undefined> => {
-    if (saving.value || uploading.value || pendingGames.value > 0) return
-
-    saving.value = true
+const saveDraft = async () => {
     formError.value = ''
     errors.value = {}
-    try {
-        const tags = tagsText.value
-            .split(',')
-            .map((entry) => entry.trim())
-            .filter(Boolean)
+    const manualValue = manualSlug.value ? slug.value?.trim() : undefined
+    if (manualSlug.value && !manualValue) {
+        formError.value = 'Check the highlighted fields.'
+        errors.value = { 'data.slug': 'Enter a slug.' }
+        return
+    }
 
-        interface PostDraftData {
-            title: string
-            plainTitle: string
-            slug: string
-            tags: Array<string>
-            gameMentions: Array<string>
-            order: number
-            summary?: string
-            cover?: MediaReference
-            authoredAt?: string
-        }
-
-        type PostFormPayload = {
-            id?: string
-            data: PostDraftData
-            body: string
-        }
-
-        const postData: PostDraftData = {
+    const [submitError, result] = await submitForm('post', {
+        id: docId.value || undefined,
+        data: {
             title: postEditorMentionParts(title.value, false)
                 .map((part) => (part.slug ? formatGameMention(part.slug) : part.text))
                 .join(''),
-            plainTitle: displayTitle.value,
-            slug: slug.value,
-            tags,
-            gameMentions: [],
+            slug: manualValue,
+            summary: summary.value.trim() || undefined,
+            tags: tags.value,
+            cover: cover.value,
+            authoredAt: toIsoWithOffset(authoredAtLocal.value),
             order: Number(order.value) || 0,
-        }
-        const trimmedSummary = summary.value.trim()
-        if (trimmedSummary) postData.summary = trimmedSummary
+        },
+        body: postEditorMentionParts(body.value, true)
+            .map((part) => (part.slug ? formatGameMention(part.slug) : part.text))
+            .join(''),
+    })
+    if (submitError) {
+        formError.value = submitError.message
+        errors.value = fieldErrors(submitError)
+        return
+    }
+    const savedId = result?.id || docId.value
+    if (!savedId) throw new Error('The saved draft could not be identified.')
 
-        if (cover.value) postData.cover = cover.value
+    docId.value = savedId
+    return savedId
+}
 
-        if (authoredAtLocal.value) {
-            const authoredAt = toIsoWithOffset(authoredAtLocal.value)
-            if (authoredAt) postData.authoredAt = authoredAt
-        }
-        const payload: PostFormPayload = {
-            data: postData,
-            body: postEditorMentionParts(body.value, true)
-                .map((part) => (part.slug ? formatGameMention(part.slug) : part.text))
-                .join(''),
-        }
-        if (docId.value) payload.id = docId.value
+const actionLabels = {
+    draft: { success: 'Saved draft', failure: 'Could not save draft.' },
+    publish: { success: 'Published post', failure: 'Could not publish post.' },
+    schedule: { success: 'Scheduled publish', failure: 'Could not schedule post.' },
+}
 
-        const [submitError, result] = await submitForm('post', payload)
-        if (submitError) {
-            formError.value = submitError.message
-            errors.value = fieldErrors(submitError)
-            return undefined
+const runPostAction = async (
+    ...args: [action: 'draft' | 'publish'] | [action: 'schedule', at: string]
+) => {
+    const [action, at] = args
+    if (busy.value) return
+
+    pendingAction.value = action
+    try {
+        const savedId = await saveDraft()
+        if (!savedId) {
+            if (action === 'schedule') {
+                scheduleError.value =
+                    'Check the highlighted fields in the editor before scheduling.'
+            }
+            return
         }
 
-        const savedId = result?.id || docId.value || slug.value
-        docId.value = savedId
-        toast.add({ title: 'Saved draft', color: 'success' })
-        if (!id && savedId) await router.replace(`/admin/posts/${encodeURIComponent(savedId)}`)
+        if (action !== 'draft') {
+            const target = { collection: 'posts' as const, id: savedId }
+            await $fetch('/api/admin/content/publish', {
+                method: 'POST',
+                body: action === 'schedule' ? { ...target, action, at } : { ...target, action },
+            })
+        }
+        if (action === 'schedule') scheduleOpen.value = false
+        toast.add({ title: actionLabels[action].success, color: 'success' })
+        if (!id) await router.replace(`/admin/posts/${encodeURIComponent(savedId)}`)
         else await loadDocument()
-
-        return savedId
+    } catch (error) {
+        const message = adminErrorMessage(error, actionLabels[action].failure)
+        if (action === 'schedule') scheduleError.value = message
+        else formError.value = message
     } finally {
-        saving.value = false
+        pendingAction.value = null
     }
 }
 
-const publishNow = async () => {
-    publishing.value = true
-    try {
-        const savedId = await saveDraft()
-        if (!savedId) return
-
-        await $fetch('/api/admin/content/publish', {
-            method: 'POST',
-            body: {
-                action: 'publish',
-                collection: 'posts',
-                id: savedId,
-            },
-        })
-        toast.add({ title: 'Published post', color: 'success' })
-        await loadDocument()
-    } catch (error) {
-        toast.add({
-            title: 'Publish failed',
-            description: adminErrorMessage(error, 'Could not publish post.'),
-            color: 'error',
-        })
-    } finally {
-        publishing.value = false
-    }
+const openSchedule = () => {
+    scheduleError.value = ''
+    scheduleAtLocal.value = toLocalDatetimeInput(new Date(Date.now() + 3_600_000).toISOString())
+    scheduleOpen.value = true
 }
 
 const schedulePublish = async () => {
-    if (!scheduleAtLocal.value) return
+    if (schedules.value.length) return
 
-    publishing.value = true
-    try {
-        const savedId = await saveDraft()
-        if (!savedId) return
-
-        const at = toIsoWithOffset(scheduleAtLocal.value)
-        if (!at) throw new Error('Choose a valid future date and time.')
-
-        await $fetch('/api/admin/content/publish', {
-            method: 'POST',
-            body: {
-                action: 'schedule',
-                collection: 'posts',
-                id: savedId,
-                at,
-            },
-        })
-        toast.add({ title: 'Scheduled publish', color: 'success' })
-        scheduleAtLocal.value = ''
-        await loadDocument()
-    } catch (error) {
-        toast.add({
-            title: 'Schedule failed',
-            description: adminErrorMessage(error, 'Could not schedule publish.'),
-            color: 'error',
-        })
-    } finally {
-        publishing.value = false
+    scheduleError.value = ''
+    const at = toIsoWithOffset(scheduleAtLocal.value)
+    if (!at || Date.parse(at) <= Date.now()) {
+        scheduleError.value = 'Choose a future date and time.'
+        return
     }
+    await runPostAction('schedule', at)
 }
 
 const unschedule = async (scheduleId: string) => {
-    publishing.value = true
+    if (busy.value) return
+    scheduleError.value = ''
+    pendingAction.value = 'unschedule'
     try {
         await $fetch('/api/admin/content/publish', {
             method: 'POST',
@@ -300,17 +277,18 @@ const unschedule = async (scheduleId: string) => {
             },
         })
         toast.add({ title: 'Cancelled schedule', color: 'neutral' })
-        await loadDocument()
+        schedules.value = schedules.value.filter((entry) => entry.id !== scheduleId)
     } catch (error) {
-        toast.add({
-            title: 'Unschedule failed',
-            description: adminErrorMessage(error, 'Could not cancel schedule.'),
-            color: 'error',
-        })
+        scheduleError.value = adminErrorMessage(error, 'Could not cancel schedule.')
     } finally {
-        publishing.value = false
+        pendingAction.value = null
     }
 }
+
+const publishActions: Array<DropdownMenuItem> = [
+    { label: 'Save draft', icon: 'lucide:save', onSelect: () => void runPostAction('draft') },
+    { label: 'Scheduled publish', icon: 'lucide:calendar-clock', onSelect: openSchedule },
+]
 </script>
 
 <template>
@@ -343,22 +321,31 @@ const unschedule = async (scheduleId: string) => {
                         >
                             {{ showPreview ? 'Edit Markdown' : 'Preview Markdown' }}
                         </UiButton>
-                        <UiButton
-                            class="ui-button"
-                            data-testid="save-post-draft"
-                            :disabled="busy"
-                            @click="saveDraft"
-                        >
-                            {{ saving ? 'Saving…' : 'Save draft' }}
-                        </UiButton>
-                        <UiButton
-                            class="ui-button"
-                            data-variant="primary"
-                            :disabled="busy"
-                            @click="publishNow"
-                        >
-                            {{ publishing ? 'Publishing…' : 'Publish' }}
-                        </UiButton>
+                        <UFieldGroup role="group" aria-label="Publish">
+                            <UButton
+                                label="Publish"
+                                color="neutral"
+                                :loading="pendingAction === 'publish'"
+                                :disabled="busy"
+                                @click="runPostAction('publish')"
+                            />
+                            <UDropdownMenu
+                                :items="publishActions"
+                                :content="{ align: 'end' }"
+                                :modal="false"
+                                :disabled="busy"
+                            >
+                                <UButton
+                                    :id="publishMenuId"
+                                    aria-label="Publish options"
+                                    icon="lucide:chevron-down"
+                                    color="neutral"
+                                    variant="outline"
+                                    :loading="pendingAction === 'draft'"
+                                    :disabled="busy"
+                                />
+                            </UDropdownMenu>
+                        </UFieldGroup>
                     </div>
                 </template>
             </UDashboardNavbar>
@@ -373,32 +360,33 @@ const unschedule = async (scheduleId: string) => {
                         v-model="title"
                         :games="games"
                         placeholder="Post title"
-                        :disabled="saving || publishing"
+                        :disabled="!!pendingAction"
                         required
                         @game="rememberGame"
                         @pending="pendingGames += $event"
                     />
                 </UiField>
 
-                <UiField label="Slug" :error="errors['data.slug']" required>
+                <UiField label="Summary" :error="errors['data.summary']">
                     <UiInput
-                        v-model="slug"
-                        placeholder="my-post-slug"
-                        class="ui-input font-mono"
-                        @update:model-value="slugTouched = true"
+                        v-model="summary"
+                        placeholder="Short summary"
+                        class="ui-input"
+                        :disabled="!!pendingAction"
                     />
                 </UiField>
 
-                <UiField label="Summary" :error="errors['data.summary']" class="sm:col-span-2">
-                    <UiInput v-model="summary" placeholder="Short summary" class="ui-input" />
-                </UiField>
-
-                <UiField label="Tags (comma separated)" :error="errors['data.tags']">
-                    <UiInput v-model="tagsText" placeholder="gaming, dev, notes" class="ui-input" />
-                </UiField>
-
-                <UiField label="Authored at" :error="errors['data.authoredAt']">
-                    <UiInput v-model="authoredAtLocal" type="datetime-local" class="ui-input" />
+                <UiField
+                    label="Tags"
+                    :error="errors['data.tags']"
+                    description="Press Enter to add a tag."
+                    class="sm:col-span-2"
+                >
+                    <UiTagInput
+                        v-model="tags"
+                        :suggestions="tagSuggestions?.tags ?? []"
+                        :disabled="!!pendingAction"
+                    />
                 </UiField>
             </div>
 
@@ -451,48 +439,85 @@ const unschedule = async (scheduleId: string) => {
                     v-model="body"
                     :games="games"
                     placeholder="Write Markdown…"
-                    :disabled="saving || publishing"
+                    :disabled="!!pendingAction"
                     multiline
                     @game="rememberGame"
                     @pending="pendingGames += $event"
                 />
             </UiField>
 
-            <section class="ui-card p-4" aria-label="Scheduled publish">
-                <div class="flex flex-col gap-3">
-                    <h3 class="text-sm font-medium">Scheduled Publish</h3>
-                    <div
-                        v-for="entry in schedules"
-                        :key="entry.id"
-                        class="flex items-center justify-between gap-2 text-sm"
+            <fieldset :disabled="!!pendingAction" class="grid min-w-0 gap-4">
+                <UiField
+                    label="Authored at"
+                    :error="errors['data.authoredAt']"
+                    description="Defaults to the time this post is published."
+                    class="sm:max-w-sm"
+                >
+                    <UiInput v-model="authoredAtLocal" type="datetime-local" class="ui-input" />
+                </UiField>
+                <AdminEntrySlug
+                    v-model="slug"
+                    v-model:manual="manualSlug"
+                    :error="errors['data.slug']"
+                />
+            </fieldset>
+
+            <UiFormDialog
+                v-model:open="scheduleOpen"
+                title="Scheduled publish"
+                submit-label="Schedule"
+                submitting-label="Scheduling…"
+                :busy="busy"
+                :saving="pendingAction === 'schedule'"
+                :hide-submit="schedules.length > 0"
+                :final-focus="focusPublishMenu"
+                @submit="schedulePublish"
+            >
+                <div class="grid gap-4">
+                    <p v-if="scheduleError" class="ui-alert" role="alert">{{ scheduleError }}</p>
+                    <UiField
+                        v-if="!schedules.length"
+                        label="Schedule at"
+                        description="Use your local time."
+                        required
                     >
-                        <span>{{ entry.at }} ({{ entry.status }})</span>
-                        <UiButton
-                            class="ui-button"
-                            data-variant="ghost"
-                            data-tone="danger"
+                        <UiInput
+                            v-model="scheduleAtLocal"
+                            type="datetime-local"
+                            class="ui-input"
                             :disabled="busy"
-                            @click="unschedule(entry.id)"
-                            >Cancel schedule</UiButton
+                            required
+                        />
+                    </UiField>
+                    <ul
+                        v-if="schedules.length"
+                        class="border-default divide-default divide-y border-t"
+                    >
+                        <li
+                            v-for="entry in schedules"
+                            :key="entry.id"
+                            class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
                         >
-                    </div>
-                    <div class="flex flex-wrap items-end gap-2">
-                        <UiField label="Schedule at">
-                            <UiInput
-                                v-model="scheduleAtLocal"
-                                type="datetime-local"
-                                class="ui-input"
-                            />
-                        </UiField>
-                        <UiButton
-                            class="ui-button"
-                            :disabled="!scheduleAtLocal || busy"
-                            @click="schedulePublish"
-                            >Schedule</UiButton
-                        >
-                    </div>
+                            <span>
+                                <time :datetime="entry.at">{{
+                                    scheduleDateFormat.format(new Date(entry.at))
+                                }}</time>
+                                · {{ entry.status }}
+                            </span>
+                            <UiButton
+                                type="button"
+                                class="ui-button"
+                                data-variant="ghost"
+                                data-tone="danger"
+                                :disabled="busy"
+                                @click="unschedule(entry.id)"
+                            >
+                                Cancel schedule
+                            </UiButton>
+                        </li>
+                    </ul>
                 </div>
-            </section>
+            </UiFormDialog>
         </template>
     </UDashboardPanel>
 </template>

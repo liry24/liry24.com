@@ -40,14 +40,6 @@ defineProps<{ errors: Record<string, string> }>()
                 required
                 placeholder="2023 – Present"
             />
-            <AdminEntryText
-                v-model="data.slug"
-                label="Slug"
-                name="data.slug"
-                :error="errors['data.slug']"
-                :suggestion="entrySlugSuggestion(data.company ?? '')"
-                required
-            />
         </div>
     </div>
 </template>

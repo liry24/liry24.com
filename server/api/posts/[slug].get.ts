@@ -24,8 +24,8 @@ export default defineEventHandler(async (event) => {
         url: full.url ?? null,
         data: full.data,
         body: full.body,
-        publishedAt: full.data.authoredAt,
-        updatedAt: full.data.authoredAt,
+        publishedAt: full.updatedAt ?? undefined,
+        updatedAt: full.updatedAt ?? undefined,
     }
     return result
 })

@@ -6,8 +6,7 @@ export default defineEventHandler(async () => {
     for (const doc of posts) {
         if (!doc.url) continue
 
-        if (doc.data.authoredAt) urls.push({ loc: doc.url, lastmod: doc.data.authoredAt })
-        else urls.push({ loc: doc.url })
+        urls.push({ loc: doc.url, lastmod: doc.data.authoredAt ?? doc.updatedAt ?? undefined })
     }
     return urls
 })

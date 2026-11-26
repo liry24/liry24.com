@@ -18,28 +18,18 @@ const styles = [
                 :error="errors['data.title']"
                 required
             />
-            <div class="grid gap-4 sm:grid-cols-2">
-                <AdminEntryText
-                    v-model="data.slug"
-                    label="Slug"
-                    name="data.slug"
-                    :error="errors['data.slug']"
-                    :suggestion="entrySlugSuggestion(data.title ?? '')"
-                    required
-                />
-                <AdminEntryText
-                    v-model="data.category"
-                    label="Category"
-                    name="data.category"
-                    :error="errors['data.category']"
-                />
-            </div>
+            <AdminEntryText
+                v-model="data.category"
+                label="Category"
+                name="data.category"
+                :error="errors['data.category']"
+            />
             <AdminEntryText
                 v-model="data.description"
                 label="Description"
                 name="data.description"
                 :error="errors['data.description']"
-                multiline
+                :rows="3"
             />
             <AdminEntryText
                 v-model="data.href"

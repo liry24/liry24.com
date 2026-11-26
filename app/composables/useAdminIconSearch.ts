@@ -1,19 +1,5 @@
 import type { Predictor } from 'gpu-icons-search'
 
-const searchIconify = async (query: string, signal: AbortSignal): Promise<Array<string>> => {
-    const url = new URL('https://api.iconify.design/search')
-    url.search = new URLSearchParams({ query, limit: '32' }).toString()
-    const response = await fetch(url, { signal, credentials: 'omit' })
-    if (!response.ok) throw new Error('Iconify search failed.')
-    const data: unknown = await response.json()
-    if (!data || typeof data !== 'object' || !('icons' in data) || !Array.isArray(data.icons))
-        throw new Error('Invalid Iconify search response.')
-
-    return data.icons.filter(
-        (id): id is string => typeof id === 'string' && /^[a-z0-9-]+:[a-z0-9-]+$/u.test(id),
-    )
-}
-
 export function useAdminIconSearch(isOpen: () => boolean) {
     let session = 0
     let predictor: Promise<Predictor> | undefined

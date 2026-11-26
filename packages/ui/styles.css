@@ -285,6 +285,11 @@
     padding: 0.375rem 0.625rem;
 }
 
+.ui-textarea {
+    min-height: calc(var(--textarea-rows, 3) * 1lh + 0.75rem + 2px);
+    resize: none;
+}
+
 .ui-input::placeholder {
     color: var(--text-muted);
 }
@@ -439,6 +444,38 @@
 .ui-token-remove:hover {
     background: var(--surface-active);
     color: var(--foreground);
+}
+
+.ui-tag-input {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.ui-tag-input:focus-within {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
+.ui-tag-query {
+    flex: 1 1 8rem;
+    min-width: 0;
+    outline: none;
+}
+
+.ui-tag-results {
+    z-index: 55;
+}
+
+.ui-tag-chevron {
+    display: inline-block;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    vertical-align: 0.2em;
+    border: solid currentColor;
+    border-width: 0 1px 1px 0;
+    transform: rotate(45deg);
 }
 
 .ui-command-menu {
