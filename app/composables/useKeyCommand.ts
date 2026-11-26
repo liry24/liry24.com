@@ -1,40 +1,55 @@
-export default (callback: () => void) => {
-    const konamiCode = [
-        'ArrowUp',
-        'ArrowUp',
-        'ArrowDown',
-        'ArrowDown',
-        'ArrowLeft',
-        'ArrowRight',
-        'ArrowLeft',
-        'ArrowRight',
-        'b',
-        'a',
-    ]
+import { isComposing, matchesShortcut } from '@ui-sdk/core'
 
+const konamiCode = [
+    'ArrowUp',
+    'ArrowUp',
+    'ArrowDown',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowLeft',
+    'ArrowRight',
+    'b',
+    'a',
+]
+
+export default function useKeyCommand(callback: () => void) {
     let index = 0
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-        const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
-        const targetKey =
-            konamiCode[index]?.length === 1 ? konamiCode[index]?.toLowerCase() : konamiCode[index]
+    // A sequence observes each key without taking over its browser action.
+    useEventListener(
+        'keydown',
+        (event) => {
+            if (event.repeat) return
 
-        if (key === targetKey) {
+            const key = konamiCode[index]
+            const target = event
+                .composedPath()
+                .find(
+                    (node): node is Element =>
+                        'nodeType' in node && node.nodeType === Node.ELEMENT_NODE,
+                )
+            const editing =
+                target?.matches('input, textarea, select') ||
+                (target && 'isContentEditable' in target && target.isContentEditable === true)
+
+            if (
+                event.defaultPrevented ||
+                isComposing(event) ||
+                editing ||
+                !key ||
+                !matchesShortcut(event, key)
+            ) {
+                index = 0
+                return
+            }
+
             index++
             if (index === konamiCode.length) {
-                callback()
                 index = 0
+                callback()
             }
-        } else index = 0
-    }
-
-    if (import.meta.client) {
-        onMounted(() => {
-            window.addEventListener('keydown', handleKeyDown)
-        })
-
-        onUnmounted(() => {
-            window.removeEventListener('keydown', handleKeyDown)
-        })
-    }
+        },
+        { passive: true },
+    )
 }
