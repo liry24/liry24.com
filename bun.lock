@@ -108,6 +108,7 @@
     },
   },
   "patchedDependencies": {
+    "@vite-hub/database@0.5.1": "patches/@vite-hub%2Fdatabase@0.5.1.patch",
     "better-auth@1.7.27": "patches/better-auth@1.7.27.patch",
     "better-call@1.4.6": "patches/better-call@1.4.6.patch",
   },

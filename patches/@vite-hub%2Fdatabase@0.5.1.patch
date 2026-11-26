@@ -1,0 +1,13 @@
+diff --git a/dist/vite-BDWj7skr.js b/dist/vite-BDWj7skr.js
+index a5e8390a8f3b37431a092fec0ebd4cea8e3f2357..0e3596cbf097a5e2c8730397140b96bcf982ebe8 100644
+--- a/dist/vite-BDWj7skr.js
++++ b/dist/vite-BDWj7skr.js
+@@ -2741,7 +2741,7 @@ function hubDatabase(options) {
+ 	}
+ 	function installNitroDevRegistry() {
+ 		if (!nitroOptions?.dev || !runtimeConfig) return;
+-		const plugin = resolve$1(databaseRoot(), NITRO_DEV_REGISTRY_PLUGIN);
++		const plugin = resolve(databaseRoot(), NITRO_DEV_REGISTRY_PLUGIN);
+ 		writeFileIfChangedSync(plugin, "import \"@vite-hub/database/runtime/registry\"\n\nexport default function viteHubDatabaseDevRegistry() {}\n");
+ 		const plugins = nitroOptions.plugins ??= [];
+ 		if (!plugins.includes(plugin)) plugins.push(plugin);
