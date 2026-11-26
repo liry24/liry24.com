@@ -1,0 +1,7 @@
+{
+    "extends": "./.nuxt/tsconfig.app.json",
+    "compilerOptions": {
+        "tsBuildInfoFile": "./.nuxt/cache/typecheck/tsconfig.vize.app.tsbuildinfo"
+    },
+    "contentMappers": [{ "package": "vize", "extensions": [".vue"] }]
+}
