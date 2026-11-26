@@ -408,6 +408,27 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await visit('/')
                 await auditPage.getByRole('button', { name: /VALORANT Act 1/ }).waitFor()
                 await scan('home')
+
+                const stacksDialog = auditPage.getByRole('dialog').filter({ hasText: 'stacks' })
+                const konamiPrefix = [
+                    'ArrowUp',
+                    'ArrowUp',
+                    'ArrowDown',
+                    'ArrowDown',
+                    'ArrowLeft',
+                    'ArrowRight',
+                    'ArrowLeft',
+                    'ArrowRight',
+                    'b',
+                ]
+                for (const key of [...konamiPrefix, 'a']) await auditPage.keyboard.press(key)
+                await stacksDialog.waitFor()
+                await auditPage.mouse.click(5, 5)
+                await stacksDialog.waitFor({ state: 'hidden' })
+
+                for (const key of [...konamiPrefix, 'x', 'a']) await auditPage.keyboard.press(key)
+                expect(await stacksDialog.isVisible()).toBe(false)
+
                 await auditPage.getByRole('button', { name: /VALORANT Act 1/ }).click()
                 await auditPage.getByRole('dialog').getByRole('table').waitFor()
                 await scan('game-stats-dialog')
@@ -552,7 +573,9 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await scan('admin-careers-empty')
 
                 await visit('/admin/assistant')
-                await auditPage.getByText(/Ask Gemini 4 Hydrogen/).waitFor()
+                await auditPage
+                    .getByText('Ask agent to inspect collections, draft posts, or prepare updates.')
+                    .waitFor()
                 await auditPage.locator('[data-hairline] svg').waitFor()
                 await scan('admin-assistant')
 
