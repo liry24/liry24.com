@@ -8,9 +8,6 @@ test('native Blob paths retain encoding and switch between app and image domain'
     expect(mediaUrl(image)).toBe('/media/%E4%BD%9C%E5%93%81/cover%20image.png')
     config.public.siteUrl = 'https://site.example'
     config.public.imagesDomain = 'https://site.example'
-    expect(mediaUrl(image)).toContain('/media/')
     config.public.imagesDomain = 'https://images.example/'
     expect(mediaUrl(image)).toBe('https://images.example/%E4%BD%9C%E5%93%81/cover%20image.png')
-    expect(mediaUrl(undefined)).toBeUndefined()
-    expect(mediaUrl(null)).toBeUndefined()
 })

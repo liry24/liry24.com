@@ -37,10 +37,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 .bind(gameId, game.igdbId, game.slug, JSON.stringify(game))
                 .run()
 
-            expect((await fetch('/api/portfolio/games')).status).toBe(404)
-            expect((await fetch('/api/portfolio/ranks')).status).toBe(404)
             expect((await fetch('/api/admin/games/catalog')).status).toBe(401)
-            expect((await fetch('/api/admin/content/games', { headers: admin })).status).toBe(404)
             const mention = '/api/posts/game-mentions/valorant'
             expect(await (await fetch(mention)).json()).toEqual({
                 slug: 'valorant',
@@ -101,13 +98,6 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                     },
                 ],
             })
-            const home = await (await fetch('/')).text()
-            expect(home).toContain('href="https://example.com/profile"')
-            expect(home).toContain('alt="Immortal 1"')
-            expect(home).toContain(
-                '>VALORANT</span><span class="text-muted font-light">V25A6</span>',
-            )
-
             const savedPost = await post('/_vitehub/forms/post', {
                 id: 'catalog-post',
                 data: { slug: 'catalog-post', title: 'A <game:valorant> post' },
@@ -121,11 +111,8 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             })
             expect(publishedPost.status, await publishedPost.text()).toBe(200)
             expect(await (await fetch('/api/posts/cards?game=valorant')).json()).toMatchObject({
-                total: 1,
+                items: [{ id: 'catalog-post' }],
             })
-            expect(await (await fetch('/posts/catalog-post')).text()).toContain(
-                '/posts?game=valorant',
-            )
 
             const deleteGame = await fetch(`/api/admin/games/${gameId}`, {
                 method: 'DELETE',

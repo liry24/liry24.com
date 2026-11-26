@@ -41,6 +41,7 @@ const select = (index: number) => {
         >
             <button
                 type="button"
+                data-testid="enlarge-artwork"
                 aria-label="Enlarge image"
                 class="block rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4"
                 @click="

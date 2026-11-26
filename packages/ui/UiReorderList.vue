@@ -105,6 +105,7 @@ async function move(event: MouseEvent, id: string, index: number) {
             v-for="(item, index) in orderedItems"
             :key="item.id"
             v-bind="handle.slot('item', { value: item.id })"
+            :data-item-id="item.id"
             class="flex min-w-0 items-center gap-2"
         >
             <div v-if="active" class="flex shrink-0 flex-col items-center">
@@ -123,6 +124,7 @@ async function move(event: MouseEvent, id: string, index: number) {
                 <button
                     type="button"
                     class="reorder-control"
+                    data-direction="up"
                     :aria-label="`Move ${label(item)} up`"
                     :aria-disabled="disabled || !!moving || index === 0"
                     @click="move($event, item.id, index - 1)"
@@ -132,6 +134,7 @@ async function move(event: MouseEvent, id: string, index: number) {
                 <button
                     type="button"
                     class="reorder-control"
+                    data-direction="down"
                     :aria-label="`Move ${label(item)} down`"
                     :aria-disabled="disabled || !!moving || index === orderedItems.length - 1"
                     @click="move($event, item.id, index + 1)"

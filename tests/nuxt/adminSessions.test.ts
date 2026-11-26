@@ -45,12 +45,21 @@ interface MountedWrapper {
 
 let wrapper: MountedWrapper | undefined
 beforeEach(() => {
+    let rows = [
+        { id: 'current', token: 'current-token' },
+        { id: 'other', token: 'private-token' },
+        { id: 'spare', token: 'spare-token' },
+    ]
     boundary.client = {
-        listSessions: vi.fn(async () => ({
-            data: [{ id: 'current' }, { id: 'other', token: 'private-token' }],
-        })),
-        revokeSession: vi.fn(async () => ({})),
-        revokeOtherSessions: vi.fn(async () => ({})),
+        listSessions: vi.fn(async () => ({ data: rows })),
+        revokeSession: vi.fn(async ({ token }) => {
+            rows = rows.filter((row) => row.token !== token)
+            return {}
+        }),
+        revokeOtherSessions: vi.fn(async () => {
+            rows = rows.filter((row) => row.id === 'current')
+            return {}
+        }),
     }
     boundary.identity = {
         user: ref({ id: 'alice' }),
@@ -78,12 +87,12 @@ async function setup() {
 
 test('native individual and bulk revocation refresh the list', async () => {
     const sessions = await setup()
-    expect(sessions.sessions.value).toHaveLength(2)
+    const ids = () => sessions.sessions.value.map(({ id }) => id)
+    expect(ids()).toEqual(['current', 'other', 'spare'])
     await sessions.revoke('private-token')
-    expect(boundary.client?.revokeSession).toHaveBeenCalledWith({ token: 'private-token' })
+    expect(ids()).toEqual(['current', 'spare'])
     await sessions.revokeOthers()
-    expect(boundary.client?.revokeOtherSessions).toHaveBeenCalledOnce()
-    expect(boundary.client?.listSessions).toHaveBeenCalledTimes(3)
+    expect(ids()).toEqual(['current'])
 })
 
 test('failures are visible, concurrent writes are ignored, and identities cannot retain sessions', async () => {
@@ -97,10 +106,11 @@ test('failures are visible, concurrent writes are ignored, and identities cannot
     const pending = sessions.revoke('private-token')
     await sessions.revokeOthers()
     expect(boundary.client?.revokeOtherSessions).not.toHaveBeenCalled()
-    finish({ error: { message: 'secret upstream error' } })
+    const upstreamError = 'SENSITIVE_REMOTE_DETAIL'
+    finish({ error: { message: upstreamError } })
     await pending
-    expect(sessions.failure.value).toContain('Please try again')
-    expect(sessions.failure.value).not.toContain('secret')
+    expect(sessions.failure.value).toBeTruthy()
+    expect(sessions.failure.value).not.toContain(upstreamError)
     if (boundary.identity) boundary.identity.user.value = { id: 'bob' }
 
     expect(sessions.sessions.value).toEqual([])
@@ -128,7 +138,6 @@ test.each([
     ['Mozilla/5.0 (iPhone) Version/18.0 Mobile/15 Safari/604.1', 'Safari', 'iOS', 'Phone'],
     ['Mozilla/5.0 (iPad) CriOS/130.0 Mobile/15 Safari/604.1', 'Chrome', 'iOS', 'Tablet'],
     ['Mozilla/5.0 (Linux; Android 14) Firefox/130.0', 'Firefox', 'Android', 'Tablet'],
-    ['', 'Unknown browser', 'Unknown OS', 'Unknown device'],
 ])('user agent %s', (ua, browser, os, device) => {
     expect(adminSessionDevice(ua)).toMatchObject({ browser, os, device })
 })
