@@ -1,19 +1,17 @@
 import { expect, test } from 'vitest'
 
-import { adminRedirect, isAdminPath } from '../shared/utils/adminRedirect'
+import { adminRedirect } from '../shared/utils/adminRedirect'
 
 test('only admin locations can resume after Pocket ID sign-in', () => {
     expect(adminRedirect('/admin/works?filter=art%20work#top')).toBe(
         '/admin/works?filter=art%20work#top',
     )
-    expect(isAdminPath('/admin')).toBe(true)
-    expect(isAdminPath('/ADMIN/works')).toBe(true)
-    expect(isAdminPath('/administrator')).toBe(false)
-    expect(isAdminPath('/posts/admin')).toBe(false)
+    expect(adminRedirect('/ADMIN/works')).toBe('/ADMIN/works')
     for (const location of [
         undefined,
         ['/admin/works'],
         '/administrator',
+        '/posts/admin',
         '/admin/%2e%2e/login',
         '/admin/works ',
         '/login',

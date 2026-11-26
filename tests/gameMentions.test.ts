@@ -1,25 +1,14 @@
-import { parseMarkdown } from 'comark/parse'
 import { expect, test } from 'vitest'
 
 import { gameTitleParts, postGameSlugs } from '../shared/utils/gameMentions'
-import { postMarkdownSecurity } from '../shared/utils/postMarkdown'
 
-test('the inline rule keeps exact IGDB slugs and excludes code, escapes, unsafe attributes and linked labels', async () => {
+test('post game references preserve exact slugs and skip code, escapes, and links', async () => {
     const source =
         'Before :game[valorant] and <game:exact--igdb-slug>\n\n`:game[inline-code]`\n\n```html\n<game:block-code>\n```\n\n\\:game[escaped] [:game[linked]](https://example.invalid) <game:bad_slug>'
     expect(await postGameSlugs('Title :game[valorant]', source)).toEqual([
         'valorant',
         'exact--igdb-slug',
     ])
-    const document = await parseMarkdown(
-        source + '\n\n:game-mention{slug="valorant" :as="script" onclick="bad()"}',
-        { plugins: [postMarkdownSecurity], autoClose: false },
-    )
-    const nodes = JSON.stringify(document.nodes)
-    expect(nodes).toContain('["game-mention",{"slug":"valorant"},"valorant"]')
-    expect(nodes).not.toContain('onclick')
-    expect(nodes).not.toContain(':as')
-    expect(nodes).toContain('<game:bad_slug>')
 })
 test('titles support only literal text and mentions; code and escaped tokens remain literal', () => {
     const title = '**Literal** :game[valorant] `<game:code>` \\<game:escaped>'

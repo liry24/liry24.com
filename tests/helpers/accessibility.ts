@@ -34,14 +34,22 @@ const wcagRules = Object.fromEntries(
         .map(({ ruleId }) => [ruleId, { enabled: true }]),
 )
 
-export function wcagViolations<T extends { tags: Array<string> }>(violations: Array<T>): Array<T> {
+function wcagViolations<T extends { tags: Array<string> }>(violations: Array<T>): Array<T> {
     return violations.filter((violation) => violation.tags.some((tag) => wcagTags.includes(tag)))
 }
 
-export async function runAccessibilityChecks(page: Page) {
+async function runAccessibilityChecks(page: Page) {
     await page.addScriptTag({ content: axe.source })
     // Include stable A/AA rules such as target-size that axe leaves disabled by default.
     return page.evaluate((rules) => window.axe.run(document, { rules }), wcagRules)
+}
+
+export async function waitForNuxtReady(page: Page) {
+    await page.waitForFunction(() => {
+        const root: NuxtRootElement | null = document.querySelector('#__nuxt')
+        const nuxt = root?.__vue_app__?.config?.globalProperties?.$nuxt
+        return Boolean(nuxt && nuxt.isHydrating === false && !nuxt['~transitionPromise'])
+    })
 }
 
 export async function scanAccessibility(page: Page, state: string, expectedErrorStatus?: number) {
@@ -58,11 +66,7 @@ export async function scanAccessibility(page: Page, state: string, expectedError
     }
     let results: axe.AxeResults
     try {
-        await page.waitForFunction(() => {
-            const root: NuxtRootElement | null = document.querySelector('#__nuxt')
-            const nuxt = root?.__vue_app__?.config?.globalProperties?.$nuxt
-            return Boolean(nuxt && nuxt.isHydrating === false && !nuxt['~transitionPromise'])
-        })
+        await waitForNuxtReady(page)
         await page.evaluate(async () => {
             await document.fonts.ready
             await new Promise<void>((done) => {

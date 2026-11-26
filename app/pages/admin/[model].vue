@@ -538,6 +538,7 @@ useHead({ title: meta.title })
             >
                 <UButton
                     :id="reorderButtonId"
+                    data-testid="toggle-reorder"
                     :label="reordering ? 'Cancel' : 'Reorder'"
                     :icon="reordering ? undefined : 'lucide:list-ordered'"
                     color="neutral"
@@ -547,6 +548,7 @@ useHead({ title: meta.title })
                 />
                 <UButton
                     v-if="reordering"
+                    data-testid="save-order"
                     label="Save order"
                     :loading="savingOrder"
                     :disabled="!orderChanged"
@@ -590,6 +592,7 @@ useHead({ title: meta.title })
                             <div v-if="!reordering" class="flex flex-wrap items-center gap-2">
                                 <UButton
                                     label="Edit"
+                                    data-testid="edit-entry"
                                     size="xs"
                                     variant="outline"
                                     color="neutral"

@@ -343,7 +343,12 @@ const unschedule = async (scheduleId: string) => {
                         >
                             {{ showPreview ? 'Edit Markdown' : 'Preview Markdown' }}
                         </UiButton>
-                        <UiButton class="ui-button" :disabled="busy" @click="saveDraft">
+                        <UiButton
+                            class="ui-button"
+                            data-testid="save-post-draft"
+                            :disabled="busy"
+                            @click="saveDraft"
+                        >
                             {{ saving ? 'Saving…' : 'Save draft' }}
                         </UiButton>
                         <UiButton

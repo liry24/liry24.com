@@ -1,6 +1,8 @@
 import type { ElementNodeAttributes, Node } from 'comark'
 import { expect } from 'vitest'
 
+export const literalCode = '<script>Code example remains text</script>'
+
 export const content = [
     'An **introduction** with [a safe link](/works).',
     '<script>globalThis.auditMarker = 1</script>',
@@ -30,7 +32,7 @@ export const content = [
     '- [x] Completed task\n- [ ] Pending task',
     '<!-- more -->',
     'Full body **retained**.',
-    '```html\n<script>Code example remains text</script>\n```',
+    ['```html', literalCode, '```'].join('\n'),
 ].join('\n\n')
 
 export function assertSafe(nodes: Array<Node>) {

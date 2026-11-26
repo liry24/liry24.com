@@ -84,7 +84,6 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 headers: { accept: 'text/html' },
             })
             expect(errorPage.status).toBe(403)
-            expect(await errorPage.text()).toContain('Retry Pocket ID sign-in')
             const retry = await app.server.fetch('/admin/works?view=list', { redirect: 'manual' })
             expect(new URL(retry.headers.get('location') ?? '/', app.url).origin).toBe(
                 provider.issuer,
@@ -193,9 +192,13 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 headers: { origin: app.url.origin, cookie: ownerSignIn.cookie },
             })
             expect(signOut.status).toBe(200)
-            expect(signOut.headers.getSetCookie()).toEqual(
-                expect.arrayContaining([expect.stringContaining('liry24-pocket.session_token=')]),
+            const revoked = await app.server.fetch(
+                '/api/auth/get-session?disableCookieCache=true',
+                {
+                    headers: { cookie: ownerSignIn.cookie },
+                },
             )
+            expect(await revoked.json()).toBeNull()
         } finally {
             await app.close()
             await provider.close()

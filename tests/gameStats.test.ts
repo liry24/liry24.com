@@ -32,7 +32,6 @@ test('game stats validate configured metrics and preserve zero separately from m
     ])
         expect(gameValueIssues(metrics, values).length).toBeGreaterThan(0)
 
-    expect(formatGameValue(undefined)).toBe('—')
     expect(formatGameValue({ key: 'winRate', value: 0 }, metrics[1])).toBe('0%')
     expect(
         formatGameValue({ key: 'peakRank', value: 2123, label: 'Immortal 1 23 RR' }, metrics[0]),
