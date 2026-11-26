@@ -15,10 +15,13 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
     if (import.meta.server) return
 
-    const request = useRequestFetch()
-    const session = await request<{ user?: { id: string; role?: string | null } } | null>(
-        '/api/auth/get-session',
-    )
+    const { data: session, error } = await authClient.getSession()
+    if (error) {
+        throw createError({
+            status: error.status || 500,
+            statusText: error.message || 'Could not verify session',
+        })
+    }
     if (!session?.user) return navigateTo(to.fullPath, { external: true })
 
     if (session.user.role !== 'admin')

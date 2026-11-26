@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { UiButton, UiReorderList, useShortcut, useShortcutHint } from '@liry24/ui'
-import type { ContentDocumentStatus, ContentSchedule } from '@vite-hub/content'
 
 const route = useRoute()
 
@@ -11,15 +10,11 @@ if (!Object.hasOwn(portfolioCollectionMeta, modelParam))
 const model = modelParam as PortfolioCollectionName
 const meta = portfolioCollectionMeta[model]
 
-interface AdminItem extends AdminEntryRecord<AdminEntryData> {
-    status?: ContentDocumentStatus | null
-    schedule?: ContentSchedule | null
-}
+const { data, pending, error, refresh } = await useFetch(`/api/admin/content/${model}`, {
+    key: `admin-model:${model}`,
+})
 
-const { data, pending, error, refresh } = await useFetch<{ items: Array<AdminItem> }>(
-    `/api/admin/content/${model}`,
-    { key: `admin-model:${model}` },
-)
+type AdminItem = NonNullable<typeof data.value>['items'][number]
 
 const items = computed(() => data.value?.items ?? [])
 const currentOrder = computed(() => items.value.map((item) => item.id))
@@ -71,15 +66,13 @@ const finalFocus = () => editTrigger.value
 
 const itemLabel = (item: AdminItem) => {
     const record = item.data
-    return (
-        record.title ??
-        record.name ??
-        record.label ??
-        record.company ??
-        record.period ??
-        record.game ??
-        item.id
-    )
+    if ('title' in record && record.title) return record.title
+    if ('name' in record && record.name) return record.name
+    if ('label' in record && record.label) return record.label
+    if ('company' in record && record.company) return record.company
+    if ('period' in record && record.period) return record.period
+    if ('game' in record && record.game) return record.game
+    return item.id
 }
 
 useHead({ title: meta.title })

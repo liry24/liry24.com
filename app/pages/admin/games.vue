@@ -4,10 +4,9 @@ import { UiReorderList } from '@liry24/ui'
 type GameCatalogItem = AdminEntryRecord<GameRecordData>
 
 const toast = useToast()
-const { data, pending, error, refresh } = await useFetch<{ items: Array<GameCatalogItem> }>(
-    '/api/admin/games/catalog',
-    { key: 'admin-games' },
-)
+const { data, pending, error, refresh } = await useFetch('/api/admin/games/catalog', {
+    key: 'admin-games',
+})
 
 const items = computed(() => data.value?.items ?? [])
 const currentOrder = computed(() => items.value.map((item) => item.id))

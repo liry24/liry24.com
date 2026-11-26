@@ -32,6 +32,15 @@ export type GameRecordData = z.infer<typeof gameFieldsSchema>
 export type GameStatsRecordData = z.infer<typeof gameStatsFieldsSchema>
 export type SocialData = z.infer<typeof socialFieldsSchema>
 
+export type CollectionDocumentData =
+    | PostData
+    | WorkData
+    | ArtData
+    | CareerData
+    | SkillData
+    | GameStatsRecordData
+    | SocialData
+
 type PortfolioDataMap = {
     works: WorkData
     arts: ArtData

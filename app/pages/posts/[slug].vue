@@ -8,32 +8,34 @@ const { isSupported: isShareSupported, share } = useShare(() => ({
 const { isSupported: isCopySupported, copy, copied } = useClipboard()
 
 const slugParam = computed(() => String(route.params.slug ?? ''))
-const { data: entry, error } = await useFetch<PostItem>(
+const { data: entry, error } = await useFetch(
     () => `/api/posts/${encodeURIComponent(slugParam.value)}`,
 )
 if (error.value) throw error.value
 
+const post = computed(() => (entry.value && 'body' in entry.value ? entry.value : null))
+
 const data = computed(() =>
-    entry.value
+    post.value
         ? {
-              ...entry.value.data,
-              date: entry.value.data.authoredAt ?? entry.value.publishedAt ?? entry.value.updatedAt,
-              body: entry.value.body,
+              ...post.value.data,
+              date: post.value.data.authoredAt ?? post.value.publishedAt ?? post.value.updatedAt,
+              body: post.value.body,
           }
         : null,
 )
 
 if (!data.value) throw createError({ status: 404, statusText: 'Post not found' })
 
-if (entry.value?.url && entry.value.url !== route.path)
-    await navigateTo(entry.value.url, { redirectCode: 301 })
+if (post.value?.url && post.value.url !== route.path)
+    await navigateTo(post.value.url, { redirectCode: 301 })
 
 const siteOrigin = String(useRuntimeConfig().public.siteUrl || useRequestURL().origin).replace(
     /\/+$/,
     '',
 )
 const canonicalUrl = computed(() =>
-    entry.value?.url ? `${siteOrigin}${entry.value.url}` : undefined,
+    post.value?.url ? `${siteOrigin}${post.value.url}` : undefined,
 )
 
 useSeoMeta({
@@ -45,7 +47,7 @@ useSeoMeta({
     ogUrl: () => canonicalUrl.value,
     ogImage: () => mediaUrl(data.value?.cover),
     articlePublishedTime: () => data.value?.date ?? undefined,
-    articleModifiedTime: () => entry.value?.updatedAt ?? undefined,
+    articleModifiedTime: () => post.value?.updatedAt ?? undefined,
 })
 
 useHead({

@@ -51,26 +51,14 @@ const rememberGame = (game: GameSearchResult) => {
 const loadDocument = async () => {
     if (!docId.value) return
 
-    const doc = await request<{
-        id: string
-        data: {
-            title?: string
-            slug?: string
-            summary?: string
-            tags?: Array<string>
-            cover?: MediaReference
-            authoredAt?: string
-            order?: number
-        }
-        body: string
-        status: ContentDocumentStatus | null
-        schedules: Array<ContentSchedule>
-    }>(`/api/admin/content/posts/${encodeURIComponent(docId.value)}`)
+    const doc = await request(`/api/admin/content/posts/${encodeURIComponent(docId.value)}`)
+    if (!isPostData(doc.data)) throw new Error('Invalid post document')
 
+    const post = doc.data
     const missing = [
         ...new Set(
             [
-                ...postEditorMentionParts(doc.data.title ?? '', false),
+                ...postEditorMentionParts(post.title ?? '', false),
                 ...postEditorMentionParts(doc.body ?? '', true),
             ].flatMap(({ slug: gameSlug }) => (gameSlug && !games.has(gameSlug) ? [gameSlug] : [])),
         ),
@@ -88,13 +76,13 @@ const loadDocument = async () => {
         }
     }
     docId.value = doc.id
-    title.value = doc.data.title ?? ''
-    slug.value = doc.data.slug ?? doc.id
-    summary.value = doc.data.summary ?? ''
-    tags.value = doc.data.tags ?? []
-    cover.value = doc.data.cover
-    authoredAtLocal.value = toLocalDatetimeInput(doc.data.authoredAt)
-    order.value = doc.data.order ?? 0
+    title.value = post.title ?? ''
+    slug.value = post.slug ?? doc.id
+    summary.value = post.summary ?? ''
+    tags.value = post.tags ?? []
+    cover.value = post.cover
+    authoredAtLocal.value = toLocalDatetimeInput(post.authoredAt)
+    order.value = post.order ?? 0
     body.value = doc.body ?? ''
     status.value = doc.status
     schedules.value = doc.schedules

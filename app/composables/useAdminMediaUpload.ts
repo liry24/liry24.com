@@ -7,7 +7,7 @@ export const useAdminMediaUpload = (folder: MaybeRefOrGetter<AdminMediaFolder>) 
         const body = new FormData()
         body.append('file', file)
         body.append('folder', toValue(folder))
-        return await $fetch<MediaReference>('/api/admin/media', {
+        return await $fetch('/api/admin/media', {
             method: 'POST',
             body,
         })

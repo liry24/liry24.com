@@ -2,15 +2,6 @@ import type { ContentDocumentStatus, ContentRef, ContentSchedule } from '@vite-h
 
 import content from '#server/content'
 
-type CollectionDocumentData =
-    | PostData
-    | WorkData
-    | ArtData
-    | CareerData
-    | SkillData
-    | GameStatsRecordData
-    | SocialData
-
 interface CollectionDocumentItem<TData = CollectionDocumentData> {
     id: string
     url?: string | null

@@ -4,9 +4,7 @@ const { slug } = defineProps<{ slug: string }>()
 const previewGames = inject(postPreviewGamesKey, null)
 const published = previewGames
     ? null
-    : await useFetch<GameMentionData | null>(
-          () => `/api/posts/game-mentions/${encodeURIComponent(slug)}`,
-      )
+    : await useFetch(() => `/api/posts/game-mentions/${encodeURIComponent(slug)}`)
 const game = computed(() => published?.data.value)
 const gameImageSrc = computed(() => mediaUrl(game.value?.icon) || game.value?.cover || undefined)
 const previewGame = computed(() => previewGames?.get(slug))

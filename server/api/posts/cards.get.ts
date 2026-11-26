@@ -5,7 +5,7 @@ import content from '#server/content'
 const postTimestamp = (entry: { data: PostData; updatedAt?: string | null }) =>
     Date.parse(entry.data.authoredAt ?? entry.updatedAt ?? '') || 0
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async (event): Promise<PostCardsPage> => {
     const parsed = z
         .object({
             game: z.string().regex(gameSlugPattern).optional(),

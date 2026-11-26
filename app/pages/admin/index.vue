@@ -1,8 +1,7 @@
 <script setup lang="ts">
-const { data: postOverview } = await useFetch<{ items: Array<{ status?: { state?: string } }> }>(
-    '/api/admin/content/posts',
-    { key: 'admin-posts-overview' },
-)
+const { data: postOverview } = await useFetch('/api/admin/content/posts', {
+    key: 'admin-posts-overview',
+})
 
 const totalPosts = computed(() => postOverview.value?.items.length ?? 0)
 const draftPosts = computed(

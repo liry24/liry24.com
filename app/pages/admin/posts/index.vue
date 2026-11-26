@@ -1,32 +1,21 @@
 <script setup lang="ts">
-import type { ContentDocumentStatus, ContentSchedule } from '@vite-hub/content'
+const { data, pending, error, refresh } = await useFetch('/api/admin/content/posts', {
+    key: 'admin-posts',
+})
 
-interface PostListItem {
-    id: string
-    data: {
-        title?: string
-        plainTitle?: string
-        slug?: string
-        authoredAt?: string
-    }
-    status: ContentDocumentStatus | null
-    schedule: ContentSchedule | null
-}
+const posts = computed(() =>
+    (data.value?.items ?? []).flatMap((item) =>
+        isPostData(item.data) ? [{ ...item, data: item.data }] : [],
+    ),
+)
 
-const scheduleTarget = ref<PostListItem | null>(null)
+const scheduleTarget = ref<(typeof posts.value)[number] | null>(null)
 const scheduleOpen = computed({
     get: () => Boolean(scheduleTarget.value),
     set: (value: boolean) => {
         if (!value) scheduleTarget.value = null
     },
 })
-
-const { data, pending, error, refresh } = await useFetch<{
-    items: Array<PostListItem>
-    schedules: Array<ContentSchedule>
-}>('/api/admin/content/posts', { key: 'admin-posts' })
-
-const posts = computed(() => data.value?.items ?? [])
 const { busyId, publishDocument, deleteDocument, scheduleDocument, unscheduleDocument } =
     useAdminContentActions('posts', refresh, 'post')
 

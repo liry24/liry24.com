@@ -12,7 +12,7 @@ const MotionUSeparator = motion.create('hr')
 const arts = usePortfolioData('arts')
 const socials = usePortfolioData('socials')
 const careers = usePortfolioData('careers')
-const gameStats = useFetch<GameStatsPage>('/api/portfolio/gameStats')
+const gameStats = useFetch('/api/portfolio/gameStats')
 const posts = useFetch<PostCardsPage>('/api/posts/cards', { query: { limit: 10 } })
 await Promise.all([arts, socials, careers, gameStats, posts])
 const data = computed(() => ({
