@@ -35,12 +35,9 @@ jobs:
           - name: Lint (Vue)
             command: bun run lint:vue
             prepare: 'false'
-          - name: Typecheck (Nuxt)
+          - name: Typecheck
             command: bun run typecheck
             prepare: 'false'
-          - name: Typecheck (tests)
-            command: bun run typecheck:tests
-            prepare: 'true'
           - name: Vitest (Node)
             command: node node_modules/vitest/vitest.mjs run --project node --exclude 'tests/worker/**'
             prepare: 'true'
@@ -148,7 +145,7 @@ jobs:
           name: worker-build
       - run: tar -xzf worker-build.tar.gz
       - run: bun x playwright-core install --with-deps chromium
-      - run: node node_modules/vitest/vitest.mjs run tests/worker/accessibility.browser.test.ts
+      - run: node node_modules/vitest/vitest.mjs run tests/worker/accessibility.browser.test.ts tests/worker/admin-flows.browser.test.ts
       - name: Upload accessibility reports
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

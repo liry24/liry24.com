@@ -1,5 +1,3 @@
-import content from '#server/content'
-
 const portfolioModels = [
     'works',
     'arts',
@@ -8,41 +6,12 @@ const portfolioModels = [
     'socials',
 ] as const satisfies ReadonlyArray<PortfolioCollectionName>
 
-function parsePortfolioModel(raw: string | undefined) {
-    return portfolioModels.find((entry) => entry === raw)
-}
-
-async function listModelItems(
-    name: (typeof portfolioModels)[number],
-): Promise<Array<PortfolioItem>> {
-    switch (name) {
-        case 'works': {
-            return await listAllCollectionItems(content.collection('works'), 'published')
-        }
-        case 'arts': {
-            return await listAllCollectionItems(content.collection('arts'), 'published')
-        }
-        case 'careers': {
-            return await listAllCollectionItems(content.collection('careers'), 'published')
-        }
-        case 'skills': {
-            return await listAllCollectionItems(content.collection('skills'), 'published')
-        }
-        case 'socials': {
-            return await listAllCollectionItems(content.collection('socials'), 'published')
-        }
-    }
-}
-
 export default defineEventHandler(async (event) => {
-    const name = parsePortfolioModel(getRouterParam(event, 'model'))
+    const raw = getRouterParam(event, 'model')
+    const name = portfolioModels.find((entry) => entry === raw)
     if (!name) throw createError({ status: 404, statusText: 'Collection not found' })
 
-    const items = await listModelItems(name)
-    items.sort((a, b) => {
-        const orderA = 'order' in a.data ? Number(a.data.order ?? 0) : 0
-        const orderB = 'order' in b.data ? Number(b.data.order ?? 0) : 0
-        return orderA - orderB || a.id.localeCompare(b.id)
-    })
+    const items = await listCollectionByName(name, 'published')
+    items.sort((a, b) => a.data.order - b.data.order || a.id.localeCompare(b.id))
     return { items: items.map(({ id, data }) => ({ id, data })), total: items.length }
 })

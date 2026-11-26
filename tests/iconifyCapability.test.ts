@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest'
 
-import { iconify } from '../../server/capabilities/iconify'
+import { iconify } from '../server/capabilities/iconify'
 
 const tool = iconify.tools.searchIcons
 

@@ -1,3 +1,4 @@
+import type { Node } from 'comark'
 import type { z } from 'zod'
 
 import type {
@@ -31,7 +32,7 @@ export type GameRecordData = z.infer<typeof gameFieldsSchema>
 export type GameStatsRecordData = z.infer<typeof gameStatsFieldsSchema>
 export type SocialData = z.infer<typeof socialFieldsSchema>
 
-export type PortfolioDataMap = {
+type PortfolioDataMap = {
     works: WorkData
     arts: ArtData
     careers: CareerData
@@ -52,4 +53,20 @@ export interface PostItem {
     body: string
     publishedAt?: string
     updatedAt?: string
+}
+
+export type PostCard = Omit<PostData, 'summary'> & {
+    id: string
+    url: string | null
+    date: string | null
+    excerpt: {
+        nodes: Array<Node>
+        frontmatter: Record<string, never>
+        meta: Record<string, never>
+    }
+}
+
+export interface PostCardsPage {
+    items: Array<PostCard>
+    total: number
 }

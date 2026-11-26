@@ -1,11 +1,11 @@
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 
 import { defineVitestProject } from '@nuxt/test-utils/config'
 import unimport from 'unimport/unplugin'
 import type { Alias } from 'vite'
 import { defineConfig } from 'vitest/config'
 
-const root = fileURLToPath(new URL('.', import.meta.url))
+const root = `${import.meta.dirname}/`
 
 function isAliasEntry(value: unknown): value is Alias {
     return (
@@ -30,7 +30,7 @@ const nuxtProject = await defineVitestProject({
         environment: 'nuxt',
         environmentOptions: {
             nuxt: {
-                rootDir: fileURLToPath(new URL('./tests/fixtures/runtime', import.meta.url)),
+                rootDir: resolve(import.meta.dirname, 'tests/fixtures/runtime'),
                 domEnvironment: 'happy-dom',
                 overrides: {
                     hooks: {
@@ -92,7 +92,7 @@ export default defineConfig({
                 // Node tests that load a server module need Nitro's import transform.
                 plugins: [
                     unimport.vite({
-                        include: /\/server\/.*\.ts$/,
+                        include: /\/(?:server|app\/utils)\/.*\.ts$/,
                         dirs: [`${root}server/utils`, `${root}shared/utils`],
                         presets: [
                             {

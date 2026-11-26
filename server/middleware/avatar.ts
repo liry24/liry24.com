@@ -1,25 +1,16 @@
 const AVATAR_REGEX = /^\/avatar\.(png|jpg|jpeg|webp)$/i
 
-const formatToWsrv = {
-    jpeg: 'jpg',
-    jpg: 'jpg',
-    png: 'png',
-    webp: 'webp',
-} as const
-
-type AvatarFormat = keyof typeof formatToWsrv
+const formatToWsrv = new Map<string, string>([
+    ['jpeg', 'jpg'],
+    ['jpg', 'jpg'],
+    ['png', 'png'],
+    ['webp', 'webp'],
+])
 
 export default defineEventHandler(async (event) => {
-    const path = getRequestURL(event).pathname
-    const match = path.match(AVATAR_REGEX)
-
-    if (!match) return
-
-    const rawFormat = match[1]?.toLowerCase()
-    if (rawFormat !== 'jpeg' && rawFormat !== 'jpg' && rawFormat !== 'png' && rawFormat !== 'webp')
-        return
-
-    const format: AvatarFormat = rawFormat
+    const match = event.url.pathname.match(AVATAR_REGEX)
+    const output = match?.[1] ? formatToWsrv.get(match[1].toLowerCase()) : undefined
+    if (!output) return
 
     const query = getQuery(event)
     const rawSize =
@@ -36,7 +27,7 @@ export default defineEventHandler(async (event) => {
         w: String(size),
         h: String(size),
         fit: 'inside',
-        output: formatToWsrv[format],
+        output,
     })
 
     const upstream = await fetch(`https://wsrv.nl/?${params}&we`)

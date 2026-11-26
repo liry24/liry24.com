@@ -2,103 +2,44 @@ import { admin, genericOAuth } from 'better-auth/plugins'
 import { defineAuth } from 'vite-hub/auth'
 import { authDatabase } from 'vite-hub/auth/database'
 
+import {
+    buildTrustedOrigins,
+    normalizeIssuer,
+    parseCsvList,
+    resolveAuthBaseUrl,
+} from './utils/authOrigin.js'
 import { localAdminAuth, localAdminPlugin } from './utils/localAdminAuth.js'
 import { readProcessEnv } from './utils/processEnv.js'
 import { readSecretValue } from './utils/secret.js'
 
-const parseList = (value: string | undefined): Array<string> =>
-    (value ?? '')
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter(Boolean)
-
-const normalizeIssuer = (value: string | undefined): string =>
-    (value || 'https://sso.liry24.com').replace(/\/+$/u, '')
-
-function resolveAuthBaseUrl(
-    origin: string,
-    runtimeSiteUrl: string | undefined,
-    isSynthetic: boolean,
-    appEnv: string | undefined,
-): string {
-    if (origin === 'https://liry24.com' || origin === 'https://dev-liry24-com.liry.workers.dev')
-        return origin
-
-    try {
-        const parsed = new URL(origin)
-        if (
-            isSynthetic &&
-            parsed.protocol === 'http:' &&
-            (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost')
-        )
-            return parsed.origin
-
-        if (
-            appEnv !== 'production' &&
-            parsed.protocol === 'https:' &&
-            parsed.hostname.endsWith('.workers.dev')
-        )
-            return parsed.origin
-    } catch {
-        // Fall back to configured URL below
-    }
-    return runtimeSiteUrl || 'https://liry24.com'
-}
+const readEnvString = (value: unknown): string | undefined =>
+    typeof value === 'string' && value ? value : undefined
 
 export default defineAuth(({ env, request, requestOrigin }) => {
     const local = import.meta.dev && request ? localAdminAuth(requestOrigin) : undefined
-    const appEnv = typeof env.APP_ENV === 'string' ? env.APP_ENV : readProcessEnv('APP_ENV')
-    const testLocal =
-        typeof env.LIRY24_TEST_LOCAL === 'string'
-            ? env.LIRY24_TEST_LOCAL
-            : readProcessEnv('LIRY24_TEST_LOCAL')
+    const appEnv = readEnvString(env.APP_ENV) ?? readProcessEnv('APP_ENV')
+    const testLocal = readEnvString(env.LIRY24_TEST_LOCAL) ?? readProcessEnv('LIRY24_TEST_LOCAL')
     const synthetic = testLocal === 'true' || appEnv === 'test'
-    const testIssuer =
-        synthetic && typeof env.POCKET_ID_TEST_ISSUER === 'string' && env.POCKET_ID_TEST_ISSUER
-            ? env.POCKET_ID_TEST_ISSUER
-            : synthetic
-              ? readProcessEnv('POCKET_ID_TEST_ISSUER')
-              : undefined
-    const issuer = normalizeIssuer(
-        testIssuer ?? (typeof env.POCKET_ID_ISSUER === 'string' ? env.POCKET_ID_ISSUER : undefined),
-    )
+    const testIssuer = synthetic
+        ? (readEnvString(env.POCKET_ID_TEST_ISSUER) ?? readProcessEnv('POCKET_ID_TEST_ISSUER'))
+        : undefined
+    const issuer = normalizeIssuer(testIssuer ?? env.POCKET_ID_ISSUER)
     const runtimeSiteUrl =
-        typeof env.NUXT_PUBLIC_SITE_URL === 'string' && env.NUXT_PUBLIC_SITE_URL
-            ? env.NUXT_PUBLIC_SITE_URL
-            : readProcessEnv('NUXT_PUBLIC_SITE_URL') || undefined
+        readEnvString(env.NUXT_PUBLIC_SITE_URL) ?? readProcessEnv('NUXT_PUBLIC_SITE_URL')
     const authBaseUrl = local
         ? requestOrigin
         : resolveAuthBaseUrl(requestOrigin, runtimeSiteUrl, synthetic, appEnv)
     const isHttps = authBaseUrl.startsWith('https://')
     const adminEmails = new Set(
-        parseList(
-            typeof env.POCKET_ID_ADMIN_EMAIL === 'string' ? env.POCKET_ID_ADMIN_EMAIL : undefined,
-        ).map((email) => email.toLowerCase()),
+        parseCsvList(env.POCKET_ID_ADMIN_EMAIL).map((email) => email.toLowerCase()),
     )
-    const adminSubs = new Set(
-        parseList(
-            typeof env.POCKET_ID_ADMIN_SUB === 'string' ? env.POCKET_ID_ADMIN_SUB : undefined,
-        ),
-    )
-    const clientId =
-        typeof env.POCKET_ID_CLIENT_ID === 'string' && env.POCKET_ID_CLIENT_ID
-            ? env.POCKET_ID_CLIENT_ID
-            : 'offline-schema-client'
+    const adminSubs = new Set(parseCsvList(env.POCKET_ID_ADMIN_SUB))
+    const clientId = env.POCKET_ID_CLIENT_ID || 'offline-schema-client'
     const clientSecret = readSecretValue(env.POCKET_ID_CLIENT_SECRET)
     const disablePocketId =
         local || (import.meta.dev && (clientId === 'offline-schema-client' || !clientSecret))
 
-    const trustedOrigins = Array.from(
-        new Set([
-            'http://localhost:3000',
-            'http://127.0.0.1:3000',
-            'http://localhost:3100',
-            'http://127.0.0.1:3100',
-            'https://liry24.com',
-            'https://dev-liry24-com.liry.workers.dev',
-            authBaseUrl,
-        ]),
-    )
+    const trustedOrigins = buildTrustedOrigins(authBaseUrl)
 
     return {
         appName: 'liry24',

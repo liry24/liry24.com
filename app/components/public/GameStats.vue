@@ -12,6 +12,23 @@ const representative = computed(() =>
     latest.value?.values.find((value) => value.key === metric.value?.key),
 )
 const badge = computed(() => representative.value?.image)
+const representativeImage = computed(() => mediaUrl(representative.value?.image))
+const tableRows = computed(() =>
+    [...sortedPeriods.value].reverse().map((period) => {
+        const byKey = new Map(period.values.map((value) => [value.key, value]))
+        return {
+            period,
+            cells: (game.metrics ?? []).map((item) => {
+                const value = byKey.get(item.key)
+                return {
+                    key: item.key,
+                    imageSrc: mediaUrl(value?.image),
+                    text: formatGameValue(value, item),
+                }
+            }),
+        }
+    }),
+)
 </script>
 
 <template>
@@ -44,8 +61,8 @@ const badge = computed(() => representative.value?.image)
             <span class="font-bold">{{ game.name }}</span
             ><span class="text-muted font-light">{{ latest?.period }}</span>
             <img
-                v-if="gameImageUrl(representative?.image)"
-                :src="gameImageUrl(representative?.image)"
+                v-if="representativeImage"
+                :src="representativeImage"
                 alt=""
                 class="size-10 object-contain"
             />
@@ -75,36 +92,19 @@ const badge = computed(() => representative.value?.image)
                     </thead>
                     <tbody>
                         <tr
-                            v-for="period in [...sortedPeriods].reverse()"
+                            v-for="{ period, cells } in tableRows"
                             :key="period.periodKey"
                             class="border-default border-t"
                         >
                             <th scope="row" class="p-2 font-medium">{{ period.period }}</th>
-                            <td v-for="metric in game.metrics" :key="metric.key" class="p-2">
+                            <td v-for="cell in cells" :key="cell.key" class="p-2">
                                 <span class="inline-flex items-center gap-1"
                                     ><img
-                                        v-if="
-                                            gameImageUrl(
-                                                period.values.find(
-                                                    (value) => value.key === metric.key,
-                                                )?.image,
-                                            )
-                                        "
-                                        :src="
-                                            gameImageUrl(
-                                                period.values.find(
-                                                    (value) => value.key === metric.key,
-                                                )?.image,
-                                            )
-                                        "
+                                        v-if="cell.imageSrc"
+                                        :src="cell.imageSrc"
                                         alt=""
                                         class="size-6 object-contain"
-                                    />{{
-                                        formatGameValue(
-                                            period.values.find((value) => value.key === metric.key),
-                                            metric,
-                                        )
-                                    }}</span
+                                    />{{ cell.text }}</span
                                 >
                             </td>
                             <td class="p-2">

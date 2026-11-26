@@ -5,20 +5,20 @@ export async function authorizeAdminForm({ request }: { request: Request }): Pro
     return Boolean(session?.user && isAdminUser(session.user))
 }
 
-export function normalizeDocumentId(raw: string | undefined, fallback: string): string {
-    if (typeof raw === 'string' && raw.trim().length > 0) {
-        const trimmed = raw.trim()
-        if (!documentIdPattern.test(trimmed)) {
-            throw createError({
-                status: 400,
-                statusText: 'Invalid document ID',
-                message: 'Document ID may only contain letters, numbers, underscores, and hyphens.',
-            })
-        }
-        return trimmed
+export function validateDocumentId(raw: string): string {
+    const trimmed = raw.trim()
+    if (!documentIdPattern.test(trimmed)) {
+        throw createError({
+            status: 400,
+            statusText: 'Invalid document ID',
+            message: 'Document ID may only contain letters, numbers, underscores, and hyphens.',
+        })
     }
+    return trimmed
+}
 
-    const sanitized = fallback
+export function buildDocumentId(source: string): string {
+    const sanitized = source
         .trim()
         .toLowerCase()
         .replaceAll(/[^a-z0-9_-]+/gu, '-')

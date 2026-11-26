@@ -1,11 +1,6 @@
 import { cms } from 'vite-hub/cms'
 import { defineContent, image, optional } from 'vite-hub/content'
 import { documents } from 'vite-hub/content/collections'
-import { z } from 'zod'
-
-const blobImage = z
-    .fromJSONSchema(image()['~standard'].jsonSchema.output({ target: 'draft-2020-12' }))
-    .pipe(mediaReferenceSchema)
 
 export const content = defineContent({
     extends: [cms, { database: 'default', blob: 'default' }],
@@ -29,10 +24,7 @@ export const content = defineContent({
         }),
         arts: documents({
             path: 'content/arts/**/*.json',
-            fields: {
-                ...artFieldsSchema.shape,
-                images: z.array(blobImage).min(1),
-            },
+            fields: artFieldsSchema.shape,
         }),
         careers: documents({
             path: 'content/careers/**/*.json',

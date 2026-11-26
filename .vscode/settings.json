@@ -11,5 +11,8 @@
         ["ui:\\s*{([^)]*)\\s*}", "(?:'|\"|`)([^']*)(?:'|\"|`)", "class:\\s*?[\"'`]([^\"'`]*).*?,"]
     ],
     "js/ts.tsdk.path": "node_modules/typescript/lib",
-    "js/ts.tsdk.promptToUseWorkspaceVersion": true
+    "js/ts.tsdk.promptToUseWorkspaceVersion": true,
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "oxc.disableNestedConfig": true,
+    "oxc.fmt.disableNestedConfig": true
 }

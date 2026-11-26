@@ -4,13 +4,14 @@ import { UiField, UiImagePicker } from '@liry24/ui'
 const model = defineModel<Array<MediaReference>>({ required: true })
 const props = defineProps<{
     label: string
-    folder: 'works' | 'arts' | 'uploads'
+    folder: AdminMediaFolder
     error?: string
     required?: boolean
     multiple?: boolean
     disabled?: boolean
 }>()
 const emit = defineEmits<{ busy: [busy: boolean] }>()
+const { uploadImage } = useAdminMediaUpload(() => props.folder)
 const uploading = ref(false)
 const uploadError = ref('')
 const selectionError = ref('')
@@ -36,14 +37,8 @@ async function upload(files: Array<File>) {
     const failed: Array<string> = []
     try {
         for (const file of files) {
-            const body = new FormData()
-            body.append('file', file)
-            body.append('folder', props.folder)
             try {
-                const image = await $fetch<MediaReference>('/api/admin/media', {
-                    method: 'POST',
-                    body,
-                })
+                const image = await uploadImage(file)
                 model.value = props.multiple ? [...model.value, image] : [image]
             } catch (error) {
                 failed.push(`${file.name} (${adminErrorMessage(error, 'upload failed')})`)

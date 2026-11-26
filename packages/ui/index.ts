@@ -5,7 +5,7 @@ export {
 } from '@ui-sdk/vue/file-input'
 export { Input as UiInput } from '@ui-sdk/vue/input'
 export { useShortcut, useShortcutHint } from '@ui-sdk/vue/shortcuts'
-export type { TokenCodec, TokenInputValue, TokenInsert } from '@ui-sdk/vue/token-input'
+export type { TokenCodec, TokenInsert } from '@ui-sdk/vue/token-input'
 export type {
     TriggerDefinition,
     TriggerItemsLoader,

@@ -1,15 +1,7 @@
 import content from '#server/content'
 
 export default defineEventHandler(async (event) => {
-    const rawSlug = getRouterParam(event, 'slug')
-    if (!rawSlug) throw createError({ status: 404, statusText: 'Post not found' })
-
-    let slug: string
-    try {
-        slug = decodeURIComponent(rawSlug)
-    } catch {
-        throw createError({ status: 404, statusText: 'Post not found' })
-    }
+    const slug = readDecodedRouterParam(event, 'slug', 'Post not found')
 
     const collection = content.collection('posts')
     const items = await listAllCollectionItems(collection, 'published')

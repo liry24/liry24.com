@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
 @import 'vite-hub/ui/styles.css';
+@import '@liry24/ui/styles.css';
 
 @theme static {
     --font-sans: 'Inter', sans-serif;
@@ -25,19 +26,6 @@
 
 @utility text-title {
     text-wrap: balance;
-}
-
-@keyframes fadeIn {
-    0% {
-        opacity: 0;
-        transform: translateY(10px);
-        filter: blur(10px);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(0);
-        filter: blur(0);
-    }
 }
 
 :root {

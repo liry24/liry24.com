@@ -1,8 +1,5 @@
 export const useGameSearch = (query: () => string | null) => {
-    const { user, session } = useAppSession()
-    const scope = computed(() =>
-        JSON.stringify([user.value?.id, user.value?.role, session.value?.id]),
-    )
+    const { session } = useAppSession()
     const games = ref<Array<GameSearchResult>>([])
     const warning = ref('')
     const loading = ref(false)
@@ -10,18 +7,48 @@ export const useGameSearch = (query: () => string | null) => {
     const cache = new Map<string, { games: Array<GameSearchResult>; warning: string }>()
     let search: AbortController | undefined
     let insertion: AbortController | undefined
-    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const runSearch = async (text: string, controller: AbortController) => {
+        try {
+            const result =
+                cache.get(text) ??
+                (await $fetch('/api/admin/games', {
+                    query: { q: text },
+                    signal: controller.signal,
+                }))
+            if (controller.signal.aborted) return
+            if (!result) throw new Error('No search result was returned')
+
+            cache.set(text, result)
+            games.value = result.games
+            warning.value = result.warning
+        } catch {
+            if (!controller.signal.aborted)
+                warning.value = 'Search unavailable. You can continue editing.'
+        } finally {
+            if (!controller.signal.aborted) loading.value = false
+        }
+    }
+
+    const { start: scheduleSearch, stop: stopSearchTimer } = useTimeoutFn(
+        (text: string, controller: AbortController) => {
+            void runSearch(text, controller)
+        },
+        250,
+        { immediate: false },
+    )
+
     const cancelSearch = () => {
-        clearTimeout(timer)
+        stopSearchTimer()
         search?.abort()
         loading.value = false
     }
 
     watch(
-        [query, scope],
-        ([text, owner], [, previousOwner]) => {
+        [query, () => session.value?.id],
+        ([text, sessionId], [, previousSessionId]) => {
             cancelSearch()
-            if (owner !== previousOwner) {
+            if (sessionId !== previousSessionId) {
                 cache.clear()
                 insertion?.abort()
                 importing.value = false
@@ -32,30 +59,7 @@ export const useGameSearch = (query: () => string | null) => {
 
             const controller = (search = new AbortController())
             loading.value = true
-            timer = setTimeout(() => {
-                void (async () => {
-                    try {
-                        const result =
-                            cache.get(text) ??
-                            (await $fetch('/api/admin/games', {
-                                query: { q: text },
-                                signal: controller.signal,
-                            }))
-                        if (controller.signal.aborted) return
-
-                        if (!result) throw new Error('No search result was returned')
-
-                        cache.set(text, result)
-                        games.value = result.games
-                        warning.value = result.warning
-                    } catch {
-                        if (!controller.signal.aborted)
-                            warning.value = 'Search unavailable. You can continue editing.'
-                    } finally {
-                        if (!controller.signal.aborted) loading.value = false
-                    }
-                })()
-            }, 250)
+            scheduleSearch(text, controller)
         },
         { immediate: true, flush: 'sync' },
     )

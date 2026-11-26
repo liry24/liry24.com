@@ -56,9 +56,7 @@ const initialFocus = () =>
                         data-variant="primary"
                         :disabled="busy"
                     >
-                        {{
-                            saving ? (submittingLabel ?? 'Saving…') : (submitLabel ?? 'Save draft')
-                        }}
+                        {{ saving ? (submittingLabel ?? 'Saving…') : (submitLabel ?? 'Save') }}
                     </Button>
                 </footer>
             </form>

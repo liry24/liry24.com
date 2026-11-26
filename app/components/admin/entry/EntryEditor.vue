@@ -2,8 +2,6 @@
 import { UiFormDialog, UiSearchPicker } from '@liry24/ui'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 
-import '@liry24/ui/styles.css'
-
 const props = defineProps<{
     model: PortfolioCollectionName
     item?: AdminEntryRecord
@@ -12,7 +10,7 @@ const props = defineProps<{
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ saved: [] }>()
 const toast = useToast()
-const form = computed(() => adminEntryForms[props.model])
+const meta = computed(() => portfolioCollectionMeta[props.model])
 const data = ref<AdminEntryData>({})
 const saving = ref(false)
 const uploading = ref(false)
@@ -28,7 +26,9 @@ const iconOpen = ref(false)
 const iconTrigger = shallowRef<HTMLElement | null>(null)
 const loadIcons = useAdminIconSearch(() => iconOpen.value)
 const hasIcon = computed(() => ['works', 'skills', 'socials'].includes(props.model))
-const title = computed(() => (props.item ? `Edit ${form.value.label}` : `New ${form.value.label}`))
+const title = computed(() =>
+    props.item ? `Edit ${meta.value.entryLabel}` : `New ${meta.value.entryLabel}`,
+)
 
 watch(open, (value) => {
     if (value) {
@@ -65,7 +65,7 @@ async function save() {
     if (busy.value) return
     formError.value = ''
     errors.value = {}
-    const payload = { ...data.value }
+    const { order: _order, ...payload } = { ...data.value }
     const key = slugKey.value
     if (manualSlug.value) {
         const value = payload[key]?.trim()
@@ -89,23 +89,12 @@ async function save() {
         }
         payload.values = result.values
     }
-    const parsed = form.value.schema.safeParse(payload)
-    if (!parsed.success) {
-        await showErrors(
-            'Check the highlighted fields.',
-            Object.fromEntries(
-                parsed.error.issues.map((issue) => [`data.${issue.path.join('.')}`, issue.message]),
-            ),
-        )
-        return
-    }
+
     saving.value = true
     let failed: { message: string; fields?: Record<string, string> } | undefined
     try {
-        const submission = props.item
-            ? { data: parsed.data, id: props.item.id }
-            : { data: parsed.data }
-        const [error] = await submitForm(form.value.endpoint, submission)
+        const submission = props.item ? { data: payload, id: props.item.id } : { data: payload }
+        const [error] = await submitForm(meta.value.endpoint, submission)
         if (error) failed = { message: error.message, fields: fieldErrors(error) }
     } catch (error) {
         failed = { message: adminErrorMessage(error, 'Could not save draft.') }
@@ -126,6 +115,7 @@ async function save() {
     <UiFormDialog
         v-model:open="open"
         :title="title"
+        submit-label="Save draft"
         :busy="busy"
         :saving="saving"
         :wide="model === 'works' || model === 'arts' || model === 'gameStats'"
@@ -191,6 +181,8 @@ async function save() {
                 v-model:open="iconOpen"
                 title="Choose an icon"
                 label="Search Iconify icons"
+                placeholder="Search by name or keyword"
+                empty-text="No icons found."
                 :load="loadIcons"
                 :final-focus="() => iconTrigger"
                 @select="data.icon = $event"

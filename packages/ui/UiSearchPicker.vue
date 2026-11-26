@@ -17,6 +17,9 @@ const props = defineProps<{
     label: string
     load: (query: string, signal: AbortSignal) => Promise<Array<string>>
     finalFocus?: () => HTMLElement | null
+    placeholder?: string
+    minQueryText?: string
+    emptyText?: string
 }>()
 const emit = defineEmits<{ select: [value: string] }>()
 const inputId = useId()
@@ -68,7 +71,7 @@ function select(value: unknown) {
                         class="ui-input"
                         type="search"
                         :aria-label="label"
-                        placeholder="Search by name or keyword"
+                        :placeholder="placeholder ?? 'Search'"
                     />
                     <ComboboxContent class="ui-search-picker-results">
                         <ComboboxList class="ui-search-picker-list">
@@ -92,10 +95,10 @@ function select(value: unknown) {
                     <Button type="button" class="ui-button" @click="reload()">Retry</Button>
                 </div>
                 <p v-else-if="state.query.trim().length < 2" class="ui-description">
-                    Enter at least two characters.
+                    {{ minQueryText ?? 'Enter at least two characters.' }}
                 </p>
                 <p v-else-if="!state.items.length" role="status" class="ui-description">
-                    No icons found.
+                    {{ emptyText ?? 'No results found.' }}
                 </p>
             </div>
         </DialogContent>

@@ -3,7 +3,7 @@ const { user, load, signOut, isLocalAdmin } = useAppSession()
 await load()
 
 const sidebarCollapsed = ref(false)
-const navigation = computed(() => [
+const navigation = [
     [
         {
             label: 'Dashboard',
@@ -21,38 +21,7 @@ const navigation = computed(() => [
             to: '/admin/assistant',
         },
     ],
-    [
-        {
-            label: 'Works',
-            icon: 'mingcute:briefcase-fill',
-            to: '/admin/works',
-        },
-        {
-            label: 'Arts',
-            icon: 'mingcute:palette-fill',
-            to: '/admin/arts',
-        },
-        {
-            label: 'Careers',
-            icon: 'mingcute:building-2-fill',
-            to: '/admin/careers',
-        },
-        {
-            label: 'Skills',
-            icon: 'mingcute:tool-fill',
-            to: '/admin/skills',
-        },
-        {
-            label: 'Game Stats',
-            icon: 'mingcute:chart-line-fill',
-            to: '/admin/gameStats',
-        },
-        {
-            label: 'Socials',
-            icon: 'mingcute:link-2-fill',
-            to: '/admin/socials',
-        },
-    ],
+    portfolioCollectionLinks.map(({ label, icon, to }) => ({ label, icon, to })),
     [
         {
             label: 'Settings',
@@ -65,7 +34,7 @@ const navigation = computed(() => [
             to: '/',
         },
     ],
-])
+]
 
 useHead({ titleTemplate: '%s | Liry24 Admin' })
 </script>

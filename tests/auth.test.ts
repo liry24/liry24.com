@@ -4,8 +4,8 @@ import { createAuthEndpoint } from 'better-auth/api'
 import { drizzle } from 'drizzle-orm/node-sqlite'
 import { expect, test } from 'vitest'
 
-import { authSqliteSchema as schema } from '../../.vitehub/auth/schema'
-import { openTestDatabase } from '../helpers/database'
+import { authSqliteSchema as schema } from '../.vitehub/auth/schema'
+import { openTestDatabase } from './helpers/database'
 
 test('auth counters bound unknown paths and dynamic routes while preserving ingress rules', async () => {
     const local = openTestDatabase()
@@ -96,6 +96,6 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
         expect((await request('/missing-after-expiry')).status).toBe(404)
         expect(db.prepare('SELECT COUNT(*) n FROM rate_limit').get()?.n).toBe(1)
     } finally {
-        db.close()
+        local.close()
     }
 }, 60_000)

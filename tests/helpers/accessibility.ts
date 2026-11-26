@@ -13,7 +13,6 @@ declare global {
 interface NuxtGlobalInstance {
     isHydrating?: boolean
     payload?: { error?: unknown }
-    '~transitionPromise'?: unknown
 }
 
 interface NuxtRootElement extends Element {
@@ -48,7 +47,7 @@ export async function waitForNuxtReady(page: Page) {
     await page.waitForFunction(() => {
         const root: NuxtRootElement | null = document.querySelector('#__nuxt')
         const nuxt = root?.__vue_app__?.config?.globalProperties?.$nuxt
-        return Boolean(nuxt && nuxt.isHydrating === false && !nuxt['~transitionPromise'])
+        return Boolean(nuxt && nuxt.isHydrating === false)
     })
 }
 
@@ -128,11 +127,7 @@ export async function scanAccessibility(page: Page, state: string, expectedError
             2,
         ),
     )
-    if (
-        blocking.length ||
-        ['light-1280-home', 'light-390-arts-viewer', 'light-1280-admin-settings'].includes(state)
-    )
-        await page.screenshot({ path: `${filename}.png`, fullPage: true })
+    if (blocking.length) await page.screenshot({ path: `${filename}.png`, fullPage: true })
 
     return blocking.map(({ id, impact, nodes }) => ({
         ...context,

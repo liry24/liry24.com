@@ -1,15 +1,13 @@
 import type { Session } from 'better-auth'
 
 export const useAdminSessions = () => {
-    const client = authClient
-    const { user, session, signOut } = useAppSession()
+    const { session, signOut } = useAppSession()
     const sessions = ref<Array<Session>>([])
     const busy = ref(false)
     const failure = ref('')
-    const owner = computed(() => `${user.value?.id ?? ''}:${session.value?.id ?? ''}`)
 
     watch(
-        owner,
+        () => session.value?.id,
         () => {
             sessions.value = []
             failure.value = ''
@@ -20,26 +18,26 @@ export const useAdminSessions = () => {
     async function run(token?: string, all = false) {
         if (busy.value) return
 
-        const scope = owner.value
+        const sessionId = session.value?.id
         busy.value = true
         failure.value = ''
 
         try {
             if (all) {
-                const result = await client.revokeOtherSessions()
+                const result = await authClient.revokeOtherSessions()
                 if (result.error)
                     throw new Error(result.error.message || 'Could not revoke sessions.')
             } else if (token) {
-                const result = await client.revokeSession({ token })
+                const result = await authClient.revokeSession({ token })
                 if (result.error)
                     throw new Error(result.error.message || 'Could not revoke session.')
             }
-            const result = await client.listSessions()
+            const result = await authClient.listSessions()
             if (result.error) throw new Error(result.error.message || 'Could not list sessions.')
 
-            if (scope === owner.value) sessions.value = result.data ?? []
+            if (sessionId === session.value?.id) sessions.value = result.data ?? []
         } catch {
-            if (scope === owner.value)
+            if (sessionId === session.value?.id)
                 failure.value = 'Could not update sessions. Please try again.'
         } finally {
             busy.value = false

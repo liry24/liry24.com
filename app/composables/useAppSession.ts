@@ -13,13 +13,7 @@ export const useAppSession = () => {
         },
         user: native.user,
         session: native.session,
-        loggedIn: native.loggedIn,
-        pending: native.pending,
-        ready: native.ready,
         isLocalAdmin,
-        refresh: async () => {
-            await native.refresh()
-        },
         signOut: async () => {
             const result = await client.signOut()
             if (result.error) throw new Error(result.error.message || 'Could not sign out.')

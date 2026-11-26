@@ -1,5 +1,4 @@
 :root {
-    --canvas: #fafafa;
     --surface: #fff;
     --surface-muted: #f4f4f5;
     --surface-elevated: #fff;
@@ -29,7 +28,6 @@
 }
 
 .dark {
-    --canvas: #09090b;
     --surface: #141416;
     --surface-muted: #1e1e22;
     --surface-elevated: #1a1a1e;
