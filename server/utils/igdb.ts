@@ -1,7 +1,6 @@
 import { createIgdbClient, eq, IgdbError } from '@liry24/igdb'
 import type { IgdbClientOptions } from '@liry24/igdb'
 import { log } from 'evlog'
-import { useServerEnv } from 'vite-hub/env'
 import { z } from 'zod'
 
 interface IgdbCredentials {

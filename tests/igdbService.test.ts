@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+
 beforeEach(() => {
     vi.resetModules()
     vi.stubEnv('IGDB_CLIENT_ID', 'synthetic-client')
@@ -23,7 +24,7 @@ test('IGDB keeps exact identity, validates images and caches OAuth credentials w
             ]),
         )
     vi.stubGlobal('fetch', fetch)
-    const { queryIgdb } = await import('../../server/utils/igdb')
+    const { queryIgdb } = await import('../server/utils/igdb')
     expect(await queryIgdb({ search: 'a"; where id = 2;' })).toEqual([
         {
             igdbId: 1,
@@ -46,7 +47,7 @@ test('unavailable credentials, malformed results and network failures return saf
         .mockResolvedValueOnce(Response.json([{ id: 1, slug: '../bad', name: 'Unsafe' }]))
         .mockRejectedValue(Error('SENSITIVE_REMOTE_DETAIL'))
     vi.stubGlobal('fetch', fetch)
-    const { queryIgdb } = await import('../../server/utils/igdb')
+    const { queryIgdb } = await import('../server/utils/igdb')
     await expect(queryIgdb({ search: 'game' })).rejects.toMatchObject({
         status: 502,
         message: expect.not.stringContaining('SENSITIVE_REMOTE_DETAIL'),
@@ -66,7 +67,7 @@ test('credential rotation recreates the IGDB client instead of reusing its cache
             : Response.json([]),
     )
     vi.stubGlobal('fetch', fetch)
-    const { queryIgdb } = await import('../../server/utils/igdb')
+    const { queryIgdb } = await import('../server/utils/igdb')
     await queryIgdb({ search: 'first' })
     vi.stubEnv('IGDB_CLIENT_SECRET', 'synthetic-rotated-secret')
     await queryIgdb({ search: 'second' })
@@ -91,7 +92,7 @@ test('Cloudflare Workers redirect: error workaround uses manual mode and blocks 
         return Response.json([{ id: 42, slug: 'zelda', name: 'Zelda' }])
     })
     vi.stubGlobal('fetch', fetch)
-    const { queryIgdb } = await import('../../server/utils/igdb')
+    const { queryIgdb } = await import('../server/utils/igdb')
 
     expect(await queryIgdb({ search: 'zelda' })).toEqual([
         { igdbId: 42, slug: 'zelda', name: 'Zelda', cover: null },
@@ -115,7 +116,7 @@ test('an unsettled auth request never poisons subsequent queries across isolated
         return Promise.resolve(Response.json([{ id: 7, slug: 'zelda', name: 'Zelda' }]))
     })
     vi.stubGlobal('fetch', fetch)
-    const { queryIgdb } = await import('../../server/utils/igdb')
+    const { queryIgdb } = await import('../server/utils/igdb')
 
     void queryIgdb({ search: 'aborted' }).catch(() => undefined)
 
@@ -142,7 +143,7 @@ test('cached token returning 401 refreshes once and retries the IGDB request', a
         return Response.json([{ id: 9, slug: 'valorant', name: 'Valorant' }])
     })
     vi.stubGlobal('fetch', fetch)
-    const { queryIgdb } = await import('../../server/utils/igdb')
+    const { queryIgdb } = await import('../server/utils/igdb')
 
     await expect(queryIgdb({ search: 'first' })).resolves.toEqual([
         { igdbId: 9, slug: 'valorant', name: 'Valorant', cover: null },

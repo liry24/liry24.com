@@ -53,12 +53,24 @@ const serverAutoImportPattern = {
     regex: String.raw`^(?:(?:\.\.?/)+(server/)?|#server/|~~/server/|@@/server/)utils/[^/]+$`,
     message: autoImportMessage,
 }
+const siblingAutoImportPattern = {
+    regex: String.raw`^\./[^/]+$`,
+    message: autoImportMessage,
+}
 
 const nuxtDirectory = new URL('../../.nuxt/', import.meta.url)
 const appAutoImportPaths = readAutoImportPaths(new URL('imports.d.ts', nuxtDirectory))
 const serverAutoImportPaths = readAutoImportPaths(
     new URL('types/server-imports.d.ts', nuxtDirectory),
 )
+const appImportRestrictions = {
+    paths: [appImportsAlias, ...appAutoImportPaths],
+    patterns: [sharedAutoImportPattern, appAutoImportPattern, rootAppAutoImportPattern],
+}
+const serverImportRestrictions = {
+    paths: [{ name: '#imports/server', message: autoImportMessage }, ...serverAutoImportPaths],
+    patterns: [sharedAutoImportPattern, serverAutoImportPattern],
+}
 
 export default defineConfig({
     ...cloudflareConfig,
@@ -85,23 +97,17 @@ export default defineConfig({
             },
         },
         {
-            files: ['server/**/*.ts'],
-            rules: {
-                'no-restricted-imports': ['error', { patterns: [sharedAutoImportPattern] }],
-            },
+            files: ['app/**/*.{ts,vue}', 'layers/*/app/**/*.{ts,vue}'],
+            rules: { 'no-restricted-imports': ['error', appImportRestrictions] },
         },
         {
-            files: ['app/**/*.{ts,vue}', 'layers/*/app/**/*.{ts,vue}'],
+            files: ['app/{composables,utils}/*.ts', 'layers/*/app/{composables,utils}/*.ts'],
             rules: {
                 'no-restricted-imports': [
                     'error',
                     {
-                        paths: [appImportsAlias, ...appAutoImportPaths],
-                        patterns: [
-                            sharedAutoImportPattern,
-                            appAutoImportPattern,
-                            rootAppAutoImportPattern,
-                        ],
+                        ...appImportRestrictions,
+                        patterns: [...appImportRestrictions.patterns, siblingAutoImportPattern],
                     },
                 ],
             },
@@ -129,30 +135,27 @@ export default defineConfig({
             },
         },
         {
-            files: ['server/{api,routes,middleware,plugins}/**/*.ts'],
+            files: [
+                'server/{agents,api,forms,middleware,plugins,routes,schedules,utils}/**/*.ts',
+                'server/content.ts',
+            ],
+            rules: { 'no-restricted-imports': ['error', serverImportRestrictions] },
+        },
+        {
+            files: ['server/utils/*.ts'],
             rules: {
                 'no-restricted-imports': [
                     'error',
                     {
-                        paths: [
-                            { name: '#imports/server', message: autoImportMessage },
-                            ...serverAutoImportPaths,
-                        ],
-                        patterns: [sharedAutoImportPattern, serverAutoImportPattern],
+                        ...serverImportRestrictions,
+                        patterns: [...serverImportRestrictions.patterns, siblingAutoImportPattern],
                     },
                 ],
             },
         },
         {
-            files: [
-                // tests/gameImport.test.ts loads this handler and its dependencies in Node.
-                'server/api/admin/games/index.post.ts',
-                'server/content.ts',
-                'server/auth.ts',
-                'server/forms/**/*.ts',
-                'server/databases/**/*.ts',
-                'server/utils/{content,gameCatalog,gameValidation,localAdminAuth}.ts',
-            ],
+            // ViteHub's generated auth types also load this module outside Nitro's type context.
+            files: ['server/utils/localAdminAuth.ts'],
             rules: {
                 'no-restricted-imports': 'off',
             },

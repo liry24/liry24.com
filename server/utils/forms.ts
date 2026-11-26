@@ -1,5 +1,3 @@
-import { useAuth } from 'vite-hub/auth/server'
-
 const documentIdPattern = /^[a-zA-Z0-9_-]{1,120}$/
 
 export async function authorizeAdminForm({ request }: { request: Request }): Promise<boolean> {

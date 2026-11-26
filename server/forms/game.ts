@@ -1,4 +1,3 @@
-import { createError } from 'nuxt/server'
 import { defineForm } from 'vite-hub/forms'
 import { z } from 'zod'
 
