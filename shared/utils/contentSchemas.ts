@@ -1,5 +1,9 @@
 import { z } from 'zod'
 
+import type { MediaReference } from '../types/content.js'
+import { gameColorPattern, gameSlugPattern } from './games.js'
+import { socialSlug } from './socials.js'
+
 export const mediaReferenceSchema: z.ZodType<MediaReference> = z.object({
     pathname: z.string().min(1),
     contentType: z.string().optional(),

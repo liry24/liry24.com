@@ -6,9 +6,7 @@ import { log } from 'evlog'
 import { defineAgent } from 'vite-hub/agent'
 import { content } from 'vite-hub/agent/capabilities'
 import { authenticated } from 'vite-hub/auth/agent'
-import { useAuth } from 'vite-hub/auth/server'
 import { webChat } from 'vite-hub/channels/adapters'
-import { useServerEnv } from 'vite-hub/env'
 
 const GEMINI_MODEL_ID = 'gemini-4-hydrogen'
 

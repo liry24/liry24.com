@@ -1,5 +1,17 @@
 import type { z } from 'zod'
 
+import type {
+    artFieldsSchema,
+    careerFieldsSchema,
+    contentCollectionNames,
+    gameFieldsSchema,
+    gameStatsFieldsSchema,
+    postFieldsSchema,
+    skillFieldsSchema,
+    socialFieldsSchema,
+    workFieldsSchema,
+} from '../utils/contentSchemas.js'
+
 export interface MediaReference {
     pathname: string
     contentType?: string

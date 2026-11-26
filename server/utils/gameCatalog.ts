@@ -1,5 +1,4 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { useDatabase } from 'vite-hub/database'
 
 export function gameCatalog() {
     const { db, schema } = useDatabase('default')

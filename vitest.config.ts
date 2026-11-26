@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 
 import { defineVitestProject } from '@nuxt/test-utils/config'
+import unimport from 'unimport/unplugin'
 import type { Alias } from 'vite'
 import { defineConfig } from 'vitest/config'
 
@@ -88,7 +89,23 @@ export default defineConfig({
     test: {
         projects: [
             {
-                resolve: { dedupe: ['vue'], alias: { '~~': root } },
+                // Node tests that load a server module need Nitro's import transform.
+                plugins: [
+                    unimport.vite({
+                        include: /\/server\/.*\.ts$/,
+                        dirs: [`${root}server/utils`, `${root}shared/utils`],
+                        presets: [
+                            {
+                                from: 'nuxt/server',
+                                imports: ['createError', 'defineEventHandler', 'readBody'],
+                            },
+                            { from: 'vite-hub/auth/server', imports: ['useAuth'] },
+                            { from: 'vite-hub/database', imports: ['useDatabase'] },
+                            { from: 'vite-hub/env', imports: ['useServerEnv'] },
+                        ],
+                    }),
+                ],
+                resolve: { dedupe: ['vue'], alias: { '~~': root, '#server': `${root}server` } },
                 test: {
                     name: 'node',
                     include: ['tests/**/*.test.ts'],

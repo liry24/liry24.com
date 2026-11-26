@@ -1,5 +1,8 @@
 import { APIError, createAuthEndpoint } from 'better-auth/api'
 import { setSessionCookie } from 'better-auth/cookies'
+import { useRuntimeConfig } from 'nuxt/server'
+
+import { localAdminUserId } from '../../shared/utils/localAdminIdentity.js'
 
 const localAdminEmail = 'liry24-local-admin@example.invalid'
 
