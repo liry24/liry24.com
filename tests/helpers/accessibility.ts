@@ -44,7 +44,7 @@ export async function runAccessibilityChecks(page: Page) {
     return page.evaluate((rules) => window.axe.run(document, { rules }), wcagRules)
 }
 
-export async function scanAccessibility(page: Page, state: string) {
+export async function scanAccessibility(page: Page, state: string, expectedErrorStatus?: number) {
     const directory = resolve('.tmp/accessibility')
     await mkdir(directory, { recursive: true })
     const filename = resolve(directory, state.replaceAll(/[^a-z0-9-]+/gi, '-'))
@@ -85,7 +85,15 @@ export async function scanAccessibility(page: Page, state: string) {
             const root: NuxtRootElement | null = document.querySelector('#__nuxt')
             return root?.__vue_app__?.config?.globalProperties?.$nuxt?.payload?.error
         })
-        if (applicationError) {
+        const errorStatus =
+            applicationError && typeof applicationError === 'object' && 'status' in applicationError
+                ? applicationError.status
+                : undefined
+        if (
+            applicationError
+                ? errorStatus !== expectedErrorStatus || !expectedErrorStatus
+                : expectedErrorStatus
+        ) {
             throw new Error(
                 `Application failed before accessibility scan: ${JSON.stringify(applicationError)}`,
             )

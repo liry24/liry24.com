@@ -1,7 +1,7 @@
 import { createError, defineEventHandler, readBody } from 'nuxt/server'
 import { z } from 'zod'
 
-import { gameFieldsSchema } from '../../../../shared/schemas/content.js'
+import { gameFieldsSchema } from '../../../../shared/utils/contentSchemas.js'
 import { requireAdminSession } from '../../../utils/auth.js'
 import { appendOrder } from '../../../utils/content.js'
 import { gameCatalog } from '../../../utils/gameCatalog.js'

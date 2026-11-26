@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const { sessions, busy, failure, current, refresh, revoke, revokeOthers, signOut } =
     useAdminSessions()
+const { isLocalAdmin } = useAppSession()
 const devices = computed(() =>
     sessions.value.map((session) => ({ session, ...adminSessionDevice(session.userAgent) })),
 )
@@ -92,7 +93,7 @@ const devices = computed(() =>
                     </dl>
                 </div>
                 <UButton
-                    v-if="item.session.id === current?.id"
+                    v-if="item.session.id === current?.id && !isLocalAdmin"
                     label="Sign out"
                     variant="subtle"
                     color="neutral"
@@ -100,7 +101,7 @@ const devices = computed(() =>
                     @click="signOut()"
                 />
                 <UButton
-                    v-else
+                    v-else-if="item.session.id !== current?.id"
                     label="Revoke"
                     variant="subtle"
                     color="error"

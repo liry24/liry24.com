@@ -10,6 +10,13 @@ const props = defineProps({
         }),
     },
 })
+
+const retryAdminPath = computed(() => {
+    const data: unknown = props.error.data
+    if (data && typeof data === 'object' && 'retryAdminPath' in data) {
+        return adminRedirect(data.retryAdminPath)
+    }
+})
 </script>
 
 <template>
@@ -23,6 +30,14 @@ const props = defineProps({
             <h2 class="text-muted text-lg">
                 {{ props.error.statusText }}
             </h2>
+            <UButton
+                v-if="retryAdminPath"
+                :to="retryAdminPath"
+                external
+                label="Retry Pocket ID sign-in"
+                variant="soft"
+                size="lg"
+            />
             <UButton
                 to="/"
                 label="Back to Home"

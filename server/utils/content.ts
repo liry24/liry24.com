@@ -14,7 +14,7 @@ import type {
     SkillData,
     SocialData,
     WorkData,
-} from '../../shared/schemas/content.js'
+} from '../../shared/types/content.js'
 import content from '../content.js'
 
 export type CollectionDocumentData =

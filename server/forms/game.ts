@@ -2,7 +2,7 @@ import { createError } from 'nuxt/server'
 import { defineForm } from 'vite-hub/forms'
 import { z } from 'zod'
 
-import { gameFieldsSchema } from '../../shared/schemas/content.js'
+import { gameFieldsSchema } from '../../shared/utils/contentSchemas.js'
 import { authorizeAdminForm, handleFormDomainError } from '../utils/forms.js'
 import { gameCatalog } from '../utils/gameCatalog.js'
 import { validateGameSave } from '../utils/gameValidation.js'

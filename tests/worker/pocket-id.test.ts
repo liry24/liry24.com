@@ -78,7 +78,21 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 email_verified: true,
                 name: 'Stranger',
             })
-            expect((await signIn()).session).toBeNull()
+            const denied = await signIn()
+            expect(denied.session).toBeNull()
+            const failure = new URL(denied.result.headers.get('location') ?? '/', app.url)
+            expect(failure.pathname).toBe('/admin/works')
+            expect(failure.searchParams.get('pocket-id-error')).toBe('1')
+            const errorPage = await app.server.fetch(failure.pathname + failure.search, {
+                redirect: 'manual',
+                headers: { accept: 'text/html' },
+            })
+            expect(errorPage.status).toBe(403)
+            expect(await errorPage.text()).toContain('Retry Pocket ID sign-in')
+            const retry = await app.server.fetch('/admin/works?view=list', { redirect: 'manual' })
+            expect(new URL(retry.headers.get('location') ?? '/', app.url).origin).toBe(
+                provider.issuer,
+            )
 
             provider.identity({
                 sub: 'owner-sub',
@@ -146,6 +160,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             ).toBeNull()
 
             for (const path of [
+                '/sign-in/local-admin',
                 '/passkey/generate-authenticate-options',
                 '/sign-in/username',
                 '/link-social',
@@ -178,6 +193,14 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                     )
                 ).status,
             ).toBe(302)
+            const signOut = await app.server.fetch('/api/auth/sign-out', {
+                method: 'POST',
+                headers: { origin: app.url.origin, cookie: ownerSignIn.cookie },
+            })
+            expect(signOut.status).toBe(200)
+            expect(signOut.headers.getSetCookie()).toEqual(
+                expect.arrayContaining([expect.stringContaining('liry24-pocket.session_token=')]),
+            )
         } finally {
             await app.close()
             await provider.close()

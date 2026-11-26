@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
 import content from '#server/content'
-import { contentCollectionNames } from '#shared/schemas/content'
 
 const collectionSchema = z.enum(contentCollectionNames)
 

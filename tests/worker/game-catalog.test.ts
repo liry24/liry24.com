@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 
-import { gameFieldsSchema } from '../../shared/schemas/content'
-import type { GameRecordData, GameStatsRecordData, PostData } from '../../shared/schemas/content'
+import type { GameRecordData, GameStatsRecordData, PostData } from '../../shared/types/content'
+import { gameFieldsSchema } from '../../shared/utils/contentSchemas'
 import { builtWorker } from '../helpers/builtWorker'
 
 type WritePayload =

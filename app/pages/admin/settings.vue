@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { signOut, user } = useAppSession()
+const { signOut, user, isLocalAdmin } = useAppSession()
 useHead({ title: 'Settings' })
 </script>
 
@@ -15,6 +15,7 @@ useHead({ title: 'Settings' })
             <UDashboardNavbar title="Settings" icon="mingcute:settings-1-fill">
                 <template #right>
                     <UButton
+                        v-if="!isLocalAdmin"
                         label="Sign out"
                         icon="mingcute:exit-line"
                         variant="outline"

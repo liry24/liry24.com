@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { contentCollectionNames } from '#shared/schemas/content'
-
 useHead({ title: 'Dashboard', titleTemplate: '%s | Liry24 Admin' })
 
 const { data: postOverview } = await useFetch<{ items: Array<{ status?: { state?: string } }> }>(

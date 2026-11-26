@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/node-sqlite'
 import { expect, test, vi } from 'vitest'
 
 import importGame from '../server/api/admin/games/index.post'
-import database from '../server/databases/default'
+import database from '../server/databases/default/index'
 import { openTestDatabase } from './helpers/database'
 
 const { queryIgdb, useDatabase } = vi.hoisted(() => ({

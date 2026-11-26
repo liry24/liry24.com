@@ -1,5 +1,3 @@
-import { contentCollectionNames } from '#shared/schemas/content'
-
 const validCollections = new Set<string>(contentCollectionNames)
 
 function parseCollectionName(raw: string | undefined): ContentCollectionName {

@@ -12,7 +12,7 @@ import {
     skillFieldsSchema,
     socialFieldsSchema,
     workFieldsSchema,
-} from '../shared/schemas/content.js'
+} from '../shared/utils/contentSchemas.js'
 import { isAdminUser } from './utils/auth.js'
 
 const blobImage = z

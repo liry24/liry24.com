@@ -1,7 +1,7 @@
 import { defineForm } from 'vite-hub/forms'
 import { z } from 'zod'
 
-import { careerFieldsSchema } from '../../shared/schemas/content.js'
+import { careerFieldsSchema } from '../../shared/utils/contentSchemas.js'
 import content from '../content.js'
 import { saveOrderedDraft } from '../utils/content.js'
 import { authorizeAdminForm, handleFormDomainError, normalizeDocumentId } from '../utils/forms.js'
