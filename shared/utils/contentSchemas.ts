@@ -1,13 +1,9 @@
 import { z } from 'zod'
 
-import type { MediaReference } from '../types/content.js'
-import { gameColorPattern, gameSlugPattern } from './games.js'
-import { socialSlug } from './socials.js'
-
 export const mediaReferenceSchema: z.ZodType<MediaReference> = z.object({
     pathname: z.string().min(1),
     contentType: z.string().optional(),
-    size: z.number().finite().nonnegative().optional(),
+    size: z.number().nonnegative().optional(),
 })
 
 export const postFieldsSchema = z.object({
@@ -20,7 +16,7 @@ export const postFieldsSchema = z.object({
     authoredAt: z.iso.datetime({ offset: true }).optional(),
     gameMentions: z.array(z.string()).default([]),
     authorUserId: z.string().optional(),
-    order: z.number().finite().default(0),
+    order: z.number().default(0),
 })
 
 export const workFieldsSchema = z.object({
@@ -34,7 +30,7 @@ export const workFieldsSchema = z.object({
     price: z.string().optional(),
     style: z.enum(['large', 'small']).default('small'),
     authoredAt: z.iso.datetime({ offset: true }).optional(),
-    order: z.number().finite().default(0),
+    order: z.number().default(0),
 })
 
 export const artFieldsSchema = z.object({
@@ -44,7 +40,7 @@ export const artFieldsSchema = z.object({
     description: z.string().optional(),
     href: z.httpUrl().optional(),
     authoredAt: z.iso.datetime({ offset: true }).optional(),
-    order: z.number().finite().default(0),
+    order: z.number().default(0),
 })
 
 export const careerFieldsSchema = z.object({
@@ -52,7 +48,7 @@ export const careerFieldsSchema = z.object({
     slug: z.string().min(1),
     period: z.string().min(1),
     position: z.string().min(1),
-    order: z.number().finite().default(0),
+    order: z.number().default(0),
 })
 
 export const skillFieldsSchema = z.object({
@@ -60,7 +56,7 @@ export const skillFieldsSchema = z.object({
     slug: z.string().min(1),
     icon: z.string().min(1),
     category: z.string().optional(),
-    order: z.number().finite().default(0),
+    order: z.number().default(0),
 })
 
 const gameDecorationSchema = {
@@ -93,7 +89,7 @@ export const gameFieldsSchema = z.object({
     cover: z.httpUrl().optional(),
     icon: mediaReferenceSchema.optional(),
     primaryMetric: z.string().optional(),
-    order: z.number().finite().default(0),
+    order: z.number().default(0),
     metrics: z.array(gameMetricSchema).max(30).default([]),
 })
 
@@ -119,7 +115,7 @@ export const socialFieldsSchema = z.object({
     slug: z.string().refine(socialSlug, 'Choose an unreserved URL segment.'),
     href: z.httpUrl(),
     icon: z.string(),
-    order: z.number().finite().default(0),
+    order: z.number().default(0),
 })
 
 export const contentCollectionNames = [

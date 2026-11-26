@@ -1,5 +1,3 @@
-import type { MediaReference, PortfolioItem } from '../types/content.js'
-
 export type GamePosition = {
     value: number
     label: string

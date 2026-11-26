@@ -1,7 +1,4 @@
-import { createError } from 'nuxt/server'
 import { useAuth } from 'vite-hub/auth/server'
-
-import { isAdminUser } from './auth.js'
 
 const documentIdPattern = /^[a-zA-Z0-9_-]{1,120}$/
 

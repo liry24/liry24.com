@@ -3,18 +3,6 @@ import { defineContent, image, optional } from 'vite-hub/content'
 import { documents } from 'vite-hub/content/collections'
 import { z } from 'zod'
 
-import {
-    artFieldsSchema,
-    careerFieldsSchema,
-    gameStatsFieldsSchema,
-    mediaReferenceSchema,
-    postFieldsSchema,
-    skillFieldsSchema,
-    socialFieldsSchema,
-    workFieldsSchema,
-} from '../shared/utils/contentSchemas.js'
-import { isAdminUser } from './utils/auth.js'
-
 const blobImage = z
     .fromJSONSchema(image()['~standard'].jsonSchema.output({ target: 'draft-2020-12' }))
     .pipe(mediaReferenceSchema)

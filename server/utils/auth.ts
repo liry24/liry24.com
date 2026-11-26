@@ -1,5 +1,4 @@
 import type { RequestEvent } from 'nuxt/server'
-import { createError } from 'nuxt/server'
 import { useAuth } from 'vite-hub/auth/server'
 
 export interface AppSessionUser {

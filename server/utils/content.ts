@@ -5,17 +5,7 @@ import type {
     ContentWriteOptions,
 } from '@vite-hub/content'
 
-import type {
-    ArtData,
-    CareerData,
-    ContentCollectionName,
-    GameStatsRecordData,
-    PostData,
-    SkillData,
-    SocialData,
-    WorkData,
-} from '../../shared/types/content.js'
-import content from '../content.js'
+import content from '#server/content'
 
 export type CollectionDocumentData =
     | PostData

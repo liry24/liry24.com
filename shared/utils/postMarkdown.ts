@@ -1,9 +1,6 @@
 import type { ComarkPlugin, Node } from 'comark'
 import security from 'comark/plugins/security'
 
-import { gameMentionRule } from './gameMentions.js'
-import { gameSlugPattern } from './games.js'
-
 // Posts allow prose HTML and the game mention component.
 const proseSecurity = security({
     allowedTags: [

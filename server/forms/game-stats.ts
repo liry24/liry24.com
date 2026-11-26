@@ -1,11 +1,7 @@
 import { defineForm } from 'vite-hub/forms'
 import { z } from 'zod'
 
-import { gameStatsFieldsSchema } from '../../shared/utils/contentSchemas.js'
-import content from '../content.js'
-import { saveOrderedDraft } from '../utils/content.js'
-import { authorizeAdminForm, handleFormDomainError, normalizeDocumentId } from '../utils/forms.js'
-import { validateGameStatsSave } from '../utils/gameValidation.js'
+import content from '#server/content'
 
 const gameStatsFormSchema = z.object({
     id: z.string().optional(),

@@ -2,10 +2,6 @@ import { admin, genericOAuth } from 'better-auth/plugins'
 import { defineAuth } from 'vite-hub/auth'
 import { authDatabase } from 'vite-hub/auth/database'
 
-import { localAdminAuth, localAdminPlugin } from './utils/localAdminAuth.js'
-import { readProcessEnv } from './utils/processEnv.js'
-import { readSecretValue } from './utils/secret.js'
-
 const parseList = (value: string | undefined): Array<string> =>
     (value ?? '')
         .split(',')

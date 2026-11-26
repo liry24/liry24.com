@@ -10,10 +10,6 @@ import { useAuth } from 'vite-hub/auth/server'
 import { webChat } from 'vite-hub/channels/adapters'
 import { useServerEnv } from 'vite-hub/env'
 
-import { isAdminUser } from '../utils/auth.js'
-import { readProcessEnv } from '../utils/processEnv.js'
-import { readSecretValue } from '../utils/secret.js'
-
 const GEMINI_MODEL_ID = 'gemini-4-hydrogen'
 
 function createOfflineMockModel(): MockLanguageModelV4 {

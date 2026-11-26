@@ -1,5 +1,3 @@
-import type { GameMetric, GameValue } from '../types/games.js'
-
 export const gameSlugPattern = /^[a-z0-9][a-z0-9-]*$/
 export const gameColorPattern = /^#[0-9a-fA-F]{6}$/
 

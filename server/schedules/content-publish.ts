@@ -1,6 +1,6 @@
 import { defineSchedule } from 'vite-hub/schedule'
 
-import content from '../content'
+import content from '#server/content'
 
 export default defineSchedule({
     cron: '* * * * *',

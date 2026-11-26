@@ -1,12 +1,8 @@
 import { createIgdbClient, eq, IgdbError } from '@liry24/igdb'
 import type { IgdbClientOptions } from '@liry24/igdb'
 import { log } from 'evlog'
-import { createError } from 'nuxt/server'
 import { useServerEnv } from 'vite-hub/env'
 import { z } from 'zod'
-
-import { readProcessEnv } from './processEnv.js'
-import { readSecretValue } from './secret.js'
 
 interface IgdbCredentials {
     client?: string
