@@ -31,19 +31,11 @@ defineEmits<{ busy: [busy: boolean] }>()
                 required
             />
             <AdminEntryText
-                v-model="data.slug"
-                label="Slug"
-                name="data.slug"
-                :error="errors['data.slug']"
-                :suggestion="entrySlugSuggestion(data.title ?? '')"
-                required
-            />
-            <AdminEntryText
                 v-model="data.description"
                 label="Description"
                 name="data.description"
                 :error="errors['data.description']"
-                multiline
+                :rows="3"
             />
             <AdminEntryText
                 v-model="data.href"

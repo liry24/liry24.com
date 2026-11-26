@@ -10,6 +10,9 @@ defineProps<{
     saving?: boolean
     wide?: boolean
     finalFocus?: () => HTMLElement | null
+    submitLabel?: string
+    submittingLabel?: string
+    hideSubmit?: boolean
 }>()
 defineEmits<{ submit: [] }>()
 const form = useTemplateRef('form')
@@ -46,8 +49,16 @@ const initialFocus = () =>
                     <DialogClose class="ui-button" data-variant="ghost" :disabled="busy">
                         Cancel
                     </DialogClose>
-                    <Button type="submit" class="ui-button" data-variant="primary" :disabled="busy">
-                        {{ saving ? 'Saving…' : 'Save draft' }}
+                    <Button
+                        v-if="!hideSubmit"
+                        type="submit"
+                        class="ui-button"
+                        data-variant="primary"
+                        :disabled="busy"
+                    >
+                        {{
+                            saving ? (submittingLabel ?? 'Saving…') : (submitLabel ?? 'Save draft')
+                        }}
                     </Button>
                 </footer>
             </form>

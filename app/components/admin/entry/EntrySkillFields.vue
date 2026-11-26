@@ -40,13 +40,5 @@ defineEmits<{ search: [event: MouseEvent] }>()
             required
             @search="$emit('search', $event)"
         />
-        <AdminEntryText
-            v-model="data.slug"
-            label="Slug"
-            name="data.slug"
-            :error="errors['data.slug']"
-            :suggestion="entrySlugSuggestion(data.name ?? '')"
-            required
-        />
     </div>
 </template>

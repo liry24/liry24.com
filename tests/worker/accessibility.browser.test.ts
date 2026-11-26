@@ -143,7 +143,7 @@ async function exerciseStatsEditor(page: Page) {
     await game.selectOption('igdb-126459')
     await expectCenteredDialog(dialog)
     await dialog.getByLabel('Period label', { exact: true }).fill('New synthetic period')
-    await dialog.getByLabel('Period key', { exact: true }).fill('new-synthetic-period')
+    expect(await dialog.getByRole('textbox', { name: 'Period key' }).count()).toBe(0)
 
     const peak = dialog.getByRole('textbox', { name: 'Peak Rank', exact: true })
     await peak.fill('1.5')
@@ -167,11 +167,12 @@ async function exerciseStatsEditor(page: Page) {
         save.click(),
     ])
     expect(response.status()).toBe(201)
+    expect(await response.json()).toEqual({ id: 'igdb-126459-new_synthetic_period' })
     expect(response.request().postDataJSON()).toMatchObject({
         data: { game: 'igdb-126459', values: [{ key: 'rank', value: 0 }] },
     })
     await dialog.waitFor({ state: 'hidden' })
-    const saved = page.locator('[data-item-id="igdb-126459-new-synthetic-period"]')
+    const saved = page.locator('[data-item-id="igdb-126459-new_synthetic_period"]')
     await saved.getByTestId('edit-entry').click()
     const edit = page.getByRole('dialog', { name: 'Edit stat period' })
     expect(await edit.getByRole('textbox', { name: 'Peak Rank', exact: true }).inputValue()).toBe(
@@ -206,7 +207,25 @@ async function exerciseArtworkEditor(page: Page, bytes: Buffer) {
         await dialog.getByRole('button', { name: 'Remove image 2' }).click()
         expect(await dialog.getByRole('img').count()).toBe(1)
         await dialog.getByRole('textbox', { name: 'Title' }).fill('Synthetic new artwork')
-        await dialog.getByRole('button', { name: 'Use synthetic-new-artwork' }).click()
+        const description = dialog.getByRole('textbox', { name: 'Description' })
+        expect(await description.getAttribute('rows')).toBe('3')
+        const descriptionHeight = () =>
+            description.evaluate((element) => element.getBoundingClientRect().height)
+        const initialHeight = await descriptionHeight()
+        await description.fill('Line\n'.repeat(8))
+        await expect.poll(descriptionHeight).toBeGreaterThan(initialHeight)
+        await description.fill('A short description')
+        await expect.poll(descriptionHeight).toBe(initialHeight)
+
+        const slug = dialog.getByRole('textbox', { name: 'Slug', exact: true })
+        expect(await slug.count()).toBe(0)
+        const manual = dialog.getByRole('checkbox', { name: 'Enter slug manually' })
+        await manual.check()
+        await slug.fill('custom-artwork-slug')
+        await manual.uncheck()
+        expect(await slug.count()).toBe(0)
+        await manual.check()
+        expect(await slug.inputValue()).toBe('custom-artwork-slug')
         const [saved] = await Promise.all([
             page.waitForResponse(
                 (entry) => new URL(entry.url()).pathname === '/_vitehub/forms/art',
@@ -214,8 +233,13 @@ async function exerciseArtworkEditor(page: Page, bytes: Buffer) {
             dialog.getByRole('button', { name: 'Save draft' }).click(),
         ])
         expect(saved.status()).toBe(201)
+        expect(await saved.json()).toEqual({ id: 'custom-artwork-slug' })
         expect(saved.request().postDataJSON()).toMatchObject({
-            data: { images: [{ pathname: expect.stringMatching(/last-art\.png$/u) }] },
+            data: {
+                slug: 'custom-artwork-slug',
+                description: 'A short description',
+                images: [{ pathname: expect.stringMatching(/last-art\.png$/u) }],
+            },
         })
         await dialog.waitFor({ state: 'hidden' })
     } finally {
@@ -630,10 +654,13 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
 
                 await visit('/admin/posts/new')
                 const editor = auditPage.getByRole('main')
-                const saveDraft = editor.getByTestId('save-post-draft')
-                await saveDraft.waitFor()
+                const publishOptions = editor.getByRole('button', { name: 'Publish options' })
+                await publishOptions.waitFor()
                 await scan('post-editor')
+                expect(await editor.getByRole('button', { name: 'Save draft' }).count()).toBe(0)
 
+                await publishOptions.click()
+                const saveDraft = auditPage.getByRole('menuitem', { name: 'Save draft' })
                 const [validation] = await Promise.all([
                     auditPage.waitForResponse(
                         (response) =>
@@ -645,6 +672,52 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 expect(validation.status()).toBe(400)
                 await editor.getByRole('alert').first().waitFor()
                 await scan('post-validation')
+
+                if (colorScheme === 'light') {
+                    const slug = editor.getByRole('textbox', { name: 'Slug', exact: true })
+                    expect(await slug.count()).toBe(0)
+                    const manual = editor.getByRole('checkbox', { name: 'Enter slug manually' })
+                    await manual.check()
+                    await slug.fill('ignored_manual_slug')
+                    await manual.uncheck()
+                    expect(await slug.count()).toBe(0)
+
+                    const tags = editor.getByRole('combobox', { name: 'Tags' })
+                    await editor.getByRole('button', { name: 'Show tag suggestions' }).click()
+                    await auditPage.getByRole('option', { name: 'dev', exact: true }).click()
+                    await tags.fill('interface design')
+                    await tags.press('Enter')
+                    await editor.getByRole('button', { name: 'Remove interface design' }).waitFor()
+                    await editor.getByRole('button', { name: 'Remove dev', exact: true }).waitFor()
+
+                    await editor
+                        .getByRole('textbox', { name: 'Title', exact: true })
+                        .fill('Synthetic new article')
+                    await publishOptions.click()
+                    await auditPage.getByRole('menuitem', { name: 'Scheduled publish' }).click()
+                    const scheduling = auditPage.getByRole('dialog', { name: 'Scheduled publish' })
+                    const at = scheduling.getByLabel('Schedule at', { exact: true })
+                    await expectFocus(at)
+                    await scan('post-schedule-dialog')
+                    const [scheduled] = await Promise.all([
+                        auditPage.waitForResponse(
+                            (response) =>
+                                new URL(response.url()).pathname === '/api/admin/content/publish',
+                        ),
+                        scheduling.getByRole('button', { name: 'Schedule', exact: true }).click(),
+                    ])
+                    expect(scheduled.status(), await scheduled.text()).toBe(200)
+                    expect(scheduled.request().postDataJSON()).toMatchObject({ action: 'schedule' })
+                    await auditPage.waitForURL('**/admin/posts/synthetic_new_article')
+                    await editor.getByText('Edit post: Synthetic new article').waitFor()
+                    await publishOptions.click()
+                    await auditPage.getByRole('menuitem', { name: 'Scheduled publish' }).click()
+                    await scheduling.getByRole('button', { name: 'Cancel schedule' }).click()
+                    await at.waitFor()
+                    await auditPage.keyboard.press('Escape')
+                    await scheduling.waitFor({ state: 'hidden' })
+                    await expectFocus(publishOptions)
+                }
 
                 await visit('/admin/skills')
                 const skill = auditPage.locator('[data-item-id="typescript"]')

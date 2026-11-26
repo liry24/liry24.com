@@ -32,14 +32,6 @@ defineEmits<{ search: [event: MouseEvent] }>()
                 :error="errors['data.label']"
                 required
             />
-            <AdminEntryText
-                v-model="data.slug"
-                label="Slug"
-                name="data.slug"
-                :error="errors['data.slug']"
-                :suggestion="entrySlugSuggestion(data.label ?? '')"
-                required
-            />
         </div>
         <AdminEntryText
             v-model="data.href"

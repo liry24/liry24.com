@@ -5,7 +5,9 @@ import content from '#server/content'
 
 const socialFormSchema = z.object({
     id: z.string().optional(),
-    data: socialFieldsSchema.extend({ order: z.number().finite().optional() }),
+    data: socialFieldsSchema
+        .partial({ slug: true })
+        .extend({ order: z.number().finite().optional() }),
 })
 
 export default defineForm({
@@ -17,10 +19,17 @@ export default defineForm({
     maxBytes: 262_144,
     onSubmit: async (submission) => {
         try {
-            const id = normalizeDocumentId(submission.data.id, submission.data.data.slug)
-            await validateSocialSave({ id, slug: submission.data.data.slug })
-            await saveOrderedDraft(content.collection('socials'), id, submission.data.data)
-            return Response.json({ id }, { status: 201 })
+            const { id, data } = submission.data
+            const saved = await saveEntryDraft(content.collection('socials'), {
+                id,
+                data,
+                key: 'slug',
+                fields: (slug, order) => ({ ...data, slug, order }),
+                label: data.label,
+                allowGeneratedKey: socialSlug,
+                validate: (id, entry) => validateSocialSave({ id, slug: entry.slug }),
+            })
+            return Response.json({ id: saved.id }, { status: 201 })
         } catch (error) {
             return handleFormDomainError(error)
         }

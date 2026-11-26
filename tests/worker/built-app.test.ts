@@ -50,6 +50,7 @@ describe.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')('built Worker', 
             expect((await fetch('/api/admin/content/posts', { headers: session })).status).toBe(
                 status,
             )
+            expect((await fetch('/api/admin/posts/tags', { headers: session })).status).toBe(status)
             for (const path of [
                 '/_vitehub/forms/post',
                 '/api/admin/content/publish',
@@ -202,5 +203,78 @@ describe.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')('built Worker', 
         }
         expect(reply.trim()).toBeTruthy()
         expect(finished).toBe(true)
+    })
+
+    test('undated posts use the publication timestamp and suggestions rank published tags', async () => {
+        const save = async (title: string, tags: Array<string>, authoredAt?: string) => {
+            const response = await post(
+                '/_vitehub/forms/post',
+                { data: { title, tags, authoredAt }, body: 'A test post.' },
+                admin,
+            )
+            expect(response.status, await response.clone().text()).toBe(201)
+            return z
+                .object({ id: z.string(), slug: z.string(), digest: z.string() })
+                .parse(await response.json())
+        }
+        const publish = (saved: { id: string; digest: string }) =>
+            post(
+                '/api/admin/content/publish',
+                { action: 'publish', collection: 'posts', ...saved },
+                admin,
+            )
+
+        const undated = await save('First release', ['writing', 'release', 'writing'])
+        expect(undated.slug).toBe('first_release')
+        const since = Date.now()
+        const publication = await publish(undated)
+        expect(publication.status, await publication.clone().text()).toBe(200)
+        const receipt = z
+            .object({
+                result: z.object({ revision: z.object({ createdAt: z.iso.datetime() }) }),
+            })
+            .parse(await publication.json())
+        const date = receipt.result.revision.createdAt
+        expect(Date.parse(date)).toBeGreaterThanOrEqual(since)
+        const detail = await fetch('/api/posts/first_release')
+        expect(await detail.json()).toMatchObject({ publishedAt: date })
+
+        const authoredAt = '2020-01-01T00:00:00.000Z'
+        const backdated = await save('Earlier writing', ['writing', 'notes'], authoredAt)
+        expect((await publish(backdated)).status).toBe(200)
+        await save('Unpublished notes', ['draft-only'])
+
+        const cards = await fetch('/api/posts/cards')
+        expect(await cards.json()).toMatchObject({
+            items: [
+                { id: undated.id, date },
+                { id: backdated.id, date: authoredAt },
+            ],
+        })
+        const tags = await fetch('/api/admin/posts/tags', { headers: admin })
+        expect(await tags.json()).toEqual({ tags: ['writing', 'notes', 'release'] })
+    })
+
+    test('creates unique automatic slugs and preserves them across edits', async () => {
+        const data = { name: 'Café OpenSource', icon: 'lucide:code' }
+        const save = (input: JSONValue) => post('/_vitehub/forms/skill', input, admin)
+        const created = await save({ data })
+        expect(created.status, await created.clone().text()).toBe(201)
+        expect(await created.json()).toEqual({ id: 'cafe_open_source' })
+        const duplicate = await save({ data })
+        expect(duplicate.status, await duplicate.clone().text()).toBe(201)
+        expect(await duplicate.json()).toEqual({ id: 'cafe_open_source_2' })
+        expect((await save({ data: { ...data, slug: 'cafe_open_source' } })).status).toBe(409)
+
+        const id = 'cafe_open_source'
+        expect((await save({ id, data: { ...data, name: 'Edited name' } })).status).toBe(201)
+        const updated = await fetch(`/api/admin/content/skills/${id}`, { headers: admin })
+        expect(await updated.json()).toMatchObject({
+            data: { name: 'Edited name', slug: id },
+        })
+
+        const cjk = await save({ data: { ...data, name: '日本語' } })
+        expect(cjk.status, await cjk.clone().text()).toBe(201)
+        expect(await cjk.json()).toEqual({ id: expect.stringMatching(/^[a-z0-9]{12}$/u) })
     })
 })

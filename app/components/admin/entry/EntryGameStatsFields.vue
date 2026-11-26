@@ -100,14 +100,6 @@ defineExpose({ getValues })
                 required
             />
             <AdminEntryText
-                v-model="data.periodKey"
-                label="Period key"
-                name="data.periodKey"
-                :error="errors['data.periodKey']"
-                :suggestion="entrySlugSuggestion(data.period ?? '')"
-                required
-            />
-            <AdminEntryText
                 v-model="data.href"
                 label="Profile URL"
                 name="data.href"

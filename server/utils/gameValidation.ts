@@ -4,13 +4,11 @@ function invalidField(message: string): never {
     throw createError({ status: 400, statusText: message, message })
 }
 
-export async function preparePostData(input: {
-    data: PostData
-    body: string
-    previousAuthorUserId?: string
-    actorUserId?: string
-}): Promise<PostData> {
-    const slugs = await postGameSlugs(input.data.title, input.body)
+export async function resolvePostGames(
+    title: string,
+    body: string,
+): Promise<Pick<PostData, 'plainTitle' | 'gameMentions'>> {
+    const slugs = await postGameSlugs(title, body)
     const gameDocs = slugs.length ? await gameCatalog().list() : []
     const bySlug = new Map(gameDocs.map((doc) => [doc.data.slug, doc]))
     const matchedIds: Array<string> = []
@@ -20,7 +18,7 @@ export async function preparePostData(input: {
 
         matchedIds.push(doc.id)
     }
-    const plainTitle = gameTitleParts(input.data.title)
+    const plainTitle = gameTitleParts(title)
         .map((part) => {
             if (!part.slug) return part.text
 
@@ -28,12 +26,7 @@ export async function preparePostData(input: {
             return matchedDoc?.data.name ?? part.text
         })
         .join('')
-    return {
-        ...input.data,
-        plainTitle,
-        gameMentions: matchedIds,
-        authorUserId: input.previousAuthorUserId ?? input.actorUserId ?? input.data.authorUserId,
-    }
+    return { plainTitle, gameMentions: matchedIds }
 }
 
 export async function validateGameSave(options: {

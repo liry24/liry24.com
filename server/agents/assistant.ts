@@ -8,7 +8,7 @@ import { content } from 'vite-hub/agent/capabilities'
 import { authenticated } from 'vite-hub/auth/agent'
 import { webChat } from 'vite-hub/channels/adapters'
 
-const GEMINI_MODEL_ID = 'gemini-4-hydrogen'
+import { iconify } from '../capabilities/iconify.js'
 
 function createOfflineMockModel(): MockLanguageModelV4 {
     const replyText =
@@ -22,7 +22,7 @@ function createOfflineMockModel(): MockLanguageModelV4 {
 
     return new MockLanguageModelV4({
         provider: 'google.generative-ai',
-        modelId: GEMINI_MODEL_ID,
+        modelId: editorialModelId,
         doGenerate: {
             content: [{ type: 'text' as const, text: replyText }],
             finishReason,
@@ -39,16 +39,6 @@ function createOfflineMockModel(): MockLanguageModelV4 {
             ]),
         }),
     })
-}
-
-function readGoogleApiKey(): string | undefined {
-    try {
-        const key = readSecretValue(useServerEnv().GOOGLE_GENERATIVE_AI_API_KEY)
-        if (key) return key
-    } catch {
-        // Fallback when running outside generated Nitro/Vite env bridge.
-    }
-    return readProcessEnv('GOOGLE_GENERATIVE_AI_API_KEY') || undefined
 }
 
 function createGoogleDiagnosticFetch(
@@ -106,7 +96,7 @@ export default defineAgent({
         message: 'Sign in as the site owner to use the editorial assistant.',
         source: async ({ request }) => (request ? resolveAdminSession(request) : null),
     }),
-    capabilities: [content()],
+    capabilities: [content(), iconify],
     channels: {
         web: webChat({
             route: {
@@ -122,6 +112,7 @@ export default defineAgent({
             'You are the editorial assistant for liry24.com (Japanese and English supported).',
             'You can inspect, draft, update, publish, and schedule documents across the site collections:',
             'posts, works, arts, careers, skills, gameStats, and socials.',
+            'Use searchIcons with a short English keyword or brand name to verify Iconify IDs before suggesting or setting an icon for a work, skill, or social link. Reuse IDs already verified in this conversation.',
             'Always save changes as drafts first, verify fields match collection schemas, and ask for explicit confirmation before publishing or scheduling.',
         ].join('\n'),
         execution: {
@@ -137,17 +128,14 @@ export default defineAgent({
             },
         },
         model: (): LanguageModel => {
-            const synthetic =
-                readProcessEnv('LIRY24_TEST_LOCAL') === 'true' ||
-                readProcessEnv('APP_ENV') === 'test'
-            const apiKey = readGoogleApiKey()
-            if (synthetic || !apiKey) return createOfflineMockModel()
+            const apiKey = readEditorialApiKey()
+            if (!apiKey) return createOfflineMockModel()
 
             const google = createGoogleGenerativeAI({
                 apiKey,
                 fetch: createGoogleDiagnosticFetch(apiKey),
             })
-            return google(GEMINI_MODEL_ID)
+            return google(editorialModelId)
         },
     },
 })

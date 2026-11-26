@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { UiButton, UiField, UiInput, UiTextarea } from '@liry24/ui'
+import { UiField, UiInput, UiTextarea } from '@liry24/ui'
 
 const model = defineModel<string | undefined>()
 defineProps<{
@@ -10,22 +10,19 @@ defineProps<{
     description?: string
     placeholder?: string
     type?: 'text' | 'url'
-    multiline?: boolean
-    suggestion?: string
+    rows?: number
 }>()
 </script>
 
 <template>
     <UiField :label="label" :error="error" :required="required" :description="description">
         <UiTextarea
-            v-if="multiline"
+            v-if="rows !== undefined"
+            v-model="model"
             :name="name"
-            :model-value="model ?? ''"
             :required="required"
             :placeholder="placeholder"
-            :rows="3"
-            class="ui-input resize-y"
-            @update:model-value="model = $event"
+            :rows="rows"
         />
         <UiInput
             v-else
@@ -37,14 +34,5 @@ defineProps<{
             class="ui-input"
             @update:model-value="model = $event"
         />
-        <UiButton
-            v-if="suggestion && model !== suggestion"
-            type="button"
-            class="ui-button w-fit max-w-full text-start break-all"
-            data-variant="ghost"
-            @click="model = suggestion"
-        >
-            Use {{ suggestion }}
-        </UiButton>
     </UiField>
 </template>
