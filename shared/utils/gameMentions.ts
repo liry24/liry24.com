@@ -1,8 +1,6 @@
 import type { ComarkPlugin, MarkdownItPlugin, Node } from 'comark'
 import { parseMarkdown } from 'comark/parse'
 
-import { gameSlugPattern } from './games.js'
-
 interface TitlePart {
     text: string
     slug?: string

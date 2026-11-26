@@ -1,10 +1,7 @@
 import { defineForm } from 'vite-hub/forms'
 import { z } from 'zod'
 
-import { postFieldsSchema } from '../../shared/utils/contentSchemas.js'
-import content from '../content.js'
-import { authorizeAdminForm, handleFormDomainError, normalizeDocumentId } from '../utils/forms.js'
-import { preparePostData } from '../utils/gameValidation.js'
+import content from '#server/content'
 
 const postFormSchema = z.object({
     id: z.string().optional(),

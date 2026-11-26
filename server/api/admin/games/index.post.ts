@@ -1,11 +1,4 @@
-import { createError, defineEventHandler, readBody } from 'nuxt/server'
 import { z } from 'zod'
-
-import { gameFieldsSchema } from '../../../../shared/utils/contentSchemas.js'
-import { requireAdminSession } from '../../../utils/auth.js'
-import { appendOrder } from '../../../utils/content.js'
-import { gameCatalog } from '../../../utils/gameCatalog.js'
-import { queryIgdb } from '../../../utils/igdb.js'
 
 const importPayloadSchema = z.object({
     igdbId: z.number().int().positive(),

@@ -1,8 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { useDatabase } from 'vite-hub/database'
 
-import type { GameRecordData } from '../../shared/types/content.js'
-
 export function gameCatalog() {
     const { db, schema } = useDatabase('default')
     const table = schema.gameCatalog

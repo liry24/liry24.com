@@ -1,10 +1,7 @@
 import { defineForm } from 'vite-hub/forms'
 import { z } from 'zod'
 
-import { workFieldsSchema } from '../../shared/utils/contentSchemas.js'
-import content from '../content.js'
-import { saveOrderedDraft } from '../utils/content.js'
-import { authorizeAdminForm, handleFormDomainError, normalizeDocumentId } from '../utils/forms.js'
+import content from '#server/content'
 
 const workFormSchema = z.object({
     id: z.string().optional(),
