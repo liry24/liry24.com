@@ -14,7 +14,7 @@ export const postFieldsSchema = z.object({
     title: z.string().min(1),
     plainTitle: z.string().default(''),
     slug: z.string().min(1),
-    summary: z.string().optional(),
+    generateSlugOnPublish: z.literal(true).optional(),
     cover: mediaReferenceSchema.optional(),
     tags: z.array(z.string()).default([]),
     authoredAt: z.iso.datetime({ offset: true }).optional(),
@@ -49,7 +49,6 @@ export const artFieldsSchema = z.object({
 
 export const careerFieldsSchema = z.object({
     company: z.string().min(1),
-    slug: z.string().min(1),
     period: z.string().min(1),
     position: z.string().min(1),
     order: z.number().default(0),
@@ -57,7 +56,6 @@ export const careerFieldsSchema = z.object({
 
 export const skillFieldsSchema = z.object({
     name: z.string().min(1),
-    slug: z.string().min(1),
     icon: z.string().min(1),
     category: z.string().optional(),
     order: z.number().default(0),

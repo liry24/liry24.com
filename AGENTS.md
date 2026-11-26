@@ -2,7 +2,7 @@
 
 ## Stack & runtime architecture
 
-- **Framework & SDK**: `nuxt@4.7.0` with `future: { compatibilityVersion: 5 }`, `@nuxt/nitro-v3-server@4.7.0` (Nitro 3), `vite-hub@0.5.1`, `@nuxt/ui` (primary UI) + `@vite-hub/ui` (`Chat` / `PromptInput` for `/admin` assistant).
+- **Framework & SDK**: `nuxt@4.7.0` with `future: { compatibilityVersion: 5 }`, `@nuxt/nitro-v3-server@4.7.0` (Nitro 3), `vite-hub@0.6.0`, `@nuxt/ui` (primary UI) + `@vite-hub/ui` (`Chat` / `PromptInput` for `/admin` assistant).
 - **Platform packages**: `@vite-hub/auth`, `@vite-hub/blob`, `@vite-hub/cms`, `@vite-hub/content`, `@vite-hub/database`, `@vite-hub/forms`, `@vite-hub/schedule`, `@vite-hub/workspace`. Use `vite-hub/*` public subpaths and generated `.nuxt` / `.vitehub` types.
 - **Database & storage**: Single Cloudflare D1 binding (`DB`) and single public R2 binding (`STORAGE` served at `/media`) shared between `@vite-hub/cms` media and `@vite-hub/content` workspace storage (unpublished draft/revision blobs are not isolated in a separate private bucket). Published, scheduled, and current draft revisions remain separate.
 - **Scheduled publishing**: `server/schedules/content-publish.ts` runs `content.publishDue()` on `* * * * *` via `@vite-hub/schedule` (Nitro `providerOutput: 'nitro'`, disabled during CI test builds with `LIRY24_DISABLE_CRON=true`).
@@ -13,7 +13,7 @@
 - **Single-owner Pocket ID OIDC**: Configured in `server/auth.ts` with `better-auth@1.7.27` (`admin`, `genericOAuth`, `providerId: 'pocket-id'`, PKCE, `requireIdTokenVerification: true`), callback path `/api/auth/callback/pocket-id`, cookie prefix `liry24-pocket`, and owner gates `POCKET_ID_ADMIN_EMAIL` / `POCKET_ID_ADMIN_SUB` + `account` (`providerId`, `accountId`, `issuer`) enforcement. Passwordless/username/link-account endpoints and legacy providers stay disabled.
 - **Origin handling**: `server/auth.ts` uses an explicit allowlist (`https://liry24.com`, `https://dev-liry24-com.liry.workers.dev`, `*.workers.dev` when non-production, and loopback HTTP for synthetic Worker tests). In `bun dev`, local administrator sessions also require `import.meta.dev` and a request origin matching the loopback listener captured by Nuxt's `listen` hook.
 - **Local admin**: Apply existing migrations with `bun x vitehub database migrate` when setting up local SQLite. Open `/admin` on the loopback URL shown by `bun dev` to sign in automatically. On hosted environments, `/admin` starts Pocket ID sign-in.
-- **Drizzle v1 compatibility**: Do NOT enable `advanced.database.joins` in `server/auth.ts`; `@better-auth/drizzle-adapter` default export targets Drizzle v0 relational filters while `@vite-hub/database` uses `drizzle-orm@1.0.0-rc.5` (`relationsFilterToSQL` throws on v0 `SQL` filters).
+- **Drizzle v1 compatibility**: Do NOT enable `advanced.database.joins` in `server/auth.ts`; `@better-auth/drizzle-adapter` default export targets Drizzle v0 relational filters while `@vite-hub/database` uses `drizzle-orm@1.0.0-rc.6` (`relationsFilterToSQL` throws on v0 `SQL` filters).
 - **Secret unsealing**: Always declare server env keys in `env.ts` (never add test-only flags there) and unseal `{ secret: true }` values with `readSecretValue` from `server/utils/secret.ts` (because ViteHub wraps runtime secrets in `SecretEnv`).
 
 ## Editorial assistant & integrations

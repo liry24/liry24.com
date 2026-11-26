@@ -19,10 +19,15 @@ test.each([
         vi.stubEnv('APP_ENV', '')
         vi.stubEnv('NUXT_PUBLIC_SITE_URL', '')
         vi.stubEnv('WORKERS_CI_BRANCH', branch)
+        vi.stubEnv('LIRY24_POST_PUBLISH_AI', undefined)
 
         const { default: config } = await import('../nuxt.config')
         expect(config.runtimeConfig).toMatchObject({
             public: { siteUrl, imagesDomain, preview },
+        })
+        expect(config.nitro?.cloudflare?.wrangler).toMatchObject({
+            vars: { LIRY24_POST_PUBLISH_AI: preview ? 'false' : 'true' },
+            previews: { vars: { LIRY24_POST_PUBLISH_AI: 'false' } },
         })
     },
 )

@@ -11,13 +11,15 @@ export default defineEventHandler(async (event) => {
     const full = await collection.get(matched.id, { ref: 'published' })
     if (!full) throw createError({ status: 404, statusText: 'Post not found' })
 
-    const result: PostItem = {
+    const { generateSlugOnPublish: _generateSlugOnPublish, ...data } = full.data
+    const { meta } = await parsePostDescription(full.body)
+    return {
         id: full.id,
         url: full.url ?? null,
-        data: full.data,
+        data,
         body: full.body,
+        description: meta.description?.trim() || undefined,
         publishedAt: full.updatedAt ?? undefined,
         updatedAt: full.updatedAt ?? undefined,
     }
-    return result
 })

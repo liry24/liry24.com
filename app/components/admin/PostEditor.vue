@@ -14,7 +14,6 @@ const docId = ref(id ?? '')
 const title = ref('')
 const slug = ref<string>()
 const manualSlug = ref(false)
-const summary = ref('')
 const tags = ref<Array<string>>([])
 const cover = ref<MediaReference | undefined>(undefined)
 const authoredAtLocal = ref('')
@@ -78,7 +77,6 @@ const loadDocument = async () => {
     docId.value = doc.id
     title.value = post.title ?? ''
     slug.value = post.slug ?? doc.id
-    summary.value = post.summary ?? ''
     tags.value = post.tags ?? []
     cover.value = post.cover
     authoredAtLocal.value = toLocalDatetimeInput(post.authoredAt)
@@ -124,7 +122,6 @@ const saveDraft = async () => {
                 .map((part) => (part.slug ? formatGameMention(part.slug) : part.text))
                 .join(''),
             slug: manualValue,
-            summary: summary.value.trim() || undefined,
             tags: tags.value,
             cover: cover.value,
             authoredAt: toIsoFromLocalInput(authoredAtLocal.value),
@@ -143,7 +140,8 @@ const saveDraft = async () => {
     if (!savedId) throw new Error('The saved draft could not be identified.')
 
     docId.value = savedId
-    return savedId
+    const digest = result && 'digest' in result ? result.digest : undefined
+    return { id: savedId, digest: typeof digest === 'string' ? digest : undefined }
 }
 
 const actionLabels = {
@@ -160,8 +158,8 @@ const runPostAction = async (
 
     pendingAction.value = action
     try {
-        const savedId = await saveDraft()
-        if (!savedId) {
+        const saved = await saveDraft()
+        if (!saved) {
             if (action === 'schedule') {
                 scheduleError.value =
                     'Check the highlighted fields in the editor before scheduling.'
@@ -170,7 +168,7 @@ const runPostAction = async (
         }
 
         if (action !== 'draft') {
-            const target = { collection: 'posts' as const, id: savedId }
+            const target = { collection: 'posts' as const, ...saved }
             await $fetch('/api/admin/content/publish', {
                 method: 'POST',
                 body: action === 'schedule' ? { ...target, action, at } : { ...target, action },
@@ -178,7 +176,7 @@ const runPostAction = async (
         }
         if (action === 'schedule') scheduleOpen.value = false
         toast.add({ title: actionLabels[action].success, color: 'success' })
-        if (!id) await router.replace(`/admin/posts/${encodeURIComponent(savedId)}`)
+        if (!id) await router.replace(`/admin/posts/${encodeURIComponent(saved.id)}`)
         else await loadDocument()
     } catch (error) {
         const message = adminErrorMessage(error, actionLabels[action].failure)
@@ -283,7 +281,7 @@ const publishActions: Array<DropdownMenuItem> = [
         <template #body>
             <p v-if="formError" class="ui-alert" role="alert">{{ formError }}</p>
 
-            <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-4">
                 <UiField label="Title" :error="errors['data.title']" required>
                     <AdminPostSlashEditor
                         v-model="title"
@@ -296,20 +294,10 @@ const publishActions: Array<DropdownMenuItem> = [
                     />
                 </UiField>
 
-                <UiField label="Summary" :error="errors['data.summary']">
-                    <UiInput
-                        v-model="summary"
-                        placeholder="Short summary"
-                        class="ui-input"
-                        :disabled="!!pendingAction"
-                    />
-                </UiField>
-
                 <UiField
                     label="Tags"
                     :error="errors['data.tags']"
                     description="Press Enter to add a tag."
-                    class="sm:col-span-2"
                 >
                     <UiTagInput
                         v-model="tags"
@@ -355,7 +343,7 @@ const publishActions: Array<DropdownMenuItem> = [
             <UiField
                 label="Body (Markdown)"
                 :error="errors.body"
-                description="Type / to insert Markdown or mention a game."
+                description="Start with an introductory paragraph for the post excerpt. Type / to insert Markdown or mention a game."
             >
                 <div
                     v-if="showPreview"

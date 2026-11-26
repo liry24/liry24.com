@@ -19,7 +19,7 @@ type RequestBody =
     | { action: 'publish' | 'schedule'; collection: 'skills'; id: string; at?: string }
     | {
           id: string
-          data: { name: string; slug: string; icon?: string; igdbId?: number; order?: number }
+          data: { name: string; slug?: string; icon?: string; igdbId?: number; order?: number }
       }
 
 test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
@@ -54,7 +54,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             const skill = (id: string, name: string, order?: number) =>
                 post('/_vitehub/forms/skill', {
                     id,
-                    data: { name, slug: id, icon: 'lucide:star', order },
+                    data: { name, icon: 'lucide:star', order },
                 })
 
             for (const [index, id] of original.entries()) {

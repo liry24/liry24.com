@@ -2,17 +2,29 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { generateText } from 'ai'
 import { customAlphabet } from 'nanoid'
 
-const slugPattern = /^[a-z0-9]+(?:_[a-z0-9]+)*$/u
+const slugFormats = {
+    snake: { pattern: /^[a-z0-9]+(?:_[a-z0-9]+)*$/u, instruction: 'snake_case with underscores' },
+    kebab: { pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/u, instruction: 'kebab-case with hyphens' },
+}
 const randomSlug = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 12)
 
 export async function generateEntrySlug(label: string): Promise<string> {
+    return (await suggestEntrySlug(label, 80)) ?? fallbackEntrySlug(label)
+}
+
+export async function suggestEntrySlug(
+    label: string,
+    maxLength: number,
+    style: keyof typeof slugFormats = 'snake',
+): Promise<string | undefined> {
     const apiKey = readEditorialApiKey()
+    const { pattern, instruction } = slugFormats[style]
     if (apiKey && label.trim()) {
         try {
             const google = createGoogleGenerativeAI({ apiKey })
             const { text } = await generateText({
                 model: google(editorialModelId),
-                system: 'Turn the supplied label into a short, recognizable English URL slug. Translate or romanize it if needed. Return only lowercase ASCII words and digits separated by underscores, up to 80 characters.',
+                system: `Turn the supplied label into a short, recognizable English URL slug. Translate or romanize it if needed. Keep only the most distinctive words. Return a single slug in ${instruction}, using lowercase ASCII letters and digits, at most ${maxLength} characters.`,
                 prompt: label.slice(0, 500),
                 maxOutputTokens: 128,
                 maxRetries: 0,
@@ -20,12 +32,18 @@ export async function generateEntrySlug(label: string): Promise<string> {
                 providerOptions: { google: { thinkingConfig: { thinkingLevel: 'low' } } },
             })
             const slug = text.trim()
-            if (slug.length <= 80 && slugPattern.test(slug)) return slug
+            if (slug.length <= maxLength && pattern.test(slug)) return slug
         } catch {
-            // A provider error or timeout should not prevent saving a draft.
+            // Callers can continue with a local slug after a provider error or timeout.
         }
     }
+}
 
+export function fallbackEntrySlug(
+    label: string,
+    maxLength = 80,
+    style: keyof typeof slugFormats = 'snake',
+): string {
     const slug = label
         .normalize('NFKD')
         .replaceAll(/\p{M}/gu, '')
@@ -34,7 +52,8 @@ export async function generateEntrySlug(label: string): Promise<string> {
         .toLowerCase()
         .replaceAll(/[^a-z0-9]+/gu, '_')
         .replaceAll(/^_|_$/gu, '')
-        .slice(0, 80)
+        .slice(0, maxLength)
         .replace(/_$/u, '')
-    return slug || randomSlug()
+    if (!slug) return randomSlug()
+    return style === 'kebab' ? slug.replaceAll('_', '-') : slug
 }

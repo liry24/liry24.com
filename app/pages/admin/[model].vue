@@ -9,6 +9,7 @@ if (!Object.hasOwn(portfolioCollectionMeta, modelParam))
 
 const model = modelParam as PortfolioCollectionName
 const meta = portfolioCollectionMeta[model]
+const showInternalId = model !== 'careers' && model !== 'skills'
 
 const { data, pending, error, refresh } = await useFetch(`/api/admin/content/${model}`, {
     key: `admin-model:${model}`,
@@ -72,7 +73,7 @@ const itemLabel = (item: AdminItem) => {
     if ('company' in record && record.company) return record.company
     if ('period' in record && record.period) return record.period
     if ('game' in record && record.game) return record.game
-    return item.id
+    return showInternalId ? item.id : `Untitled ${meta.entryLabel}`
 }
 
 useHead({ title: meta.title })
@@ -206,7 +207,9 @@ useHead({ title: meta.title })
                                         size="sm"
                                     />
                                 </div>
-                                <p class="text-muted mt-1 font-mono text-xs">{{ item.id }}</p>
+                                <p v-if="showInternalId" class="text-muted mt-1 font-mono text-xs">
+                                    {{ item.id }}
+                                </p>
                             </div>
 
                             <div v-if="!reordering" class="flex flex-wrap items-center gap-2">

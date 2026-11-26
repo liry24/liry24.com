@@ -33,9 +33,7 @@ export default defineEventHandler(async (event): Promise<PostCardsPage> => {
     const pageSummaries = selected.slice(input.offset, input.offset + input.limit)
     const page: Array<PostItem> = await Promise.all(
         pageSummaries.map(async (summary) => {
-            const full = summary.data.summary
-                ? null
-                : await collection.get(summary.id, { ref: 'published' })
+            const full = await collection.get(summary.id, { ref: 'published' })
             const updatedAt = full?.updatedAt ?? summary.updatedAt ?? undefined
             return {
                 id: summary.id,

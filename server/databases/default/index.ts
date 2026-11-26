@@ -1,5 +1,5 @@
 import { defineDatabase } from 'vite-hub/database'
 
-import { gameCatalog } from './schema.js'
+import { gameCatalog, postSlugs } from './schema.js'
 
-export default defineDatabase({ schema: { gameCatalog } })
+export default defineDatabase({ schema: { gameCatalog, postSlugs } })

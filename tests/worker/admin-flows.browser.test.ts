@@ -20,6 +20,7 @@ async function exerciseIconPicker(page: Page) {
     const entry = page.getByRole('dialog', { name: 'New skill' })
     const name = entry.getByLabel('Name', { exact: true })
     await name.waitFor()
+    expect(await entry.getByRole('checkbox', { name: 'Enter slug manually' }).count()).toBe(0)
     await name.press('n')
     expect(await name.inputValue()).toBe('n')
     const find = entry.getByRole('button', { name: 'Find icon' })
@@ -250,7 +251,7 @@ async function exercisePostEditor(page: Page) {
     ])
     expect(scheduled.status(), await scheduled.text()).toBe(200)
     expect(scheduled.request().postDataJSON()).toMatchObject({ action: 'schedule' })
-    await page.waitForURL('**/admin/posts/synthetic_new_article')
+    await page.waitForURL('**/admin/posts/synthetic-new-article')
     await editor.getByText('Edit post: Synthetic new article').waitFor()
     await publishOptions.click()
     await page.getByRole('menuitem', { name: 'Scheduled publish' }).click()
@@ -297,7 +298,9 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
             await exercisePostEditor(page)
 
             await visit('/admin/skills')
-            await page.locator('[data-item-id="typescript"]').waitFor()
+            const skill = page.locator('[data-item-id="typescript"]')
+            await skill.getByText('TypeScript', { exact: true }).waitFor()
+            expect(await skill.getByText(/^typescript$/).count()).toBe(0)
             await exerciseIconPicker(page)
 
             await page.getByTestId('toggle-reorder').click()

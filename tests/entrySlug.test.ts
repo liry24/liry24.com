@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest'
 
-import { generateEntrySlug } from '../server/utils/entrySlug'
+import { generateEntrySlug, suggestEntrySlug } from '../server/utils/entrySlug'
 
 const { generateText } = vi.hoisted(() => ({
     generateText: vi.fn<() => Promise<{ text: string }>>(),
@@ -21,3 +21,16 @@ test('falls back to snake case when Gemini is unavailable', async () => {
     generateText.mockRejectedValueOnce(new Error('Synthetic provider failure'))
     await expect(generateEntrySlug('Café OpenSource')).resolves.toBe('cafe_open_source')
 })
+
+test('accepts a kebab-case slug for posts', async () => {
+    generateText.mockResolvedValueOnce({ text: 'mountain-view\n' })
+    await expect(suggestEntrySlug('山の眺め', 48, 'kebab')).resolves.toBe('mountain-view')
+})
+
+test.each(['a'.repeat(49), 'UPPER-CASE', 'double--hyphen', 'snake_case', '`valid-slug`'])(
+    'rejects invalid post slug suggestions such as %s',
+    async (text) => {
+        generateText.mockResolvedValueOnce({ text })
+        await expect(suggestEntrySlug('Example', 48, 'kebab')).resolves.toBeUndefined()
+    },
+)

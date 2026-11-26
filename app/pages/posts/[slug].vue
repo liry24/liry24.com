@@ -40,9 +40,9 @@ const canonicalUrl = computed(() =>
 
 useSeoMeta({
     title: () => data.value?.plainTitle || data.value?.title || 'Post',
-    description: () => data.value?.summary || undefined,
+    description: () => post.value?.description,
     ogTitle: () => data.value?.plainTitle || data.value?.title || 'Post',
-    ogDescription: () => data.value?.summary || undefined,
+    ogDescription: () => post.value?.description,
     ogType: 'article',
     ogUrl: () => canonicalUrl.value,
     ogImage: () => mediaUrl(data.value?.cover),

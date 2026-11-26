@@ -42,6 +42,22 @@ describe.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')('built Worker', 
             body: JSON.stringify(data),
         })
 
+    const savePostDraft = async (data: { title: string; slug?: string }, id?: string) => {
+        const response = await post('/_vitehub/forms/post', { id, data, body: 'Intro.' }, admin)
+        expect(response.status, await response.clone().text()).toBe(201)
+        return z
+            .object({ id: z.string(), slug: z.string(), digest: z.string() })
+            .parse(await response.json())
+    }
+    const publishPostDraft = async ({ id, digest }: { id: string; digest: string }) => {
+        const response = await post(
+            '/api/admin/content/publish',
+            { action: 'publish', collection: 'posts', id, digest },
+            admin,
+        )
+        expect(response.status, await response.clone().text()).toBe(200)
+    }
+
     test('admin APIs reject anonymous and non-admin callers before processing requests', async () => {
         const viewer = await app.session('built-viewer', 'user')
         for (const [session, status] of [
@@ -215,7 +231,7 @@ describe.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')('built Worker', 
             )
 
         const undated = await save('First release', ['writing', 'release', 'writing'])
-        expect(undated.slug).toBe('first_release')
+        expect(undated.slug).toBe('first-release')
         const since = Date.now()
         const publication = await publish(undated)
         expect(publication.status, await publication.clone().text()).toBe(200)
@@ -226,8 +242,11 @@ describe.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')('built Worker', 
             .parse(await publication.json())
         const date = receipt.result.revision.createdAt
         expect(Date.parse(date)).toBeGreaterThanOrEqual(since)
-        const detail = await fetch('/api/posts/first_release')
-        expect(await detail.json()).toMatchObject({ publishedAt: date })
+        const detail = await fetch('/api/posts/first-release')
+        expect(await detail.json()).toMatchObject({
+            publishedAt: date,
+            description: 'A test post.',
+        })
 
         const authoredAt = '2020-01-01T00:00:00.000Z'
         const backdated = await save('Earlier writing', ['writing', 'notes'], authoredAt)
@@ -245,26 +264,53 @@ describe.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')('built Worker', 
         expect(await tags.json()).toEqual({ tags: ['writing', 'notes', 'release'] })
     })
 
-    test('creates unique automatic slugs and preserves them across edits', async () => {
-        const data = { name: 'Café OpenSource', icon: 'lucide:code' }
-        const save = (input: JSONValue) => post('/_vitehub/forms/skill', input, admin)
-        const created = await save({ data })
-        expect(created.status, await created.clone().text()).toBe(201)
-        expect(await created.json()).toEqual({ id: 'cafe_open_source' })
-        const duplicate = await save({ data })
-        expect(duplicate.status, await duplicate.clone().text()).toBe(201)
-        expect(await duplicate.json()).toEqual({ id: 'cafe_open_source_2' })
-        expect((await save({ data: { ...data, slug: 'cafe_open_source' } })).status).toBe(409)
+    test.each([
+        ['skill', 'skills', 'name', { name: 'Blender', icon: 'lucide:code' }],
+        ['career', 'careers', 'company', { company: 'Studio', period: '2025', position: 'Artist' }],
+    ] as const)(
+        'uses stable internal IDs for %s entries without slugs',
+        async (form, collection, label, data) => {
+            const save = (input: JSONValue) => post(`/_vitehub/forms/${form}`, input, admin)
+            const create = async () => {
+                const response = await save({ data })
+                expect(response.status, await response.clone().text()).toBe(201)
+                return z.object({ id: z.uuid() }).parse(await response.json()).id
+            }
+            const id = await create()
+            expect(await create()).not.toBe(id)
+            expect(
+                (await save({ id, data: { ...data, [label]: 'Edited', slug: 'old' } })).status,
+            ).toBe(201)
+            const updated = await fetch(`/api/admin/content/${collection}/${id}`, {
+                headers: admin,
+            })
+            const entry = z
+                .object({ id: z.string(), data: z.record(z.string(), z.unknown()) })
+                .parse(await updated.json())
+            expect(entry).toMatchObject({ id, data: { [label]: 'Edited', order: 0 } })
+            expect(entry.data).not.toHaveProperty('slug')
+        },
+    )
 
-        const id = 'cafe_open_source'
-        expect((await save({ id, data: { ...data, name: 'Edited name' } })).status).toBe(201)
-        const updated = await fetch(`/api/admin/content/skills/${id}`, { headers: admin })
-        expect(await updated.json()).toMatchObject({
-            data: { name: 'Edited name', slug: id },
+    test('keeps a post slug after publication until the slug is edited manually', async () => {
+        const first = await savePostDraft({ title: 'Keep this slug' })
+        expect(first.slug).toBe('keep-this-slug')
+        await publishPostDraft(first)
+
+        const edited = await savePostDraft({ title: 'Edited title' }, first.id)
+        expect(edited.slug).toBe(first.slug)
+        await publishPostDraft(edited)
+        expect(await (await fetch(`/api/posts/${first.slug}`)).json()).toMatchObject({
+            data: { title: 'Edited title', slug: first.slug },
         })
 
-        const cjk = await save({ data: { ...data, name: '日本語' } })
-        expect(cjk.status, await cjk.clone().text()).toBe(201)
-        expect(await cjk.json()).toEqual({ id: expect.stringMatching(/^[a-z0-9]{12}$/u) })
+        await publishPostDraft(
+            await savePostDraft({ title: 'Edited title', slug: 'my_custom_slug' }, first.id),
+        )
+        expect(await (await fetch('/api/posts/my_custom_slug')).json()).toMatchObject({
+            id: first.id,
+            data: { slug: 'my_custom_slug' },
+        })
+        expect((await savePostDraft({ title: 'Keep this slug' })).slug).toBe('keep-this-slug-2')
     })
 })

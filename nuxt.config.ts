@@ -202,6 +202,9 @@ export default defineNuxtConfig({
                 },
                 vars: {
                     APP_ENV: appEnv || 'production',
+                    LIRY24_POST_PUBLISH_AI: isPreview
+                        ? 'false'
+                        : (process.env.LIRY24_POST_PUBLISH_AI ?? 'true'),
                     IGDB_CLIENT_ID: igdbClientId,
                 },
                 routes: [
@@ -215,6 +218,7 @@ export default defineNuxtConfig({
                 previews: {
                     vars: {
                         APP_ENV: 'dev',
+                        LIRY24_POST_PUBLISH_AI: 'false',
                         IGDB_CLIENT_ID: igdbClientId,
                         NUXT_PUBLIC_SITE_URL: 'https://dev-liry24-com.liry.workers.dev',
                         NUXT_PUBLIC_IMAGES_DOMAIN: 'https://dev-liry24-com.liry.workers.dev',

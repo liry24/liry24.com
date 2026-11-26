@@ -8,3 +8,8 @@ export const gameCatalog = sqliteTable('game_catalog', {
     slug: text().notNull().unique(),
     data: text({ mode: 'json' }).$type<GameRecordData>().notNull(),
 })
+
+export const postSlugs = sqliteTable('post_slugs', {
+    slug: text().primaryKey(),
+    postId: text('post_id').notNull(),
+})

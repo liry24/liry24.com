@@ -3,6 +3,8 @@ import { env } from 'vite-hub/env'
 const synthetic = process.env.LIRY24_TEST_LOCAL === 'true' || process.env.APP_ENV === 'test'
 
 export const serverEnv = {
+    APP_ENV: env({ optional: true }),
+    LIRY24_POST_PUBLISH_AI: env({ optional: true }),
     BETTER_AUTH_SECRET: env({ secret: true }),
     POCKET_ID_CLIENT_ID: env(synthetic ? { optional: true } : {}),
     POCKET_ID_CLIENT_SECRET: env(synthetic ? { secret: true, optional: true } : { secret: true }),

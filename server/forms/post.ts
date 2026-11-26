@@ -5,12 +5,9 @@ import content from '#server/content'
 
 const postFormSchema = z.object({
     id: z.string().optional(),
-    data: postFieldsSchema.partial({ slug: true }),
+    data: postFieldsSchema.omit({ generateSlugOnPublish: true }).partial({ slug: true }),
     body: z.string(),
 })
-
-const reservedSlugs = new Set(['cards', 'new'])
-const availableSlug = (slug: string) => !reservedSlugs.has(slug.toLowerCase())
 
 export default defineForm({
     schema: postFormSchema,
@@ -24,6 +21,19 @@ export default defineForm({
             const { id, data, body } = submission.data
             const posts = content.collection('posts')
             const games = await resolvePostGames(data.title, body)
+            const checkSlug = !id?.trim() || data.slug !== undefined
+            const [occupied, published] = checkSlug
+                ? await Promise.all([
+                      listPostSlugOwners(),
+                      listAllCollectionItems(posts, 'published'),
+                  ])
+                : [new Map<string, string>(), []]
+            for (const post of published) {
+                for (const path of [post.id, post.data.slug]) {
+                    const key = path.toLowerCase()
+                    if (!occupied.has(key)) occupied.set(key, post.id)
+                }
+            }
 
             const saved = await saveEntryDraft(posts, {
                 id,
@@ -31,38 +41,53 @@ export default defineForm({
                 body,
                 key: 'slug',
                 label: games.plainTitle,
-                allowGeneratedKey: availableSlug,
+                generateKey: fallbackPostSlug,
+                suffixGeneratedKey: suffixPostSlug,
+                allowGeneratedKey: (slug) => isPostSlugAllowed(slug) && !occupied.has(slug),
                 fields: (slug, order, previous) => ({
                     ...data,
                     ...games,
                     slug,
+                    generateSlugOnPublish:
+                        data.slug === undefined
+                            ? (previous?.generateSlugOnPublish ?? (previous ? undefined : true))
+                            : undefined,
                     order,
                     authorUserId:
                         previous?.authorUserId ?? submission.user?.id ?? data.authorUserId,
                 }),
                 async validate(id, entry, previous) {
                     if (entry.slug === previous?.slug) return
-                    if (!availableSlug(entry.slug) || !availableSlug(id)) {
+                    if (!isPostSlugAllowed(entry.slug) || !isPostSlugAllowed(id)) {
                         throw createError({
                             status: 400,
                             statusText: 'Choose a different post slug.',
                         })
                     }
-                    if (!submission.data.id?.trim()) return
+                    const paths = [id.toLowerCase(), entry.slug.toLowerCase()]
+                    if (
+                        paths.some(
+                            (path) =>
+                                occupied.has(path) && (!previous || occupied.get(path) !== id),
+                        )
+                    )
+                        throw postSlugConflict()
+
+                    if (data.slug === undefined) return
 
                     const entries = await listAllCollectionItems(posts, 'draft')
                     if (
                         entries.some(
                             (post) =>
                                 post.id !== id &&
-                                (post.id === entry.slug || post.data.slug === entry.slug),
+                                [post.id, post.data.slug].some(
+                                    (path) =>
+                                        typeof path === 'string' &&
+                                        paths.includes(path.toLowerCase()),
+                                ),
                         )
-                    ) {
-                        throw createError({
-                            status: 409,
-                            statusText: 'A post with this slug already exists.',
-                        })
-                    }
+                    )
+                        throw postSlugConflict()
                 },
             })
             return Response.json(saved, { status: 201 })

@@ -20,6 +20,7 @@ const formError = ref('')
 const summary = useTemplateRef('summary')
 const stats = useTemplateRef('stats')
 const manualSlug = ref(false)
+const hasSlug = computed(() => props.model !== 'careers' && props.model !== 'skills')
 const slugKey = computed(() => (props.model === 'gameStats' ? 'periodKey' : 'slug'))
 const slugLabel = computed(() => (props.model === 'gameStats' ? 'Period key' : 'Slug'))
 const iconOpen = ref(false)
@@ -67,7 +68,7 @@ async function save() {
     errors.value = {}
     const { order: _order, ...payload } = { ...data.value }
     const key = slugKey.value
-    if (manualSlug.value) {
+    if (hasSlug.value && manualSlug.value) {
         const value = payload[key]?.trim()
         if (!value) {
             await showErrors('Check the highlighted fields.', {
@@ -167,6 +168,7 @@ async function save() {
                 @busy="uploading = $event"
             />
             <AdminEntrySlug
+                v-if="hasSlug"
                 v-model="data[slugKey]"
                 v-model:manual="manualSlug"
                 :label="slugLabel"

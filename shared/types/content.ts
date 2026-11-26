@@ -64,7 +64,7 @@ export interface PostItem {
     updatedAt?: string
 }
 
-export type PostCard = Omit<PostData, 'summary'> & {
+export type PostCard = Omit<PostData, 'generateSlugOnPublish'> & {
     id: string
     url: string | null
     date: string | null

@@ -60,7 +60,7 @@ async function validatePostGameReferences(id: string, digest: string) {
         })
     }
 
-    if (!post.data.gameMentions?.length) return
+    if (!post.data.gameMentions?.length) return post
 
     const gameIds = new Set((await gameCatalog().list()).map((game) => game.id))
     if (post.data.gameMentions.some((gameId) => !gameIds.has(gameId))) {
@@ -69,6 +69,7 @@ async function validatePostGameReferences(id: string, digest: string) {
             statusText: 'Import every mentioned game before publishing.',
         })
     }
+    return post
 }
 
 export default defineEventHandler(async (event) => {
@@ -91,6 +92,9 @@ export default defineEventHandler(async (event) => {
             return { ok: true }
         }
 
+        if (input.action === 'schedule' && Date.parse(input.at) <= Date.now())
+            throw createError({ status: 400, statusText: 'Choose a future publication time.' })
+
         let digest = input.digest
         if (digest === undefined) {
             const status = await content.collection(input.collection).status(input.id)
@@ -99,9 +103,11 @@ export default defineEventHandler(async (event) => {
             digest = status.draft
         }
 
+        if (input.collection === 'posts' && digest) {
+            const post = await validatePostGameReferences(input.id, digest)
+            if (!post.issues?.length) digest = await preparePostSlug(post)
+        }
         const expect = [{ collection: input.collection, id: input.id, digest }]
-        if (input.collection === 'posts' && digest)
-            await validatePostGameReferences(input.id, digest)
 
         if (input.action === 'publish') {
             const result = await content.publish({

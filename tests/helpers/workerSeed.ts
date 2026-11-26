@@ -228,7 +228,6 @@ export async function seedBrowserFixtures(app: BuiltWorker, admin: Record<string
         id: 'typescript',
         data: {
             name: 'TypeScript',
-            slug: 'typescript',
             icon: 'simple-icons:typescript',
             category: 'Language',
             order: 0,
@@ -239,7 +238,6 @@ export async function seedBrowserFixtures(app: BuiltWorker, admin: Record<string
         id: 'vue',
         data: {
             name: 'Vue',
-            slug: 'vue',
             icon: 'simple-icons:vuedotjs',
             category: 'Framework',
             order: 1,
@@ -252,12 +250,11 @@ export async function seedBrowserFixtures(app: BuiltWorker, admin: Record<string
             title: 'Played :game[valorant]',
             plainTitle: 'Played VALORANT',
             slug: 'synthetic-game-mention',
-            summary: 'Synthetic summary with game mention.',
             tags: ['dev'],
             gameMentions: [],
             order: 0,
         },
-        body: 'Summary paragraph with :game[valorant].\n\n<!-- more -->\n\nFull synthetic article body with :game[valorant].',
+        body: 'Introduction with :game[valorant].\n\nFull synthetic article body with :game[valorant].',
     })
 
     return { fixtureBytes, uploadedMedia }

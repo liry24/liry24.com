@@ -1,26 +1,30 @@
 import { parseMarkdown } from 'comark/parse'
-import summary from 'comark/plugins/summary'
+import titleDescription from 'comark/plugins/title-description'
+
+export function parsePostDescription(body: string) {
+    return parseMarkdown(body, {
+        plugins: [postMarkdownSecurity, titleDescription()],
+        autoClose: false,
+    })
+}
 
 export async function postCards(entries: Array<PostItem>): Promise<Array<PostCard>> {
     return await Promise.all(
         entries.map(async (entry) => {
-            const document = await parseMarkdown(entry.data.summary || entry.body, {
-                plugins: [postMarkdownSecurity, summary()],
-                autoClose: false,
-            })
-            const nodes = entry.data.summary
-                ? document.nodes
-                : (document.meta.summary ??
-                  document.nodes
-                      .filter((node) => Array.isArray(node) && node[0] === 'p')
-                      .slice(0, 1))
-            const { summary: _summary, ...data } = entry.data
+            const { meta, nodes } = await parsePostDescription(entry.body)
+            const content = nodes.filter((node) => Array.isArray(node) && node[0] !== 'hr')
+            const paragraph = content[meta.title === undefined ? 0 : 1]
+            const { generateSlugOnPublish: _generateSlugOnPublish, ...data } = entry.data
             return {
                 ...data,
                 id: entry.id,
                 url: entry.url,
                 date: entry.data.authoredAt ?? entry.publishedAt ?? entry.updatedAt ?? null,
-                excerpt: { nodes, frontmatter: {}, meta: {} },
+                excerpt: {
+                    nodes: meta.description !== undefined && paragraph ? [paragraph] : [],
+                    frontmatter: {},
+                    meta: {},
+                },
             }
         }),
     )

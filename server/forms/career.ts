@@ -5,9 +5,7 @@ import content from '#server/content'
 
 const careerFormSchema = z.object({
     id: z.string().optional(),
-    data: careerFieldsSchema
-        .partial({ slug: true })
-        .extend({ order: z.number().finite().optional() }),
+    data: careerFieldsSchema.extend({ order: z.number().finite().optional() }),
 })
 
 export default defineForm({
@@ -20,14 +18,12 @@ export default defineForm({
     onSubmit: async (submission) => {
         try {
             const { id, data } = submission.data
-            const saved = await saveEntryDraft(content.collection('careers'), {
+            const savedId = await saveUnkeyedEntryDraft(content.collection('careers'), {
                 id,
-                data,
-                key: 'slug',
-                fields: (slug, order) => ({ ...data, slug, order }),
-                label: data.company,
+                order: data.order,
+                fields: (order) => ({ ...data, order }),
             })
-            return Response.json({ id: saved.id }, { status: 201 })
+            return Response.json({ id: savedId }, { status: 201 })
         } catch (error) {
             return handleFormDomainError(error)
         }

@@ -7,6 +7,10 @@ export default defineEventHandler(async (event) => {
 
     const publishDeletion = getQuery(event).publish === 'true'
     const col = content.collection(collectionName)
+    if (collectionName === 'posts' && publishDeletion) {
+        const published = await content.collection('posts').get(id, { ref: 'published' })
+        if (published && !(await claimPostSlugs(id, published.data.slug))) throw postSlugConflict()
+    }
     await col.remove(id)
     if (publishDeletion) {
         await content.publish({

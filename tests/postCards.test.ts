@@ -2,7 +2,7 @@ import type { ElementNodeAttributes, Node } from 'comark'
 import { parseMarkdown } from 'comark/parse'
 import { expect, test } from 'vitest'
 
-import { postCards } from '../server/utils/postCards'
+import { parsePostDescription, postCards } from '../server/utils/postCards'
 import type { PostItem } from '../shared/types/content'
 import { postMarkdownSecurity } from '../shared/utils/postMarkdown'
 
@@ -137,30 +137,34 @@ const entry = (body: string): PostItem => ({
     body,
 })
 
-test('post cards use the first paragraph if there is no summary delimiter', async () => {
-    const [card] = await postCards([entry('Introduction\n\nFull article')])
-    expect(card?.excerpt.nodes).toEqual([['p', {}, 'Introduction']])
+test.each([
+    ['**Introduction**\n\nFull article', 'Introduction'],
+    ['# Markdown title\n\n**Introduction**\n\nFull article', 'Introduction'],
+    ['## Heading\n\n**Introduction**', undefined],
+    ['- List first\n\n**Introduction**', undefined],
+])('uses Comark to select the introductory paragraph in %j', async (body, description) => {
+    const [card] = await postCards([entry(body)])
+    expect(card?.title).toBe('Title')
+    expect(card?.excerpt.nodes).toEqual(description ? [['p', {}, ['strong', {}, description]]] : [])
+    expect((await parsePostDescription(body)).meta.description).toBe(description)
 })
 
 test('the Markdown security policy applies to the full article and the published excerpt', async () => {
     const preview = await parseMarkdown(content, { plugins: [postMarkdownSecurity] })
     const [card] = await postCards([entry(content)])
     assertSafe(preview.nodes)
-    assertSafe(card?.excerpt.nodes ?? [])
     expect(preview.nodes).toContainEqual([
         'pre',
         expect.objectContaining({ language: 'html' }),
         ['code', expect.anything(), literalCode],
     ])
-    const delimiter = preview.nodes.findIndex((node) => Array.isArray(node) && node[0] === null)
-    expect(delimiter).toBeGreaterThan(0)
-    expect(card?.excerpt.nodes).toEqual(preview.nodes.slice(0, delimiter))
+    expect(card?.excerpt.nodes).toEqual(preview.nodes.slice(0, 1))
 })
 
-test('explicit card summaries use the same component and HTML security policy', async () => {
-    const post = entry('FULL_BODY_SENTINEL')
-    post.data.summary =
-        'Introduction :game-mention{slug="valorant" :as="script" onclick="bad()"} <a href="javascript:bad()">link</a>'
+test('the introductory paragraph keeps sanitized inline game mentions and links', async () => {
+    const post = entry(
+        'Introduction :game-mention{slug="valorant" :as="script" onclick="bad()"} <a href="javascript:bad()">link</a>',
+    )
     const [card] = await postCards([post])
     expect(card?.excerpt.nodes).toEqual([
         [

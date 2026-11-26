@@ -1,4 +1,5 @@
 {
     "20261124084037_overjoyed_reavers": "0000_overjoyed_reavers.sql",
-    "20261125021724_default": "0001_default.sql"
+    "20261125021724_default": "0001_default.sql",
+    "20261126134511_post_slugs": "0002_post_slugs.sql"
 }
