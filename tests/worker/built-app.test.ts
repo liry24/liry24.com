@@ -50,7 +50,10 @@ function isExpectedHttpErrorLog(message: string): boolean {
         ) {
             return true
         }
-        return parsed.data.status === 404 && parsed.data.path === '/api/posts/built-worker-post'
+        return (
+            parsed.data.status === 404 &&
+            ['/api/posts/built-worker-post', '/login'].includes(parsed.data.path)
+        )
     } catch {
         return false
     }
@@ -88,13 +91,13 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
 
                 for (const path of [
                     '/',
-                    '/login',
                     '/favicon.ico',
                     '/api/posts/cards',
                     '/api/portfolio/works',
                 ]) {
                     expect((await app.server.fetch(path)).status, path).toBe(200)
                 }
+                expect((await app.server.fetch('/login', { redirect: 'manual' })).status).toBe(404)
                 expect(await (await app.server.fetch('/api/auth/get-session')).text()).toBe('null')
 
                 for (const path of ['/admin', '/admin/works']) {

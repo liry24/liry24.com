@@ -3,13 +3,6 @@ import { UiReorderList } from '@liry24/ui'
 import type { ContentDocumentStatus, ContentSchedule } from '@vite-hub/content'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 
-import { gameFieldsSchema, gameStatsFieldsSchema } from '#shared/schemas/content'
-import type {
-    GameRecordData,
-    MediaReference,
-    PortfolioCollectionName,
-} from '#shared/schemas/content'
-
 type FormEndpointName = 'work' | 'art' | 'career' | 'skill' | 'game' | 'game-stats' | 'social'
 
 interface CollectionMeta {

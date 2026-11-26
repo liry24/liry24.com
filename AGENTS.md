@@ -11,7 +11,8 @@
 ## Authentication & secrets
 
 - **Single-owner Pocket ID OIDC**: Configured in `server/auth.ts` with `better-auth@1.7.27` (`admin`, `genericOAuth`, `providerId: 'pocket-id'`, PKCE, `requireIdTokenVerification: true`), callback path `/api/auth/callback/pocket-id`, cookie prefix `liry24-pocket`, and owner gates `POCKET_ID_ADMIN_EMAIL` / `POCKET_ID_ADMIN_SUB` + `account` (`providerId`, `accountId`, `issuer`) enforcement. Passwordless/username/link-account endpoints and legacy providers stay disabled.
-- **Origin handling**: `resolveAuthBaseUrl` in `server/auth.ts` uses an explicit allowlist (`https://liry24.com`, `https://dev-liry24-com.liry.workers.dev`, `*.workers.dev` when non-production, and loopback HTTP only when `LIRY24_TEST_LOCAL=true` or `APP_ENV=test`) rather than `@vite-hub/runtime`'s build-time `publicUrl`.
+- **Origin handling**: `server/auth.ts` uses an explicit allowlist (`https://liry24.com`, `https://dev-liry24-com.liry.workers.dev`, `*.workers.dev` when non-production, and loopback HTTP for synthetic Worker tests). In `bun dev`, local administrator sessions also require `import.meta.dev` and a request origin matching the loopback listener captured by Nuxt's `listen` hook.
+- **Local admin**: Apply existing migrations with `bun x vitehub database migrate` when setting up local SQLite. Open `/admin` on the loopback URL shown by `bun dev` to sign in automatically. On hosted environments, `/admin` starts Pocket ID sign-in.
 - **Drizzle v1 compatibility**: Do NOT enable `advanced.database.joins` in `server/auth.ts`; `@better-auth/drizzle-adapter` default export targets Drizzle v0 relational filters while `@vite-hub/database` uses `drizzle-orm@1.0.0-rc.5` (`relationsFilterToSQL` throws on v0 `SQL` filters).
 - **Secret unsealing**: Always declare server env keys in `env.ts` (never add test-only flags there) and unseal `{ secret: true }` values with `readSecretValue` from `server/utils/secret.ts` (because ViteHub wraps runtime secrets in `SecretEnv`).
 
@@ -19,7 +20,7 @@
 
 - **Assistant (`server/agents/assistant.ts`)**: `defineAgent` with `content()` capability and `webChat` channel, enforced admin-only at **both** `webChat.route.admission.authenticate` (before payload validation) and `defineAgent.invoker`. Uses direct `@ai-sdk/google` `'gemini-4-hydrogen'` with `google: { thinkingConfig: { thinkingLevel: 'low' } }` — do not reintroduce ChatGPT or Cloudflare AI Gateway fallbacks. Offline tests (`LIRY24_TEST_LOCAL=true`, `APP_ENV=test`, or unset API key) use `MockLanguageModelV4`.
 - **IGDB (`server/utils/igdb.ts`)**: Uses `@liry24/igdb` (keep minor version pinned `~4.0.0`) reading `useServerEnv()` with `readSecretValue` (and `process.env` fallback), validating responses with Zod and returning safe 502/503 errors.
-- **Domain helpers**: Shared Zod/content schemas live in `shared/schemas/content.ts`, Markdown/game rules in `shared/utils/` and `server/utils/gameValidation.ts`, and public SEO / OG image generation (`nuxt-og-image` + Takumi) stays Nuxt-owned.
+- **Domain helpers**: Shared Zod schemas live in `shared/utils/contentSchemas.ts` and their types in `shared/types/content.ts`. Markdown and game rules live in `shared/utils/` and `server/utils/gameValidation.ts`. Public SEO and OG image generation use Nuxt (`nuxt-og-image` and Takumi).
 
 ## Deployment, Previews & patches
 

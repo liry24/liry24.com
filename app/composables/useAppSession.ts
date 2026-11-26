@@ -3,7 +3,9 @@ import { authClient as client } from 'vite-hub/auth/vue'
 export function useAppSession() {
     const nuxt = useNuxtApp()
     const native = useUserSession()
-    const isAdmin = computed(() => native.user.value?.role === 'admin')
+    const isLocalAdmin = computed(
+        () => import.meta.dev && native.user.value?.id === localAdminUserId,
+    )
 
     return {
         load: async () => {
@@ -16,7 +18,7 @@ export function useAppSession() {
         loggedIn: native.loggedIn,
         pending: native.pending,
         ready: native.ready,
-        isAdmin,
+        isLocalAdmin,
         refresh: async () => {
             await native.refresh()
         },
@@ -27,7 +29,7 @@ export function useAppSession() {
             }
             await nuxt.runWithContext(() => clearNuxtData((key) => key.startsWith('admin-')))
             await native.refresh()
-            await nuxt.runWithContext(() => navigateTo('/login'))
+            await nuxt.runWithContext(() => navigateTo('/'))
         },
     }
 }

@@ -1,7 +1,7 @@
 import { parseMarkdown } from 'comark/parse'
 import summary from 'comark/plugins/summary'
 
-import type { PostItem } from '../schemas/content.js'
+import type { PostItem } from '../types/content.js'
 import { postMarkdownSecurity } from './postMarkdown.js'
 
 export async function postCards(entries: Array<PostItem>) {

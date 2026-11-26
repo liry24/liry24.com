@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { z } from 'zod'
 
-import { gameFieldsSchema } from '../../shared/schemas/content'
+import { gameFieldsSchema } from '../../shared/utils/contentSchemas'
 import { builtWorker } from '../helpers/builtWorker'
 
 const orderedList = z.object({

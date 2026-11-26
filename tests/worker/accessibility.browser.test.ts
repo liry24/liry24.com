@@ -6,7 +6,7 @@ import type { Browser, Cookie, Page } from 'playwright-core'
 import { expect, test } from 'vitest'
 import { z } from 'zod'
 
-import { gameFieldsSchema } from '../../shared/schemas/content'
+import { gameFieldsSchema } from '../../shared/utils/contentSchemas'
 import { scanAccessibility } from '../helpers/accessibility'
 import { builtWorker } from '../helpers/builtWorker'
 
@@ -131,6 +131,9 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                     /status of 400/i.test(text) &&
                     (!locationUrl || locationUrl.includes('/_vitehub/forms/post'))
                 ) {
+                    return
+                }
+                if (/status of 403/i.test(text) && locationUrl.includes('pocket-id-error=1')) {
                     return
                 }
                 errors.push(`${label}${page.url()}: ${text}`)
@@ -360,10 +363,14 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                     )
                 }
 
-                const scan = async (state: string) => {
+                const scan = async (state: string, expectedErrorStatus?: number) => {
                     const width = auditPage.viewportSize()?.width ?? 1280
                     violations.push(
-                        ...(await scanAccessibility(auditPage, `${colorScheme}-${width}-${state}`)),
+                        ...(await scanAccessibility(
+                            auditPage,
+                            `${colorScheme}-${width}-${state}`,
+                            expectedErrorStatus,
+                        )),
                     )
                 }
 
@@ -431,18 +438,17 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 }
 
                 await auditContext.clearCookies()
-                await visit('/login')
-                await auditPage
-                    .getByRole('button', { name: 'Sign in with Pocket ID', exact: true })
-                    .waitFor()
-                await scan('login')
-
-                await visit('/login?error=forbidden')
-                await auditPage
-                    .getByRole('alert')
-                    .filter({ hasText: 'This account does not have administrator access.' })
-                    .waitFor()
-                await scan('login-error')
+                const signInError = await auditPage.goto(
+                    new URL('/admin?pocket-id-error=1', app.url).href,
+                )
+                expect(signInError?.status()).toBe(403)
+                await waitForNuxtReady(auditPage)
+                await auditPage.waitForFunction(
+                    (theme) => document.documentElement.classList.contains(theme),
+                    colorScheme,
+                )
+                await auditPage.getByRole('link', { name: 'Retry Pocket ID sign-in' }).waitFor()
+                await scan('pocket-id-error', 403)
 
                 await auditContext.addCookies(sessionCookies)
                 await visit('/admin')

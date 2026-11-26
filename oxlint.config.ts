@@ -1,3 +1,4 @@
-import { liry24OxlintConfig } from '@liry24/oxlint-config'
+import config from '@liry24/oxlint-config'
+import { defineConfig } from 'oxlint'
 
-export default liry24OxlintConfig(new URL('./.nuxt/', import.meta.url))
+export default defineConfig({ extends: [config] })

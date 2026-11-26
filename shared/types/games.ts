@@ -1,4 +1,4 @@
-import type { MediaReference, PortfolioItem } from '../schemas/content.js'
+import type { MediaReference, PortfolioItem } from '../types/content.js'
 
 export type GamePosition = {
     value: number

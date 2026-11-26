@@ -3,7 +3,6 @@ import { isWorkspaceConflict } from 'vite-hub/workspace'
 import { useWorkspaceFiles } from 'vite-hub/workspace/files'
 import { z } from 'zod'
 
-import { contentCollectionNames } from '../../../shared/schemas/content.js'
 import content from '../../content.js'
 
 const payloadSchema = z.object({

@@ -13,3 +13,10 @@ export const serverEnv = {
     IGDB_CLIENT_SECRET: env({ secret: true, optional: true }),
     GOOGLE_GENERATIVE_AI_API_KEY: env({ secret: true, optional: true }),
 }
+
+export const developmentServerEnv = {
+    ...serverEnv,
+    BETTER_AUTH_SECRET: env({ secret: true, optional: true }),
+    POCKET_ID_CLIENT_ID: env({ optional: true }),
+    POCKET_ID_CLIENT_SECRET: env({ secret: true, optional: true }),
+}

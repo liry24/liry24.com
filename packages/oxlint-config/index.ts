@@ -4,7 +4,7 @@ import cloudflareConfig from '@cloudflare/oxlint-config'
 import { defineConfig } from 'oxlint'
 
 const strippedPrefixes = ['react/', 'jsx-a11y/']
-const strippedRules = new Set(['@nkzw/require-use-effect-arguments'])
+const strippedRules = new Set(['@nkzw/require-use-effect-arguments', 'eslint/curly'])
 
 const baseRules = Object.fromEntries(
     Object.entries(cloudflareConfig.rules ?? {}).filter(
@@ -58,120 +58,115 @@ const serverAutoImportPattern = {
     message: autoImportMessage,
 }
 
-export function liry24OxlintConfig(nuxtDirectory: URL) {
-    const appAutoImportPaths = readAutoImportPaths(new URL('imports.d.ts', nuxtDirectory))
-    const serverAutoImportPaths = readAutoImportPaths(
-        new URL('types/server-imports.d.ts', nuxtDirectory),
-    )
+const nuxtDirectory = new URL('../../.nuxt/', import.meta.url)
+const appAutoImportPaths = readAutoImportPaths(new URL('imports.d.ts', nuxtDirectory))
+const serverAutoImportPaths = readAutoImportPaths(
+    new URL('types/server-imports.d.ts', nuxtDirectory),
+)
 
-    return defineConfig({
-        ...cloudflareConfig,
-        plugins: (cloudflareConfig.plugins ?? []).filter(
-            (plugin) => plugin !== 'react' && plugin !== 'jsx-a11y',
-        ),
-        ignorePatterns: [
-            '.nuxt/**',
-            'tests/fixtures/runtime/.nuxt/**',
-            '.output/**',
-            '.vitehub/**',
-            '.wrangler/**',
-            '.tmp/**',
-            'node_modules/**',
-            'patches/**',
-        ],
-        rules: baseRules,
-        overrides: [
-            ...(cloudflareConfig.overrides ?? []),
-            {
-                files: ['**/*.vue'],
-                rules: {
-                    'no-undef': 'off',
-                },
+export default defineConfig({
+    ...cloudflareConfig,
+    plugins: (cloudflareConfig.plugins ?? []).filter(
+        (plugin) => plugin !== 'react' && plugin !== 'jsx-a11y',
+    ),
+    ignorePatterns: [
+        '.nuxt/**',
+        'tests/fixtures/runtime/.nuxt/**',
+        '.output/**',
+        '.vitehub/**',
+        '.wrangler/**',
+        '.tmp/**',
+        'node_modules/**',
+        'patches/**',
+    ],
+    rules: { ...baseRules, curly: ['error', 'multi-line'] },
+    overrides: [
+        ...(cloudflareConfig.overrides ?? []),
+        {
+            files: ['**/*.vue'],
+            rules: {
+                'no-undef': 'off',
             },
-            {
-                files: ['server/**/*.ts'],
-                rules: {
-                    'no-restricted-imports': ['error', { patterns: [sharedAutoImportPattern] }],
-                },
+        },
+        {
+            files: ['server/**/*.ts'],
+            rules: {
+                'no-restricted-imports': ['error', { patterns: [sharedAutoImportPattern] }],
             },
-            {
-                files: ['app/**/*.{ts,vue}', 'layers/*/app/**/*.{ts,vue}'],
-                rules: {
-                    'no-restricted-imports': [
-                        'error',
-                        {
-                            paths: [appImportsAlias, ...appAutoImportPaths],
-                            patterns: [
-                                sharedAutoImportPattern,
-                                appAutoImportPattern,
-                                rootAppAutoImportPattern,
-                            ],
-                        },
-                    ],
-                },
-            },
-            {
-                files: ['tests/nuxt/**/*.ts'],
-                rules: {
-                    'no-restricted-imports': [
-                        'error',
-                        {
-                            paths: [
-                                appImportsAlias,
-                                ...appAutoImportPaths.filter(
-                                    ({ name }) => name === 'vue' || name === 'cn',
-                                ),
-                                {
-                                    name: 'vite-hub/auth/vue',
-                                    importNames: ['useUserSession'],
-                                    message: autoImportMessage,
-                                },
-                            ],
-                            patterns: [sharedAutoImportPattern, rootAppAutoImportPattern],
-                        },
-                    ],
-                },
-            },
-            {
-                files: ['server/{api,routes,middleware,plugins}/**/*.ts'],
-                rules: {
-                    'no-restricted-imports': [
-                        'error',
-                        {
-                            paths: [
-                                { name: '#imports/server', message: autoImportMessage },
-                                ...serverAutoImportPaths,
-                            ],
-                            patterns: [sharedAutoImportPattern, serverAutoImportPattern],
-                        },
-                    ],
-                },
-            },
-            {
-                // tests/gameImport.test.ts loads this handler directly in Node.
-                files: ['server/api/admin/games/index.post.ts'],
-                rules: {
-                    'no-restricted-imports': ['error', { patterns: [sharedAutoImportPattern] }],
-                },
-            },
-            {
-                files: [
-                    'server/content.ts',
-                    'server/auth.ts',
-                    'server/forms/**/*.ts',
-                    'server/utils/gameValidation.ts',
+        },
+        {
+            files: ['app/**/*.{ts,vue}', 'layers/*/app/**/*.{ts,vue}'],
+            rules: {
+                'no-restricted-imports': [
+                    'error',
+                    {
+                        paths: [appImportsAlias, ...appAutoImportPaths],
+                        patterns: [
+                            sharedAutoImportPattern,
+                            appAutoImportPattern,
+                            rootAppAutoImportPattern,
+                        ],
+                    },
                 ],
-                rules: {
-                    'no-restricted-imports': 'off',
-                },
             },
-            {
-                files: ['**/*.{ts,tsx,mts,cts,vue}'],
-                rules: {
-                    'typescript/no-explicit-any': 'error',
-                    '@typescript-eslint/no-explicit-any': 'error',
-                },
+        },
+        {
+            files: ['tests/nuxt/**/*.ts'],
+            rules: {
+                'no-restricted-imports': [
+                    'error',
+                    {
+                        paths: [
+                            appImportsAlias,
+                            ...appAutoImportPaths.filter(
+                                ({ name }) => name === 'vue' || name === 'cn',
+                            ),
+                            {
+                                name: 'vite-hub/auth/vue',
+                                importNames: ['useUserSession'],
+                                message: autoImportMessage,
+                            },
+                        ],
+                        patterns: [sharedAutoImportPattern, rootAppAutoImportPattern],
+                    },
+                ],
             },
-        ],
-    })
-}
+        },
+        {
+            files: ['server/{api,routes,middleware,plugins}/**/*.ts'],
+            rules: {
+                'no-restricted-imports': [
+                    'error',
+                    {
+                        paths: [
+                            { name: '#imports/server', message: autoImportMessage },
+                            ...serverAutoImportPaths,
+                        ],
+                        patterns: [sharedAutoImportPattern, serverAutoImportPattern],
+                    },
+                ],
+            },
+        },
+        {
+            files: [
+                // tests/gameImport.test.ts loads this handler and its dependencies in Node.
+                'server/api/admin/games/index.post.ts',
+                'server/content.ts',
+                'server/auth.ts',
+                'server/forms/**/*.ts',
+                'server/databases/**/*.ts',
+                'server/utils/{content,gameCatalog,gameValidation,localAdminAuth}.ts',
+            ],
+            rules: {
+                'no-restricted-imports': 'off',
+            },
+        },
+        {
+            files: ['**/*.{ts,tsx,mts,cts,vue}'],
+            rules: {
+                'typescript/no-explicit-any': 'error',
+                '@typescript-eslint/no-explicit-any': 'error',
+            },
+        },
+    ],
+})

@@ -1,6 +1,6 @@
 import { createError } from 'nuxt/server'
 
-import type { GameRecordData, GameStatsRecordData, PostData } from '../../shared/schemas/content.js'
+import type { GameRecordData, GameStatsRecordData, PostData } from '../../shared/types/content.js'
 import type { GameMetric } from '../../shared/types/games.js'
 import { gameTitleParts, postGameSlugs } from '../../shared/utils/gameMentions.js'
 import { gameValueIssues } from '../../shared/utils/games.js'

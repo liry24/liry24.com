@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { user, load, signOut } = useAppSession()
+const { user, load, signOut, isLocalAdmin } = useAppSession()
 await load()
 
 const sidebarCollapsed = ref(false)
@@ -160,6 +160,7 @@ useHead({ titleTemplate: '%s | Liry24 Admin' })
                                 class="min-w-0 flex-1 text-left"
                             />
                             <UButton
+                                v-if="!isLocalAdmin"
                                 icon="mingcute:exit-line"
                                 aria-label="Sign out"
                                 variant="ghost"

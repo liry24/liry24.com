@@ -1,5 +1,4 @@
 import content from '#server/content'
-import { contentCollectionNames } from '#shared/schemas/content'
 
 const validCollections = new Set<string>(contentCollectionNames)
 

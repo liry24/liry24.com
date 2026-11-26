@@ -2,6 +2,7 @@ import { admin, genericOAuth } from 'better-auth/plugins'
 import { defineAuth } from 'vite-hub/auth'
 import { authDatabase } from 'vite-hub/auth/database'
 
+import { localAdminAuth, localAdminPlugin } from './utils/localAdminAuth.js'
 import { readProcessEnv } from './utils/processEnv.js'
 import { readSecretValue } from './utils/secret.js'
 
@@ -45,7 +46,8 @@ function resolveAuthBaseUrl(
     return runtimeSiteUrl || 'https://liry24.com'
 }
 
-export default defineAuth(({ env, requestOrigin }) => {
+export default defineAuth(({ env, request, requestOrigin }) => {
+    const local = import.meta.dev && request ? localAdminAuth(requestOrigin) : undefined
     const appEnv = typeof env.APP_ENV === 'string' ? env.APP_ENV : readProcessEnv('APP_ENV')
     const testLocal =
         typeof env.LIRY24_TEST_LOCAL === 'string'
@@ -65,7 +67,9 @@ export default defineAuth(({ env, requestOrigin }) => {
         typeof env.NUXT_PUBLIC_SITE_URL === 'string' && env.NUXT_PUBLIC_SITE_URL
             ? env.NUXT_PUBLIC_SITE_URL
             : readProcessEnv('NUXT_PUBLIC_SITE_URL') || undefined
-    const authBaseUrl = resolveAuthBaseUrl(requestOrigin, runtimeSiteUrl, synthetic, appEnv)
+    const authBaseUrl = local
+        ? requestOrigin
+        : resolveAuthBaseUrl(requestOrigin, runtimeSiteUrl, synthetic, appEnv)
     const isHttps = authBaseUrl.startsWith('https://')
     const adminEmails = new Set(
         parseList(
@@ -82,6 +86,8 @@ export default defineAuth(({ env, requestOrigin }) => {
             ? env.POCKET_ID_CLIENT_ID
             : 'offline-schema-client'
     const clientSecret = readSecretValue(env.POCKET_ID_CLIENT_SECRET)
+    const disablePocketId =
+        local || (import.meta.dev && (clientId === 'offline-schema-client' || !clientSecret))
 
     const trustedOrigins = Array.from(
         new Set([
@@ -100,7 +106,13 @@ export default defineAuth(({ env, requestOrigin }) => {
         baseURL: authBaseUrl,
         database: authDatabase(),
         trustedOrigins,
-        disabledPaths: ['/sign-in/username', '/link-social', '/unlink-account'],
+        secret: local?.secret ?? readSecretValue(env.BETTER_AUTH_SECRET),
+        disabledPaths: [
+            '/sign-in/username',
+            '/link-social',
+            '/unlink-account',
+            ...(disablePocketId ? ['/sign-in/social', '/sign-in/oauth2'] : []),
+        ],
         emailAndPassword: { enabled: false },
         account: {
             additionalFields: {
@@ -183,6 +195,7 @@ export default defineAuth(({ env, requestOrigin }) => {
         },
         plugins: [
             admin({ defaultRole: 'user' }),
+            ...(local ? [localAdminPlugin] : []),
             {
                 ...genericOAuth({
                     config: [
@@ -213,7 +226,7 @@ export default defineAuth(({ env, requestOrigin }) => {
             },
         ],
         advanced: {
-            cookiePrefix: 'liry24-pocket',
+            cookiePrefix: local ? 'liry24-local' : 'liry24-pocket',
             ipAddress: {
                 ipAddressHeaders: ['x-forwarded-for', 'x-real-ip', 'cf-connecting-ip'],
                 disableIpTracking: false,

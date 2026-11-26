@@ -1,8 +1,10 @@
+import { randomBytes } from 'node:crypto'
+
 import { defineNuxtConfig } from 'nuxt/config'
 import { parseURL } from 'ufo'
 import viteHub from 'vite-hub/nuxt'
 
-import { serverEnv } from './env.ts'
+import { developmentServerEnv, serverEnv } from './env.ts'
 import { liriaIconCollection } from './layers/icons/liria.ts'
 
 const appEnv =
@@ -14,6 +16,7 @@ const baseURL =
 const imagesDomain = isPreview ? baseURL : 'https://images.liry24.com'
 const title = 'Liry24'
 const diagnostics = process.env.NUXT_DIAGNOSTICS === '1'
+let localAdmin = { origin: '', secret: '' }
 
 export default defineNuxtConfig({
     compatibilityDate: '2026-10-13',
@@ -40,7 +43,6 @@ export default defineNuxtConfig({
                 publicUrl: baseURL,
                 auth: true,
                 console: false,
-                env: { server: serverEnv },
                 database: {
                     driver: 'cloudflare',
                     binding: 'DB',
@@ -117,6 +119,8 @@ export default defineNuxtConfig({
         'motion-v/nuxt',
     ],
 
+    vitehub: { env: { server: serverEnv } },
+
     extends: ['~~/layers/cursor', '~~/layers/icons', '~~/layers/squircle', '~~/layers/sentence'],
 
     components: [
@@ -164,6 +168,7 @@ export default defineNuxtConfig({
     },
 
     runtimeConfig: {
+        localAdmin: { origin: '', secret: '' },
         public: {
             siteUrl: baseURL,
             imagesDomain,
@@ -309,21 +314,46 @@ export default defineNuxtConfig({
     },
 
     sitemap: {
-        exclude: ['/admin', '/admin/**', '/login'],
+        exclude: ['/admin', '/admin/**'],
         sources: ['/api/sitemap/posts'],
     },
 
     robots: {
-        disallow: ['/admin', '/api/admin', '/_vitehub', '/login'],
+        disallow: ['/admin', '/api/admin', '/_vitehub'],
     },
 
     $development: {
+        devServer: { host: '127.0.0.1' },
+        hooks: {
+            listen(server, listener: unknown) {
+                const address = server.address()
+                if (address && typeof address === 'object') {
+                    const host = address.address === '::1' ? '[::1]' : address.address
+                    if (host === '127.0.0.1' || host === '[::1]') {
+                        const https =
+                            listener && typeof listener === 'object' && 'https' in listener
+                                ? listener.https
+                                : false
+                        const protocol = https ? 'https' : 'http'
+                        localAdmin = {
+                            origin: new URL(`${protocol}://${host}:${address.port}`).origin,
+                            secret: randomBytes(32).toString('hex'),
+                        }
+                        return
+                    }
+                }
+                localAdmin = { origin: '', secret: '' }
+            },
+            'nitro:build:before'(nitro) {
+                nitro.options.runtimeConfig.localAdmin = localAdmin
+            },
+        },
         modules: diagnostics ? ['@nuxt/hints'] : [],
         a11y: { enabled: diagnostics },
         devtools: { timeline: { enabled: diagnostics } },
         vite: { warmupEntry: false },
         runtimeConfig: { public: { siteUrl: '' } },
-        vitehub: { logs: true },
+        vitehub: { env: { server: developmentServerEnv }, logs: true },
     },
 
     $production: {
