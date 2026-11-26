@@ -41,15 +41,14 @@ const expectedAdminGatePaths = new Set([
 function isExpectedHttpErrorLog(message: string): boolean {
     try {
         const parsed = evlogAuthFailureSchema.safeParse(JSON.parse(message))
-        if (!parsed.success) {
-            return false
-        }
+        if (!parsed.success) return false
+
         if (
             (parsed.data.status === 401 || parsed.data.status === 403) &&
             expectedAdminGatePaths.has(parsed.data.path)
-        ) {
+        )
             return true
-        }
+
         return (
             parsed.data.status === 404 &&
             ['/api/posts/built-worker-post', '/login'].includes(parsed.data.path)
@@ -94,9 +93,9 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                     '/favicon.ico',
                     '/api/posts/cards',
                     '/api/portfolio/works',
-                ]) {
+                ])
                     expect((await app.server.fetch(path)).status, path).toBe(200)
-                }
+
                 expect((await app.server.fetch('/login', { redirect: 'manual' })).status).toBe(404)
                 expect(await (await app.server.fetch('/api/auth/get-session')).text()).toBe('null')
 
@@ -446,18 +445,17 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                         files.map((path) => readFile(resolve(serverDir, path), 'utf8')),
                     )
                 ).join('\n')
-                for (const family of ['Special Gothic Expanded One', 'Geist Mono']) {
+                for (const family of ['Special Gothic Expanded One', 'Geist Mono'])
                     expect(output).toContain(family)
-                }
+
                 for (const marker of [
                     'openDevelopmentDB',
                     'LIRY24_DEV_DB_PATH',
                     '.data/development/sqlite.db',
                     'drizzle-orm/node-sqlite',
                     '@litijs/void',
-                ]) {
+                ])
                     expect(output).not.toContain(marker)
-                }
             } finally {
                 const errorLogs = app.server
                     .getLogs()

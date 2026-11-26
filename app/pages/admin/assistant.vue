@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import type { PromptInputSubmit } from '@vite-hub/ui'
 
-useHead({ title: 'Assistant' })
-
 const input = ref('')
 const agent = useAgent('assistant')
 const { messages, status, error, sendMessage, stop, clearError } = useChat(agent)
@@ -11,25 +9,17 @@ const busy = computed(() => status.value === 'submitted' || status.value === 'st
 
 const handleSubmit = async (payload: PromptInputSubmit) => {
     const text = payload.text.trim()
-    if (!text && payload.files.length === 0) {
-        return
-    }
+    if (!text && payload.files.length === 0) return
+
     clearError()
     input.value = ''
     if (text) {
-        if (payload.files.length > 0) {
-            await sendMessage({
-                text,
-                files: [...payload.files],
-            })
-        } else {
-            await sendMessage({ text })
-        }
+        if (payload.files.length > 0) await sendMessage({ text, files: [...payload.files] })
+        else await sendMessage({ text })
+
         return
     }
-    await sendMessage({
-        files: [...payload.files],
-    })
+    await sendMessage({ files: [...payload.files] })
 }
 
 const resetConversation = async () => {
@@ -38,6 +28,8 @@ const resetConversation = async () => {
     messages.value = []
     input.value = ''
 }
+
+useHead({ title: 'Assistant' })
 </script>
 
 <template>
@@ -51,7 +43,6 @@ const resetConversation = async () => {
         <template #header>
             <UDashboardNavbar title="Editorial Assistant" icon="mingcute:sparkles-2-fill">
                 <template #right>
-                    <UBadge label="gemini-4-hydrogen" variant="subtle" color="neutral" />
                     <UButton
                         label="Clear chat"
                         icon="mingcute:delete-2-line"
@@ -84,8 +75,7 @@ const resetConversation = async () => {
                 >
                     <AdminHairlineRiffle label="Editorial assistant ready" class="max-w-xs" />
                     <p class="text-muted text-sm">
-                        Ask Gemini 4 Hydrogen to inspect collections, draft posts, or prepare
-                        updates.
+                        Ask agent to inspect collections, draft posts, or prepare updates.
                     </p>
                 </div>
                 <Chat v-else :messages="messages" :status="status" />

@@ -92,9 +92,8 @@ export const postMarkdownSecurity: ComarkPlugin = {
         // Accept prose attributes only; arbitrary bindings can also resolve after validation.
         const filter = (nodes: Array<Node>) => {
             for (const node of nodes) {
-                if (typeof node === 'string' || node[0] === null) {
-                    continue
-                }
+                if (typeof node === 'string' || node[0] === null) continue
+
                 if (node[0] === 'game-mention') {
                     const slug = node[1].slug
                     node[1] = typeof slug === 'string' && gameSlugPattern.test(slug) ? { slug } : {}

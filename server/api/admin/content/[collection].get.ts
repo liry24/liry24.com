@@ -1,13 +1,12 @@
 const validCollections = new Set<string>(contentCollectionNames)
 
 function parseCollectionName(raw: string | undefined): ContentCollectionName {
-    if (!raw || !validCollections.has(raw)) {
+    if (!raw || !validCollections.has(raw))
         throw createError({ status: 404, statusText: 'Collection not found' })
-    }
+
     const matched = contentCollectionNames.find((name) => name === raw)
-    if (!matched) {
-        throw createError({ status: 404, statusText: 'Collection not found' })
-    }
+    if (!matched) throw createError({ status: 404, statusText: 'Collection not found' })
+
     return matched
 }
 

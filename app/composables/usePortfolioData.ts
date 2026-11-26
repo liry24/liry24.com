@@ -1,5 +1,6 @@
-export function usePortfolioData<Name extends PortfolioCollectionName>(model: Name) {
+export const usePortfolioData = <Name extends PortfolioCollectionName>(model: Name) => {
     const request = useRequestFetch()
+
     return useAsyncData<Array<PortfolioItem<Name>>>(
         `portfolio:${model}`,
         async (_app, { signal }) => {

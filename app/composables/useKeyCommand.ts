@@ -25,9 +25,7 @@ export default (callback: () => void) => {
                 callback()
                 index = 0
             }
-        } else {
-            index = 0
-        }
+        } else index = 0
     }
 
     if (import.meta.client) {

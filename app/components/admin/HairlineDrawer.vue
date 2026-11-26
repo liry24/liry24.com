@@ -16,9 +16,7 @@ let disposed = false
 onMounted(async () => {
     const { drawer } = await import('@lucasmarkes/hairline')
 
-    if (disposed || !element.value) {
-        return
-    }
+    if (disposed || !element.value) return
 
     instance = drawer(element.value, {
         intensity,

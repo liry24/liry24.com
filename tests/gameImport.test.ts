@@ -46,9 +46,8 @@ test('IGDB import writes a live game immediately and concurrent imports share it
             name: 'Valorant',
             cover: null,
         }
-        for (const response of responses) {
-            expect(response).toEqual(expected)
-        }
+        for (const response of responses) expect(response).toEqual(expected)
+
         expect(await db.select().from(database.schema.gameCatalog)).toEqual([
             {
                 id: expected.id,

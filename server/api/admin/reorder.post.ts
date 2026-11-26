@@ -36,12 +36,11 @@ function orderChanges(
             statusText: 'Provide the same unique items in both orders.',
         })
     }
-    if (items.length === to.length && items.every(({ id }, index) => id === to[index])) {
-        return []
-    }
-    if (items.length !== from.length || items.some(({ id }, index) => id !== from[index])) {
+    if (items.length === to.length && items.every(({ id }, index) => id === to[index])) return []
+
+    if (items.length !== from.length || items.some(({ id }, index) => id !== from[index]))
         throw orderConflict()
-    }
+
     const current = new Map(items.map(({ id, data }) => [id, data.order ?? 0]))
     const ranks = Array.from(current.values())
     const distinctRanks = new Set(ranks).size === ranks.length
@@ -53,13 +52,12 @@ function orderChanges(
 
 export default defineEventHandler(async (event) => {
     const session = await requireAdminSession(event)
-    if (!event.req.headers.get('content-type')?.startsWith('application/json')) {
+    if (!event.req.headers.get('content-type')?.startsWith('application/json'))
         throw createError({ status: 415, statusText: 'JSON required' })
-    }
+
     const parsed = payloadSchema.safeParse(await readBody(event))
-    if (!parsed.success) {
-        throw createError({ status: 400, statusText: 'Invalid reorder payload.' })
-    }
+    if (!parsed.success) throw createError({ status: 400, statusText: 'Invalid reorder payload.' })
+
     event.res.headers.set('Cache-Control', 'private, no-store')
     const input = parsed.data
 
@@ -68,9 +66,8 @@ export default defineEventHandler(async (event) => {
         const items = await catalog.listOrdered()
         const changes = orderChanges(items, input)
         const expected = items.map(({ id, data }) => ({ id, order: data.order ?? 0 }))
-        if (changes.length && !(await catalog.reorder(expected, changes))) {
-            throw orderConflict()
-        }
+        if (changes.length && !(await catalog.reorder(expected, changes))) throw orderConflict()
+
         return { ok: true }
     }
 
@@ -83,13 +80,10 @@ export default defineEventHandler(async (event) => {
     const published = draft ? null : await history.head({ ref: 'published' })
     const { items, schedules } = await listAdminCollection(input.model)
     const changes = orderChanges(items, input)
-    if (!changes.length) {
-        return { ok: true }
-    }
+    if (!changes.length) return { ok: true }
+
     const revision = draft ?? published
-    if (!revision) {
-        throw orderConflict()
-    }
+    if (!revision) throw orderConflict()
 
     const scheduledIds = new Set(
         schedules
@@ -108,9 +102,8 @@ export default defineEventHandler(async (event) => {
         await Promise.all(
             changes.map(async ({ id, order }) => {
                 const raw = await collection.raw(id, { revision: revision.id })
-                if (!raw) {
-                    throw orderConflict()
-                }
+                if (!raw) throw orderConflict()
+
                 const data = jsonDocument.parse(JSON.parse(raw.text))
                 return [raw.path, JSON.stringify({ ...data, order }, null, 2) + '\n'] as const
             }),
@@ -128,9 +121,8 @@ export default defineEventHandler(async (event) => {
             message: `Reorder ${input.model}`,
             metadata: { actorUserId: session.user.id },
         }
-        if (draft) {
-            await history.commit({ ...options, changes: { put } })
-        } else {
+        if (draft) await history.commit({ ...options, changes: { put } })
+        else {
             // Match Content's draft fallback when the workspace only has a published ref.
             const view = await history.open(revision.id)
             const entries = (await view.list('', { recursive: true })).filter(
@@ -150,9 +142,8 @@ export default defineEventHandler(async (event) => {
             await history.commit({ ...options, files })
         }
     } catch (error) {
-        if (isWorkspaceConflict(error)) {
-            throw orderConflict()
-        }
+        if (isWorkspaceConflict(error)) throw orderConflict()
+
         if (
             error &&
             typeof error === 'object' &&

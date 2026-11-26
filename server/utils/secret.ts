@@ -12,9 +12,8 @@ function isSealedSecret(value: unknown): value is SealedSecret {
 }
 
 export function readSecretValue(value: unknown): string | undefined {
-    if (typeof value === 'string') {
-        return value || undefined
-    }
+    if (typeof value === 'string') return value || undefined
+
     if (isSealedSecret(value)) {
         const unsealed = value.unseal()
         return unsealed || undefined

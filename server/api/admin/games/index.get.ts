@@ -1,10 +1,8 @@
 function isUnconfiguredIgdbError(error: unknown): boolean {
-    if (!error || typeof error !== 'object') {
-        return false
-    }
-    if ('status' in error && error.status === 503) {
-        return true
-    }
+    if (!error || typeof error !== 'object') return false
+
+    if ('status' in error && error.status === 503) return true
+
     return 'statusCode' in error && error.statusCode === 503
 }
 
@@ -12,9 +10,8 @@ export default defineEventHandler(async (event) => {
     await requireAdminSession(event)
     const params = getQuery(event)
     const query = String(params.q ?? '').trim()
-    if (query.length > 100) {
-        throw createError({ status: 400, statusText: 'Search is too long' })
-    }
+    if (query.length > 100) throw createError({ status: 400, statusText: 'Search is too long' })
+
     event.res.headers.set('Cache-Control', 'private, no-store')
 
     const slugs = new Set(Array.isArray(params.slug) ? params.slug : [params.slug].filter(Boolean))
@@ -38,9 +35,8 @@ export default defineEventHandler(async (event) => {
     const sortGames = (a: GameSearchResult, b: GameSearchResult) =>
         Number(b.slug === lowerQuery) - Number(a.slug === lowerQuery) ||
         a.name.localeCompare(b.name)
-    if (slugs.size) {
-        return { games: saved.filter((game) => slugs.has(game.slug)), warning: '' }
-    }
+    if (slugs.size) return { games: saved.filter((game) => slugs.has(game.slug)), warning: '' }
+
     const limited = saved
         .filter((game) =>
             id !== undefined
@@ -49,14 +45,11 @@ export default defineEventHandler(async (event) => {
         )
         .sort(sortGames)
         .slice(0, 100)
-    if (!query) {
-        return { games: limited, warning: '' }
-    }
+    if (!query) return { games: limited, warning: '' }
 
     try {
-        if (id !== undefined && limited.length) {
-            return { games: limited, warning: '' }
-        }
+        if (id !== undefined && limited.length) return { games: limited, warning: '' }
+
         const remote = await queryIgdb(id === undefined ? { search: query } : { id })
         if (
             gameSlugPattern.test(lowerQuery) &&
@@ -69,9 +62,8 @@ export default defineEventHandler(async (event) => {
         }
         const canonical = new Map(saved.map((game) => [game.igdbId, game]))
         const matches = new Map(limited.map((game) => [game.igdbId, game]))
-        for (const game of remote) {
-            matches.set(game.igdbId, canonical.get(game.igdbId) ?? game)
-        }
+        for (const game of remote) matches.set(game.igdbId, canonical.get(game.igdbId) ?? game)
+
         return {
             games: [...matches.values()].sort(sortGames),
             warning: '',

@@ -78,23 +78,19 @@ const moving = computed(() => handle.state.moving)
 watch(
     () => !props.active || props.disabled,
     (disabled) => {
-        if (disabled) {
-            handle.api.reorder.cancel()
-        }
+        if (disabled) handle.api.reorder.cancel()
     },
 )
 
 async function move(event: MouseEvent, id: string, index: number) {
-    if (props.disabled || moving.value || index < 0 || index >= orderedItems.value.length) {
-        return
-    }
+    if (props.disabled || moving.value || index < 0 || index >= orderedItems.value.length) return
+
     const button = event.currentTarget as HTMLButtonElement
     const hadFocus = button === document.activeElement
     if (handle.api.reorder.move(id, index) && hadFocus) {
         await nextTick()
-        if (button.isConnected && document.activeElement === document.body) {
+        if (button.isConnected && document.activeElement === document.body)
             button.focus({ preventScroll: true })
-        }
     }
 }
 </script>

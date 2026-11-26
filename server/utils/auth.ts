@@ -20,11 +20,10 @@ export async function getAppSession(event: RequestEvent) {
 
 export async function requireAdminSession(event: RequestEvent) {
     const session = await getAppSession(event)
-    if (!session?.user) {
-        throw createError({ status: 401, statusText: 'Sign in required' })
-    }
-    if (!isAdminUser(session.user)) {
+    if (!session?.user) throw createError({ status: 401, statusText: 'Sign in required' })
+
+    if (!isAdminUser(session.user))
         throw createError({ status: 403, statusText: 'Administrator role required' })
-    }
+
     return session
 }

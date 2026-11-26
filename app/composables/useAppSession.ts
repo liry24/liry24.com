@@ -1,6 +1,6 @@
 import { authClient as client } from 'vite-hub/auth/vue'
 
-export function useAppSession() {
+export const useAppSession = () => {
     const nuxt = useNuxtApp()
     const native = useUserSession()
     const isLocalAdmin = computed(
@@ -9,9 +9,7 @@ export function useAppSession() {
 
     return {
         load: async () => {
-            if (!native.ready.value) {
-                await native.refresh()
-            }
+            if (!native.ready.value) await native.refresh()
         },
         user: native.user,
         session: native.session,
@@ -24,9 +22,8 @@ export function useAppSession() {
         },
         signOut: async () => {
             const result = await client.signOut()
-            if (result.error) {
-                throw new Error(result.error.message || 'Could not sign out.')
-            }
+            if (result.error) throw new Error(result.error.message || 'Could not sign out.')
+
             await nuxt.runWithContext(() => clearNuxtData((key) => key.startsWith('admin-')))
             await native.refresh()
             await nuxt.runWithContext(() => navigateTo('/'))

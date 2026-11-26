@@ -31,10 +31,9 @@ const searchWarning = ref('')
 const importWarning = ref('')
 const candidates = new Map<string, GameSearchResult>()
 const imports = new Map<number, AbortController>()
+
 onScopeDispose(() => {
-    for (const controller of imports.values()) {
-        controller.abort()
-    }
+    for (const controller of imports.values()) controller.abort()
 })
 
 const findGames: TriggerItemsLoader = async (query, { signal }) => {
@@ -54,9 +53,8 @@ const findGames: TriggerItemsLoader = async (query, { signal }) => {
         })
         return items.slice(0, 12)
     } catch (error) {
-        if (signal.aborted) {
-            throw error
-        }
+        if (signal.aborted) throw error
+
         searchWarning.value = 'Game search is unavailable.'
         return []
     }
@@ -83,7 +81,7 @@ const markdownCommands = [
         arguments: [
             {
                 name: 'level',
-                hint: '<1–6>',
+                hint: '<1-6>',
                 required: true,
                 items: headingLevels,
                 allowCustomValue: false,
@@ -141,12 +139,12 @@ const triggers = computed<Array<TriggerDefinition>>(() => [
     },
 ])
 
-function gameToken(key: string): TokenInsert {
+const gameToken = (key: string): TokenInsert => {
     const game = candidates.get(key)
     return { type: 'game', value: game?.slug ?? '', label: game?.name ?? '' }
 }
 
-async function importGame(game: GameSearchResult): Promise<Partial<TokenInsert>> {
+const importGame = async (game: GameSearchResult): Promise<Partial<TokenInsert>> => {
     const controller = new AbortController()
     imports.set(game.igdbId, controller)
     emit('pending', 1)
@@ -160,9 +158,9 @@ async function importGame(game: GameSearchResult): Promise<Partial<TokenInsert>>
         emit('game', saved)
         return { value: saved.slug, label: saved.name }
     } catch (error) {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted)
             importWarning.value = 'Could not import the game. Use /game to try again.'
-        }
+
         throw error
     } finally {
         imports.delete(game.igdbId)
@@ -170,11 +168,10 @@ async function importGame(game: GameSearchResult): Promise<Partial<TokenInsert>>
     }
 }
 
-function menuMessage(trigger: string | null, argument: string | null) {
-    return trigger === '/game ' || argument === 'game' ? searchWarning.value : ''
-}
+const menuMessage = (trigger: string | null, argument: string | null) =>
+    trigger === '/game ' || argument === 'game' ? searchWarning.value : ''
 
-function select(value: string, details: TriggerMenuSelectDetails, precedingLine: string) {
+const select = (value: string, details: TriggerMenuSelectDetails, precedingLine: string) => {
     importWarning.value = ''
     const gameKey = details.arguments.game ?? (details.trigger === '/game ' ? value : '')
     if (gameKey) {
@@ -194,6 +191,7 @@ function select(value: string, details: TriggerMenuSelectDetails, precedingLine:
     const command = details.trigger === '/' ? value : details.trigger.slice(1).trim()
     const direct = details.trigger === '/' ? '' : value
     const blockStart = precedingLine.trim() ? '\n\n' : ''
+
     switch (command) {
         case 'heading':
             details.insert(`${blockStart}${'#'.repeat(Number(details.arguments.level ?? direct))} `)

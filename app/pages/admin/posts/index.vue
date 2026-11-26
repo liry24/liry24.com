@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import type { ContentDocumentStatus, ContentSchedule } from '@vite-hub/content'
 
-useHead({ title: 'Posts' })
-
 interface PostListItem {
     id: string
     title: string
@@ -29,28 +27,16 @@ const { data, pending, error, refresh } = await useFetch<{
 const posts = computed(() => data.value?.items ?? [])
 
 const stateColor = (state: string | undefined) => {
-    if (state === 'published') {
-        return 'success'
-    }
-    if (state === 'changed' || state === 'draft') {
-        return 'warning'
-    }
-    if (state === 'deleted') {
-        return 'error'
-    }
+    if (state === 'published') return 'success'
+    if (state === 'changed' || state === 'draft') return 'warning'
+    if (state === 'deleted') return 'error'
     return 'neutral'
 }
 
 const stateContrastClass = (state: string | undefined) => {
-    if (state === 'published') {
-        return 'text-green-800 dark:text-green-300'
-    }
-    if (state === 'changed' || state === 'draft') {
-        return 'text-amber-800 dark:text-amber-300'
-    }
-    if (state === 'deleted') {
-        return 'text-red-700 dark:text-red-400'
-    }
+    if (state === 'published') return 'text-green-800 dark:text-green-300'
+    if (state === 'changed' || state === 'draft') return 'text-amber-800 dark:text-amber-300'
+    if (state === 'deleted') return 'text-red-700 dark:text-red-400'
     return ''
 }
 
@@ -87,9 +73,8 @@ const openSchedule = (item: PostListItem) => {
 }
 
 const confirmSchedule = async () => {
-    if (!scheduleTarget.value || !scheduleInput.value) {
-        return
-    }
+    if (!scheduleTarget.value || !scheduleInput.value) return
+
     busyId.value = scheduleTarget.value.id
     try {
         const at = new Date(scheduleInput.value).toISOString()
@@ -159,6 +144,8 @@ const deletePost = async (item: PostListItem) => {
         busyId.value = null
     }
 }
+
+useHead({ title: 'Posts' })
 </script>
 
 <template>

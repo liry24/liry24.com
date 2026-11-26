@@ -21,25 +21,24 @@ function resolveAuthBaseUrl(
     isSynthetic: boolean,
     appEnv: string | undefined,
 ): string {
-    if (origin === 'https://liry24.com' || origin === 'https://dev-liry24-com.liry.workers.dev') {
+    if (origin === 'https://liry24.com' || origin === 'https://dev-liry24-com.liry.workers.dev')
         return origin
-    }
+
     try {
         const parsed = new URL(origin)
         if (
             isSynthetic &&
             parsed.protocol === 'http:' &&
             (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost')
-        ) {
+        )
             return parsed.origin
-        }
+
         if (
             appEnv !== 'production' &&
             parsed.protocol === 'https:' &&
             parsed.hostname.endsWith('.workers.dev')
-        ) {
+        )
             return parsed.origin
-        }
     } catch {
         // Fall back to configured URL below
     }
@@ -147,12 +146,9 @@ export default defineAuth(({ env, request, requestOrigin }) => {
                     before: async (user) => {
                         const email = typeof user.email === 'string' ? user.email.toLowerCase() : ''
                         if (adminEmails.size > 0) {
-                            if (adminEmails.has(email)) {
-                                return { data: { ...user, role: 'admin' } }
-                            }
-                            if (adminSubs.size === 0) {
-                                return false
-                            }
+                            if (adminEmails.has(email)) return { data: { ...user, role: 'admin' } }
+
+                            if (adminSubs.size === 0) return false
                         }
                         return { data: user }
                     },
@@ -173,9 +169,9 @@ export default defineAuth(({ env, request, requestOrigin }) => {
                             adminSubs.size > 0 &&
                             account.providerId === 'pocket-id' &&
                             !adminSubs.has(account.accountId)
-                        ) {
+                        )
                             return false
-                        }
+
                         return { data: withIssuer }
                     },
                     after: async (account, ctx) => {

@@ -29,11 +29,9 @@ function isViteHubOptions(value: unknown): value is ViteHubOptionsShape {
 }
 
 function getViteHubOptions(config: { modules?: Array<unknown> }): ViteHubOptionsShape {
-    for (const entry of config.modules ?? []) {
-        if (Array.isArray(entry) && entry.length >= 2 && isViteHubOptions(entry[1])) {
-            return entry[1]
-        }
-    }
+    for (const entry of config.modules ?? [])
+        if (Array.isArray(entry) && entry.length >= 2 && isViteHubOptions(entry[1])) return entry[1]
+
     throw new Error('ViteHub module options were not found in nuxt.config.ts')
 }
 
@@ -50,9 +48,9 @@ test('ViteHub configuration defines isolated preview resources, single public R2
             'LIRY24_DISABLE_CRON',
             'NUXT_PUBLIC_SITE_URL',
             'WORKERS_CI_BRANCH',
-        ]) {
+        ])
             vi.stubEnv(key, '')
-        }
+
         vi.stubEnv('APP_ENV', 'production')
         vi.resetModules()
         const { default: config } = await import('../../nuxt.config')

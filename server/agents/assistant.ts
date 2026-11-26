@@ -50,9 +50,7 @@ function createOfflineMockModel(): MockLanguageModelV4 {
 function readGoogleApiKey(): string | undefined {
     try {
         const key = readSecretValue(useServerEnv().GOOGLE_GENERATIVE_AI_API_KEY)
-        if (key) {
-            return key
-        }
+        if (key) return key
     } catch {
         // Fallback when running outside generated Nitro/Vite env bridge.
     }
@@ -95,9 +93,8 @@ function createGoogleDiagnosticFetch(
 
 async function resolveAdminSession(request: Request) {
     const session = await useAuth(request).api.getSession({ headers: request.headers })
-    if (!session?.user) {
-        return null
-    }
+    if (!session?.user) return null
+
     if (!isAdminUser(session.user)) {
         throw Object.assign(new Error('Administrator role required.'), {
             status: 403,
@@ -150,9 +147,8 @@ export default defineAgent({
                 readProcessEnv('LIRY24_TEST_LOCAL') === 'true' ||
                 readProcessEnv('APP_ENV') === 'test'
             const apiKey = readGoogleApiKey()
-            if (synthetic || !apiKey) {
-                return createOfflineMockModel()
-            }
+            if (synthetic || !apiKey) return createOfflineMockModel()
+
             const google = createGoogleGenerativeAI({
                 apiKey,
                 fetch: createGoogleDiagnosticFetch(apiKey),

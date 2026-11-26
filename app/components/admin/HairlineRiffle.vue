@@ -16,9 +16,7 @@ let disposed = false
 onMounted(async () => {
     const { riffle } = await import('@lucasmarkes/hairline')
 
-    if (disposed || !element.value) {
-        return
-    }
+    if (disposed || !element.value) return
 
     instance = riffle(element.value, {
         intensity,

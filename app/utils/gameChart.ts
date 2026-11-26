@@ -17,17 +17,16 @@ const horizontalGradient = (mark: ChartMark): ChartMark => ({
             render(context) {
                 const scene = initialized.render(context)
                 const paint = (node: SceneNode): SceneNode => {
-                    if (node.kind === 'group') {
+                    if (node.kind === 'group')
                         return { ...node, children: node.children.map(paint) }
-                    }
-                    if (node.kind !== 'polyline' || node.points.length < 2) {
-                        return node
-                    }
+
+                    if (node.kind !== 'polyline' || node.points.length < 2) return node
+
                     const first = node.points[0]
                     const last = node.points.at(-1)
-                    if (!first || !last || !node.points.every((point) => point[1] === first[1])) {
+                    if (!first || !last || !node.points.every((point) => point[1] === first[1]))
                         return node
-                    }
+
                     return {
                         kind: 'group',
                         key: `${node.key}-flat`,
@@ -59,17 +58,15 @@ export function gameChart(periods: Array<GamePeriod>, metric: GameMetric, id: st
     for (const period of ordered) {
         const record = period.values.find((value) => value.key === metric.key)
         if (!record) {
-            if (run.length) {
-                runs.push(run)
-            }
+            if (run.length) runs.push(run)
+
             run = []
             continue
         }
         run.push({ x: period.periodKey, value: record.value, record, period })
     }
-    if (run.length) {
-        runs.push(run)
-    }
+    if (run.length) runs.push(run)
+
     const gradients = runs.map((points, index) => ({
         id: `${id}-${index}`,
         x1: 0,

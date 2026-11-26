@@ -43,9 +43,7 @@ watch(
 )
 
 onUnmounted(() => {
-    if (import.meta.client) {
-        window.removeEventListener('popstate', onPopState)
-    }
+    if (import.meta.client) window.removeEventListener('popstate', onPopState)
 })
 </script>
 

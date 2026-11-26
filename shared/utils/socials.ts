@@ -14,11 +14,8 @@ const reserved = new Set([
 ])
 
 const hasControlOrWhitespace = (value: string): boolean => {
-    for (const char of value) {
-        if ((char.codePointAt(0) ?? 0) <= 0x20) {
-            return true
-        }
-    }
+    for (const char of value) if ((char.codePointAt(0) ?? 0) <= 0x20) return true
+
     return false
 }
 

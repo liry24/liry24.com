@@ -127,9 +127,9 @@ export async function scanAccessibility(page: Page, state: string, expectedError
     if (
         blocking.length ||
         ['light-1280-home', 'light-390-arts-viewer', 'light-1280-admin-settings'].includes(state)
-    ) {
+    )
         await page.screenshot({ path: `${filename}.png`, fullPage: true })
-    }
+
     return blocking.map(({ id, impact, nodes }) => ({
         ...context,
         id,

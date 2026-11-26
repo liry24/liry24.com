@@ -16,9 +16,9 @@ export interface BuiltWorkerOptions {
 
 function parseGeneratedWrangler(raw: string): Unstable_RawConfig {
     const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
         throw new Error('Generated wrangler config must be a JSON object')
-    }
+
     return parsed
 }
 
@@ -27,9 +27,8 @@ export async function builtWorker(options: BuiltWorkerOptions = {}) {
     const directory = await mkdtemp(resolve(temporaryRoot, 'liry24-native-worker-'))
     const generatedPath = resolve('.output/server/wrangler.json')
     const generated = parseGeneratedWrangler(await readFile(generatedPath, 'utf8'))
-    if (!generated.main) {
-        throw new Error('Generated wrangler config is missing main entry')
-    }
+    if (!generated.main) throw new Error('Generated wrangler config is missing main entry')
+
     const config: Unstable_RawConfig = {
         ...generated,
         name: 'liry24-native-worker-test',
@@ -68,9 +67,8 @@ export async function builtWorker(options: BuiltWorkerOptions = {}) {
         GOOGLE_GENERATIVE_AI_API_KEY: 'synthetic-google-key',
         NUXT_APP_SECRET: 'synthetic-nuxt-app-secret-0123456789abcdef',
     }
-    if (options.secrets) {
-        Object.assign(secrets, options.secrets)
-    }
+    if (options.secrets) Object.assign(secrets, options.secrets)
+
     const configPath = resolve(directory, 'wrangler.json')
     await writeFile(configPath, JSON.stringify(config))
     const server = createTestHarness({ workers: [{ configPath, secrets }] })
@@ -117,9 +115,9 @@ export async function builtWorker(options: BuiltWorkerOptions = {}) {
                 if (
                     dirname(directory) !== temporaryRoot ||
                     !basename(directory).startsWith('liry24-native-worker-')
-                ) {
+                )
                     throw new Error('Unexpected test directory')
-                }
+
                 await rm(directory, { recursive: true, force: true })
             },
         }

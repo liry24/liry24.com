@@ -44,13 +44,12 @@ export const sqliteD1 = (database: DatabaseSync) => {
         prepare: (sql: string) => new Statement(sql),
         async batch(input: Array<unknown>) {
             const statements = input.map((statement) => {
-                if (typeof statement !== 'object' || statement === null) {
+                if (typeof statement !== 'object' || statement === null)
                     throw new Error('Statement belongs to another D1 binding.')
-                }
+
                 const mapped = statementMap.get(statement)
-                if (!mapped) {
-                    throw new Error('Statement belongs to another D1 binding.')
-                }
+                if (!mapped) throw new Error('Statement belongs to another D1 binding.')
+
                 return mapped
             })
             database.exec(

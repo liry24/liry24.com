@@ -34,10 +34,8 @@ const highlightNames = new Map(
     }),
 )
 
-export function highlightMarkdown(editor: HTMLElement) {
-    if (!globalThis.CSS?.highlights || typeof Highlight === 'undefined') {
-        return
-    }
+export const highlightMarkdown = (editor: HTMLElement) => {
+    if (!globalThis.CSS?.highlights || typeof Highlight === 'undefined') return
 
     const textNodes: Array<{ node: Node; from: number; to: number; offsets: Array<number> }> = []
     let source = ''
@@ -53,36 +51,28 @@ export function highlightMarkdown(editor: HTMLElement) {
                     source += character
                 }
             }
-            if (offsets.length) {
-                textNodes.push({ node, from, to: source.length, offsets })
-            }
-        } else if (node.nodeName === 'SPAN') {
-            source += '\uFFFC'
-        }
+            if (offsets.length) textNodes.push({ node, from, to: source.length, offsets })
+        } else if (node.nodeName === 'SPAN') source += '\uFFFC'
     }
 
     const ranges: Array<{ name: string; highlight: Highlight; range: Range }> = []
     markdownParser.parse(source).iterate({
         enter({ name, from, to }) {
             const group = highlightNames.get(name)
-            if (!group || from === to) {
-                return
-            }
+            if (!group || from === to) return
+
             const highlight = CSS.highlights.get(group) ?? new Highlight()
             CSS.highlights.set(group, highlight)
             highlight.priority = group === 'md-syntax' ? 2 : group === 'md-quote' ? 0 : 1
             for (const text of textNodes) {
-                if (text.from >= to) {
-                    break
-                }
-                if (text.to <= from) {
-                    continue
-                }
+                if (text.from >= to) break
+
+                if (text.to <= from) continue
+
                 const start = text.offsets[Math.max(from, text.from) - text.from]
                 const end = text.offsets[Math.min(to, text.to) - text.from - 1]
-                if (start === undefined || end === undefined) {
-                    continue
-                }
+                if (start === undefined || end === undefined) continue
+
                 const range = editor.ownerDocument.createRange()
                 range.setStart(text.node, start)
                 range.setEnd(text.node, end + 1)
@@ -94,9 +84,8 @@ export function highlightMarkdown(editor: HTMLElement) {
     return () => {
         for (const { name, highlight, range } of ranges) {
             highlight.delete(range)
-            if (!highlight.size && CSS.highlights.get(name) === highlight) {
+            if (!highlight.size && CSS.highlights.get(name) === highlight)
                 CSS.highlights.delete(name)
-            }
         }
     }
 }

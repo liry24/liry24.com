@@ -1,4 +1,4 @@
-export function useGameSearch(query: () => string | null) {
+export const useGameSearch = (query: () => string | null) => {
     const { user, session } = useAppSession()
     const scope = computed(() =>
         JSON.stringify([user.value?.id, user.value?.role, session.value?.id]),
@@ -16,6 +16,7 @@ export function useGameSearch(query: () => string | null) {
         search?.abort()
         loading.value = false
     }
+
     watch(
         [query, scope],
         ([text, owner], [, previousOwner]) => {
@@ -27,9 +28,8 @@ export function useGameSearch(query: () => string | null) {
             }
             games.value = []
             warning.value = ''
-            if (text === null) {
-                return
-            }
+            if (text === null) return
+
             const controller = (search = new AbortController())
             loading.value = true
             timer = setTimeout(() => {
@@ -41,23 +41,18 @@ export function useGameSearch(query: () => string | null) {
                                 query: { q: text },
                                 signal: controller.signal,
                             }))
-                        if (controller.signal.aborted) {
-                            return
-                        }
-                        if (!result) {
-                            throw new Error('No search result was returned')
-                        }
+                        if (controller.signal.aborted) return
+
+                        if (!result) throw new Error('No search result was returned')
+
                         cache.set(text, result)
                         games.value = result.games
                         warning.value = result.warning
                     } catch {
-                        if (!controller.signal.aborted) {
+                        if (!controller.signal.aborted)
                             warning.value = 'Search unavailable. You can continue editing.'
-                        }
                     } finally {
-                        if (!controller.signal.aborted) {
-                            loading.value = false
-                        }
+                        if (!controller.signal.aborted) loading.value = false
                     }
                 })()
             }, 250)
@@ -66,12 +61,12 @@ export function useGameSearch(query: () => string | null) {
     )
 
     async function importGame(game: GameSearchResult) {
-        if (importing.value) {
-            return
-        }
+        if (importing.value) return
+
         const controller = (insertion = new AbortController())
         importing.value = true
         warning.value = ''
+
         try {
             const saved = game.id
                 ? game
@@ -80,24 +75,22 @@ export function useGameSearch(query: () => string | null) {
                       body: { igdbId: game.igdbId },
                       signal: controller.signal,
                   })
-            if (controller.signal.aborted) {
-                return
-            }
+            if (controller.signal.aborted) return
+
             cache.clear()
             return saved
         } catch {
-            if (!controller.signal.aborted) {
+            if (!controller.signal.aborted)
                 warning.value = 'Import failed. Your input has been kept.'
-            }
         } finally {
-            if (insertion === controller) {
-                importing.value = false
-            }
+            if (insertion === controller) importing.value = false
         }
     }
+
     onScopeDispose(() => {
         cancelSearch()
         insertion?.abort()
     })
+
     return { games, warning, loading, importing, importGame }
 }

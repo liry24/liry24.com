@@ -23,9 +23,8 @@ export const baselineStatements = () =>
 export function openTestDatabase() {
     const sqlite = new DatabaseSync(':memory:')
     sqlite.exec('PRAGMA foreign_keys=ON')
-    for (const sql of baselineStatements()) {
-        sqlite.exec(sql)
-    }
+    for (const sql of baselineStatements()) sqlite.exec(sql)
+
     const env = { DB: sqliteD1(sqlite) }
     return { sqlite, env, close: () => sqlite.close() }
 }

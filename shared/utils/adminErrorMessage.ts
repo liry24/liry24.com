@@ -6,9 +6,8 @@ export function adminErrorMessage(cause: unknown, fallback: string) {
             typeof data === 'object' &&
             'message' in data &&
             typeof data.message === 'string'
-        ) {
+        )
             return data.message
-        }
     }
     return cause instanceof Error ? cause.message : fallback
 }

@@ -13,9 +13,8 @@ export default defineEventHandler(async (event) => {
             offset: z.coerce.number().int().nonnegative().default(0),
         })
         .safeParse(getQuery(event))
-    if (!parsed.success) {
-        throw createError({ status: 400, statusText: 'Invalid post query' })
-    }
+    if (!parsed.success) throw createError({ status: 400, statusText: 'Invalid post query' })
+
     const input = parsed.data
 
     const collection = content.collection('posts')
@@ -25,9 +24,8 @@ export default defineEventHandler(async (event) => {
     )
     const entries: Array<PostItem> = []
     for (const full of fullDocs) {
-        if (!full) {
-            continue
-        }
+        if (!full) continue
+
         entries.push({
             id: full.id,
             url: full.url ?? null,

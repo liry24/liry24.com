@@ -37,13 +37,11 @@ export function assertSafe(nodes: Array<Node>) {
     const elements: Array<{ tag: string; props: ElementNodeAttributes }> = []
     const visit = (list: Array<Node>) => {
         for (const node of list) {
-            if (typeof node === 'string' || node[0] === null) {
-                continue
-            }
+            if (typeof node === 'string' || node[0] === null) continue
+
             const [tag, props, ...children] = node
-            if (tag) {
-                elements.push({ tag, props })
-            }
+            if (tag) elements.push({ tag, props })
+
             visit(children)
         }
     }
@@ -61,13 +59,11 @@ export function assertSafe(nodes: Array<Node>) {
         ]).not.toContain(tag.toLowerCase())
         for (const [name, value] of Object.entries(props)) {
             expect(name).not.toMatch(/^(on|@|v-on:)|srcdoc|innerhtml/i)
-            if (['href', 'src'].includes(name)) {
+            if (['href', 'src'].includes(name))
                 expect(String(value)).not.toMatch(/javascript|data:/i)
-            }
         }
-        for (const name of ['as', ':as', 'to', ':to', 'copy', ':copy', ':href', ':src']) {
+        for (const name of ['as', ':as', 'to', ':to', 'copy', ':copy', ':href', ':src'])
             expect(props).not.toHaveProperty(name)
-        }
     }
     expect(elements.some((el) => el.tag === 'a' && el.props.href === '/works')).toBe(true)
     expect(elements.some((el) => el.tag === 'img' && el.props.src === '/safe.png')).toBe(true)

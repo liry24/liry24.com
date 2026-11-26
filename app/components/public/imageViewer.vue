@@ -10,9 +10,7 @@ let returnFocus: FocusableElement | null = null
 watch(
     open,
     (value) => {
-        if (value && import.meta.client) {
-            returnFocus = captureActiveFocus()
-        }
+        if (value && import.meta.client) returnFocus = captureActiveFocus()
     },
     { immediate: true },
 )

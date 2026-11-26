@@ -29,9 +29,9 @@ test('game stats validate configured metrics and preserve zero separately from m
             { key: 'kd', value: 1 },
             { key: 'kd', value: 2 },
         ],
-    ]) {
+    ])
         expect(gameValueIssues(metrics, values).length).toBeGreaterThan(0)
-    }
+
     expect(formatGameValue(undefined)).toBe('—')
     expect(formatGameValue({ key: 'winRate', value: 0 }, metrics[1])).toBe('0%')
     expect(

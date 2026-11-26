@@ -56,13 +56,11 @@ function toPlaywrightCookies(cookieHeader: string, url: URL): Array<Cookie> {
     const result: Array<Cookie> = []
     for (const pair of cookieHeader.split('; ')) {
         const sep = pair.indexOf('=')
-        if (sep <= 0) {
-            continue
-        }
+        if (sep <= 0) continue
+
         const name = pair.slice(0, sep)
-        if (!isHttps && name.startsWith('__Secure-')) {
-            continue
-        }
+        if (!isHttps && name.startsWith('__Secure-')) continue
+
         result.push({
             name,
             value: pair.slice(sep + 1),
@@ -113,15 +111,12 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                     errors.push(`${label}${page.url()}: ${text}`)
                     return
                 }
-                if (message.type() !== 'error') {
-                    return
-                }
+                if (message.type() !== 'error') return
+
                 const locationUrl = message.location().url
                 if (locationUrl) {
                     try {
-                        if (new URL(locationUrl).origin !== app.url.origin) {
-                            return
-                        }
+                        if (new URL(locationUrl).origin !== app.url.origin) return
                     } catch {
                         // Ignore unparseable location URL and check remaining filters.
                     }
@@ -130,12 +125,11 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                     allowExpectedValidation400 &&
                     /status of 400/i.test(text) &&
                     (!locationUrl || locationUrl.includes('/_vitehub/forms/post'))
-                ) {
+                )
                     return
-                }
-                if (/status of 403/i.test(text) && locationUrl.includes('pocket-id-error=1')) {
-                    return
-                }
+
+                if (/status of 403/i.test(text) && locationUrl.includes('pocket-id-error=1')) return
+
                 errors.push(`${label}${page.url()}: ${text}`)
             })
         }
@@ -494,9 +488,8 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await scan('admin-skills-reorder')
                 const skillOrder = () => auditPage.getByText(/^(TypeScript|Vue)$/).allTextContents()
                 const [firstSkill, secondSkill] = await skillOrder()
-                if (!firstSkill || !secondSkill) {
-                    throw new Error('Missing skills to reorder')
-                }
+                if (!firstSkill || !secondSkill) throw new Error('Missing skills to reorder')
+
                 const initialOrder = [firstSkill, secondSkill]
                 const reverseOrder = [secondSkill, firstSkill]
                 const firstHandle = auditPage.getByRole('button', {
@@ -524,9 +517,8 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                     .getByRole('listitem')
                     .filter({ has: firstHandle })
                     .boundingBox()
-                if (!source || !target) {
-                    throw new Error('Missing drag handles')
-                }
+                if (!source || !target) throw new Error('Missing drag handles')
+
                 await auditPage.mouse.move(
                     source.x + source.width / 2,
                     source.y + source.height / 2,
