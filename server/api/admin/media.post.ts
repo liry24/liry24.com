@@ -1,59 +1,22 @@
-function extensionForMime(mimeType: string): string | undefined {
-    switch (mimeType) {
-        case 'image/png': {
-            return 'png'
-        }
-        case 'image/jpeg': {
-            return 'jpg'
-        }
-        case 'image/webp': {
-            return 'webp'
-        }
-        case 'image/avif': {
-            return 'avif'
-        }
-        case 'image/gif': {
-            return 'gif'
-        }
-        default: {
-            return undefined
-        }
-    }
-}
+const mimeExtensions = new Map<string, string>([
+    ['image/png', 'png'],
+    ['image/jpeg', 'jpg'],
+    ['image/webp', 'webp'],
+    ['image/avif', 'avif'],
+    ['image/gif', 'gif'],
+])
 
 const allowedFolders = new Set(['posts', 'works', 'arts', 'games', 'uploads'])
 const maxFileBytes = 10 * 1024 * 1024
-
-interface UploadLikeFile {
-    name: string
-    type: string
-    size: number
-    arrayBuffer: () => Promise<ArrayBuffer>
-}
-
-function isUploadFile(value: unknown): value is UploadLikeFile {
-    return Boolean(
-        value &&
-        typeof value === 'object' &&
-        'arrayBuffer' in value &&
-        typeof value.arrayBuffer === 'function' &&
-        'type' in value &&
-        typeof value.type === 'string' &&
-        'size' in value &&
-        typeof value.size === 'number' &&
-        'name' in value &&
-        typeof value.name === 'string',
-    )
-}
 
 export default defineEventHandler(async (event): Promise<MediaReference> => {
     await requireAdminSession(event)
     const formData = await event.req.formData()
     const fileEntry = formData.get('file')
-    if (!isUploadFile(fileEntry))
+    if (!fileEntry || typeof fileEntry === 'string')
         throw createError({ status: 400, statusText: 'Image file is required' })
 
-    const extension = extensionForMime(fileEntry.type)
+    const extension = mimeExtensions.get(fileEntry.type)
     if (!extension) {
         throw createError({
             status: 400,

@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { gameFieldsSchema } from '../../shared/utils/contentSchemas'
 import { builtWorker } from '../helpers/builtWorker'
+import { seedGameCatalog } from '../helpers/workerSeed'
 
 const orderedList = z.object({
     items: z.array(
@@ -101,11 +102,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             for (const [index, name] of original.entries()) {
                 const igdbId = index + 1
                 const game = gameFieldsSchema.parse({ igdbId, slug: name, name, order: index * 2 })
-                await app.env.DB.prepare(
-                    'INSERT INTO game_catalog (id, igdb_id, slug, data) VALUES (?, ?, ?, ?)',
-                )
-                    .bind(name, igdbId, name, JSON.stringify(game))
-                    .run()
+                await seedGameCatalog(app.env.DB, name, game)
             }
             const alternative = ['beta', 'gamma', 'alpha']
             const competing = await Promise.all([

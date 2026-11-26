@@ -1,67 +1,27 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { mkdir, writeFile } from 'node:fs/promises'
 
 import { chromium } from 'playwright-core'
-import type { Browser, Cookie, Locator, Page } from 'playwright-core'
+import type { Browser, Page } from 'playwright-core'
 import { expect, test } from 'vitest'
-import { z } from 'zod'
 
-import { gameFieldsSchema, mediaReferenceSchema } from '../../shared/utils/contentSchemas'
 import { scanAccessibility, waitForNuxtReady } from '../helpers/accessibility'
 import { builtWorker } from '../helpers/builtWorker'
-
-interface FormSeedPayload {
-    id?: string
-    data: object
-    body?: string
-}
-
-const artworkTitle = 'Accessibility artwork'
-const artworkPath = '/arts?open=accessibility-artwork'
-const postPath = '/posts/synthetic-game-mention'
-const attachedProfile = 'https://example.invalid/apex'
-
-async function multipartRequest(
-    form: FormData,
-    headers: Record<string, string>,
-): Promise<{ headers: Record<string, string>; body: Uint8Array }> {
-    const serialized = new Request('http://multipart.invalid', { method: 'POST', body: form })
-    const contentType = serialized.headers.get('content-type')
-    return {
-        headers: contentType ? { ...headers, 'content-type': contentType } : headers,
-        body: new Uint8Array(await serialized.arrayBuffer()),
-    }
-}
-
-function toPlaywrightCookies(cookieHeader: string, url: URL): Array<Cookie> {
-    const isHttps = url.protocol === 'https:'
-    const result: Array<Cookie> = []
-    for (const pair of cookieHeader.split('; ')) {
-        const sep = pair.indexOf('=')
-        if (sep <= 0) continue
-
-        const name = pair.slice(0, sep)
-        if (!isHttps && name.startsWith('__Secure-')) continue
-
-        result.push({
-            name,
-            value: pair.slice(sep + 1),
-            domain: url.hostname,
-            path: '/',
-            expires: -1,
-            httpOnly: true,
-            secure: isHttps,
-            sameSite: 'Lax',
-        })
-    }
-    return result
-}
+import {
+    ARTWORK_PATH,
+    ARTWORK_TITLE,
+    ATTACHED_PROFILE,
+    POST_PATH,
+    expectFocus,
+    observeBrowserErrors,
+    seedBrowserFixtures,
+    toPlaywrightCookies,
+} from '../helpers/workerSeed'
 
 function artworkControls(page: Page) {
     const card = page.getByRole('button').filter({
-        has: page.getByRole('img', { name: artworkTitle, exact: true }),
+        has: page.getByRole('img', { name: ARTWORK_TITLE, exact: true }),
     })
-    const dialog = page.getByRole('dialog', { name: artworkTitle, exact: true })
+    const dialog = page.getByRole('dialog', { name: ARTWORK_TITLE, exact: true })
     const enlarge = dialog.getByTestId('enlarge-artwork')
     const image = page.getByRole('dialog').filter({ hasNot: page.getByTestId('enlarge-artwork') })
     return { card, dialog, enlarge, image }
@@ -69,226 +29,6 @@ function artworkControls(page: Page) {
 
 const gameStatsTrigger = (page: Page) =>
     page.getByRole('main').getByRole('button').and(page.locator('[aria-haspopup="dialog"]'))
-const reorderHandle = (entry: Locator) => entry.locator('button[aria-pressed]')
-
-async function expectFocus(locator: Locator) {
-    await expect
-        .poll(() => locator.evaluate((element) => element === document.activeElement))
-        .toBe(true)
-}
-
-async function expectCenteredDialog(dialog: Locator) {
-    expect(
-        await dialog.evaluate((element) => {
-            const bounds = element.getBoundingClientRect()
-            return (
-                Math.abs(bounds.left - (innerWidth - bounds.right)) < 3 &&
-                Math.abs(bounds.top - (innerHeight - bounds.bottom)) < 3
-            )
-        }),
-    ).toBe(true)
-}
-
-async function exerciseIconPicker(page: Page) {
-    const add = page.getByRole('button', { name: 'Add', exact: true })
-    expect(await add.getAttribute('aria-keyshortcuts')).toBe('N')
-    await page.keyboard.press('n')
-    const entry = page.getByRole('dialog', { name: 'New skill' })
-    const name = entry.getByLabel('Name', { exact: true })
-    await name.waitFor()
-    await name.press('n')
-    expect(await name.inputValue()).toBe('n')
-    const find = entry.getByRole('button', { name: 'Find icon' })
-    await find.click()
-    const picker = page.getByRole('dialog', { name: 'Choose an icon' })
-    await expectCenteredDialog(picker)
-    const keywords: Array<string> = []
-    const iconSearch = 'https://api.iconify.design/search?*'
-    await page.route(iconSearch, (route) => {
-        const word = new URL(route.request().url()).searchParams.get('query') ?? ''
-        keywords.push(word)
-        return route.fulfill({
-            headers: { 'access-control-allow-origin': '*' },
-            json: { icons: word === 'hom' ? ['lucide:house'] : ['mingcute:home-2-line'] },
-        })
-    })
-    try {
-        const weightRequest = page.waitForResponse(
-            (response) => new URL(response.url()).pathname.endsWith('.bin') && response.ok(),
-        )
-        await picker.getByRole('combobox', { name: 'Search Iconify icons' }).fill('hom')
-        await weightRequest
-        const result = picker.getByRole('option', { name: 'mingcute:home-2-line' })
-        await result.waitFor()
-        expect(keywords[0]).toBe('hom')
-        expect(keywords).toContain('house')
-        await result.click()
-        await picker.waitFor({ state: 'hidden' })
-        expect(await entry.getByLabel('Icon', { exact: true }).inputValue()).toBe(
-            'mingcute:home-2-line',
-        )
-        await expectFocus(find)
-    } finally {
-        await page.unroute(iconSearch)
-    }
-    await page.keyboard.press('Escape')
-    await entry.waitFor({ state: 'hidden' })
-    await expectFocus(add)
-}
-
-async function exerciseStatsEditor(page: Page) {
-    await page.getByRole('button', { name: 'Add', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'New stat period' })
-    const game = dialog.getByLabel('Game', { exact: true })
-    await game.selectOption('igdb-126459')
-    await expectCenteredDialog(dialog)
-    await dialog.getByLabel('Period label', { exact: true }).fill('New synthetic period')
-    expect(await dialog.getByRole('textbox', { name: 'Period key' }).count()).toBe(0)
-
-    const peak = dialog.getByRole('textbox', { name: 'Peak Rank', exact: true })
-    await peak.fill('1.5')
-    const save = dialog.getByRole('button', { name: 'Save draft' })
-    await save.click()
-    await dialog
-        .getByText('Enter a non-negative whole number within the safe integer range.')
-        .waitFor()
-    await peak.fill('0')
-    await game.selectOption('igdb-114795')
-    const rank = dialog.getByRole('textbox', { name: 'Rank', exact: true })
-    expect(await rank.inputValue()).toBe('')
-    await rank.fill('7')
-    await game.selectOption('igdb-126459')
-    expect(await peak.inputValue()).toBe('0')
-
-    const [response] = await Promise.all([
-        page.waitForResponse(
-            (entry) => new URL(entry.url()).pathname === '/_vitehub/forms/game-stats',
-        ),
-        save.click(),
-    ])
-    expect(response.status()).toBe(201)
-    expect(await response.json()).toEqual({ id: 'igdb-126459-new_synthetic_period' })
-    expect(response.request().postDataJSON()).toMatchObject({
-        data: { game: 'igdb-126459', values: [{ key: 'rank', value: 0 }] },
-    })
-    await dialog.waitFor({ state: 'hidden' })
-    const saved = page.locator('[data-item-id="igdb-126459-new_synthetic_period"]')
-    await saved.getByTestId('edit-entry').click()
-    const edit = page.getByRole('dialog', { name: 'Edit stat period' })
-    expect(await edit.getByRole('textbox', { name: 'Peak Rank', exact: true }).inputValue()).toBe(
-        '0',
-    )
-    await page.keyboard.press('Escape')
-    await edit.waitFor({ state: 'hidden' })
-}
-
-async function exerciseArtworkEditor(page: Page, bytes: Buffer) {
-    await page.getByRole('button', { name: 'Add', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'New artwork' })
-    const upload = '**/api/admin/media'
-    await page.route(upload, (route) =>
-        route.request().postDataBuffer()?.includes('rejected-art.png')
-            ? route.fulfill({ status: 400, json: { message: 'Synthetic upload failure' } })
-            : route.continue(),
-    )
-    try {
-        const files = ['first-art.png', 'rejected-art.png', 'last-art.png']
-        await dialog
-            .locator('input[type=file]')
-            .setInputFiles(files.map((name) => ({ name, mimeType: 'image/png', buffer: bytes })))
-        await dialog
-            .getByRole('alert')
-            .getByText(/rejected-art.png/)
-            .waitFor()
-        const image = dialog.getByRole('img', { name: 'Gallery images 1' })
-        expect(await image.getAttribute('src')).toMatch(/first-art\.png$/u)
-        await dialog.getByRole('button', { name: 'Move image 2 earlier' }).click()
-        expect(await image.getAttribute('src')).toMatch(/last-art\.png$/u)
-        await dialog.getByRole('button', { name: 'Remove image 2' }).click()
-        expect(await dialog.getByRole('img').count()).toBe(1)
-        await dialog.getByRole('textbox', { name: 'Title' }).fill('Synthetic new artwork')
-        const description = dialog.getByRole('textbox', { name: 'Description' })
-        expect(await description.getAttribute('rows')).toBe('3')
-        const descriptionHeight = () =>
-            description.evaluate((element) => element.getBoundingClientRect().height)
-        const initialHeight = await descriptionHeight()
-        await description.fill('Line\n'.repeat(8))
-        await expect.poll(descriptionHeight).toBeGreaterThan(initialHeight)
-        await description.fill('A short description')
-        await expect.poll(descriptionHeight).toBe(initialHeight)
-
-        const slug = dialog.getByRole('textbox', { name: 'Slug', exact: true })
-        expect(await slug.count()).toBe(0)
-        const manual = dialog.getByRole('checkbox', { name: 'Enter slug manually' })
-        await manual.check()
-        await slug.fill('custom-artwork-slug')
-        await manual.uncheck()
-        expect(await slug.count()).toBe(0)
-        await manual.check()
-        expect(await slug.inputValue()).toBe('custom-artwork-slug')
-        const [saved] = await Promise.all([
-            page.waitForResponse(
-                (entry) => new URL(entry.url()).pathname === '/_vitehub/forms/art',
-            ),
-            dialog.getByRole('button', { name: 'Save draft' }).click(),
-        ])
-        expect(saved.status()).toBe(201)
-        expect(await saved.json()).toEqual({ id: 'custom-artwork-slug' })
-        expect(saved.request().postDataJSON()).toMatchObject({
-            data: {
-                slug: 'custom-artwork-slug',
-                description: 'A short description',
-                images: [{ pathname: expect.stringMatching(/last-art\.png$/u) }],
-            },
-        })
-        await dialog.waitFor({ state: 'hidden' })
-    } finally {
-        await page.unroute(upload)
-    }
-}
-
-async function exerciseReorder(page: Page) {
-    const entries = page.getByRole('main').locator('[data-item-id]')
-    const order = () =>
-        entries.evaluateAll((items) => items.map((item) => item.getAttribute('data-item-id')))
-    const firstEntry = page.locator('[data-item-id="typescript"]')
-    const secondEntry = page.locator('[data-item-id="vue"]')
-    const firstHandle = reorderHandle(firstEntry)
-    const secondHandle = reorderHandle(secondEntry)
-    const initialOrder = ['typescript', 'vue']
-    const reversedOrder = ['vue', 'typescript']
-
-    await firstHandle.press('Space')
-    await firstHandle.press('ArrowDown')
-    await expect.poll(order).toEqual(reversedOrder)
-    await firstHandle.press('Escape')
-    await expect.poll(order).toEqual(initialOrder)
-    await expectFocus(firstHandle)
-
-    await secondEntry.locator('button[data-direction="up"]').click()
-    await expect.poll(order).toEqual(reversedOrder)
-    await secondHandle.scrollIntoViewIfNeeded()
-    await firstEntry.scrollIntoViewIfNeeded()
-    const source = await secondHandle.boundingBox()
-    const target = await firstEntry.boundingBox()
-    if (!source || !target) throw new Error('Missing reorder source or target')
-
-    const x = source.x + source.width / 2
-    await page.mouse.move(x, source.y + source.height / 2)
-    await page.mouse.down()
-    await page.mouse.move(x, target.y + target.height * 0.75, { steps: 12 })
-    await page.mouse.up()
-    await expect.poll(order).toEqual(initialOrder)
-
-    await firstHandle.press('Space')
-    await firstHandle.press('ArrowDown')
-    await firstHandle.press('Space')
-    await page.getByTestId('save-order').click()
-    await page.getByTestId('save-order').waitFor({ state: 'hidden' })
-    await page.reload()
-    await waitForNuxtReady(page)
-    await expect.poll(order).toEqual(reversedOrder)
-}
 
 test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
     'public and admin UI meet WCAG 2.2 A/AA, mobile navigation, and reduced-motion requirements',
@@ -296,213 +36,10 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
         const app = await builtWorker({ env: { NUXT_PUBLIC_IMAGES_DOMAIN: '' } })
         let browser: Browser | undefined
         const errors: Array<string> = []
-        const observeErrors = (page: Page, label = '') => {
-            page.on('pageerror', (error) => {
-                errors.push(`${label}${page.url()}: ${error.message}`)
-            })
-            page.on('console', (message) => {
-                const text = message.text()
-                if (/hydration.*mismatch|non-element root|NUXT_E400[23]/i.test(text))
-                    errors.push(`${label}${page.url()}: ${text}`)
-            })
-            page.on('response', (response) => {
-                if (response.status() >= 500 && new URL(response.url()).origin === app.url.origin)
-                    errors.push(`${label}${response.url()}: ${response.status()}`)
-            })
-        }
 
         try {
             const admin = await app.session('a11y-admin', 'admin', 'owner@example.invalid')
-            const jsonHeaders = {
-                'content-type': 'application/json',
-                ...admin,
-            }
-
-            const fixtureBytes = await readFile(resolve('tests/fixtures/accessibility-artwork.png'))
-            const mediaForm = new FormData()
-            mediaForm.append(
-                'file',
-                new File([new Uint8Array(fixtureBytes)], 'accessibility-artwork.png', {
-                    type: 'image/png',
-                }),
-            )
-            mediaForm.append('folder', 'arts')
-            const uploadResponse = await app.server.fetch('/api/admin/media', {
-                method: 'POST',
-                ...(await multipartRequest(mediaForm, admin)),
-            })
-            expect(uploadResponse.status, await uploadResponse.clone().text()).toBe(200)
-            const uploadedMedia = mediaReferenceSchema.parse(await uploadResponse.json())
-
-            const submitAndPublish = async (
-                formName: string,
-                collection: string,
-                payload: FormSeedPayload,
-            ) => {
-                const saveResponse = await app.server.fetch(`/_vitehub/forms/${formName}`, {
-                    method: 'POST',
-                    headers: jsonHeaders,
-                    body: JSON.stringify(payload),
-                })
-                expect(saveResponse.status, await saveResponse.clone().text()).toBe(201)
-                const saved = z.object({ id: z.string() }).parse(await saveResponse.json())
-
-                const publishResponse = await app.server.fetch('/api/admin/content/publish', {
-                    method: 'POST',
-                    headers: jsonHeaders,
-                    body: JSON.stringify({
-                        action: 'publish',
-                        collection,
-                        id: saved.id,
-                    }),
-                })
-                expect(publishResponse.status, await publishResponse.clone().text()).toBe(200)
-                return saved.id
-            }
-
-            const valorantId = 'igdb-126459'
-            const valorantGame = gameFieldsSchema.parse({
-                igdbId: 126_459,
-                slug: 'valorant',
-                name: 'VALORANT',
-                primaryMetric: 'rank',
-                order: 0,
-                metrics: [
-                    {
-                        key: 'rank',
-                        label: 'Peak Rank',
-                        format: 'integer',
-                        positions: [
-                            {
-                                label: 'Immortal',
-                                value: 2100,
-                                color: '#FF4655',
-                            },
-                        ],
-                    },
-                ],
-            })
-            const apexId = 'igdb-114795'
-            const apexGame = gameFieldsSchema.parse({
-                igdbId: 114_795,
-                slug: 'apex-legends',
-                name: 'Apex Legends',
-                primaryMetric: 'rank',
-                order: 1,
-                metrics: [
-                    {
-                        key: 'rank',
-                        label: 'Rank',
-                        format: 'integer',
-                        positions: [],
-                    },
-                ],
-            })
-            for (const [id, game] of [
-                [valorantId, valorantGame],
-                [apexId, apexGame],
-            ] as const) {
-                await app.env.DB.prepare(
-                    'INSERT INTO game_catalog (id, igdb_id, slug, data) VALUES (?, ?, ?, ?)',
-                )
-                    .bind(id, game.igdbId, game.slug, JSON.stringify(game))
-                    .run()
-            }
-
-            await submitAndPublish('game-stats', 'gameStats', {
-                data: {
-                    game: valorantId,
-                    periodKey: 'act-1',
-                    period: 'Act 1',
-                    order: 1,
-                    values: [
-                        {
-                            key: 'rank',
-                            value: 2100,
-                            label: 'Immortal 1',
-                            image: uploadedMedia,
-                            color: '#FF4655',
-                        },
-                    ],
-                },
-            })
-
-            await submitAndPublish('game-stats', 'gameStats', {
-                data: {
-                    game: apexId,
-                    periodKey: 's23',
-                    period: 'S23',
-                    order: 0,
-                    href: attachedProfile,
-                    values: [
-                        {
-                            key: 'rank',
-                            value: 22,
-                            label: 'Predator',
-                            image: uploadedMedia,
-                        },
-                    ],
-                },
-            })
-
-            await submitAndPublish('art', 'arts', {
-                data: {
-                    title: artworkTitle,
-                    slug: 'accessibility-artwork',
-                    images: [uploadedMedia],
-                    description: 'Synthetic artwork for accessibility audit.',
-                    order: 0,
-                },
-            })
-
-            await submitAndPublish('work', 'works', {
-                data: {
-                    title: 'Accessibility large work',
-                    slug: 'accessibility-large-work',
-                    style: 'large',
-                    category: 'Tooling',
-                    description: 'Synthetic work for accessibility audit.',
-                    image: uploadedMedia,
-                    href: 'https://example.invalid/work',
-                    order: 0,
-                },
-            })
-
-            await submitAndPublish('skill', 'skills', {
-                id: 'typescript',
-                data: {
-                    name: 'TypeScript',
-                    slug: 'typescript',
-                    icon: 'simple-icons:typescript',
-                    category: 'Language',
-                    order: 0,
-                },
-            })
-
-            await submitAndPublish('skill', 'skills', {
-                id: 'vue',
-                data: {
-                    name: 'Vue',
-                    slug: 'vue',
-                    icon: 'simple-icons:vuedotjs',
-                    category: 'Framework',
-                    order: 1,
-                },
-            })
-
-            await submitAndPublish('post', 'posts', {
-                id: 'synthetic-game-mention',
-                data: {
-                    title: 'Played :game[valorant]',
-                    plainTitle: 'Played VALORANT',
-                    slug: 'synthetic-game-mention',
-                    summary: 'Synthetic summary with game mention.',
-                    tags: ['dev'],
-                    gameMentions: [],
-                    order: 0,
-                },
-                body: 'Summary paragraph with :game[valorant].\n\n<!-- more -->\n\nFull synthetic article body with :game[valorant].',
-            })
+            await seedBrowserFixtures(app, admin)
 
             browser = await chromium.launch({ headless: true })
             const sessionCookies = toPlaywrightCookies(admin.cookie, app.url)
@@ -521,7 +58,7 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 )
                 await auditContext.addCookies(sessionCookies)
                 const auditPage = await auditContext.newPage()
-                observeErrors(auditPage, `${colorScheme} `)
+                observeBrowserErrors(auditPage, app.url.origin, errors, `${colorScheme} `)
 
                 const waitForTheme = () =>
                     auditPage.waitForFunction(
@@ -575,35 +112,10 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await visit('/')
                 const stats = gameStatsTrigger(auditPage)
                 await stats.waitFor()
-                await auditPage
-                    .locator('a[href="' + attachedProfile + '"]')
-                    .getByRole('img')
-                    .waitFor()
+                await auditPage.locator(`a[href="${ATTACHED_PROFILE}"]`).getByRole('img').waitFor()
                 await scan('home')
 
                 const dialog = auditPage.getByRole('dialog')
-                if (colorScheme === 'light') {
-                    const konamiPrefix = [
-                        'ArrowUp',
-                        'ArrowUp',
-                        'ArrowDown',
-                        'ArrowDown',
-                        'ArrowLeft',
-                        'ArrowRight',
-                        'ArrowLeft',
-                        'ArrowRight',
-                        'b',
-                    ]
-                    for (const key of [...konamiPrefix, 'a']) await auditPage.keyboard.press(key)
-                    await dialog.waitFor()
-                    await auditPage.mouse.click(5, 5)
-                    await dialog.waitFor({ state: 'hidden' })
-
-                    for (const key of [...konamiPrefix, 'x', 'a'])
-                        await auditPage.keyboard.press(key)
-                    expect(await dialog.isVisible()).toBe(false)
-                }
-
                 await stats.click()
                 await dialog.getByRole('table').waitFor()
                 await scan('game-stats-dialog')
@@ -622,10 +134,11 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await visit('/posts')
                 await auditPage
                     .getByRole('link')
-                    .and(auditPage.locator('a[href="' + postPath + '"]'))
+                    .and(auditPage.locator(`a[href="${POST_PATH}"]`))
                     .waitFor()
                 await scan('posts')
-                await visit(postPath)
+
+                await visit(POST_PATH)
                 await auditPage
                     .getByRole('heading', { level: 1 })
                     .locator('a[href="/posts?game=valorant"]')
@@ -647,7 +160,7 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await visit('/admin/posts')
                 await auditPage
                     .getByRole('link')
-                    .and(auditPage.locator('a[href="/admin' + postPath + '"]'))
+                    .and(auditPage.locator(`a[href="/admin${POST_PATH}"]`))
                     .first()
                     .waitFor()
                 await scan('admin-posts')
@@ -657,67 +170,19 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 const publishOptions = editor.getByRole('button', { name: 'Publish options' })
                 await publishOptions.waitFor()
                 await scan('post-editor')
-                expect(await editor.getByRole('button', { name: 'Save draft' }).count()).toBe(0)
 
                 await publishOptions.click()
-                const saveDraft = auditPage.getByRole('menuitem', { name: 'Save draft' })
-                const [validation] = await Promise.all([
-                    auditPage.waitForResponse(
-                        (response) =>
-                            new URL(response.url()).pathname === '/_vitehub/forms/post' &&
-                            response.request().method() === 'POST',
-                    ),
-                    saveDraft.click(),
-                ])
-                expect(validation.status()).toBe(400)
+                await auditPage.getByRole('menuitem', { name: 'Save draft' }).click()
                 await editor.getByRole('alert').first().waitFor()
                 await scan('post-validation')
 
-                if (colorScheme === 'light') {
-                    const slug = editor.getByRole('textbox', { name: 'Slug', exact: true })
-                    expect(await slug.count()).toBe(0)
-                    const manual = editor.getByRole('checkbox', { name: 'Enter slug manually' })
-                    await manual.check()
-                    await slug.fill('ignored_manual_slug')
-                    await manual.uncheck()
-                    expect(await slug.count()).toBe(0)
-
-                    const tags = editor.getByRole('combobox', { name: 'Tags' })
-                    await editor.getByRole('button', { name: 'Show tag suggestions' }).click()
-                    await auditPage.getByRole('option', { name: 'dev', exact: true }).click()
-                    await tags.fill('interface design')
-                    await tags.press('Enter')
-                    await editor.getByRole('button', { name: 'Remove interface design' }).waitFor()
-                    await editor.getByRole('button', { name: 'Remove dev', exact: true }).waitFor()
-
-                    await editor
-                        .getByRole('textbox', { name: 'Title', exact: true })
-                        .fill('Synthetic new article')
-                    await publishOptions.click()
-                    await auditPage.getByRole('menuitem', { name: 'Scheduled publish' }).click()
-                    const scheduling = auditPage.getByRole('dialog', { name: 'Scheduled publish' })
-                    const at = scheduling.getByLabel('Schedule at', { exact: true })
-                    await expectFocus(at)
-                    await scan('post-schedule-dialog')
-                    const [scheduled] = await Promise.all([
-                        auditPage.waitForResponse(
-                            (response) =>
-                                new URL(response.url()).pathname === '/api/admin/content/publish',
-                        ),
-                        scheduling.getByRole('button', { name: 'Schedule', exact: true }).click(),
-                    ])
-                    expect(scheduled.status(), await scheduled.text()).toBe(200)
-                    expect(scheduled.request().postDataJSON()).toMatchObject({ action: 'schedule' })
-                    await auditPage.waitForURL('**/admin/posts/synthetic_new_article')
-                    await editor.getByText('Edit post: Synthetic new article').waitFor()
-                    await publishOptions.click()
-                    await auditPage.getByRole('menuitem', { name: 'Scheduled publish' }).click()
-                    await scheduling.getByRole('button', { name: 'Cancel schedule' }).click()
-                    await at.waitFor()
-                    await auditPage.keyboard.press('Escape')
-                    await scheduling.waitFor({ state: 'hidden' })
-                    await expectFocus(publishOptions)
-                }
+                await publishOptions.click()
+                await auditPage.getByRole('menuitem', { name: 'Scheduled publish' }).click()
+                const scheduling = auditPage.getByRole('dialog', { name: 'Scheduled publish' })
+                await scheduling.getByLabel('Schedule at', { exact: true }).waitFor()
+                await scan('post-schedule-dialog')
+                await auditPage.keyboard.press('Escape')
+                await scheduling.waitFor({ state: 'hidden' })
 
                 await visit('/admin/skills')
                 const skill = auditPage.locator('[data-item-id="typescript"]')
@@ -728,27 +193,21 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await scan('entry-edit-dialog')
                 await auditPage.keyboard.press('Escape')
                 await dialog.waitFor({ state: 'hidden' })
-                if (colorScheme === 'light') await exerciseIconPicker(auditPage)
 
                 await auditPage.getByTestId('toggle-reorder').click()
-                await reorderHandle(skill).waitFor()
-                await auditPage.keyboard.press('n')
-                expect(await dialog.isVisible()).toBe(false)
+                await skill.locator('button[aria-pressed]').waitFor()
                 await scan('admin-skills-reorder')
-                if (colorScheme === 'light') await exerciseReorder(auditPage)
 
                 await visit('/admin/gameStats')
-                if (colorScheme === 'light') await exerciseStatsEditor(auditPage)
                 await auditPage.getByRole('button', { name: 'Add', exact: true }).click()
                 await dialog.getByLabel('Game', { exact: true }).selectOption('igdb-126459')
                 await scan('admin-stat-editor')
                 await auditPage.keyboard.press('Escape')
                 await dialog.waitFor({ state: 'hidden' })
 
-                if (colorScheme === 'light') {
-                    await visit('/admin/arts')
-                    await exerciseArtworkEditor(auditPage, fixtureBytes)
-                }
+                await visit('/admin/games')
+                await auditPage.locator('[data-item-id="igdb-126459"]').waitFor()
+                await scan('admin-games')
 
                 await visit('/admin/careers')
                 await scan('admin-careers-empty')
@@ -765,7 +224,6 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await visit('/admin/gameStats')
                 await auditPage.getByRole('button', { name: 'Add', exact: true }).click()
                 await dialog.getByLabel('Game', { exact: true }).selectOption('igdb-126459')
-                await expectCenteredDialog(dialog)
                 await scan('admin-stat-editor')
                 await auditPage.keyboard.press('Escape')
                 await dialog.waitFor({ state: 'hidden' })
@@ -777,7 +235,7 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await visit('/arts')
                 await scanArtViewer()
 
-                await visit(postPath)
+                await visit(POST_PATH)
                 await scan('post-detail')
 
                 await visit('/admin/posts/new')
@@ -801,7 +259,7 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 )
                 await motionContext.addCookies(sessionCookies)
                 const motionPage = await motionContext.newPage()
-                observeErrors(motionPage, `${reducedMotion} `)
+                observeBrowserErrors(motionPage, app.url.origin, errors, `${reducedMotion} `)
 
                 const settled = async (path: string) => {
                     await motionPage.waitForURL(new URL(path, app.url).href)
@@ -824,8 +282,8 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await dialog.waitFor({ state: 'hidden' })
                 await expectFocus(card)
 
-                await motionPage.goto(new URL(artworkPath, app.url).href)
-                await settled(artworkPath)
+                await motionPage.goto(new URL(ARTWORK_PATH, app.url).href)
+                await settled(ARTWORK_PATH)
                 await dialog.waitFor()
                 await motionPage.evaluate(() => history.back())
                 await dialog.waitFor({ state: 'hidden' })

@@ -25,13 +25,13 @@
 ## Deployment, Previews & patches
 
 - **Nitro-generated Wrangler config**: `nuxt.config.ts` emits `.output/server/wrangler.json` (and `.wrangler/deploy/config.json`) with production bindings (`DB` `227d818f-cd40-4fca-9710-b57273be94ca`, `STORAGE` `liry24-com`, route `liry24.com` production-only with `previews_enabled` omitted so `*.liry24.com` never intercepts `sso.liry24.com`, `memo.liry24.com`, or `images.liry24.com`) and Method B `previews` (`APP_ENV: 'dev'`, `NUXT_PUBLIC_SITE_URL: 'https://dev-liry24-com.liry.workers.dev'`, `NUXT_PUBLIC_IMAGES_DOMAIN: 'https://dev-liry24-com.liry.workers.dev'`, D1 `liry24-com-dev` `3c7c6179-12d0-4108-9eea-b3e20d394cef`, R2 `liry24-com-dev-storage`).
-- **Root patches (`patchedDependencies`)**: Keep `patches/better-auth@1.7.27.patch` and `patches/better-call@1.4.6.patch` (re-verify `tests/worker/auth.test.ts` rate-limit counter bounding on every upgrade).
+- **Root patches (`patchedDependencies`)**: Keep `patches/better-auth@1.7.27.patch` and `patches/better-call@1.4.6.patch` (re-verify `tests/auth.test.ts` rate-limit counter bounding on every upgrade).
 - **Production freeze**: Never modify `main`, production D1 (`227d818f-cd40-4fca-9710-b57273be94ca`), production R2 (`liry24-com`), or Cloudflare Workers Builds `production_settings` without explicit user approval after `https://dev-liry24-com.liry.workers.dev` verification.
 
 ## Verification commands
 
-- Standard checks: `bun run format:check`, `bun run lint`, `bun run lint:vue`, `bun run typecheck`, `bun run typecheck:tests`, `bun run test`.
-- `bun run typecheck` regenerates Nuxt and ViteHub types, then uses `tsconfig.vize.json` to check the projects with tsrs and the Vize `.vue` content mapper. `bun run typecheck:tests` uses the generated types. Opt in to Vue lint rules individually in `vite.config.ts`.
+- Standard checks: `bun run format:check` (`vp fmt --check`), `bun run lint` (`vp lint`), `bun run lint:vue`, `bun run typecheck`, `bun run test`.
+- `bun run typecheck` regenerates Nuxt and ViteHub types, then uses `tsconfig.vize.json` to check all projects (including `tsconfig.tests.json`) with tsrs and the Vize `.vue` content mapper. Formatting, Oxlint (with Nuxt auto-import enforcement), and Vue lint rules are configured in `vite.config.ts` via Vite+.
 - Put app tests that rely on auto-imports in `tests/nuxt/`. `@nuxt/test-utils` applies the fixture's Nuxt transform there and supports `mockNuxtImport`. Node tests load their dependencies directly and use explicit imports.
 - Optional Nuxt diagnostics: `bun run check:doctor`. Use `--changed` for local edits or `--since origin/dev` for branch changes.
 - Built Worker checks (always run `bun run build` after `server/` edits first): `bun x wrangler deploy --dry-run --config .output/server/wrangler.json` and `LIRY24_TEST_BUILT_WORKER=true bun x vitest run tests/worker/` (always via Node/Vitest, never `bun test`).

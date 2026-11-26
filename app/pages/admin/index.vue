@@ -1,7 +1,7 @@
 <script setup lang="ts">
-const { data: postOverview } = await useFetch<{ items: Array<{ status?: { state?: string } }> }>(
-    '/api/admin/content/posts',
-)
+const { data: postOverview } = await useFetch('/api/admin/content/posts', {
+    key: 'admin-posts-overview',
+})
 
 const totalPosts = computed(() => postOverview.value?.items.length ?? 0)
 const draftPosts = computed(
@@ -11,22 +11,7 @@ const draftPosts = computed(
         ).length ?? 0,
 )
 
-const collectionLinks = [
-    { name: 'posts', label: 'Posts', to: '/admin/posts', icon: 'mingcute:document-2-fill' },
-    { name: 'works', label: 'Works', to: '/admin/works', icon: 'mingcute:briefcase-fill' },
-    { name: 'arts', label: 'Arts', to: '/admin/arts', icon: 'mingcute:palette-fill' },
-    { name: 'careers', label: 'Careers', to: '/admin/careers', icon: 'mingcute:building-2-fill' },
-    { name: 'skills', label: 'Skills', to: '/admin/skills', icon: 'mingcute:tool-fill' },
-    {
-        name: 'gameStats',
-        label: 'Game Stats',
-        to: '/admin/gameStats',
-        icon: 'mingcute:chart-line-fill',
-    },
-    { name: 'socials', label: 'Socials', to: '/admin/socials', icon: 'mingcute:link-2-fill' },
-] as const
-
-useHead({ title: 'Dashboard', titleTemplate: '%s | Liry24 Admin' })
+useHead({ title: 'Dashboard' })
 </script>
 
 <template>
@@ -78,7 +63,7 @@ useHead({ title: 'Dashboard', titleTemplate: '%s | Liry24 Admin' })
                 <h2 class="text-muted text-sm font-medium">Content Collections</h2>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <UCard
-                        v-for="item in collectionLinks"
+                        v-for="item in adminCollectionLinks"
                         :key="item.name"
                         class="hover:bg-elevated/40 transition-colors"
                     >

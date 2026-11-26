@@ -20,6 +20,7 @@ export default defineNuxtConfig({
     alias: { '~~': root, '~': `${root}app` },
     imports: {
         presets: [
+            { from: '@vueuse/core', imports: ['useTimeoutFn'] },
             { from: 'cn', imports: ['cn'] },
             { from: 'vite-hub/auth/vue', imports: ['useUserSession'] },
         ],

@@ -95,8 +95,7 @@ export async function validateGameStatsSave(options: {
     const game = await gameCatalog().get(data.game)
     if (!game) invalidField('Choose a saved game.')
 
-    const metrics: Array<GameMetric> = Array.isArray(game.data.metrics) ? game.data.metrics : []
-    const issues = gameValueIssues(metrics, data.values)
+    const issues = gameValueIssues(game.data.metrics, data.values)
     const firstIssue = issues[0]
     if (firstIssue) invalidField(firstIssue)
 
@@ -130,12 +129,4 @@ export async function validateGameRemoval(id: string) {
         [...draftPosts, ...publishedPosts].some((item) => item.data.gameMentions?.includes(id))
     )
         throw createError({ status: 409, statusText: 'Game is referenced by Game Stats or Posts' })
-}
-
-export async function validateSocialSave(options: { id: string; slug: string }) {
-    const existing = await listAllCollectionItems(content.collection('socials'), 'draft')
-    for (const doc of existing) {
-        if (doc.id !== options.id && doc.data.slug === options.slug)
-            invalidField('A social link with this slug already exists.')
-    }
 }

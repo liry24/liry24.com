@@ -14,6 +14,7 @@ const baseURL =
     process.env.NUXT_PUBLIC_SITE_URL ||
     (isPreview ? 'https://dev-liry24-com.liry.workers.dev' : 'https://liry24.com')
 const imagesDomain = isPreview ? baseURL : 'https://images.liry24.com'
+const igdbClientId = process.env.IGDB_CLIENT_ID || '907z6pjakj7oiu1oyqhnepvktcw10p'
 const title = 'Liry24'
 const diagnostics = process.env.NUXT_DIAGNOSTICS === '1'
 let localAdmin = { origin: '', secret: '' }
@@ -27,7 +28,12 @@ export default defineNuxtConfig({
 
     a11y: { enabled: false },
 
-    css: ['~/assets/css/main.css'],
+    css: [
+        '~/assets/css/main.css',
+        '~/assets/css/cursor.css',
+        '~/assets/css/sentence.css',
+        '~/assets/css/squircle.css',
+    ],
 
     imports: { presets: [{ from: 'cn', imports: ['cn'] }] },
 
@@ -35,66 +41,7 @@ export default defineNuxtConfig({
         '@nuxt/fonts',
         '@nuxt/ui',
         '@comark/vue',
-        [
-            viteHub,
-            {
-                host: process.env.LIRY24_HOST === 'node' ? 'node' : 'cloudflare',
-                name: process.env.LIRY24_WORKER_NAME || 'liry24-com',
-                publicUrl: baseURL,
-                auth: true,
-                console: false,
-                database: {
-                    driver: 'cloudflare',
-                    binding: 'DB',
-                    databaseName: process.env.LIRY24_DATABASE_NAME || 'liry24-com',
-                    databaseId:
-                        process.env.LIRY24_DATABASE_ID || '227d818f-cd40-4fca-9710-b57273be94ca',
-                    previewDatabaseId:
-                        process.env.LIRY24_PREVIEW_DATABASE_ID ||
-                        '3c7c6179-12d0-4108-9eea-b3e20d394cef',
-                },
-                blob: {
-                    driver: 'cloudflare',
-                    binding: 'STORAGE',
-                    bucketName: process.env.LIRY24_STORAGE_BUCKET || 'liry24-com',
-                    serve: { access: 'public', route: '/media' },
-                },
-                schedule: {
-                    providerOutput: process.env.LIRY24_DISABLE_CRON === 'true' ? false : 'nitro',
-                },
-                observability: {
-                    service: 'liry24-com',
-                    browserErrors: false,
-                    evlog: {
-                        minLevel: 'info',
-                        exclude: [
-                            '/_nuxt/**',
-                            '/favicon.ico',
-                            '/robots.txt',
-                            '/sitemap.xml',
-                            '/media/**',
-                        ],
-                        sampling: {
-                            rates: {
-                                debug: 0,
-                                info: 1,
-                                warn: 100,
-                                error: 100,
-                            },
-                            keep: [
-                                { status: 500 },
-                                { duration: 2000 },
-                                { path: '/api/admin/**' },
-                                { path: '/_vitehub/agents/**' },
-                            ],
-                        },
-                    },
-                },
-                agent: {
-                    invocations: 'database',
-                },
-            },
-        ],
+        viteHub,
         '@nuxt/image',
         '@vueuse/nuxt',
         '@nuxt/a11y',
@@ -119,9 +66,57 @@ export default defineNuxtConfig({
         'motion-v/nuxt',
     ],
 
-    vitehub: { env: { server: serverEnv } },
+    vitehub: {
+        host: 'cloudflare',
+        name: 'liry24-com',
+        publicUrl: baseURL,
+        auth: true,
+        console: false,
+        env: { server: serverEnv },
+        database: {
+            driver: 'cloudflare',
+            binding: 'DB',
+            databaseName: 'liry24-com',
+            databaseId: '227d818f-cd40-4fca-9710-b57273be94ca',
+            previewDatabaseId: '3c7c6179-12d0-4108-9eea-b3e20d394cef',
+        },
+        blob: {
+            driver: 'cloudflare',
+            binding: 'STORAGE',
+            bucketName: 'liry24-com',
+            serve: { access: 'public', route: '/media' },
+        },
+        schedule: {
+            providerOutput: process.env.LIRY24_DISABLE_CRON === 'true' ? false : 'nitro',
+        },
+        observability: {
+            service: 'liry24-com',
+            browserErrors: false,
+            evlog: {
+                minLevel: 'info',
+                exclude: ['/_nuxt/**', '/favicon.ico', '/robots.txt', '/sitemap.xml', '/media/**'],
+                sampling: {
+                    rates: {
+                        debug: 0,
+                        info: 1,
+                        warn: 100,
+                        error: 100,
+                    },
+                    keep: [
+                        { status: 500 },
+                        { duration: 2000 },
+                        { path: '/api/admin/**' },
+                        { path: '/_vitehub/agents/**' },
+                    ],
+                },
+            },
+        },
+        agent: {
+            invocations: 'database',
+        },
+    },
 
-    extends: ['~~/layers/cursor', '~~/layers/icons', '~~/layers/squircle', '~~/layers/sentence'],
+    extends: ['~~/layers/icons'],
 
     components: [
         { path: '~/components/public' },
@@ -143,9 +138,6 @@ export default defineNuxtConfig({
     },
 
     vite: {
-        ssr: {
-            noExternal: ['@liry24/ui', '@vite-hub/ui', /@liry24[/\\]ui/, /@vite-hub[/\\]ui/],
-        },
         optimizeDeps: {
             noDiscovery: true,
             include: [
@@ -210,7 +202,7 @@ export default defineNuxtConfig({
                 },
                 vars: {
                     APP_ENV: appEnv || 'production',
-                    IGDB_CLIENT_ID: process.env.IGDB_CLIENT_ID || '907z6pjakj7oiu1oyqhnepvktcw10p',
+                    IGDB_CLIENT_ID: igdbClientId,
                 },
                 routes: [
                     {
@@ -223,8 +215,7 @@ export default defineNuxtConfig({
                 previews: {
                     vars: {
                         APP_ENV: 'dev',
-                        IGDB_CLIENT_ID:
-                            process.env.IGDB_CLIENT_ID || '907z6pjakj7oiu1oyqhnepvktcw10p',
+                        IGDB_CLIENT_ID: igdbClientId,
                         NUXT_PUBLIC_SITE_URL: 'https://dev-liry24-com.liry.workers.dev',
                         NUXT_PUBLIC_IMAGES_DOMAIN: 'https://dev-liry24-com.liry.workers.dev',
                     },

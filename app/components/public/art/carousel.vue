@@ -11,12 +11,6 @@ const imageViewer = overlay.create(LazyImageViewer)
 const carousel = useTemplateRef('carousel')
 const activeIndex = ref(0)
 
-const onClickPrev = () => {
-    activeIndex.value--
-}
-const onClickNext = () => {
-    activeIndex.value++
-}
 const onSelect = (index: number) => {
     activeIndex.value = index
 }
@@ -33,8 +27,6 @@ const select = (index: number) => {
             ref="carousel"
             v-slot="{ item }"
             :items="data"
-            :prev="{ onClick: onClickPrev }"
-            :next="{ onClick: onClickNext }"
             :ui="{ container: 'items-center' }"
             class="mx-auto w-full"
             @select="onSelect"

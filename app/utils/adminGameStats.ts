@@ -1,4 +1,4 @@
-export type AdminStatValue = GameStatsRecordData['values'][number]
+type AdminStatValue = GameStatsRecordData['values'][number]
 export type AdminStatDraft = Omit<AdminStatValue, 'key' | 'value'> & { number: string }
 
 export function collectAdminStatValues(

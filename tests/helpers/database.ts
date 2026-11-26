@@ -2,8 +2,6 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
-import { sqliteD1 } from './d1'
-
 const migrationsDir = 'server/databases/default/migrations'
 
 export const baselineStatements = () =>
@@ -25,6 +23,5 @@ export function openTestDatabase() {
     sqlite.exec('PRAGMA foreign_keys=ON')
     for (const sql of baselineStatements()) sqlite.exec(sql)
 
-    const env = { DB: sqliteD1(sqlite) }
-    return { sqlite, env, close: () => sqlite.close() }
+    return { sqlite, close: () => sqlite.close() }
 }

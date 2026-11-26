@@ -1,6 +1,6 @@
 import type { MediaReference, PortfolioItem } from '../types/content.js'
 
-export type GamePosition = {
+type GamePosition = {
     value: number
     label: string
     image?: MediaReference | null
@@ -23,7 +23,7 @@ export type GameValue = {
     color?: string | null
 }
 
-export type GameData = {
+type GameData = {
     slug: string
     igdbId: number
     name: string

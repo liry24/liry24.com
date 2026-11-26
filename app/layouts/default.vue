@@ -16,30 +16,24 @@ const tabs = [
     },
 ]
 
-const title = ref('Liry24')
-const originalTitle = ref('Liry24')
 const titleHovered = ref(false)
+const originalTitle = computed(
+    () => tabs.find((tab) => route.path.startsWith(tab.to))?.label || 'Liry24',
+)
+const title = computed(() => (titleHovered.value ? 'back to home' : originalTitle.value))
 
 watch(
     () => route.path,
     () => {
-        const text = tabs.find((tab) => route.path.startsWith(tab.to))?.label || 'Liry24'
-        title.value = text
-        originalTitle.value = text
         titleHovered.value = false
     },
-    { immediate: true },
 )
 
 const handleMouseEnter = () => {
-    if (route.path !== '/') {
-        title.value = 'back to home'
-        titleHovered.value = true
-    }
+    if (route.path !== '/') titleHovered.value = true
 }
 
 const handleMouseLeave = () => {
-    title.value = originalTitle.value
     titleHovered.value = false
 }
 
@@ -50,7 +44,7 @@ const showIgdbAttribution = computed(() => route.path === '/' || route.path.star
     <div class="flex flex-col gap-16">
         <MotionConfig :transition="{ duration: 0.6 }" reduced-motion="user">
             <div class="mx-8 my-12 flex min-h-dvh flex-col gap-12 md:mx-12 lg:mx-24 lg:mt-24">
-                <header class="fade-in flex w-full flex-col items-center gap-3">
+                <header class="flex w-full flex-col items-center gap-3">
                     <NuxtLink
                         to="/"
                         class="flex items-center gap-3"
@@ -88,14 +82,6 @@ const showIgdbAttribution = computed(() => route.path === '/' || route.path.star
                             color="neutral"
                             variant="link"
                             orientation="horizontal"
-                            :delay-duration="0"
-                            :disable-click-trigger="false"
-                            :disable-hover-trigger="false"
-                            :skip-delay-duration="0"
-                            :disable-pointer-leave-close="false"
-                            :unmount-on-hide="false"
-                            :disabled="false"
-                            :collapsible="false"
                             class="text-toned ml-auto font-mono text-lg font-medium"
                         />
 
@@ -109,7 +95,7 @@ const showIgdbAttribution = computed(() => route.path === '/' || route.path.star
             </div>
 
             <footer
-                class="fade-in @container mx-8 mb-10 flex flex-col items-center gap-3 md:mx-12 lg:mx-24"
+                class="@container mx-8 mb-10 flex flex-col items-center gap-3 md:mx-12 lg:mx-24"
             >
                 <USeparator decorative />
 

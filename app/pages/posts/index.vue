@@ -35,16 +35,12 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'posts' }, [
             variant="ghost"
         />
     </div>
-    <p v-if="!filtered?.length" class="text-muted py-8 text-center">No posts found.</p>
-    <UPage
-        v-if="filtered?.length"
-        :ui="{ center: 'sm:mx-4 grid grid-cols-1 gap-6 lg:grid-cols-2' }"
-    >
+    <p v-if="!filtered.length" class="text-muted py-8 text-center">No posts found.</p>
+    <UPage v-else :ui="{ center: 'sm:mx-4 grid grid-cols-1 gap-6 lg:grid-cols-2' }">
         <article
-            v-for="(post, index) in filtered"
-            :key="String(post.slug)"
-            :style="{ 'animation-delay': `${100 + index * 100}ms` }"
-            class="fade-in hover:bg-muted flex flex-col justify-between gap-2 rounded-xl p-5 transition-colors"
+            v-for="post in filtered"
+            :key="post.slug"
+            class="hover:bg-muted flex flex-col justify-between gap-2 rounded-xl p-5 transition-colors"
         >
             <h2
                 class="before:text-dimmed text-2xl font-bold before:font-mono before:-tracking-widest before:content-['//_']"
@@ -67,7 +63,7 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'posts' }, [
                     class="text-muted font-mono text-sm"
                 />
                 <UBadge
-                    v-for="(tag, tagIndex) in post.tags.filter((tag) => tag !== null)"
+                    v-for="(tag, tagIndex) in post.tags"
                     :key="`tag-${tagIndex}`"
                     :label="tag"
                     icon="mingcute:hashtag-line"

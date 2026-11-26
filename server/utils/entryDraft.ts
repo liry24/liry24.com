@@ -43,7 +43,7 @@ export async function saveEntryDraft<
     let previous: Data | undefined
 
     if (options.id?.trim()) {
-        id = normalizeDocumentId(options.id, '')
+        id = validateDocumentId(options.id)
         const draft = await collection.get(id, { ref: 'draft' })
         previous = draft?.data
         const currentKey = manualKey ?? previous?.[key]
@@ -67,8 +67,7 @@ export async function saveEntryDraft<
         )
         const makeId = (value: string) => {
             const prefix = options.idPrefix ?? ''
-            return normalizeDocumentId(
-                undefined,
+            return buildDocumentId(
                 (manualKey === undefined ? prefix.slice(0, 100 - value.length) : prefix) + value,
             )
         }

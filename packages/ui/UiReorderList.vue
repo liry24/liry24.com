@@ -156,16 +156,16 @@ async function move(event: MouseEvent, id: string, index: number) {
     min-height: 2rem;
     place-items: center;
     border-radius: 0.375rem;
-    color: var(--ui-text-highlighted);
+    color: var(--foreground);
 }
 
 .reorder-control:hover:not([aria-disabled='true'], :disabled),
 .reorder-control[aria-pressed='true'] {
-    background: var(--ui-bg-elevated);
+    background: var(--surface-hover);
 }
 
 .reorder-control:focus-visible {
-    outline: 2px solid var(--ui-primary);
+    outline: 2px solid var(--ring);
     outline-offset: -2px;
 }
 
@@ -181,7 +181,7 @@ async function move(event: MouseEvent, id: string, index: number) {
 
 .reorder-control[aria-disabled='true'],
 .reorder-control:disabled {
-    color: var(--ui-text-muted);
+    color: var(--text-muted);
     cursor: default;
 }
 </style>

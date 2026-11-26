@@ -111,7 +111,7 @@ test('failures are visible, concurrent writes are ignored, and identities cannot
     await pending
     expect(sessions.failure.value).toBeTruthy()
     expect(sessions.failure.value).not.toContain(upstreamError)
-    if (boundary.identity) boundary.identity.user.value = { id: 'bob' }
+    if (boundary.identity) boundary.identity.session.value = null
 
     expect(sessions.sessions.value).toEqual([])
     let finishList!: (value: { data?: Array<MockSessionRow> }) => void
@@ -121,9 +121,9 @@ test('failures are visible, concurrent writes are ignored, and identities cannot
         }),
     )
     const refresh = sessions.refresh()
-    if (boundary.identity) boundary.identity.user.value = { id: 'carol' }
+    if (boundary.identity) boundary.identity.session.value = { id: 'next-session' }
 
-    finishList({ data: [{ id: 'bob-session' }] })
+    finishList({ data: [{ id: 'stale-session' }] })
     await refresh
     expect(sessions.sessions.value).toEqual([])
 })

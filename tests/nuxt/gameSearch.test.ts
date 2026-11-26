@@ -102,7 +102,7 @@ test('imports use canonical saved data, preserve failures, and ignore responses 
     const pending = Promise.withResolvers<GameSearchResult>()
     const fetcher = vi.fn().mockReturnValueOnce(pending.promise)
     fetchBoundary.mockImplementation(fetcher)
-    const { user, state } = setup()
+    const { session, state } = setup()
     const importing = state.importGame(game)
     expect(await state.importGame(game)).toBeUndefined()
     const saved = { ...game, id: 'igdb-1', slug: 'canonical' }
@@ -117,7 +117,7 @@ test('imports use canonical saved data, preserve failures, and ignore responses 
     const old = Promise.withResolvers<GameSearchResult>()
     fetcher.mockReturnValueOnce(old.promise)
     const cancelled = state.importGame(game)
-    user.value = { id: 'bob', role: 'admin' }
+    session.value = { id: 'session-2' }
     expect(fetcher.mock.calls[2]![1].signal.aborted).toBe(true)
     old.resolve(saved)
     expect(await cancelled).toBeUndefined()

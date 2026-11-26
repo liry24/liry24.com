@@ -3,7 +3,7 @@ export interface FocusableElement {
     focus: () => void
 }
 
-export const isFocusableElement = (value: unknown): value is FocusableElement =>
+const isFocusableElement = (value: unknown): value is FocusableElement =>
     typeof value === 'object' &&
     value !== null &&
     'isConnected' in value &&

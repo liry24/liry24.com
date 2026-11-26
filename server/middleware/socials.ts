@@ -16,5 +16,5 @@ export default defineEventHandler(async (event) => {
 
     const socials = await listAllCollectionItems(content.collection('socials'), 'published')
     const target = socials.find((doc) => doc.data.slug === slug)?.data.href
-    if (typeof target === 'string') return sendRedirect(event, target, 302)
+    if (target) return sendRedirect(event, target, 302)
 })

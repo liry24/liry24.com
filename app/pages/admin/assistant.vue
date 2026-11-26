@@ -63,7 +63,6 @@ useHead({ title: 'Assistant' })
                 :title="error.message || 'Assistant request failed.'"
                 color="error"
                 variant="subtle"
-                :ui="{ title: 'text-red-700 dark:text-red-400' }"
                 close
                 @update:open="clearError"
             />
@@ -73,7 +72,11 @@ useHead({ title: 'Assistant' })
                     v-if="messages.length === 0"
                     class="mx-auto flex min-h-full w-full max-w-sm flex-col items-center justify-center gap-3 py-8 text-center"
                 >
-                    <AdminHairlineRiffle label="Editorial assistant ready" class="max-w-xs" />
+                    <AdminHairlineFigure
+                        kind="riffle"
+                        label="Editorial assistant ready"
+                        class="max-w-xs"
+                    />
                     <p class="text-muted text-sm">
                         Ask agent to inspect collections, draft posts, or prepare updates.
                     </p>

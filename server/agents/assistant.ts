@@ -128,8 +128,17 @@ export default defineAgent({
             },
         },
         model: (): LanguageModel => {
+            if (isOfflineEditorialMode()) return createOfflineMockModel()
+
             const apiKey = readEditorialApiKey()
-            if (!apiKey) return createOfflineMockModel()
+            if (!apiKey) {
+                if (import.meta.dev) return createOfflineMockModel()
+
+                throw createError({
+                    status: 503,
+                    statusText: 'Editorial assistant is not configured.',
+                })
+            }
 
             const google = createGoogleGenerativeAI({
                 apiKey,

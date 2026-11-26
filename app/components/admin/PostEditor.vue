@@ -1,18 +1,8 @@
 <script setup lang="ts">
-import {
-    UiButton,
-    UiField,
-    UiFileInput,
-    UiFileInputTrigger,
-    UiFormDialog,
-    UiInput,
-    UiTagInput,
-} from '@liry24/ui'
+import { UiButton, UiField, UiFileInput, UiFileInputTrigger, UiInput, UiTagInput } from '@liry24/ui'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { ContentDocumentStatus, ContentSchedule } from '@vite-hub/content'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
-
-import '@liry24/ui/styles.css'
 
 const { id } = defineProps<{ id?: string }>()
 
@@ -33,19 +23,14 @@ const body = ref('')
 const status = ref<ContentDocumentStatus | null>(null)
 const schedules = ref<Array<ContentSchedule>>([])
 const scheduleOpen = ref(false)
-const scheduleAtLocal = ref('')
 const scheduleError = ref('')
-const publishMenuId = useId()
-const focusPublishMenu = () => document.getElementById(publishMenuId)
-const scheduleDateFormat = new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-})
+const publishMenu = useTemplateRef<{ $el?: HTMLElement }>('publishMenu')
+const focusPublishMenu = () => publishMenu.value?.$el ?? null
 const { data: tagSuggestions } = useLazyFetch('/api/admin/posts/tags', { server: false })
 
 type PostAction = 'draft' | 'publish' | 'schedule'
 const pendingAction = ref<PostAction | 'unschedule' | null>(null)
-const uploading = ref(false)
+const { uploading, uploadSingle } = useAdminMediaUpload('posts')
 const formError = ref('')
 const errors = ref<Record<string, string>>({})
 const showPreview = ref(false)
@@ -63,48 +48,17 @@ const rememberGame = (game: GameSearchResult) => {
     games.set(game.slug, game)
 }
 
-const toLocalDatetimeInput = (iso: string | undefined): string => {
-    if (!iso) return ''
-
-    const ms = Date.parse(iso)
-    if (Number.isNaN(ms)) return ''
-
-    const offset = new Date(ms).getTimezoneOffset() * 60 * 1000
-    return new Date(ms - offset).toISOString().slice(0, 16)
-}
-
-const toIsoWithOffset = (local: string): string | undefined => {
-    if (!local.trim()) return undefined
-
-    const parsed = new Date(local)
-    if (Number.isNaN(parsed.getTime())) return undefined
-
-    return parsed.toISOString()
-}
-
 const loadDocument = async () => {
     if (!docId.value) return
 
-    const doc = await request<{
-        id: string
-        data: {
-            title?: string
-            slug?: string
-            summary?: string
-            tags?: Array<string>
-            cover?: MediaReference
-            authoredAt?: string
-            order?: number
-        }
-        body: string
-        status: ContentDocumentStatus | null
-        schedules: Array<ContentSchedule>
-    }>(`/api/admin/content/posts/${encodeURIComponent(docId.value)}`)
+    const doc = await request(`/api/admin/content/posts/${encodeURIComponent(docId.value)}`)
+    if (!isPostData(doc.data)) throw new Error('Invalid post document')
 
+    const post = doc.data
     const missing = [
         ...new Set(
             [
-                ...postEditorMentionParts(doc.data.title ?? '', false),
+                ...postEditorMentionParts(post.title ?? '', false),
                 ...postEditorMentionParts(doc.body ?? '', true),
             ].flatMap(({ slug: gameSlug }) => (gameSlug && !games.has(gameSlug) ? [gameSlug] : [])),
         ),
@@ -122,13 +76,13 @@ const loadDocument = async () => {
         }
     }
     docId.value = doc.id
-    title.value = doc.data.title ?? ''
-    slug.value = doc.data.slug ?? doc.id
-    summary.value = doc.data.summary ?? ''
-    tags.value = doc.data.tags ?? []
-    cover.value = doc.data.cover
-    authoredAtLocal.value = toLocalDatetimeInput(doc.data.authoredAt)
-    order.value = doc.data.order ?? 0
+    title.value = post.title ?? ''
+    slug.value = post.slug ?? doc.id
+    summary.value = post.summary ?? ''
+    tags.value = post.tags ?? []
+    cover.value = post.cover
+    authoredAtLocal.value = toLocalDatetimeInput(post.authoredAt)
+    order.value = post.order ?? 0
     body.value = doc.body ?? ''
     status.value = doc.status
     schedules.value = doc.schedules
@@ -142,24 +96,13 @@ const uploadCover = async (files: Array<File>) => {
     const file = files[0]
     if (!file) return
 
-    uploading.value = true
     try {
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('folder', 'posts')
-        cover.value = await $fetch<MediaReference>('/api/admin/media', {
-            method: 'POST',
-            body: formData,
+        const uploaded = await uploadSingle(file, {
+            successTitle: 'Uploaded cover image',
+            fallbackError: 'Could not upload cover image.',
         })
-        toast.add({ title: 'Uploaded cover image', color: 'success' })
-    } catch (error) {
-        toast.add({
-            title: 'Upload failed',
-            description: adminErrorMessage(error, 'Could not upload cover image.'),
-            color: 'error',
-        })
+        if (uploaded) cover.value = uploaded
     } finally {
-        uploading.value = false
         coverFiles.value = []
     }
 }
@@ -184,7 +127,7 @@ const saveDraft = async () => {
             summary: summary.value.trim() || undefined,
             tags: tags.value,
             cover: cover.value,
-            authoredAt: toIsoWithOffset(authoredAtLocal.value),
+            authoredAt: toIsoFromLocalInput(authoredAtLocal.value),
             order: Number(order.value) || 0,
         },
         body: postEditorMentionParts(body.value, true)
@@ -248,20 +191,7 @@ const runPostAction = async (
 
 const openSchedule = () => {
     scheduleError.value = ''
-    scheduleAtLocal.value = toLocalDatetimeInput(new Date(Date.now() + 3_600_000).toISOString())
     scheduleOpen.value = true
-}
-
-const schedulePublish = async () => {
-    if (schedules.value.length) return
-
-    scheduleError.value = ''
-    const at = toIsoWithOffset(scheduleAtLocal.value)
-    if (!at || Date.parse(at) <= Date.now()) {
-        scheduleError.value = 'Choose a future date and time.'
-        return
-    }
-    await runPostAction('schedule', at)
 }
 
 const unschedule = async (scheduleId: string) => {
@@ -306,21 +236,20 @@ const publishActions: Array<DropdownMenuItem> = [
             >
                 <template #right>
                     <div class="flex flex-wrap items-center justify-end gap-2">
-                        <span
+                        <UBadge
                             v-if="status?.state"
-                            class="ui-badge"
-                            :data-tone="status.state === 'published' ? 'success' : 'warning'"
-                        >
-                            {{ status.state }}
-                        </span>
-                        <UiButton
-                            class="ui-button"
-                            data-variant="ghost"
+                            :label="status.state"
+                            :color="status.state === 'published' ? 'success' : 'warning'"
+                            variant="subtle"
+                            size="sm"
+                        />
+                        <UButton
+                            :label="showPreview ? 'Edit Markdown' : 'Preview Markdown'"
+                            variant="ghost"
+                            color="neutral"
                             :disabled="busy"
                             @click="showPreview = !showPreview"
-                        >
-                            {{ showPreview ? 'Edit Markdown' : 'Preview Markdown' }}
-                        </UiButton>
+                        />
                         <UFieldGroup role="group" aria-label="Publish">
                             <UButton
                                 label="Publish"
@@ -336,7 +265,7 @@ const publishActions: Array<DropdownMenuItem> = [
                                 :disabled="busy"
                             >
                                 <UButton
-                                    :id="publishMenuId"
+                                    ref="publishMenu"
                                     aria-label="Publish options"
                                     icon="lucide:chevron-down"
                                     color="neutral"
@@ -462,62 +391,16 @@ const publishActions: Array<DropdownMenuItem> = [
                 />
             </fieldset>
 
-            <UiFormDialog
+            <AdminPostScheduleDialog
                 v-model:open="scheduleOpen"
-                title="Scheduled publish"
-                submit-label="Schedule"
-                submitting-label="Scheduling…"
+                :schedules="schedules"
                 :busy="busy"
                 :saving="pendingAction === 'schedule'"
-                :hide-submit="schedules.length > 0"
+                :error="scheduleError"
                 :final-focus="focusPublishMenu"
-                @submit="schedulePublish"
-            >
-                <div class="grid gap-4">
-                    <p v-if="scheduleError" class="ui-alert" role="alert">{{ scheduleError }}</p>
-                    <UiField
-                        v-if="!schedules.length"
-                        label="Schedule at"
-                        description="Use your local time."
-                        required
-                    >
-                        <UiInput
-                            v-model="scheduleAtLocal"
-                            type="datetime-local"
-                            class="ui-input"
-                            :disabled="busy"
-                            required
-                        />
-                    </UiField>
-                    <ul
-                        v-if="schedules.length"
-                        class="border-default divide-default divide-y border-t"
-                    >
-                        <li
-                            v-for="entry in schedules"
-                            :key="entry.id"
-                            class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
-                        >
-                            <span>
-                                <time :datetime="entry.at">{{
-                                    scheduleDateFormat.format(new Date(entry.at))
-                                }}</time>
-                                · {{ entry.status }}
-                            </span>
-                            <UiButton
-                                type="button"
-                                class="ui-button"
-                                data-variant="ghost"
-                                data-tone="danger"
-                                :disabled="busy"
-                                @click="unschedule(entry.id)"
-                            >
-                                Cancel schedule
-                            </UiButton>
-                        </li>
-                    </ul>
-                </div>
-            </UiFormDialog>
+                @schedule="runPostAction('schedule', $event)"
+                @unschedule="unschedule"
+            />
         </template>
     </UDashboardPanel>
 </template>

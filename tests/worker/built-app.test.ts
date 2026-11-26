@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { z } from 'zod'
 
 import { builtWorker } from '../helpers/builtWorker'
+import { multipartRequest, seedGameCatalog } from '../helpers/workerSeed'
 
 type Worker = Awaited<ReturnType<typeof builtWorker>>
 type Session = Awaited<ReturnType<Worker['session']>>
@@ -66,11 +67,9 @@ describe.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')('built Worker', 
         const form = new FormData()
         form.append('file', new File([bytes], 'sample.png', { type: 'image/png' }))
         form.append('folder', 'posts')
-        const multipart = new Request(app.url, { method: 'POST', body: form })
         const upload = await fetch('/api/admin/media', {
             method: 'POST',
-            headers: { ...Object.fromEntries(multipart.headers), ...admin },
-            body: new Uint8Array(await multipart.arrayBuffer()),
+            ...(await multipartRequest(form, admin)),
         })
         expect(upload.status, await upload.clone().text()).toBe(200)
         const { pathname } = z.object({ pathname: z.string() }).parse(await upload.json())
@@ -82,22 +81,13 @@ describe.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')('built Worker', 
     })
 
     test('publish and schedule keep drafts separate from the public article', async () => {
-        await app.env.DB.prepare(
-            'INSERT INTO game_catalog (id, igdb_id, slug, data) VALUES (?, ?, ?, ?)',
-        )
-            .bind(
-                'igdb-100',
-                100,
-                'first-game',
-                JSON.stringify({
-                    igdbId: 100,
-                    slug: 'first-game',
-                    name: 'First Game',
-                    order: 0,
-                    metrics: [],
-                }),
-            )
-            .run()
+        await seedGameCatalog(app.env.DB, 'igdb-100', {
+            igdbId: 100,
+            slug: 'first-game',
+            name: 'First Game',
+            order: 0,
+            metrics: [],
+        })
         const save = (body: string) =>
             post(
                 '/_vitehub/forms/post',

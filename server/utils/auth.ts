@@ -1,15 +1,7 @@
 import type { RequestEvent } from 'nuxt/server'
 
-export interface AppSessionUser {
-    id: string
-    name?: string | null
-    email?: string | null
-    image?: string | null
-    role?: string | null
-}
-
-export function isAdminUser(user: AppSessionUser | { role?: unknown } | null | undefined) {
-    return Boolean(user && typeof user === 'object' && user.role === 'admin')
+export function isAdminUser(user: { role?: unknown } | null | undefined) {
+    return user?.role === 'admin'
 }
 
 export async function getAppSession(event: RequestEvent) {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { UiFileInput, UiFileInputTrigger } from '@liry24/ui'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 
 const props = defineProps<{ item?: AdminEntryRecord<GameRecordData> }>()
@@ -7,8 +8,9 @@ const emit = defineEmits<{ saved: [] }>()
 const toast = useToast()
 const game = ref<GameRecordData>()
 const metricsText = ref('')
+const iconFiles = shallowRef<Array<File>>([])
 const saving = ref(false)
-const uploading = ref(false)
+const { uploading, uploadSingle } = useAdminMediaUpload('games')
 const errorMessage = ref('')
 const errors = ref<Record<string, string>>({})
 
@@ -20,26 +22,18 @@ watch(open, (value) => {
     errors.value = {}
 })
 
-async function upload(event: Event) {
-    const input = event.target as HTMLInputElement
-    const file = input.files?.[0]
-    if (!file || !game.value || saving.value || uploading.value) return
-    uploading.value = true
+async function upload(files: Array<File>) {
+    iconFiles.value = files
+    const file = files[0]
+    if (!file || !game.value || saving.value) return
     try {
-        const body = new FormData()
-        body.append('file', file)
-        body.append('folder', 'games')
-        game.value.icon = await $fetch<MediaReference>('/api/admin/media', { method: 'POST', body })
-        toast.add({ title: 'Uploaded image', color: 'success' })
-    } catch (error) {
-        toast.add({
-            title: 'Upload failed',
-            description: adminErrorMessage(error, 'Could not upload image.'),
-            color: 'error',
+        const uploaded = await uploadSingle(file, {
+            successTitle: 'Uploaded image',
+            fallbackError: 'Could not upload image.',
         })
+        if (uploaded) game.value.icon = uploaded
     } finally {
-        uploading.value = false
-        input.value = ''
+        iconFiles.value = []
     }
 }
 
@@ -82,21 +76,38 @@ async function save() {
                     :title="errorMessage"
                     color="error"
                     variant="subtle"
-                    :ui="{ title: 'text-red-700 dark:text-red-400' }"
                 />
-                <UFormField label="Name" required
-                    ><UInput :model-value="game.name" disabled
-                /></UFormField>
+                <UFormField label="Name" required>
+                    <UInput :model-value="game.name" disabled />
+                </UFormField>
                 <UFormField label="Primary metric" :error="errors['data.primaryMetric']">
                     <UInput v-model="game.primaryMetric" />
                 </UFormField>
-                <UFormField label="Icon upload">
-                    <input
-                        type="file"
-                        accept="image/*"
-                        :disabled="uploading || saving"
-                        @change="upload"
-                    />
+                <UFormField label="Icon upload" :description="game.icon?.pathname">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <UiFileInput
+                            :value="iconFiles"
+                            accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
+                            :disabled="uploading || saving"
+                            @value-change="upload"
+                            @reject="
+                                toast.add({
+                                    title: 'Choose a supported image file',
+                                    color: 'error',
+                                })
+                            "
+                        >
+                            <UiFileInputTrigger class="ui-button">
+                                {{ uploading ? 'Uploading…' : 'Choose image' }}
+                            </UiFileInputTrigger>
+                        </UiFileInput>
+                        <img
+                            v-if="game.icon"
+                            :src="mediaUrl(game.icon)"
+                            alt="Game icon preview"
+                            class="size-10 rounded object-cover"
+                        />
+                    </div>
                 </UFormField>
                 <UFormField label="Metrics JSON" :error="errors['data.metrics']">
                     <UTextarea v-model="metricsText" :rows="6" class="font-mono" />

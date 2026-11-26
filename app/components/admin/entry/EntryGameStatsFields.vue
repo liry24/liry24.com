@@ -20,9 +20,7 @@ const {
     error,
     status,
     refresh,
-} = useLazyFetch<{
-    items: Array<AdminEntryRecord<GameRecordData>>
-}>('/api/admin/games/catalog', { key: 'admin-game-stat-catalog', server: false })
+} = useLazyFetch('/api/admin/games/catalog', { key: 'admin-game-stat-catalog', server: false })
 
 const games = computed(() => catalog.value?.items ?? [])
 const selectedGame = computed(() => games.value.find((entry) => entry.id === data.value.game))

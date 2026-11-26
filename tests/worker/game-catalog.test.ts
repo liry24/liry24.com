@@ -3,6 +3,7 @@ import { expect, test } from 'vitest'
 import type { GameRecordData, GameStatsRecordData, PostData } from '../../shared/types/content'
 import { gameFieldsSchema } from '../../shared/utils/contentSchemas'
 import { builtWorker } from '../helpers/builtWorker'
+import { seedGameCatalog } from '../helpers/workerSeed'
 
 type WritePayload =
     | {
@@ -31,11 +32,7 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 slug: 'valorant',
                 name: 'Valorant',
             })
-            await app.env.DB.prepare(
-                'INSERT INTO game_catalog (id, igdb_id, slug, data) VALUES (?, ?, ?, ?)',
-            )
-                .bind(gameId, game.igdbId, game.slug, JSON.stringify(game))
-                .run()
+            await seedGameCatalog(app.env.DB, gameId, game)
 
             expect((await fetch('/api/admin/games/catalog')).status).toBe(401)
             const mention = '/api/posts/game-mentions/valorant'

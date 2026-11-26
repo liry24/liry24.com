@@ -27,7 +27,19 @@ export default defineForm({
                 fields: (slug, order) => ({ ...data, slug, order }),
                 label: data.label,
                 allowGeneratedKey: socialSlug,
-                validate: (id, entry) => validateSocialSave({ id, slug: entry.slug }),
+                validate: async (docId, entry) => {
+                    const existing = await listAllCollectionItems(
+                        content.collection('socials'),
+                        'draft',
+                    )
+                    if (existing.some((doc) => doc.id !== docId && doc.data.slug === entry.slug)) {
+                        throw createError({
+                            status: 400,
+                            statusText: 'A social link with this slug already exists.',
+                            message: 'A social link with this slug already exists.',
+                        })
+                    }
+                },
             })
             return Response.json({ id: saved.id }, { status: 201 })
         } catch (error) {

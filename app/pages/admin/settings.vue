@@ -47,7 +47,6 @@ useHead({ title: 'Settings' })
                             variant="soft"
                             color="success"
                             size="sm"
-                            class="text-green-800 dark:text-green-300"
                         />
                     </template>
                 </UUser>

@@ -7,7 +7,14 @@ const { game, metric, periods } = defineProps<{
 
 const gradientId = useId().replaceAll(':', '')
 const definition = computed(() => gameChart(periods, metric, gradientId))
-const point = (value: unknown) => value as RankPoint
+const tooltipData = (value: unknown) => {
+    const datum = value as RankPoint
+    return {
+        imageSrc: mediaUrl(datum.record.image),
+        period: datum.period.period,
+        formatted: formatGameValue(datum.record, metric),
+    }
+}
 </script>
 
 <template>
@@ -21,19 +28,18 @@ const point = (value: unknown) => value as RankPoint
         :aria-label="`${game} ${metric.label} history`"
     >
         <template #tooltip="{ primaryPoint }">
-            <div class="flex items-center gap-2">
-                <img
-                    v-if="gameImageUrl(point(primaryPoint.datum).record.image)"
-                    :src="gameImageUrl(point(primaryPoint.datum).record.image)"
-                    alt=""
-                    class="size-8 object-contain"
-                />
+            <div
+                v-for="tip in [tooltipData(primaryPoint.datum)]"
+                :key="tip.period"
+                class="flex items-center gap-2"
+            >
+                <img v-if="tip.imageSrc" :src="tip.imageSrc" alt="" class="size-8 object-contain" />
                 <div>
                     <p class="text-muted text-xs">
-                        {{ point(primaryPoint.datum).period.period }}
+                        {{ tip.period }}
                     </p>
                     <p class="font-medium">
-                        {{ formatGameValue(point(primaryPoint.datum).record, metric) }}
+                        {{ tip.formatted }}
                     </p>
                 </div>
             </div>

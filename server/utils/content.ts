@@ -2,31 +2,21 @@ import type { ContentDocumentStatus, ContentRef, ContentSchedule } from '@vite-h
 
 import content from '#server/content'
 
-export type CollectionDocumentData =
-    | PostData
-    | WorkData
-    | ArtData
-    | CareerData
-    | SkillData
-    | GameStatsRecordData
-    | SocialData
-
-export interface CollectionDocumentItem<TData = CollectionDocumentData> {
+interface CollectionDocumentItem<TData = CollectionDocumentData> {
     id: string
     url?: string | null
     updatedAt?: string | null
     data: TData
 }
 
-export interface AdminContentSummary {
+interface AdminContentSummary {
     id: string
-    title: string
     data: CollectionDocumentData
     status: ContentDocumentStatus | null
     schedule: ContentSchedule | null
 }
 
-export interface AdminContentDocument {
+interface AdminContentDocument {
     id: string
     data: CollectionDocumentData
     body: string
@@ -39,6 +29,28 @@ interface ListableCollection<TData> {
         items: Array<CollectionDocumentItem<TData>>
         nextCursor: string | null
     }>
+}
+
+export function parseCollectionName(raw: string | undefined): ContentCollectionName {
+    const matched = contentCollectionNames.find((name) => name === raw)
+    if (!matched) throw createError({ status: 404, statusText: 'Collection not found' })
+
+    return matched
+}
+
+export function readDecodedRouterParam(
+    event: Parameters<typeof getRouterParam>[0],
+    name: string,
+    notFoundText: string,
+): string {
+    const raw = getRouterParam(event, name)
+    if (!raw) throw createError({ status: 404, statusText: notFoundText })
+
+    try {
+        return decodeURIComponent(raw)
+    } catch {
+        throw createError({ status: 404, statusText: notFoundText })
+    }
 }
 
 export function appendOrder(items: Array<{ data: { order?: number } }>) {
@@ -65,7 +77,7 @@ export async function listAllCollectionItems<TData>(
     }
 }
 
-async function listCollectionByName(
+export async function listCollectionByName(
     name: ContentCollectionName,
     ref: ContentRef,
 ): Promise<Array<CollectionDocumentItem>> {
@@ -99,9 +111,13 @@ export async function listAdminCollection(name: ContentCollectionName): Promise<
     schedules: Array<ContentSchedule>
 }> {
     const col = content.collection(name)
-    const docs = await listCollectionByName(name, 'draft')
+    const [docs, statuses, activeSchedules] = await Promise.all([
+        listCollectionByName(name, 'draft'),
+        col.status(),
+        content.schedules({ collection: name }),
+    ])
 
-    const activeSchedules = await content.schedules({ collection: name })
+    const statusByDocId = new Map(statuses.map((entry) => [entry.id, entry]))
     const scheduleByDocId = new Map<string, ContentSchedule>()
     for (const entry of activeSchedules) {
         for (const item of entry.expect) {
@@ -110,26 +126,14 @@ export async function listAdminCollection(name: ContentCollectionName): Promise<
         }
     }
 
-    const items = await Promise.all(
-        docs.map(async (doc) => {
-            const status = await col.status(doc.id)
-            const title =
-                'title' in doc.data && typeof doc.data.title === 'string' ? doc.data.title : doc.id
-            return {
-                id: doc.id,
-                title: title || doc.id,
-                data: doc.data,
-                status,
-                schedule: scheduleByDocId.get(doc.id) ?? null,
-            }
-        }),
-    )
+    const items: Array<AdminContentSummary> = docs.map((doc) => ({
+        id: doc.id,
+        data: doc.data,
+        status: statusByDocId.get(doc.id) ?? null,
+        schedule: scheduleByDocId.get(doc.id) ?? null,
+    }))
 
-    items.sort((a, b) => {
-        const orderA = 'order' in a.data ? Number(a.data.order ?? 0) : 0
-        const orderB = 'order' in b.data ? Number(b.data.order ?? 0) : 0
-        return orderA - orderB || a.id.localeCompare(b.id)
-    })
+    items.sort((a, b) => a.data.order - b.data.order || a.id.localeCompare(b.id))
 
     return { items, schedules: activeSchedules }
 }
@@ -149,7 +153,7 @@ export async function getAdminDocument(
     return {
         id: doc.id,
         data: doc.data,
-        body: typeof doc.body === 'string' ? doc.body : '',
+        body: doc.body,
         status,
         schedules,
     }

@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest'
 
+import { postEditorMentionParts } from '../app/utils/postEditorMentions'
+
 test('the editor restores chips while keeping Markdown examples and links as source text', () => {
     const markdown = [
         'Actual <game:legacy> and :game[current].',
