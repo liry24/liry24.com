@@ -32,11 +32,14 @@ jobs:
           - name: Lint
             command: bun run lint
             prepare: 'true'
+          - name: Lint (Vue)
+            command: bun run lint:vue
+            prepare: 'false'
           - name: Typecheck (Nuxt)
             command: bun run typecheck
-            prepare: 'true'
+            prepare: 'false'
           - name: Typecheck (tests)
-            command: bun x tsc --noEmit -p tsconfig.tests.json
+            command: bun run typecheck:tests
             prepare: 'true'
           - name: Vitest (Node)
             command: node node_modules/vitest/vitest.mjs run --project node --exclude 'tests/worker/**'

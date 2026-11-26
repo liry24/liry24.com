@@ -30,7 +30,8 @@
 
 ## Verification commands
 
-- Standard checks: `bun run format:check`, `bun run lint`, `bun run typecheck`, `bun x tsc --noEmit -p tsconfig.tests.json`, `bun run test`.
+- Standard checks: `bun run format:check`, `bun run lint`, `bun run lint:vue`, `bun run typecheck`, `bun run typecheck:tests`, `bun run test`.
+- `bun run typecheck` regenerates Nuxt and ViteHub types, then uses `tsconfig.vize.json` to check the projects with tsrs and the Vize `.vue` content mapper. `bun run typecheck:tests` uses the generated types. Opt in to Vue lint rules individually in `vite.config.ts`.
 - Put app tests that rely on auto-imports in `tests/nuxt/`. `@nuxt/test-utils` applies the fixture's Nuxt transform there and supports `mockNuxtImport`. Node tests load their dependencies directly and use explicit imports.
 - Optional Nuxt diagnostics: `bun run check:doctor`. Use `--changed` for local edits or `--since origin/dev` for branch changes.
 - Built Worker checks (always run `bun run build` after `server/` edits first): `bun x wrangler deploy --dry-run --config .output/server/wrangler.json` and `LIRY24_TEST_BUILT_WORKER=true bun x vitest run tests/worker/` (always via Node/Vitest, never `bun test`).

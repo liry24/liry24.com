@@ -1,6 +1,7 @@
 {
     "extends": "./.nuxt/tsconfig.app.json",
     "compilerOptions": {
+        "tsBuildInfoFile": "./.nuxt/cache/typecheck/tsconfig.tests.tsbuildinfo",
         "types": ["node"]
     },
     "include": [
