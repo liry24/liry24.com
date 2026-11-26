@@ -1,0 +1,10 @@
+{
+    "files": [],
+    "references": [
+        { "path": "./tsconfig.vize.app.json" },
+        { "path": "./.nuxt/tsconfig.server.json" },
+        { "path": "./.nuxt/tsconfig.shared.json" },
+        { "path": "./tsconfig.vize.node.json" },
+        { "path": "./tsconfig.tests.json" }
+    ]
+}
