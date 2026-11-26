@@ -44,6 +44,7 @@
         "comark-ui": "0.14.3",
         "drizzle-orm": "1.0.0-rc.5",
         "evlog": "^2.37.1",
+        "gpu-icons-search": "0.2.0",
         "motion-v": "^2.13.0",
         "nitro": "^3.0.261103-rc",
         "nuxt": "4.7.0",
@@ -2031,6 +2032,8 @@
     "globby": ["globby@16.2.4", "", { "dependencies": { "@sindresorhus/merge-streams": "^4.0.0", "fast-glob": "^3.3.3", "ignore": "^7.0.5", "is-path-inside": "^4.0.0", "micromatch": "^4.0.8", "slash": "^5.1.0", "unicorn-magic": "^0.4.0" } }, "sha512-c8B/VNLmxRcmqqenRA9t+9IyOjf9+V6lTxPaUJLqOCONdQkWZ0ETYgX0qbtJqPsgCNusT9MZ5Jeidw8Eb9tn2g=="],
 
     "gopd": ["gopd@1.2.0", "", {}, "sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg=="],
+
+    "gpu-icons-search": ["gpu-icons-search@0.2.0", "", {}, "sha512-VVcsEc26bphqpAhDgMEXpBHeaXbTMwKm46S0rIfpaxTyDXSL5G/RfndYywrHWJUd9421+id5yM5bfr6VHuRmTA=="],
 
     "graceful-fs": ["graceful-fs@4.2.12", "", {}, "sha512-iuyGF2E4oafQfPsRrG2wtY2ILupMhvtdrhzrxB+0VcjsPpSPttpfYdjnGFGsTi5MaJFjI1jOKHPQ6UTbTj9TAw=="],
 
