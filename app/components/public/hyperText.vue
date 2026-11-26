@@ -43,9 +43,7 @@ const { pause, resume } = useIntervalFn(
                 l === ' ' ? l : i <= iterations.value ? (text[i] ?? '') : getRandomLetter(),
             )
             iterations.value += 0.1
-        } else {
-            pause()
-        }
+        } else pause()
     },
     computed(() => duration / (text.length * 10)),
 )
@@ -63,9 +61,7 @@ watch(
     },
 )
 
-if (animateOnLoad) {
-    triggerAnimation()
-}
+if (animateOnLoad) triggerAnimation()
 </script>
 
 <template>

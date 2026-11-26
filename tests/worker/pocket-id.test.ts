@@ -31,13 +31,10 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 function remember(response: { headers: { getSetCookie(): Array<string> } }) {
                     for (const value of response.headers.getSetCookie()) {
                         const pair = value.split(';')[0]
-                        if (!pair) {
-                            continue
-                        }
+                        if (!pair) continue
+
                         const sep = pair.indexOf('=')
-                        if (sep > 0) {
-                            cookies.set(pair.slice(0, sep), pair)
-                        }
+                        if (sep > 0) cookies.set(pair.slice(0, sep), pair)
                     }
                 }
 
@@ -54,9 +51,8 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
                 const login = await fetch(authorization, { redirect: 'manual' })
                 expect(login.status).toBe(302)
                 const location = login.headers.get('location')
-                if (!location) {
-                    throw new Error('Missing OIDC redirect location')
-                }
+                if (!location) throw new Error('Missing OIDC redirect location')
+
                 const callback = new URL(location)
                 expect(callback.pathname).toBe('/api/auth/callback/pocket-id')
                 const result = await app.server.fetch(callback.pathname + callback.search, {
@@ -113,9 +109,8 @@ test.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')(
             const callback = new URL(ownerSignIn.result.headers.get('location') ?? '/', app.url)
             expect(callback.pathname + callback.search).toBe('/admin/works?view=list')
             const ownerId = ownerSignIn.session?.user.id
-            if (!ownerId) {
-                throw new Error('Missing owner id')
-            }
+            if (!ownerId) throw new Error('Missing owner id')
+
             expect((await signIn()).session?.user.id).toBe(ownerId)
 
             expect(

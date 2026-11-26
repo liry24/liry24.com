@@ -11,9 +11,7 @@ const slugParam = computed(() => String(route.params.slug ?? ''))
 const { data: entry, error } = await useFetch<PostItem>(
     () => `/api/posts/${encodeURIComponent(slugParam.value)}`,
 )
-if (error.value) {
-    throw error.value
-}
+if (error.value) throw error.value
 
 const data = computed(() =>
     entry.value
@@ -25,13 +23,10 @@ const data = computed(() =>
         : null,
 )
 
-if (!data.value) {
-    throw createError({ status: 404, statusText: 'Post not found' })
-}
+if (!data.value) throw createError({ status: 404, statusText: 'Post not found' })
 
-if (entry.value?.url && entry.value.url !== route.path) {
+if (entry.value?.url && entry.value.url !== route.path)
     await navigateTo(entry.value.url, { redirectCode: 301 })
-}
 
 const siteOrigin = String(useRuntimeConfig().public.siteUrl || useRequestURL().origin).replace(
     /\/+$/,

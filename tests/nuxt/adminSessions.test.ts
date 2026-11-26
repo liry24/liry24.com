@@ -27,9 +27,8 @@ const { boundary } = vi.hoisted(() => ({
 }))
 
 function getClient(): MockAuthClient {
-    if (!boundary.client) {
-        throw new Error('MockAuthClient was not initialized')
-    }
+    if (!boundary.client) throw new Error('MockAuthClient was not initialized')
+
     return boundary.client
 }
 
@@ -102,9 +101,8 @@ test('failures are visible, concurrent writes are ignored, and identities cannot
     await pending
     expect(sessions.failure.value).toContain('Please try again')
     expect(sessions.failure.value).not.toContain('secret')
-    if (boundary.identity) {
-        boundary.identity.user.value = { id: 'bob' }
-    }
+    if (boundary.identity) boundary.identity.user.value = { id: 'bob' }
+
     expect(sessions.sessions.value).toEqual([])
     let finishList!: (value: { data?: Array<MockSessionRow> }) => void
     boundary.client?.listSessions.mockReturnValueOnce(
@@ -113,9 +111,8 @@ test('failures are visible, concurrent writes are ignored, and identities cannot
         }),
     )
     const refresh = sessions.refresh()
-    if (boundary.identity) {
-        boundary.identity.user.value = { id: 'carol' }
-    }
+    if (boundary.identity) boundary.identity.user.value = { id: 'carol' }
+
     finishList({ data: [{ id: 'bob-session' }] })
     await refresh
     expect(sessions.sessions.value).toEqual([])

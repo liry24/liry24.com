@@ -46,9 +46,8 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
                                 ),
                             }
                         }
-                        if (new URL(req.url).pathname.startsWith('/api/auth/early-')) {
+                        if (new URL(req.url).pathname.startsWith('/api/auth/early-'))
                             return { response: new Response('early') }
-                        }
                     },
                 },
             ],
@@ -60,22 +59,21 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
                     headers: { 'cf-connecting-ip': ip },
                 }),
             )
-        for (const path of ['/missing-a', '/missing-b?x=1', '/%67et-session']) {
+        for (const path of ['/missing-a', '/missing-b?x=1', '/%67et-session'])
             expect((await request(path)).status).toBe(404)
-        }
+
         expect(db.prepare('SELECT COUNT(*) n FROM rate_limit').get()?.n).toBe(1)
         expect((await request('/missing-c')).status).toBe(429)
         expect((await request('/missing-c', '198.51.100.21')).status).toBe(404)
 
-        for (const path of ['/probe/a', '/probe/a%2Fb', '/probe/%41?x=1']) {
+        for (const path of ['/probe/a', '/probe/a%2Fb', '/probe/%41?x=1'])
             expect((await request(path)).status).toBe(200)
-        }
+
         expect((await request('/probe/next')).status).toBe(429)
         expect((await request('/probe/strict')).status).toBe(429)
         expect(db.prepare('SELECT COUNT(*) n FROM rate_limit').get()?.n).toBe(3)
-        for (let i = 0; i < 4; i++) {
-            expect((await request('/get-session')).status).toBe(200)
-        }
+        for (let i = 0; i < 4; i++) expect((await request('/get-session')).status).toBe(200)
+
         expect((await request('/get-session')).status).toBe(429)
 
         const invalidPaths: ReadonlyArray<readonly [string, string]> = [
@@ -83,9 +81,9 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
             ['/probe//id', 'GET'],
             ['/probe/id/', 'GET'],
         ]
-        for (const [path, method] of invalidPaths) {
+        for (const [path, method] of invalidPaths)
             expect((await request(path, '198.51.100.22', method)).status).toBe(404)
-        }
+
         expect((await request('/rewrite-first', '198.51.100.23')).status).toBe(200)
         expect((await request('/early-second', '198.51.100.23')).status).toBe(200)
         expect((await request('/rewrite-third', '198.51.100.23')).status).toBe(200)

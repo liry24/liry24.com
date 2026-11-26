@@ -5,18 +5,16 @@ import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 
 import '@liry24/ui/styles.css'
 
-const props = defineProps<{
-    id?: string
-}>()
+const { id } = defineProps<{ id?: string }>()
 
 const toast = useToast()
 const router = useRouter()
 const request = useRequestFetch()
 
-const docId = ref(props.id ?? '')
+const docId = ref(id ?? '')
 const title = ref('')
 const slug = ref('')
-const slugTouched = ref(Boolean(props.id))
+const slugTouched = ref(Boolean(id))
 const summary = ref('')
 const tagsText = ref('')
 const cover = ref<MediaReference | undefined>(undefined)
@@ -45,37 +43,32 @@ const displayTitle = computed(() =>
 )
 provide(postPreviewGamesKey, games)
 
-function rememberGame(game: GameSearchResult) {
+const rememberGame = (game: GameSearchResult) => {
     games.set(game.slug, game)
 }
 
-function toLocalDatetimeInput(iso: string | undefined): string {
-    if (!iso) {
-        return ''
-    }
+const toLocalDatetimeInput = (iso: string | undefined): string => {
+    if (!iso) return ''
+
     const ms = Date.parse(iso)
-    if (Number.isNaN(ms)) {
-        return ''
-    }
+    if (Number.isNaN(ms)) return ''
+
     const offset = new Date(ms).getTimezoneOffset() * 60 * 1000
     return new Date(ms - offset).toISOString().slice(0, 16)
 }
 
-function toIsoWithOffset(local: string): string | undefined {
-    if (!local.trim()) {
-        return undefined
-    }
+const toIsoWithOffset = (local: string): string | undefined => {
+    if (!local.trim()) return undefined
+
     const parsed = new Date(local)
-    if (Number.isNaN(parsed.getTime())) {
-        return undefined
-    }
+    if (Number.isNaN(parsed.getTime())) return undefined
+
     return parsed.toISOString()
 }
 
 const loadDocument = async () => {
-    if (!props.id) {
-        return
-    }
+    if (!id) return
+
     const doc = await request<{
         id: string
         data: {
@@ -90,7 +83,7 @@ const loadDocument = async () => {
         body: string
         status: ContentDocumentStatus | null
         schedules: Array<ContentSchedule>
-    }>(`/api/admin/content/posts/${encodeURIComponent(props.id)}`)
+    }>(`/api/admin/content/posts/${encodeURIComponent(id)}`)
 
     const missing = [
         ...new Set(
@@ -125,23 +118,18 @@ const loadDocument = async () => {
     schedules.value = doc.schedules
 }
 
-if (props.id) {
-    await loadDocument()
-}
+if (id) await loadDocument()
 
 watch(displayTitle, (value) => {
-    if (!slugTouched.value && !props.id) {
-        slug.value = entrySlugSuggestion(value)
-    }
+    if (!slugTouched.value && !id) slug.value = entrySlugSuggestion(value)
 })
 
 const coverFiles = shallowRef<Array<File>>([])
 const uploadCover = async (files: Array<File>) => {
     coverFiles.value = files
     const file = files[0]
-    if (!file) {
-        return
-    }
+    if (!file) return
+
     uploading.value = true
     try {
         const formData = new FormData()
@@ -165,9 +153,8 @@ const uploadCover = async (files: Array<File>) => {
 }
 
 const saveDraft = async (): Promise<string | undefined> => {
-    if (saving.value || uploading.value || pendingGames.value > 0) {
-        return
-    }
+    if (saving.value || uploading.value || pendingGames.value > 0) return
+
     saving.value = true
     formError.value = ''
     errors.value = {}
@@ -206,17 +193,13 @@ const saveDraft = async (): Promise<string | undefined> => {
             order: Number(order.value) || 0,
         }
         const trimmedSummary = summary.value.trim()
-        if (trimmedSummary) {
-            postData.summary = trimmedSummary
-        }
-        if (cover.value) {
-            postData.cover = cover.value
-        }
+        if (trimmedSummary) postData.summary = trimmedSummary
+
+        if (cover.value) postData.cover = cover.value
+
         if (authoredAtLocal.value) {
             const authoredAt = toIsoWithOffset(authoredAtLocal.value)
-            if (authoredAt) {
-                postData.authoredAt = authoredAt
-            }
+            if (authoredAt) postData.authoredAt = authoredAt
         }
         const payload: PostFormPayload = {
             data: postData,
@@ -224,9 +207,7 @@ const saveDraft = async (): Promise<string | undefined> => {
                 .map((part) => (part.slug ? formatGameMention(part.slug) : part.text))
                 .join(''),
         }
-        if (docId.value) {
-            payload.id = docId.value
-        }
+        if (docId.value) payload.id = docId.value
 
         const [submitError, result] = await submitForm('post', payload)
         if (submitError) {
@@ -238,11 +219,9 @@ const saveDraft = async (): Promise<string | undefined> => {
         const savedId = result?.id || docId.value || slug.value
         docId.value = savedId
         toast.add({ title: 'Saved draft', color: 'success' })
-        if (!props.id && savedId) {
-            await router.replace(`/admin/posts/${encodeURIComponent(savedId)}`)
-        } else {
-            await loadDocument()
-        }
+        if (!id && savedId) await router.replace(`/admin/posts/${encodeURIComponent(savedId)}`)
+        else await loadDocument()
+
         return savedId
     } finally {
         saving.value = false
@@ -253,9 +232,8 @@ const publishNow = async () => {
     publishing.value = true
     try {
         const savedId = await saveDraft()
-        if (!savedId) {
-            return
-        }
+        if (!savedId) return
+
         await $fetch('/api/admin/content/publish', {
             method: 'POST',
             body: {
@@ -278,19 +256,16 @@ const publishNow = async () => {
 }
 
 const schedulePublish = async () => {
-    if (!scheduleAtLocal.value) {
-        return
-    }
+    if (!scheduleAtLocal.value) return
+
     publishing.value = true
     try {
         const savedId = await saveDraft()
-        if (!savedId) {
-            return
-        }
+        if (!savedId) return
+
         const at = toIsoWithOffset(scheduleAtLocal.value)
-        if (!at) {
-            throw new Error('Choose a valid future date and time.')
-        }
+        if (!at) throw new Error('Choose a valid future date and time.')
+
         await $fetch('/api/admin/content/publish', {
             method: 'POST',
             body: {
@@ -348,7 +323,7 @@ const unschedule = async (scheduleId: string) => {
     >
         <template #header>
             <UDashboardNavbar
-                :title="props.id ? `Edit post: ${displayTitle || docId}` : 'New post'"
+                :title="id ? `Edit post: ${displayTitle || docId}` : 'New post'"
                 icon="mingcute:document-2-fill"
             >
                 <template #right>

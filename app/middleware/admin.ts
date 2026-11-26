@@ -2,9 +2,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
     to.meta.pageTransition = false
     const signInError = to.query[pocketIdErrorParam]
     if (signInError !== undefined) {
-        if (import.meta.client && useNuxtApp().isHydrating && useError().value) {
-            return
-        }
+        if (import.meta.client && useNuxtApp().isHydrating && useError().value) return
+
         const unavailable = signInError === 'unavailable'
         throw createError({
             status: unavailable ? 503 : 403,
@@ -14,17 +13,14 @@ export default defineNuxtRouteMiddleware(async (to) => {
             data: { retryAdminPath: pocketIdRetryPath(to.fullPath) },
         })
     }
-    if (import.meta.server) {
-        return
-    }
+    if (import.meta.server) return
+
     const request = useRequestFetch()
     const session = await request<{ user?: { id: string; role?: string | null } } | null>(
         '/api/auth/get-session',
     )
-    if (!session?.user) {
-        return navigateTo(to.fullPath, { external: true })
-    }
-    if (session.user.role !== 'admin') {
+    if (!session?.user) return navigateTo(to.fullPath, { external: true })
+
+    if (session.user.role !== 'admin')
         throw createError({ status: 403, statusText: 'Access denied' })
-    }
 })

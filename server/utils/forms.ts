@@ -35,15 +35,11 @@ export function normalizeDocumentId(raw: string | undefined, fallback: string): 
 
 function extractErrorStatus(error: unknown): number {
     if (error && typeof error === 'object') {
-        if ('code' in error && error.code === 'WORKSPACE_CONFLICT') {
-            return 409
-        }
-        if ('status' in error && typeof error.status === 'number') {
-            return error.status
-        }
-        if ('statusCode' in error && typeof error.statusCode === 'number') {
-            return error.statusCode
-        }
+        if ('code' in error && error.code === 'WORKSPACE_CONFLICT') return 409
+
+        if ('status' in error && typeof error.status === 'number') return error.status
+
+        if ('statusCode' in error && typeof error.statusCode === 'number') return error.statusCode
     }
     return 500
 }
@@ -51,16 +47,14 @@ function extractErrorStatus(error: unknown): number {
 function extractErrorMessage(error: unknown): string {
     if (error && typeof error === 'object') {
         if ('data' in error && error.data && typeof error.data === 'object') {
-            if ('message' in error.data && typeof error.data.message === 'string') {
+            if ('message' in error.data && typeof error.data.message === 'string')
                 return error.data.message
-            }
         }
-        if ('statusText' in error && typeof error.statusText === 'string' && error.statusText) {
+        if ('statusText' in error && typeof error.statusText === 'string' && error.statusText)
             return error.statusText
-        }
-        if ('message' in error && typeof error.message === 'string' && error.message) {
+
+        if ('message' in error && typeof error.message === 'string' && error.message)
             return error.message
-        }
     }
     return 'Could not save content.'
 }

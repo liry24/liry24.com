@@ -85,15 +85,15 @@ test('Cloudflare Workers redirect: error workaround uses manual mode and blocks 
     const cancelSpy = vi.fn(async () => undefined)
     let shouldRedirectApi = false
     const fetch = vi.fn(async (url: string, init?: RequestInit) => {
-        if (init?.redirect === 'error') {
+        if (init?.redirect === 'error')
             throw new TypeError('Invalid redirect value, must be one of "follow" or "manual"')
-        }
-        if (url === 'https://id.twitch.tv/oauth2/token') {
+
+        if (url === 'https://id.twitch.tv/oauth2/token')
             return Response.json({ access_token: 'synthetic-token', expires_in: 3600 })
-        }
-        if (shouldRedirectApi) {
+
+        if (shouldRedirectApi)
             return new Response(new ReadableStream({ cancel: cancelSpy }), { status: 302 })
-        }
+
         return Response.json([{ id: 42, slug: 'zelda', name: 'Zelda' }])
     })
     vi.stubGlobal('fetch', fetch)
@@ -115,12 +115,12 @@ test('an unsettled auth request never poisons subsequent queries across isolated
     let call = 0
     const fetch = vi.fn((url: string) => {
         call++
-        if (call === 1 && url === 'https://id.twitch.tv/oauth2/token') {
+        if (call === 1 && url === 'https://id.twitch.tv/oauth2/token')
             return new Promise<Response>(() => {})
-        }
-        if (url === 'https://id.twitch.tv/oauth2/token') {
+
+        if (url === 'https://id.twitch.tv/oauth2/token')
             return Promise.resolve(Response.json({ access_token: 'fresh-token', expires_in: 3600 }))
-        }
+
         return Promise.resolve(Response.json([{ id: 7, slug: 'zelda', name: 'Zelda' }]))
     })
     vi.stubGlobal('fetch', fetch)
@@ -145,9 +145,9 @@ test('cached token returning 401 refreshes once and retries the IGDB request', a
             return Response.json({ access_token: `token-${tokenCount}`, expires_in: 3600 })
         }
         const auth = new Headers(init?.headers).get('authorization')
-        if (expireCachedToken && auth === 'Bearer token-1') {
+        if (expireCachedToken && auth === 'Bearer token-1')
             return new Response('Unauthorized', { status: 401 })
-        }
+
         return Response.json([{ id: 9, slug: 'valorant', name: 'Valorant' }])
     })
     vi.stubGlobal('fetch', fetch)

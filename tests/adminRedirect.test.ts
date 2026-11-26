@@ -21,7 +21,6 @@ test('only admin locations can resume after Pocket ID sign-in', () => {
         '//example.com/admin/works',
         String.raw`/\example.com/admin/works`,
         'https://example.com/admin/works',
-    ]) {
+    ])
         expect(adminRedirect(location)).toBe('/admin')
-    }
 })

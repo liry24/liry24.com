@@ -39,15 +39,15 @@ function rethrowContentError(error: unknown): never {
             ? error.message
             : 'Content action failed.'
 
-    if (code === 'WORKSPACE_CONFLICT') {
+    if (code === 'WORKSPACE_CONFLICT')
         throw createError({ status: 409, statusText: message, message, cause: error })
-    }
-    if (code === 'CONTENT_NOT_FOUND') {
+
+    if (code === 'CONTENT_NOT_FOUND')
         throw createError({ status: 404, statusText: message, message, cause: error })
-    }
-    if (code === 'CONTENT_INVALID' || code === 'CONTENT_R0011') {
+
+    if (code === 'CONTENT_INVALID' || code === 'CONTENT_R0011')
         throw createError({ status: 400, statusText: message, message, cause: error })
-    }
+
     throw createError({ status: 500, statusText: message, message, cause: error })
 }
 
@@ -60,9 +60,8 @@ async function validatePostGameReferences(id: string, digest: string) {
         })
     }
 
-    if (!post.data.gameMentions?.length) {
-        return
-    }
+    if (!post.data.gameMentions?.length) return
+
     const gameIds = new Set((await gameCatalog().list()).map((game) => game.id))
     if (post.data.gameMentions.some((gameId) => !gameIds.has(gameId))) {
         throw createError({
@@ -95,16 +94,14 @@ export default defineEventHandler(async (event) => {
         let digest = input.digest
         if (digest === undefined) {
             const status = await content.collection(input.collection).status(input.id)
-            if (!status) {
-                throw createError({ status: 404, statusText: 'Document not found' })
-            }
+            if (!status) throw createError({ status: 404, statusText: 'Document not found' })
+
             digest = status.draft
         }
 
         const expect = [{ collection: input.collection, id: input.id, digest }]
-        if (input.collection === 'posts' && digest) {
+        if (input.collection === 'posts' && digest)
             await validatePostGameReferences(input.id, digest)
-        }
 
         if (input.action === 'publish') {
             const result = await content.publish({
@@ -123,9 +120,8 @@ export default defineEventHandler(async (event) => {
         })
         return { ok: true, schedule }
     } catch (error) {
-        if (error && typeof error === 'object' && 'statusCode' in error) {
-            throw error
-        }
+        if (error && typeof error === 'object' && 'statusCode' in error) throw error
+
         rethrowContentError(error)
     }
 })

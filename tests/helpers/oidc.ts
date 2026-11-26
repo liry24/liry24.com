@@ -65,9 +65,9 @@ export async function oidcProvider() {
                     !challenge ||
                     !redirectUri ||
                     !state
-                ) {
+                )
                     throw new Error('PKCE, nonce, redirect_uri, and state are required')
-                }
+
                 const code = randomUUID()
                 codes.set(code, {
                     nonce,
@@ -82,9 +82,8 @@ export async function oidcProvider() {
             }
             if (url.pathname === '/token') {
                 let body = ''
-                for await (const chunk of request) {
-                    body += String(chunk)
-                }
+                for await (const chunk of request) body += String(chunk)
+
                 const params = new URLSearchParams(body)
                 const codeKey = params.get('code') ?? ''
                 const code = codes.get(codeKey)
@@ -95,15 +94,14 @@ export async function oidcProvider() {
                 const verifierDigest = createHash('sha256')
                     .update(params.get('code_verifier') ?? '')
                     .digest('base64url')
-                if (!code) {
-                    throw new Error(`missing or unknown code: "${codeKey}"`)
-                }
-                if (clientId !== 'synthetic-pocket-client') {
+                if (!code) throw new Error(`missing or unknown code: "${codeKey}"`)
+
+                if (clientId !== 'synthetic-pocket-client')
                     throw new Error(`client_id mismatch: got=${String(clientId)}`)
-                }
-                if (clientSecret !== 'synthetic-pocket-secret') {
+
+                if (clientSecret !== 'synthetic-pocket-secret')
                     throw new Error(`client_secret mismatch: present=${Boolean(clientSecret)}`)
-                }
+
                 if (redirectUri !== code.redirect) {
                     throw new Error(
                         `redirect_uri mismatch: got=${String(redirectUri)} expected=${code.redirect}`,
@@ -156,9 +154,8 @@ export async function oidcProvider() {
     server.listen(0, '127.0.0.1')
     await once(server, 'listening')
     const address = server.address()
-    if (!address || typeof address === 'string') {
-        throw new Error('Missing OIDC server address')
-    }
+    if (!address || typeof address === 'string') throw new Error('Missing OIDC server address')
+
     issuer = `http://127.0.0.1:${address.port}`
     return {
         issuer,
@@ -171,11 +168,8 @@ export async function oidcProvider() {
         close: () =>
             new Promise<void>((resolve, reject) => {
                 server.close((error) => {
-                    if (error) {
-                        reject(error)
-                    } else {
-                        resolve()
-                    }
+                    if (error) reject(error)
+                    else resolve()
                 })
             }),
     }

@@ -1,11 +1,7 @@
 <script setup lang="ts">
-useSeoMeta({ title: 'Posts', description: 'Blog posts by Liry24.' })
-defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'posts' }, [
-    { key: 'og' },
-    { key: 'whatsapp', width: 800, height: 800 },
-])
 const route = useRoute()
 const page = ref(1)
+
 const { data, error } = await useFetch<PostCardsPage>('/api/posts/cards', {
     query: computed(() => ({
         game: typeof route.query.game === 'string' ? route.query.game : undefined,
@@ -13,16 +9,22 @@ const { data, error } = await useFetch<PostCardsPage>('/api/posts/cards', {
         offset: (page.value - 1) * 20,
     })),
 })
-if (error.value) {
-    throw error.value
-}
+if (error.value) throw error.value
+
 const filtered = computed(() => data.value?.items ?? [])
+
 watch(
     () => route.query.game,
     () => {
         page.value = 1
     },
 )
+
+useSeoMeta({ title: 'Posts', description: 'Blog posts by Liry24.' })
+defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'posts' }, [
+    { key: 'og' },
+    { key: 'whatsapp', width: 800, height: 800 },
+])
 </script>
 
 <template>

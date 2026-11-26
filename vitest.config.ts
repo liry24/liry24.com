@@ -37,14 +37,10 @@ const nuxtProject = await defineVitestProject({
                             viteConfig: { resolve?: { alias?: unknown } },
                             { isClient }: { isClient: boolean },
                         ) {
-                            if (!isClient || !Array.isArray(viteConfig.resolve?.alias)) {
-                                return
-                            }
-                            for (const entry of viteConfig.resolve.alias) {
-                                if (isAliasEntry(entry)) {
-                                    capturedNuxtAliases.push(entry)
-                                }
-                            }
+                            if (!isClient || !Array.isArray(viteConfig.resolve?.alias)) return
+
+                            for (const entry of viteConfig.resolve.alias)
+                                if (isAliasEntry(entry)) capturedNuxtAliases.push(entry)
                         },
                     },
                 },
@@ -54,18 +50,14 @@ const nuxtProject = await defineVitestProject({
 })
 
 function normalizeAliases(raw: unknown): Array<Alias> {
-    if (Array.isArray(raw)) {
-        return raw.filter(isAliasEntry)
-    }
-    if (typeof raw !== 'object' || raw === null) {
-        return []
-    }
+    if (Array.isArray(raw)) return raw.filter(isAliasEntry)
+
+    if (typeof raw !== 'object' || raw === null) return []
+
     const result: Array<Alias> = []
-    for (const [find, replacement] of Object.entries(raw)) {
-        if (typeof replacement === 'string') {
-            result.push({ find, replacement })
-        }
-    }
+    for (const [find, replacement] of Object.entries(raw))
+        if (typeof replacement === 'string') result.push({ find, replacement })
+
     return result
 }
 
@@ -73,19 +65,15 @@ const existingAliases = normalizeAliases(nuxtProject.resolve?.alias)
 
 function stripNonCloneableNuxtOverrides(project: { test?: { environmentOptions?: unknown } }) {
     const envOptions = project.test?.environmentOptions
-    if (typeof envOptions !== 'object' || envOptions === null || !('nuxt' in envOptions)) {
-        return
-    }
+    if (typeof envOptions !== 'object' || envOptions === null || !('nuxt' in envOptions)) return
+
     const nuxtOptions = envOptions.nuxt
-    if (typeof nuxtOptions !== 'object' || nuxtOptions === null) {
-        return
-    }
+    if (typeof nuxtOptions !== 'object' || nuxtOptions === null) return
+
     const cleanNuxt = Object.fromEntries(
         Object.entries(nuxtOptions).filter(([key]) => key !== 'overrides'),
     )
-    if (project.test) {
-        project.test.environmentOptions = { ...envOptions, nuxt: cleanNuxt }
-    }
+    if (project.test) project.test.environmentOptions = { ...envOptions, nuxt: cleanNuxt }
 }
 
 stripNonCloneableNuxtOverrides(nuxtProject)

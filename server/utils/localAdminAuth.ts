@@ -7,22 +7,19 @@ import { localAdminUserId } from '../../shared/utils/localAdminIdentity.js'
 const localAdminEmail = 'liry24-local-admin@example.invalid'
 
 export function localAdminAuth(origin: string) {
-    if (!import.meta.dev) {
-        return
-    }
+    if (!import.meta.dev) return
+
     const config = useRuntimeConfig().localAdmin
-    if (!config.origin || !config.secret) {
-        return
-    }
+    if (!config.origin || !config.secret) return
+
     const target = new URL(origin)
     const listener = new URL(config.origin)
     if (
         target.protocol === listener.protocol &&
         target.port === listener.port &&
         (target.hostname === listener.hostname || target.hostname === 'localhost')
-    ) {
+    )
         return config
-    }
 }
 
 export const localAdminPlugin = {
@@ -50,9 +47,7 @@ export const localAdminPlugin = {
                     })
                 } catch (error) {
                     user = await findUser()
-                    if (!user) {
-                        throw error
-                    }
+                    if (!user) throw error
                 }
                 user ??= await findUser()
             }
@@ -61,9 +56,9 @@ export const localAdminPlugin = {
                 user.email !== localAdminEmail ||
                 !('role' in user) ||
                 user.role !== 'admin'
-            ) {
+            )
                 throw new APIError('FORBIDDEN', { message: 'Local administrator is unavailable.' })
-            }
+
             const session = await internalAdapter.createSession(user.id)
             if (!session) {
                 throw new APIError('INTERNAL_SERVER_ERROR', {

@@ -3,12 +3,6 @@ import { MasonryWall } from '@yeger/vue-masonry-wall'
 
 import { LazyArtViewer } from '#components'
 
-useSeoMeta({ title: 'Arts', description: 'A collection of artworks by Liry24.' })
-defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'arts' }, [
-    { key: 'og' },
-    { key: 'whatsapp', width: 800, height: 800 },
-])
-
 const route = useRoute()
 const overlay = useOverlay()
 
@@ -19,10 +13,14 @@ const modalArtViewer = overlay.create(LazyArtViewer)
 onMounted(() => {
     const slug = typeof route.query.open === 'string' ? route.query.open : undefined
     const matched = slug ? data.value?.find((entry) => entry.data.slug === slug) : undefined
-    if (matched) {
-        modalArtViewer.open({ item: matched })
-    }
+    if (matched) modalArtViewer.open({ item: matched })
 })
+
+useSeoMeta({ title: 'Arts', description: 'A collection of artworks by Liry24.' })
+defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'arts' }, [
+    { key: 'og' },
+    { key: 'whatsapp', width: 800, height: 800 },
+])
 </script>
 
 <template>

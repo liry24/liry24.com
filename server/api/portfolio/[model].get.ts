@@ -36,9 +36,7 @@ async function listModelItems(
 
 export default defineEventHandler(async (event) => {
     const name = parsePortfolioModel(getRouterParam(event, 'model'))
-    if (!name) {
-        throw createError({ status: 404, statusText: 'Collection not found' })
-    }
+    if (!name) throw createError({ status: 404, statusText: 'Collection not found' })
 
     const items = await listModelItems(name)
     items.sort((a, b) => {

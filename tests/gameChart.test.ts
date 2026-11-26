@@ -61,13 +61,11 @@ test('area and line use the same monotone path, numeric ordering, rank colors an
 })
 
 function pointLabel(datum: unknown): string | undefined {
-    if (typeof datum !== 'object' || datum === null || !('record' in datum)) {
-        return undefined
-    }
+    if (typeof datum !== 'object' || datum === null || !('record' in datum)) return undefined
+
     const { record } = datum
-    if (typeof record !== 'object' || record === null || !('label' in record)) {
-        return undefined
-    }
+    if (typeof record !== 'object' || record === null || !('label' in record)) return undefined
+
     return typeof record.label === 'string' ? record.label : undefined
 }
 test('flat paths remain painted with different recorded colors and equal values retain distinct labels', () => {

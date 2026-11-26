@@ -13,9 +13,8 @@ const props = defineProps({
 
 const retryAdminPath = computed(() => {
     const data: unknown = props.error.data
-    if (data && typeof data === 'object' && 'retryAdminPath' in data) {
+    if (data && typeof data === 'object' && 'retryAdminPath' in data)
         return adminRedirect(data.retryAdminPath)
-    }
 })
 </script>
 

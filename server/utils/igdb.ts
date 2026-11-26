@@ -52,9 +52,8 @@ async function fetchWithoutRedirects(
     const response = await globalThis.fetch(input, nextInit)
     // workerd throws TypeError on redirect: "error", so reject 3xx responses under manual mode.
     if (rejectRedirects && response.status >= 300 && response.status < 400) {
-        if (response.body) {
-            await response.body.cancel().catch(() => undefined)
-        }
+        if (response.body) await response.body.cancel().catch(() => undefined)
+
         throw new TypeError('IGDB upstream returned an unexpected redirect.')
     }
     return response
@@ -127,9 +126,8 @@ async function fetchTwitchAccessToken(
         }
 
         if (!response.ok) {
-            if (response.body) {
-                await response.body.cancel().catch(() => undefined)
-            }
+            if (response.body) await response.body.cancel().catch(() => undefined)
+
             throw new IgdbError('HTTP_ERROR', 'auth', { status: response.status })
         }
 
@@ -141,9 +139,7 @@ async function fetchTwitchAccessToken(
         }
 
         const parsed = twitchTokenSchema.safeParse(payload)
-        if (!parsed.success) {
-            throw new IgdbError('INVALID_RESPONSE', 'auth')
-        }
+        if (!parsed.success) throw new IgdbError('INVALID_RESPONSE', 'auth')
 
         const expiresMs = parsed.data.expires_in * 1000
         return {
@@ -168,9 +164,9 @@ async function resolveIgdbAccessToken(
         cachedToken.clientId === clientId &&
         cachedToken.clientSecret === clientSecret &&
         cachedToken.expiresAt > Date.now()
-    ) {
+    )
         return { token: cachedToken.accessToken, fromCache: true }
-    }
+
     const fresh = await fetchTwitchAccessToken(clientId, clientSecret)
     cachedToken = fresh
     return { token: fresh.accessToken, fromCache: false }
@@ -188,12 +184,10 @@ async function runIgdbQuery(
         fetch: createIgdbFetch(),
     })
     const games = client.query('games').fields('id', 'slug', 'name', 'cover.image_id')
-    if ('id' in query) {
-        return await games.where((game) => eq(game.id, query.id)).limit(1)
-    }
-    if ('slug' in query) {
-        return await games.where((game) => eq(game.slug, query.slug)).limit(1)
-    }
+    if ('id' in query) return await games.where((game) => eq(game.id, query.id)).limit(1)
+
+    if ('slug' in query) return await games.where((game) => eq(game.slug, query.slug)).limit(1)
+
     return await games.search(query.search).limit(10)
 }
 
@@ -212,9 +206,8 @@ async function executeIgdbQuery(
             error.code === 'HTTP_ERROR' &&
             error.status === 401
         ) {
-            if (cachedToken?.accessToken === token) {
-                cachedToken = undefined
-            }
+            if (cachedToken?.accessToken === token) cachedToken = undefined
+
             const refreshed = await resolveIgdbAccessToken(clientId, clientSecret, true)
             return await runIgdbQuery(clientId, refreshed.token, query)
         }

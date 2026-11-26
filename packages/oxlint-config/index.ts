@@ -15,22 +15,18 @@ const baseRules = Object.fromEntries(
 
 const autoImportMessage = 'Use the Nuxt auto-import directly.'
 
-function readAutoImportPaths(declarationUrl: URL) {
+const readAutoImportPaths = (declarationUrl: URL) => {
     const declarations = readFileSync(declarationUrl, 'utf8')
     const paths = new Map<string, Array<string>>()
 
     for (const [, specifiers, source] of declarations.matchAll(
         /^export \{ (.+) \} from '([^']+)';$/gm,
     )) {
-        if (!source || !specifiers || source.startsWith('.')) {
-            continue
-        }
+        if (!source || !specifiers || source.startsWith('.')) continue
 
         const names = specifiers.split(', ').filter((specifier) => !specifier.includes(' '))
         const sources = source.startsWith('#app/') ? [source, '#app', 'nuxt/app'] : [source]
-        for (const name of sources) {
-            paths.set(name, [...(paths.get(name) ?? []), ...names])
-        }
+        for (const name of sources) paths.set(name, [...(paths.get(name) ?? []), ...names])
     }
 
     return Array.from(paths, ([name, importNames]) => ({
@@ -79,7 +75,7 @@ export default defineConfig({
         'node_modules/**',
         'patches/**',
     ],
-    rules: { ...baseRules, curly: ['error', 'multi-line'] },
+    rules: { ...baseRules, curly: ['error', 'multi-or-nest'] },
     overrides: [
         ...(cloudflareConfig.overrides ?? []),
         {

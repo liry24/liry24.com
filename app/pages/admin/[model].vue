@@ -27,12 +27,11 @@ const route = useRoute()
 const toast = useToast()
 
 const modelParam = String(route.params.model ?? '')
-if (!Object.hasOwn(metaByModel, modelParam)) {
+if (!Object.hasOwn(metaByModel, modelParam))
     throw createError({ status: 404, statusText: 'Model not found' })
-}
+
 const model = modelParam as AdminModel
 const meta = metaByModel[model]
-useHead({ title: meta.title })
 
 interface AdminEditableFields {
     title?: string
@@ -141,12 +140,12 @@ const {
     model === 'games' && igdbQuery.value.trim() ? igdbQuery.value.trim() : null,
 )
 
-function stringField(key: AdminStringKey): string {
+const stringField = (key: AdminStringKey): string => {
     const val = formData.value[key]
     return typeof val === 'string' ? val : ''
 }
 
-function setStringField(key: AdminStringKey, value: string | number) {
+const setStringField = (key: AdminStringKey, value: string | number) => {
     if (key === 'style') {
         formData.value = {
             ...formData.value,
@@ -159,28 +158,27 @@ function setStringField(key: AdminStringKey, value: string | number) {
     formData.value = next
 }
 
-function beginReorder() {
+const beginReorder = () => {
     reorderFrom.value = currentOrder.value
     orderDraft.value = currentOrder.value
     reorderError.value = ''
 }
 
-async function endReorder() {
+const endReorder = async () => {
     reorderFrom.value = null
     await nextTick()
     document.getElementById(reorderButtonId)?.focus()
 }
 
-function cancelReorder() {
+const cancelReorder = () => {
     reorderError.value = ''
     void endReorder()
 }
 
-async function saveOrder() {
+const saveOrder = async () => {
     const from = reorderFrom.value
-    if (!from || !orderChanged.value || savingOrder.value) {
-        return
-    }
+    if (!from || !orderChanged.value || savingOrder.value) return
+
     savingOrder.value = true
     reorderError.value = ''
     let resetOrder = false
@@ -205,13 +203,11 @@ async function saveOrder() {
         reorderError.value = adminErrorMessage(error_, 'Could not save order.')
     } finally {
         savingOrder.value = false
-        if (resetOrder) {
-            await endReorder()
-        }
+        if (resetOrder) await endReorder()
     }
 }
 
-function defaultRecord(): AdminEditableFields {
+const defaultRecord = (): AdminEditableFields => {
     if (model === 'works') {
         return {
             title: '',
@@ -271,22 +267,19 @@ const openEdit = (item: AdminItem) => {
     formError.value = ''
     errors.value = {}
     formData.value = { ...item.data }
-    if (model === 'games') {
-        jsonExtraText.value = JSON.stringify(item.data.metrics ?? [], null, 2)
-    } else if (model === 'gameStats') {
+    if (model === 'games') jsonExtraText.value = JSON.stringify(item.data.metrics ?? [], null, 2)
+    else if (model === 'gameStats')
         jsonExtraText.value = JSON.stringify(item.data.values ?? [], null, 2)
-    } else {
-        jsonExtraText.value = ''
-    }
+    else jsonExtraText.value = ''
+
     editorOpen.value = true
 }
 
 const uploadImage = async (event: Event, target: 'single' | 'cover' | 'art-append') => {
     const input = event.target as HTMLInputElement | null
     const file = input?.files?.[0]
-    if (!file) {
-        return
-    }
+    if (!file) return
+
     uploading.value = true
     try {
         const body = new FormData()
@@ -299,11 +292,9 @@ const uploadImage = async (event: Event, target: 'single' | 'cover' | 'art-appen
         if (target === 'art-append') {
             const current = formData.value.images ?? []
             formData.value = { ...formData.value, images: [...current, uploaded] }
-        } else if (target === 'cover') {
-            formData.value = { ...formData.value, icon: uploaded }
-        } else {
-            formData.value = { ...formData.value, image: uploaded }
-        }
+        } else if (target === 'cover') formData.value = { ...formData.value, icon: uploaded }
+        else formData.value = { ...formData.value, image: uploaded }
+
         toast.add({ title: 'Uploaded image', color: 'success' })
     } catch (error_) {
         toast.add({
@@ -313,9 +304,7 @@ const uploadImage = async (event: Event, target: 'single' | 'cover' | 'art-appen
         })
     } finally {
         uploading.value = false
-        if (input) {
-            input.value = ''
-        }
+        if (input) input.value = ''
     }
 }
 
@@ -368,9 +357,8 @@ const handleImportGame = async (game: GameSearchResult) => {
 }
 
 const publishItem = async (item: AdminItem) => {
-    if (model === 'games') {
-        return
-    }
+    if (model === 'games') return
+
     busyId.value = item.id
     try {
         await $fetch('/api/admin/content/publish', {
@@ -399,14 +387,14 @@ const deleteItem = async (item: AdminItem) => {
     busyId.value = item.id
     try {
         const id = encodeURIComponent(item.id)
-        if (model === 'games') {
-            await $fetch(`/api/admin/games/${id}`, { method: 'DELETE' })
-        } else {
+        if (model === 'games') await $fetch(`/api/admin/games/${id}`, { method: 'DELETE' })
+        else {
             await $fetch(`/api/admin/content/${model}/${id}`, {
                 method: 'DELETE',
                 query: { publish: 'true' },
             })
         }
+
         toast.add({ title: 'Deleted item', color: 'neutral' })
         await refresh()
     } catch (error_) {
@@ -430,6 +418,8 @@ const itemLabel = (item: AdminItem) =>
             item.data.game ??
             item.id,
     )
+
+useHead({ title: meta.title })
 </script>
 
 <template>

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-useHead({ title: 'Dashboard', titleTemplate: '%s | Liry24 Admin' })
-
 const { data: postOverview } = await useFetch<{ items: Array<{ status?: { state?: string } }> }>(
     '/api/admin/content/posts',
 )
@@ -27,6 +25,8 @@ const collectionLinks = [
     },
     { name: 'socials', label: 'Socials', to: '/admin/socials', icon: 'mingcute:link-2-fill' },
 ] as const
+
+useHead({ title: 'Dashboard', titleTemplate: '%s | Liry24 Admin' })
 </script>
 
 <template>

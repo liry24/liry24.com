@@ -11,9 +11,9 @@ export function adminRedirect(value: unknown) {
         !value.startsWith('/') ||
         value.startsWith('//') ||
         /[\\\s]/u.test(value)
-    ) {
+    )
         return '/admin'
-    }
+
     const origin = 'https://admin.invalid'
     const url = new URL(value, origin)
     return url.origin === origin && isAdminPath(url.pathname)

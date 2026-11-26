@@ -24,16 +24,14 @@ export async function preparePostData(input: {
     const matchedIds: Array<string> = []
     for (const slug of slugs) {
         const doc = bySlug.get(slug)
-        if (!doc) {
-            invalidField('Choose an imported game for every game mention.')
-        }
+        if (!doc) invalidField('Choose an imported game for every game mention.')
+
         matchedIds.push(doc.id)
     }
     const plainTitle = gameTitleParts(input.data.title)
         .map((part) => {
-            if (!part.slug) {
-                return part.text
-            }
+            if (!part.slug) return part.text
+
             const matchedDoc = bySlug.get(part.slug)
             return matchedDoc?.data.name ?? part.text
         })
@@ -53,19 +51,16 @@ export async function validateGameSave(options: {
 }) {
     const { id, data, previous } = options
     const metricKeys = new Set(data.metrics.map((item) => item.key))
-    if (metricKeys.size !== data.metrics.length) {
-        invalidField('Metric keys must be unique.')
-    }
-    if (data.primaryMetric && !data.metrics.some((item) => item.key === data.primaryMetric)) {
+    if (metricKeys.size !== data.metrics.length) invalidField('Metric keys must be unique.')
+
+    if (data.primaryMetric && !data.metrics.some((item) => item.key === data.primaryMetric))
         invalidField('Choose an existing metric.')
-    }
+
     for (const metric of data.metrics) {
         for (const position of metric.positions ?? []) {
             const issues = gameValueIssues([metric], [{ ...position, key: metric.key }])
             const firstIssue = issues[0]
-            if (firstIssue) {
-                invalidField(firstIssue)
-            }
+            if (firstIssue) invalidField(firstIssue)
         }
     }
 
@@ -73,9 +68,8 @@ export async function validateGameSave(options: {
         previous.igdbId !== data.igdbId ||
         previous.slug !== data.slug ||
         previous.name !== data.name
-    ) {
+    )
         invalidField('IGDB identity cannot be edited. Import the game from search.')
-    }
 
     const stats = await gameStatsEntries()
     const recordedKeys = new Set(
@@ -92,18 +86,16 @@ export async function validateGameSave(options: {
             ),
     )
     for (const key of recordedKeys) {
-        if (!key) {
-            continue
-        }
+        if (!key) continue
+
         const before = previous.metrics.find((metric) => metric.key === key)
         const after = data.metrics.find((metric) => metric.key === key)
         if (
             !after ||
             after.format !== before?.format ||
             (after.unit || '') !== (before?.unit || '')
-        ) {
+        )
             invalidField(`Keep the key, format and unit of recorded metric ${key}.`)
-        }
     }
 }
 
@@ -112,29 +104,23 @@ export async function validateGameStatsSave(options: {
     data: Omit<GameStatsRecordData, 'order'>
 }) {
     const { id, data } = options
-    if (data.start && data.end && Date.parse(data.start) > Date.parse(data.end)) {
+    if (data.start && data.end && Date.parse(data.start) > Date.parse(data.end))
         invalidField('End must follow start.')
-    }
+
     const game = await gameCatalog().get(data.game)
-    if (!game) {
-        invalidField('Choose a saved game.')
-    }
+    if (!game) invalidField('Choose a saved game.')
 
     const metrics: Array<GameMetric> = Array.isArray(game.data.metrics) ? game.data.metrics : []
     const issues = gameValueIssues(metrics, data.values)
     const firstIssue = issues[0]
-    if (firstIssue) {
-        invalidField(firstIssue)
-    }
+    if (firstIssue) invalidField(firstIssue)
 
     const existing = await listAllCollectionItems(content.collection('gameStats'), 'draft')
     for (const doc of existing) {
-        if (doc.id === id) {
-            continue
-        }
-        if (doc.data.game === data.game && doc.data.periodKey === data.periodKey) {
+        if (doc.id === id) continue
+
+        if (doc.data.game === data.game && doc.data.periodKey === data.periodKey)
             invalidField('A stat period with this game and periodKey already exists.')
-        }
     }
 }
 
@@ -157,16 +143,14 @@ export async function validateGameRemoval(id: string) {
     if (
         stats.some((item) => item.data.game === id) ||
         [...draftPosts, ...publishedPosts].some((item) => item.data.gameMentions?.includes(id))
-    ) {
+    )
         throw createError({ status: 409, statusText: 'Game is referenced by Game Stats or Posts' })
-    }
 }
 
 export async function validateSocialSave(options: { id: string; slug: string }) {
     const existing = await listAllCollectionItems(content.collection('socials'), 'draft')
     for (const doc of existing) {
-        if (doc.id !== options.id && doc.data.slug === options.slug) {
+        if (doc.id !== options.id && doc.data.slug === options.slug)
             invalidField('A social link with this slug already exists.')
-        }
     }
 }

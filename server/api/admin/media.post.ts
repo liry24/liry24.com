@@ -50,9 +50,8 @@ export default defineEventHandler(async (event): Promise<MediaReference> => {
     await requireAdminSession(event)
     const formData = await event.req.formData()
     const fileEntry = formData.get('file')
-    if (!isUploadFile(fileEntry)) {
+    if (!isUploadFile(fileEntry))
         throw createError({ status: 400, statusText: 'Image file is required' })
-    }
 
     const extension = extensionForMime(fileEntry.type)
     if (!extension) {

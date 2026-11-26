@@ -59,9 +59,7 @@ const codec: TokenCodec = {
 const value = shallowRef(fromText(model.value, codec))
 
 watch(model, (source) => {
-    if (source !== toText(value.value, codec)) {
-        value.value = fromText(source, codec)
-    }
+    if (source !== toText(value.value, codec)) value.value = fromText(source, codec)
 })
 
 function updateValue(next: TokenInputValue, details: TokenInputValueChangeDetails) {
@@ -81,22 +79,18 @@ function preventLineBreak(event: InputEvent) {
 }
 
 function waitForMenuResults(event: KeyboardEvent) {
-    if (event.isComposing || !['Enter', 'Tab'].includes(event.key)) {
-        return
-    }
+    if (event.isComposing || !['Enter', 'Tab'].includes(event.key)) return
+
     const editor = controller.editor.element
-    if (event.target !== editor) {
-        return
-    }
+    if (event.target !== editor) return
+
     const menuId = editor?.getAttribute('aria-controls')
     if (
         menuId &&
         editor?.ownerDocument.getElementById(menuId)?.getAttribute('aria-busy') === 'true'
     ) {
         event.stopPropagation()
-        if (event.key === 'Enter') {
-            event.preventDefault()
-        }
+        if (event.key === 'Enter') event.preventDefault()
     }
 }
 
@@ -111,15 +105,12 @@ function select(item: string, details: TriggerMenuSelectDetails) {
 }
 
 watchPostEffect((onCleanup) => {
-    if (!props.multiline || !value.value.length) {
-        return
-    }
+    if (!props.multiline || !value.value.length) return
+
     const editor = root.value?.querySelector<HTMLElement>('[data-slot="token-input-editor"]')
     if (editor) {
         const clear = highlightMarkdown(editor)
-        if (clear) {
-            onCleanup(clear)
-        }
+        if (clear) onCleanup(clear)
     }
 })
 </script>

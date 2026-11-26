@@ -1,12 +1,6 @@
 <script setup lang="ts">
 import { MasonryWall } from '@yeger/vue-masonry-wall'
 
-useSeoMeta({ title: 'Works', description: 'A collection of works by Liry24.' })
-defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
-    { key: 'og' },
-    { key: 'whatsapp', width: 800, height: 800 },
-])
-
 const entries = await usePortfolioData('works')
 const data = computed(() =>
     (entries.data.value ?? []).map((entry) => ({
@@ -15,6 +9,12 @@ const data = computed(() =>
         image: mediaUrl(entry.data.image),
     })),
 )
+
+useSeoMeta({ title: 'Works', description: 'A collection of works by Liry24.' })
+defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
+    { key: 'og' },
+    { key: 'whatsapp', width: 800, height: 800 },
+])
 </script>
 
 <template>

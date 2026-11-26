@@ -96,12 +96,10 @@ export async function listAllCollectionItems<TData>(
         const page = cursor
             ? await collection.list({ ref, limit: 1000, cursor })
             : await collection.list({ ref, limit: 1000 })
-        for (const item of page.items) {
-            items.push({ id: item.id, url: item.url, data: item.data })
-        }
-        if (!page.nextCursor || page.items.length === 0) {
-            return items
-        }
+        for (const item of page.items) items.push({ id: item.id, url: item.url, data: item.data })
+
+        if (!page.nextCursor || page.items.length === 0) return items
+
         cursor = page.nextCursor
     }
 }
@@ -146,9 +144,8 @@ export async function listAdminCollection(name: ContentCollectionName): Promise<
     const scheduleByDocId = new Map<string, ContentSchedule>()
     for (const entry of activeSchedules) {
         for (const item of entry.expect) {
-            if (item.collection === name && !scheduleByDocId.has(item.id)) {
+            if (item.collection === name && !scheduleByDocId.has(item.id))
                 scheduleByDocId.set(item.id, entry)
-            }
         }
     }
 
@@ -182,9 +179,8 @@ export async function getAdminDocument(
 ): Promise<AdminContentDocument | null> {
     const col = content.collection(name)
     const doc = await col.get(id, { ref: 'draft' })
-    if (!doc) {
-        return null
-    }
+    if (!doc) return null
+
     const [status, schedules] = await Promise.all([
         col.status(id),
         content.schedules({ collection: name, id }),

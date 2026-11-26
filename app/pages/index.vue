@@ -4,12 +4,6 @@ import { motion } from 'motion-v'
 import { LazyStacksModal } from '#components'
 
 const { app } = useAppConfig()
-useHead({ titleTemplate: null })
-useSeoMeta({ title: 'Liry24', description: 'Personal website of Liry24.' })
-defineOgImage('Home.takumi', { title: 'Liry24' }, [
-    { key: 'og' },
-    { key: 'whatsapp', width: 800, height: 800 },
-])
 const overlay = useOverlay()
 
 const modalStacks = overlay.create(LazyStacksModal)
@@ -39,9 +33,7 @@ const statGames = computed(() =>
 
 const rotateArray = <T>(arr: Array<T>, n: number): Array<T> => {
     const len = arr.length
-    if (len === 0) {
-        return arr
-    }
+    if (len === 0) return arr
 
     const shift = n % len
 
@@ -49,6 +41,13 @@ const rotateArray = <T>(arr: Array<T>, n: number): Array<T> => {
 }
 
 useKeyCommand(modalStacks.open)
+
+useHead({ titleTemplate: null })
+useSeoMeta({ title: 'Liry24', description: 'Personal website of Liry24.' })
+defineOgImage('Home.takumi', { title: 'Liry24' }, [
+    { key: 'og' },
+    { key: 'whatsapp', width: 800, height: 800 },
+])
 </script>
 
 <template>
