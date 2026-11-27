@@ -1,7 +1,6 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
 @import 'vite-hub/ui/styles.css';
-@import '@liry24/ui/styles.css';
 
 @theme static {
     --font-sans: 'Inter', sans-serif;

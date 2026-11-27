@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { UiSlashEditor } from '@liry24/ui'
 import type {
     TokenCodec,
     TokenInsert,
@@ -7,6 +6,11 @@ import type {
     TriggerItemsLoader,
     TriggerMenuSelectDetails,
 } from '@liry24/ui'
+import {
+    applyMarkdownSlashCommand,
+    createMarkdownSlashCommands,
+    markdownDirectTriggers,
+} from '@liry24/ui/markdown'
 
 const props = defineProps<{
     games: ReadonlyMap<string, GameSearchResult>
@@ -73,40 +77,7 @@ const gameCommand = {
         },
     ],
 }
-const headingLevels = ['1', '2', '3', '4', '5', '6']
-const markdownCommands = [
-    {
-        value: 'heading',
-        label: 'heading',
-        arguments: [
-            {
-                name: 'level',
-                hint: '<1-6>',
-                required: true,
-                items: headingLevels,
-                allowCustomValue: false,
-            },
-        ],
-    },
-    { value: 'code', label: 'code', arguments: [{ name: 'lang', hint: '[language]' }] },
-    { value: 'quote', label: 'quote' },
-    { value: 'list', label: 'list' },
-    { value: 'ordered', label: 'ordered' },
-    { value: 'task', label: 'task' },
-    {
-        value: 'link',
-        label: 'link',
-        arguments: [
-            { name: 'url', hint: '<URL>', required: true },
-            { name: 'label', hint: '[label]' },
-        ],
-    },
-    { value: 'divider', label: 'divider' },
-    { value: 'more', label: 'more' },
-]
-
-const directArguments = (query: string) =>
-    query.trim() ? [{ value: query.trim(), label: query.trim() }] : []
+const markdownCommands = createMarkdownSlashCommands({ includeMore: true })
 
 const triggers = computed<Array<TriggerDefinition>>(() => [
     {
@@ -118,19 +89,7 @@ const triggers = computed<Array<TriggerDefinition>>(() => [
         pattern: /[^\s]/u,
         insert: (item) => gameToken(item.value),
     },
-    ...(props.multiline
-        ? [
-              { char: '/heading ', items: headingLevels },
-              { char: '/code ', items: directArguments },
-              {
-                  char: '/link ',
-                  items: directArguments,
-                  spaces: true,
-                  maxLength: 2048,
-                  pattern: /[^\s]/u,
-              },
-          ]
-        : []),
+    ...(props.multiline ? markdownDirectTriggers : []),
     {
         char: '/',
         type: 'game',
@@ -188,52 +147,7 @@ const select = (value: string, details: TriggerMenuSelectDetails, precedingLine:
         return importGame(game)
     }
 
-    const command = details.trigger === '/' ? value : details.trigger.slice(1).trim()
-    const direct = details.trigger === '/' ? '' : value
-    const blockStart = precedingLine.trim() ? '\n\n' : ''
-
-    switch (command) {
-        case 'heading':
-            details.insert(`${blockStart}${'#'.repeat(Number(details.arguments.level ?? direct))} `)
-            break
-        case 'code': {
-            const language = (details.arguments.lang ?? direct).replaceAll(/[^\w+.-]/g, '')
-            details.insert(`${blockStart}\`\`\`${language}\n\n\`\`\`\n`)
-            break
-        }
-        case 'quote':
-            details.insert(blockStart + '> ')
-            break
-        case 'list':
-            details.insert(blockStart + '- ')
-            break
-        case 'ordered':
-            details.insert(blockStart + '1. ')
-            break
-        case 'task':
-            details.insert(blockStart + '- [ ] ')
-            break
-        case 'link': {
-            const [url = '', ...label] = direct.split(/\s+/)
-            const href = (details.arguments.url ?? url).replaceAll(/[\s<>]/g, (char) =>
-                encodeURIComponent(char),
-            )
-            const text = (details.arguments.label ?? (label.join(' ') || href)).replaceAll(
-                /[\\[\]]/g,
-                String.raw`\$&`,
-            )
-            details.insert(`[${text}](<${href}>)`)
-            break
-        }
-        case 'divider':
-            details.insert(`${blockStart || '\n'}---\n\n`)
-            break
-        case 'more':
-            details.insert(`${blockStart}<!-- more -->\n\n`)
-            break
-        default:
-            details.preventDefault()
-    }
+    if (!applyMarkdownSlashCommand(value, details, precedingLine)) details.preventDefault()
 }
 </script>
 

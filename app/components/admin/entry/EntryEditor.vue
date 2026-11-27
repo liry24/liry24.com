@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { UiFormDialog, UiSearchPicker } from '@liry24/ui'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 
 const props = defineProps<{
@@ -50,7 +49,7 @@ async function showErrors(message: string, fields: Record<string, string> = {}) 
     formError.value = message
     errors.value = fields
     await nextTick()
-    const invalid = summary.value
+    const invalid = summary.value?.el
         ?.closest('form')
         ?.querySelector<HTMLElement>('[aria-invalid="true"]')
     if (invalid) {
@@ -123,9 +122,9 @@ async function save() {
         :final-focus="finalFocus"
         @submit="save"
     >
-        <p v-if="formError" ref="summary" class="ui-alert mb-4 w-full" role="alert" tabindex="-1">
+        <UiAlert v-if="formError" ref="summary" class="mb-4" tabindex="-1">
             {{ formError }}
-        </p>
+        </UiAlert>
         <fieldset v-if="open" :disabled="busy" class="min-w-0">
             <AdminEntryWorkFields
                 v-if="model === 'works'"

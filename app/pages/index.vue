@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { motion } from 'motion-v'
 
-import { LazyStacksModal } from '#components'
+import { LazyGameStatsViewer, LazyStacksModal } from '#components'
 
-const { app } = useAppConfig()
+const route = useRoute()
+const appConfig = useAppConfig()
+const { app } = appConfig
 const overlay = useOverlay()
 
 const modalStacks = overlay.create(LazyStacksModal)
-const MotionUSeparator = motion.create('hr')
+const modalGameStats = overlay.create(LazyGameStatsViewer)
 
 const arts = usePortfolioData('arts')
 const socials = usePortfolioData('socials')
@@ -42,6 +44,12 @@ const rotateArray = <T>(arr: Array<T>, n: number): Array<T> => {
 
 useKeyCommand(modalStacks.open)
 
+onMounted(() => {
+    const slug = typeof route.query.game === 'string' ? route.query.game : undefined
+    const matched = slug ? statGames.value.find((entry) => entry.data.slug === slug) : undefined
+    if (matched) modalGameStats.open({ game: matched.data, periods: matched.periods })
+})
+
 useHead({ titleTemplate: null })
 useSeoMeta({ title: 'Liry24', description: 'Personal website of Liry24.' })
 defineOgImage('Home.takumi', { title: 'Liry24' }, [
@@ -51,33 +59,53 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
 </script>
 
 <template>
-    <div v-if="data" class="flex flex-col gap-16">
+    <div v-if="data" class="flex flex-col gap-14 sm:gap-16">
         <UMarquee
+            v-if="data.arts.length"
             pause-on-hover
-            :ui="{ content: 'gap-8 md:gap-12 lg:gap-16' }"
-            class="my-8 [--duration:40s]"
+            :overlay="false"
+            :ui="{ content: 'gap-5 sm:gap-8 md:gap-10 lg:gap-12' }"
+            class="my-2 mask-x-from-88% mask-x-to-100% [--duration:42s]"
         >
             <Motion
                 v-for="(art, index) in rotateArray(data.arts, 1)"
-                :key="index"
-                :initial="{ scale: 1.1, opacity: 0, filter: 'blur(20px)' }"
-                :animate="{ scale: 1, opacity: 1, filter: 'blur(0px)' }"
-                :transition="{ delay: 0.2 + index * 0.1 }"
+                :key="art.id"
+                :initial="{ scale: 1.04, opacity: 0 }"
+                :animate="{ scale: 1, opacity: 1 }"
+                :transition="{ delay: Math.min(0.05 + index * 0.04, 0.25) }"
             >
-                <NuxtLink :to="`/arts?open=${art.data.slug}`">
+                <NuxtLink
+                    :to="`/arts?open=${art.data.slug}`"
+                    class="group bg-muted/50 ring-default/70 relative block overflow-hidden rounded-2xl ring-1 focus-visible:outline-2 focus-visible:outline-offset-4"
+                >
                     <NuxtImg
                         :src="mediaUrl(art.data.images[0])"
                         :alt="art.data.title"
                         :height="320"
                         format="webp"
-                        class="aspect-square size-64 cursor-pointer rounded-xl object-cover md:size-72 lg:size-80"
+                        class="aspect-square size-56 object-cover transition-transform duration-200 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100 sm:size-64 md:size-72 lg:size-80"
                     />
+                    <div
+                        aria-hidden="true"
+                        class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent px-4 pt-10 pb-3.5 text-white opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
+                    >
+                        <span class="line-clamp-1 text-sm font-medium tracking-tight">
+                            {{ art.data.title }}
+                        </span>
+                    </div>
                 </NuxtLink>
             </Motion>
         </UMarquee>
 
-        <Motion :initial="{ opacity: 0 }" :animate="{ opacity: 1 }" :transition="{ delay: 0.4 }">
-            <div class="mx-auto mb-16 flex max-w-xl flex-wrap items-center justify-center gap-2">
+        <Motion
+            v-if="data.socials.length"
+            :initial="{ opacity: 0, y: 8 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ delay: 0.1 }"
+        >
+            <div
+                class="mx-auto flex max-w-2xl flex-wrap items-center justify-center gap-1.5 sm:gap-2"
+            >
                 <UButton
                     v-for="(social, index) in data.socials"
                     :key="`social-${index}`"
@@ -85,19 +113,37 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                     target="_blank"
                     :icon="social.icon"
                     :label="social.label"
+                    color="neutral"
                     variant="ghost"
                     class="gap-2"
                 />
             </div>
         </Motion>
 
-        <Motion :initial="{ opacity: 0 }" :animate="{ opacity: 1 }" :transition="{ delay: 0.6 }">
-            <div class="flex w-full flex-col items-center gap-2">
-                <div class="flex items-center gap-3 leading-none text-nowrap">
-                    <Icon name="liria:liria" size="42" aria-hidden="true" class="text-toned" />
-                    <h2 class="ml-1 pt-0.5 text-5xl font-extrabold">Liria</h2>
+        <Motion
+            :initial="{ opacity: 0, y: 10 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ delay: 0.15 }"
+        >
+            <section class="flex w-full flex-col items-center gap-2">
+                <div
+                    class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 leading-none"
+                >
+                    <span class="inline-flex items-center gap-3">
+                        <Icon
+                            name="liria:liria"
+                            data-icon-ic="false"
+                            aria-hidden="true"
+                            class="text-toned size-8 shrink-0 sm:size-9 md:size-[42px]"
+                        />
+                        <h2
+                            class="text-highlighted ml-1 pt-0.5 text-3xl font-extrabold tracking-[-0.04em] sm:text-4xl md:text-5xl"
+                        >
+                            Liria
+                        </h2>
+                    </span>
                     <p
-                        class="text-muted pt-0.5 text-5xl font-thin tracking-tighter before:content-['//']"
+                        class="text-muted pt-0.5 text-3xl font-thin tracking-[-0.07em] before:content-['//'] sm:text-4xl md:text-5xl"
                     >
                         Creation Circle
                     </p>
@@ -107,23 +153,26 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                     <UButton
                         :to="app.liria.website"
                         target="_blank"
-                        aria-label="Website"
+                        aria-label="Liria Website"
                         icon="mingcute:world-2-fill"
-                        variant="link"
+                        color="neutral"
+                        variant="ghost"
                     />
                     <UButton
                         :to="app.liria.x"
                         target="_blank"
-                        aria-label="X"
+                        aria-label="Liria X"
                         icon="mingcute:social-x-fill"
-                        variant="link"
+                        color="neutral"
+                        variant="ghost"
                     />
                     <UButton
                         :to="app.liria.github"
                         target="_blank"
-                        aria-label="Github"
+                        aria-label="Liria GitHub"
                         icon="mingcute:github-fill"
-                        variant="link"
+                        color="neutral"
+                        variant="ghost"
                     />
                 </div>
 
@@ -131,16 +180,16 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                     <NuxtLink
                         :to="app.liria.liriaGraphics"
                         target="_blank"
-                        class="group relative flex size-full flex-col items-center justify-center gap-4 rounded-xl p-10"
+                        class="group relative flex size-full flex-col items-center justify-center gap-4 rounded-xl p-10 font-[Geist] focus-visible:outline-2 focus-visible:outline-offset-4"
                     >
                         <NuxtImg
                             src="/graphics-ss.png"
                             alt=""
-                            class="absolute inset-0 size-full overflow-clip mask-x-from-60% mask-x-to-90% object-cover object-[0%_10%] opacity-10 transition-opacity group-hover:opacity-30"
+                            class="pointer-events-none absolute inset-0 size-full overflow-clip mask-x-from-60% mask-x-to-90% object-cover object-[0%_10%] opacity-10 transition-opacity group-hover:opacity-30 motion-reduce:transition-none"
                         />
 
-                        <span class="z-1 text-5xl font-extrabold tracking-tight">
-                            Liria<span class="font-thin tracking-tighter">Graphics</span>
+                        <span class="z-1 text-4xl font-extrabold tracking-tight sm:text-5xl">
+                            Liria<span class="font-thin tracking-[-0.07em]">Graphics</span>
                         </span>
 
                         <p class="text-toned z-1 text-center">
@@ -151,137 +200,153 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                     <NuxtLink
                         :to="app.liria.avatio"
                         target="_blank"
-                        class="group relative flex size-full flex-col items-center justify-center gap-4 rounded-xl p-10"
+                        class="group relative flex size-full flex-col items-center justify-center gap-4 rounded-xl p-10 focus-visible:outline-2 focus-visible:outline-offset-4"
                     >
                         <UColorModeImage
                             light="/avatio-ss-light.png"
                             dark="/avatio-ss-dark.png"
                             alt=""
-                            class="absolute inset-0 size-full overflow-clip mask-x-from-60% mask-x-to-90% object-cover object-[0%_10%] opacity-10 transition-opacity group-hover:opacity-30"
+                            class="pointer-events-none absolute inset-0 size-full overflow-clip mask-x-from-60% mask-x-to-90% object-cover object-[0%_10%] opacity-10 transition-opacity group-hover:opacity-30 motion-reduce:transition-none"
                         />
 
-                        <span class="z-1 text-5xl font-extrabold tracking-tight"> Avatio </span>
+                        <span class="z-1 text-4xl font-extrabold tracking-tight sm:text-5xl">
+                            Avatio
+                        </span>
 
                         <p class="text-toned z-1 text-center">
                             VR-SNS Avatar Setups Sharing Platform.
                         </p>
                     </NuxtLink>
                 </div>
-            </div>
+            </section>
         </Motion>
 
-        <MotionUSeparator
-            :initial="{ opacity: 0 }"
-            :animate="{ opacity: 1 }"
-            :transition="{ delay: 0.65 }"
-            class="my-12 max-w-sm self-center"
-        />
+        <USeparator decorative class="mx-auto max-w-xs" />
 
-        <div class="grid w-full max-w-6xl grid-cols-1 gap-x-16 gap-y-24 self-center lg:grid-cols-2">
+        <div
+            class="grid w-full max-w-6xl grid-cols-1 items-start gap-x-16 gap-y-14 self-center lg:grid-cols-2"
+        >
             <Motion
-                as="div"
-                :initial="{ opacity: 0, filter: 'blur(20px)' }"
-                :animate="{ opacity: 1, filter: 'blur(0px)' }"
-                :transition="{ delay: 0.7 }"
-                class="grid gap-4"
+                as="section"
+                :initial="{ opacity: 0, y: 10 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="{ delay: 0.2 }"
+                class="flex flex-col gap-5"
             >
                 <h2
-                    class="text-muted font-mono text-sm leading-none text-nowrap before:content-['//_']"
+                    class="text-muted before:text-dimmed font-mono text-sm leading-none text-nowrap before:content-['//_']"
                 >
                     Career
                 </h2>
-                <div
-                    v-for="(career, index) in data.careers"
-                    :key="`career-${index}`"
-                    class="text-muted mx-2 flex flex-col items-start gap-1 tracking-wide"
+                <ol
+                    v-if="data.careers.length"
+                    class="border-default flex flex-col gap-4 border-s ps-4 sm:ps-5"
                 >
-                    <p class="font-mono text-sm text-nowrap">{{ career.period }}</p>
-                    <p class="text-toned font-medium">
-                        {{ career.position }}
-                        <span class="text-muted font-light">at </span>
-                        <span class="text-highlighted">{{ career.company }}</span>
-                    </p>
-                </div>
+                    <li
+                        v-for="(career, index) in data.careers"
+                        :key="`career-${index}`"
+                        class="flex flex-col items-start gap-1"
+                    >
+                        <p class="text-muted font-mono text-xs text-nowrap tabular-nums sm:text-sm">
+                            {{ career.period }}
+                        </p>
+                        <p class="text-toned text-sm font-medium sm:text-base">
+                            {{ career.position }}
+                            <span class="text-muted font-normal">at </span>
+                            <span class="text-highlighted font-semibold">{{ career.company }}</span>
+                        </p>
+                    </li>
+                </ol>
             </Motion>
 
             <Motion
-                as="div"
-                :initial="{ opacity: 0, filter: 'blur(20px)' }"
-                :animate="{ opacity: 1, filter: 'blur(0px)' }"
-                :transition="{ delay: 0.8 }"
-                class="grid gap-4"
+                as="section"
+                :initial="{ opacity: 0, y: 10 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="{ delay: 0.22 }"
+                class="flex flex-col gap-5"
             >
                 <h2
-                    class="text-muted font-mono text-sm leading-none text-nowrap before:content-['//_']"
+                    class="text-muted before:text-dimmed font-mono text-sm leading-none text-nowrap before:content-['//_']"
                 >
-                    Ranks
+                    Game Stats
                 </h2>
 
-                <GameStats
-                    v-for="game in statGames"
-                    :key="game.id"
-                    :game="game.data"
-                    :periods="game.periods"
-                />
+                <div class="grid gap-3">
+                    <GameStats
+                        v-for="game in statGames"
+                        :key="game.id"
+                        :game="game.data"
+                        :periods="game.periods"
+                    />
+                </div>
             </Motion>
         </div>
 
-        <MotionUSeparator
-            :initial="{ opacity: 0 }"
-            :animate="{ opacity: 1 }"
-            :transition="{ delay: 0.9 }"
-            class="my-12 max-w-sm self-center"
-        />
+        <USeparator decorative class="mx-auto max-w-xs" />
 
-        <div class="grid w-full max-w-6xl grid-cols-1 gap-x-16 gap-y-24 self-center lg:grid-cols-2">
-            <Motion
-                as="div"
-                :initial="{ opacity: 0, filter: 'blur(20px)' }"
-                :animate="{ opacity: 1, filter: 'blur(0px)' }"
-                :transition="{ delay: 1 }"
-                class="flex flex-col gap-4 lg:col-span-2"
-            >
+        <Motion
+            as="section"
+            :initial="{ opacity: 0, y: 10 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ delay: 0.25 }"
+            class="flex w-full max-w-6xl flex-col gap-5 self-center"
+        >
+            <div class="flex items-center justify-between gap-4">
                 <h2
-                    class="text-muted font-mono text-sm leading-none text-nowrap before:content-['//_']"
+                    class="text-muted before:text-dimmed font-mono text-sm leading-none text-nowrap before:content-['//_']"
                 >
                     Latest Posts
                 </h2>
+                <UButton
+                    to="/posts"
+                    label="All posts"
+                    :trailing-icon="appConfig.ui.icons.arrowRight"
+                    variant="link"
+                    color="neutral"
+                    size="sm"
+                    class="p-0 font-mono text-xs"
+                />
+            </div>
 
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <article
-                        v-for="post in data.posts.slice(0, 10)"
-                        :key="String(post.slug)"
-                        class="hover:bg-muted flex h-fit flex-col gap-3 rounded-xl p-6 transition-colors"
-                    >
-                        <h2 class="line-clamp-2 text-2xl font-bold">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
+                <article
+                    v-for="post in data.posts.slice(0, 10)"
+                    :key="String(post.slug)"
+                    class="hover:border-default hover:bg-muted/60 flex h-full flex-col justify-between gap-3 rounded-2xl border border-transparent p-5 transition-[background-color,border-color] duration-200 ease-out motion-reduce:transition-none sm:p-6"
+                >
+                    <div class="flex flex-col gap-2.5">
+                        <h3
+                            class="text-highlighted line-clamp-2 text-xl font-bold tracking-tight sm:text-2xl"
+                        >
                             <PostTitle :title="post.title" :to="`/posts/${post.slug}`" />
-                        </h2>
+                        </h3>
 
                         <MarkdownDocument
                             v-if="post.excerpt.nodes.length"
                             :value="post.excerpt"
-                            class="line-clamp-3 text-sm wrap-break-word *:first:mt-0 *:last:mb-0"
+                            class="text-toned line-clamp-3 text-sm leading-relaxed wrap-break-word *:first:mt-0 *:last:mb-0"
                         />
+                    </div>
 
-                        <div class="flex flex-wrap items-center gap-2">
-                            <NuxtTime
-                                v-if="post.date"
-                                :datetime="post.date"
-                                date-style="short"
-                                time-style="short"
-                                class="text-muted font-mono text-sm leading-none text-nowrap"
-                            />
-                            <UBadge
-                                v-for="(tag, index) in post.tags.filter((tag) => tag !== null)"
-                                :key="`tag-${index}`"
-                                :label="tag"
-                                icon="mingcute:hashtag-line"
-                                variant="soft"
-                            />
-                        </div>
-                    </article>
-                </div>
-            </Motion>
-        </div>
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-1">
+                        <NuxtTime
+                            v-if="post.date"
+                            :datetime="post.date"
+                            date-style="short"
+                            time-style="short"
+                            class="text-muted font-mono text-xs leading-none text-nowrap tabular-nums sm:text-sm"
+                        />
+                        <span
+                            v-for="(tag, index) in post.tags.filter((tag) => tag !== null)"
+                            :key="`tag-${index}`"
+                            class="text-muted font-mono text-xs"
+                        >
+                            #{{ tag }}
+                        </span>
+                    </div>
+                </article>
+            </div>
+        </Motion>
     </div>
 </template>

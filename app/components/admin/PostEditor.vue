@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { UiButton, UiField, UiFileInput, UiFileInputTrigger, UiInput, UiTagInput } from '@liry24/ui'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { ContentDocumentStatus, ContentSchedule } from '@vite-hub/content'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
@@ -279,7 +278,7 @@ const publishActions: Array<DropdownMenuItem> = [
         </template>
 
         <template #body>
-            <p v-if="formError" class="ui-alert" role="alert">{{ formError }}</p>
+            <UiAlert v-if="formError">{{ formError }}</UiAlert>
 
             <div class="grid gap-4">
                 <UiField label="Title" :error="errors['data.title']" required>
@@ -307,7 +306,7 @@ const publishActions: Array<DropdownMenuItem> = [
                 </UiField>
             </div>
 
-            <div class="ui-card flex flex-wrap items-center gap-4 p-4">
+            <UiCard class="flex flex-wrap items-center gap-4 p-4">
                 <UiField label="Cover image" :description="cover?.pathname">
                     <UiFileInput
                         :value="coverFiles"
@@ -318,7 +317,7 @@ const publishActions: Array<DropdownMenuItem> = [
                             toast.add({ title: 'Choose a supported image file', color: 'error' })
                         "
                     >
-                        <UiFileInputTrigger class="ui-button">
+                        <UiFileInputTrigger>
                             {{ uploading ? 'Uploading…' : 'Choose image' }}
                         </UiFileInputTrigger>
                     </UiFileInput>
@@ -331,26 +330,22 @@ const publishActions: Array<DropdownMenuItem> = [
                 />
                 <UiButton
                     v-if="cover"
-                    class="ui-button"
-                    data-variant="ghost"
-                    data-tone="danger"
+                    variant="ghost"
+                    color="error"
                     :disabled="busy"
                     @click="cover = undefined"
                     >Clear</UiButton
                 >
-            </div>
+            </UiCard>
 
             <UiField
                 label="Body (Markdown)"
                 :error="errors.body"
                 description="Start with an introductory paragraph for the post excerpt. Type / to insert Markdown or mention a game."
             >
-                <div
-                    v-if="showPreview"
-                    class="ui-card prose dark:prose-invert min-h-80 max-w-none p-4"
-                >
+                <UiCard v-if="showPreview" class="prose dark:prose-invert min-h-80 max-w-none p-4">
                     <Markdown :value="body" :plugins="[postMarkdownSecurity]" />
-                </div>
+                </UiCard>
                 <AdminPostSlashEditor
                     v-show="!showPreview"
                     v-model="body"
@@ -370,7 +365,7 @@ const publishActions: Array<DropdownMenuItem> = [
                     description="Defaults to the time this post is published."
                     class="sm:max-w-sm"
                 >
-                    <UiInput v-model="authoredAtLocal" type="datetime-local" class="ui-input" />
+                    <UiInput v-model="authoredAtLocal" type="datetime-local" />
                 </UiField>
                 <AdminEntrySlug
                     v-model="slug"

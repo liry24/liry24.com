@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { UiButton, UiField, UiInput } from '@liry24/ui'
-
 const model = defineModel<string | undefined>()
 defineProps<{ error?: string; required?: boolean }>()
 defineEmits<{ search: [event: MouseEvent] }>()
@@ -15,10 +13,10 @@ defineEmits<{ search: [event: MouseEvent] }>()
                 name="data.icon"
                 :required="required"
                 placeholder="lucide:link"
-                class="ui-input min-w-28 flex-1 font-mono"
+                class="min-w-28 flex-1 font-mono"
                 @update:model-value="model = $event"
             />
-            <UiButton type="button" class="ui-button shrink-0" @click="$emit('search', $event)">
+            <UiButton class="shrink-0" @click="$emit('search', $event)">
                 <Icon name="mingcute:search-line" aria-hidden="true" />
                 Find icon
             </UiButton>

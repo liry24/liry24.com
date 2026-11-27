@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const route = useRoute()
+const appConfig = useAppConfig()
 
 const tabs = [
     {
@@ -42,12 +43,17 @@ const showIgdbAttribution = computed(() => route.path === '/' || route.path.star
 
 <template>
     <div class="flex flex-col gap-16">
-        <MotionConfig :transition="{ duration: 0.6 }" reduced-motion="user">
-            <div class="mx-8 my-12 flex min-h-dvh flex-col gap-12 md:mx-12 lg:mx-24 lg:mt-24">
+        <MotionConfig
+            :transition="{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }"
+            reduced-motion="user"
+        >
+            <div
+                class="mx-5 my-8 flex min-h-dvh flex-col gap-10 sm:mx-8 sm:my-12 md:mx-12 md:gap-12 lg:mx-24 lg:mt-20"
+            >
                 <header class="flex w-full flex-col items-center gap-3">
                     <NuxtLink
                         to="/"
-                        class="flex items-center gap-3"
+                        class="flex min-h-11 max-w-full items-center justify-center gap-2.5 rounded-xl px-2 py-1 focus-visible:outline-2 focus-visible:outline-offset-4 sm:min-h-14 sm:gap-3"
                         @mouseenter="handleMouseEnter"
                         @mouseleave="handleMouseLeave"
                     >
@@ -56,33 +62,36 @@ const showIgdbAttribution = computed(() => route.path === '/' || route.path.star
                             v-slot="{ src, imgAttrs, isLoaded }"
                             src="/avatar.png"
                             alt=""
-                            class="aspect-square size-14 rounded-full object-cover"
+                            class="ring-default/70 aspect-square size-11 shrink-0 rounded-full object-cover ring-1 sm:size-13 md:size-14"
                         >
                             <img v-if="isLoaded" v-bind="imgAttrs" :src />
-                            <USkeleton v-else class="aspect-square size-14 rounded-full" />
+                            <USkeleton
+                                v-else
+                                class="aspect-square size-11 shrink-0 rounded-full sm:size-13 md:size-14"
+                            />
                         </NuxtImg>
-                        <Icon v-if="titleHovered" name="mingcute:arrow-left-fill" size="58" />
+                        <Icon
+                            v-if="titleHovered"
+                            name="mingcute:arrow-left-fill"
+                            data-icon-ic="false"
+                            aria-hidden="true"
+                            class="size-8 shrink-0 sm:size-10 md:size-12"
+                        />
                         <HyperText
                             :text="title"
-                            :duration="500"
+                            :duration="450"
                             as="h1"
-                            :class="
-                                cn(
-                                    'font-[Special_Gothic_Expanded_One] text-6xl leading-none tracking-tight',
-                                    route.path === '/' && 'w-56',
-                                    titleHovered && 'w-117',
-                                )
-                            "
+                            class="text-highlighted font-[Special_Gothic_Expanded_One] text-4xl leading-none tracking-tight sm:text-5xl md:text-6xl"
                         />
                     </NuxtLink>
 
-                    <div class="ml-1 flex items-center gap-2">
+                    <div class="flex items-center gap-1.5 sm:gap-2">
                         <UNavigationMenu
                             :items="tabs"
                             color="neutral"
                             variant="link"
                             orientation="horizontal"
-                            class="text-toned ml-auto font-mono text-lg font-medium"
+                            class="text-toned font-mono text-base font-medium sm:text-lg"
                         />
 
                         <ColorModeButton />
@@ -95,12 +104,12 @@ const showIgdbAttribution = computed(() => route.path === '/' || route.path.star
             </div>
 
             <footer
-                class="@container mx-8 mb-10 flex flex-col items-center gap-3 md:mx-12 lg:mx-24"
+                class="@container mx-5 mb-8 flex flex-col items-center gap-3 sm:mx-8 sm:mb-10 md:mx-12 lg:mx-24"
             >
                 <USeparator decorative />
 
                 <div
-                    class="text-muted mt-8 flex w-full items-center justify-between gap-3 text-sm sm:px-10"
+                    class="text-muted mt-6 flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm sm:px-6"
                 >
                     <p>
                         Avatar illustration:
@@ -109,16 +118,19 @@ const showIgdbAttribution = computed(() => route.path === '/' || route.path.star
                             target="_blank"
                             external
                             variant="link"
+                            color="neutral"
                             label="寺乃なあ"
-                            trailing-icon="mingcute:arrow-right-up-line"
+                            :trailing-icon="appConfig.ui.icons.external"
                             class="gap-0.5 p-0"
                             :ui="{
                                 label: 'leading-none',
-                                trailingIcon: 'text-dimmed size-4.5',
+                                trailingIcon: 'text-dimmed size-4',
                             }"
                         />
                     </p>
-                    <p class="leading-none text-nowrap">{{ new Date().getFullYear() }} © Liry24</p>
+                    <p class="leading-none text-nowrap tabular-nums">
+                        {{ new Date().getFullYear() }} © Liry24
+                    </p>
                 </div>
 
                 <NuxtLink
@@ -126,7 +138,7 @@ const showIgdbAttribution = computed(() => route.path === '/' || route.path.star
                     to="https://www.igdb.com"
                     target="_blank"
                     rel="noopener"
-                    class="text-muted text-xs"
+                    class="text-muted hover:text-default text-xs transition-colors"
                     >Game data by IGDB</NuxtLink
                 >
 

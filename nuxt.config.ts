@@ -40,6 +40,7 @@ export default defineNuxtConfig({
     modules: [
         '@nuxt/fonts',
         '@nuxt/ui',
+        '@liry24/ui/nuxt',
         '@comark/vue',
         viteHub,
         '@nuxt/image',
@@ -134,7 +135,7 @@ export default defineNuxtConfig({
     },
 
     build: {
-        transpile: ['@liry24/ui', '@vite-hub/ui'],
+        transpile: ['@vite-hub/ui'],
     },
 
     vite: {
@@ -269,7 +270,13 @@ export default defineNuxtConfig({
         defaults: { weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
         families: [
             { name: 'Inter', provider: 'google', preload: true, global: true },
-            { name: 'Geist', weights: [200], provider: 'google', preload: false, global: true },
+            {
+                name: 'Geist',
+                weights: [100, 200, 400, 700, 800],
+                provider: 'google',
+                preload: false,
+                global: true,
+            },
             { name: 'Geist Mono', provider: 'google', preload: true, global: true },
             {
                 name: 'Special Gothic Expanded One',
