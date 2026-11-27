@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { UiReorderList } from '@liry24/ui'
-
 type GameCatalogItem = AdminEntryRecord<GameRecordData>
 
 const toast = useToast()
@@ -13,6 +11,7 @@ const currentOrder = computed(() => items.value.map((item) => item.id))
 const busyId = ref<string | null>(null)
 const editorOpen = ref(false)
 const editingGame = shallowRef<GameCatalogItem>()
+const editTrigger = shallowRef<HTMLElement | null>(null)
 const reorderButton = useTemplateRef<{ $el?: HTMLElement }>('reorderButton')
 
 const {
@@ -40,10 +39,13 @@ const {
     importGame,
 } = useGameSearch(() => (igdbQuery.value.trim() ? igdbQuery.value.trim() : null))
 
-const openEdit = (item: GameCatalogItem) => {
+const openEdit = (event: MouseEvent, item: GameCatalogItem) => {
+    editTrigger.value = event.currentTarget as HTMLButtonElement | null
     editingGame.value = { id: item.id, data: item.data }
     editorOpen.value = true
 }
+
+const finalFocus = () => editTrigger.value
 
 const handleImportGame = async (game: GameSearchResult) => {
     const saved = await importGame(game)
@@ -213,7 +215,7 @@ useHead({ title: 'Game settings' })
                                     size="xs"
                                     variant="outline"
                                     color="neutral"
-                                    @click="openEdit(item)"
+                                    @click="openEdit($event, item)"
                                 />
                                 <UButton
                                     label="Delete"
@@ -232,6 +234,7 @@ useHead({ title: 'Game settings' })
             <AdminEntryGameSettingsEditor
                 v-model:open="editorOpen"
                 :item="editingGame"
+                :final-focus="finalFocus"
                 @saved="refresh()"
             />
         </template>

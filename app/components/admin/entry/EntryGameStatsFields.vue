@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { UiButton, UiField, UiSelect } from '@liry24/ui'
-
 const data = defineModel<AdminEntryData>({ required: true })
 defineProps<{ errors: Record<string, string>; busy: boolean }>()
 defineEmits<{ busy: [busy: boolean] }>()
@@ -81,7 +79,7 @@ defineExpose({ getValues })
             </UiField>
             <div v-if="error" class="flex flex-wrap items-center gap-2">
                 <p class="ui-error" role="alert">Could not load games.</p>
-                <UiButton type="button" class="ui-button" @click="refresh()">Retry</UiButton>
+                <UiButton size="sm" @click="refresh()">Retry</UiButton>
             </div>
             <NuxtLink
                 v-else-if="status === 'success' && !games.length"
@@ -122,16 +120,14 @@ defineExpose({ getValues })
                 <p v-if="errors['data.values']" class="ui-error" role="alert">
                     {{ errors['data.values'] }}
                 </p>
-                <div
+                <UiCard
                     v-for="key in removed"
                     :key="key"
-                    class="ui-card flex flex-wrap items-center justify-between gap-2 p-3 text-sm"
+                    class="flex flex-wrap items-center justify-between gap-2 p-3 text-sm"
                 >
                     <span>Unavailable metric <strong class="font-mono">{{ key }}</strong></span>
-                    <UiButton type="button" class="ui-button" @click="delete draft[key]"
-                        >Remove</UiButton
-                    >
-                </div>
+                    <UiButton size="sm" @click="delete draft[key]">Remove</UiButton>
+                </UiCard>
                 <template v-for="metric in metrics" :key="`${selectedGame.id}:${metric.key}`">
                     <AdminEntryStatMetric
                         v-if="draft[metric.key]"

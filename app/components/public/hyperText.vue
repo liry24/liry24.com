@@ -8,8 +8,9 @@ interface Props {
     as?: string
     class?: HTMLAttributes['class']
 }
-const { text, duration = 800, as = 'span', class: className = undefined } = defineProps<Props>()
+const { text, duration = 600, as = 'span', class: className = undefined } = defineProps<Props>()
 
+const reducedMotion = usePreferredReducedMotion()
 const alphabet = 'abcdefghijklmnopqrstuvwxyz'
 const displayText = ref(text.split(''))
 const iterations = ref(0)
@@ -25,7 +26,8 @@ const { pause, resume } = useIntervalFn(
             iterations.value += 0.1
         } else pause()
     },
-    computed(() => duration / (text.length * 10)),
+    computed(() => duration / Math.max(text.length * 10, 1)),
+    { immediate: false },
 )
 
 watch(
@@ -34,7 +36,7 @@ watch(
         displayText.value = newText.split('')
         iterations.value = 0
         pause()
-        resume()
+        if (reducedMotion.value !== 'reduce') resume()
     },
 )
 </script>
@@ -44,7 +46,7 @@ watch(
         <span
             v-for="(letter, i) in displayText"
             :key="i"
-            :class="cn('inline-block', letter === ' ' ? 'w-3' : '')"
+            :class="cn('inline-block', letter === ' ' ? 'w-2 sm:w-3' : '')"
         >
             {{ letter }}
         </span>

@@ -40,6 +40,7 @@ export default defineNuxtConfig({
     modules: [
         '@nuxt/fonts',
         '@nuxt/ui',
+        '@liry24/ui/nuxt',
         '@comark/vue',
         viteHub,
         '@nuxt/image',
@@ -134,7 +135,7 @@ export default defineNuxtConfig({
     },
 
     build: {
-        transpile: ['@liry24/ui', '@vite-hub/ui'],
+        transpile: ['@vite-hub/ui'],
     },
 
     vite: {

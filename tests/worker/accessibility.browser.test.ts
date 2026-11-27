@@ -27,6 +27,20 @@ function artworkControls(page: Page) {
     return { card, dialog, enlarge, image }
 }
 
+const WORK_TITLE = 'Accessibility large work'
+
+function workControls(page: Page) {
+    const card = page.getByRole('button').filter({
+        has: page.getByRole('heading', { name: WORK_TITLE, exact: true }),
+    })
+    const dialog = page.getByRole('dialog', { name: WORK_TITLE, exact: true })
+    const enlarge = dialog.getByTestId('enlarge-work-image')
+    const image = page
+        .getByRole('dialog')
+        .filter({ hasNot: page.getByTestId('enlarge-work-image') })
+    return { card, dialog, enlarge, image }
+}
+
 const gameStatsTrigger = (page: Page) =>
     page.getByRole('main').getByRole('button').and(page.locator('[aria-haspopup="dialog"]'))
 
@@ -109,6 +123,32 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                     await dialog.waitFor({ state: 'hidden' })
                 }
 
+                const scanWorkViewer = async () => {
+                    const { card, dialog, enlarge, image } = workControls(auditPage)
+                    await card.click()
+                    await dialog.waitFor()
+                    await dialog.locator('a[href="https://example.invalid/work"]').waitFor()
+                    await scan('works-viewer')
+                    const fitsViewport = await dialog.evaluate((element) => {
+                        const bounds = element.getBoundingClientRect()
+                        return (
+                            bounds.left >= 0 &&
+                            bounds.right <= innerWidth &&
+                            element.scrollWidth <= element.clientWidth
+                        )
+                    })
+                    expect(fitsViewport, 'The work dialog stays within the viewport').toBe(true)
+
+                    await enlarge.click()
+                    await image.waitFor()
+                    await scan('work-image-viewer')
+                    await auditPage.keyboard.press('Escape')
+                    await image.waitFor({ state: 'hidden' })
+                    await auditPage.keyboard.press('Escape')
+                    await dialog.waitFor({ state: 'hidden' })
+                    await expectFocus(card)
+                }
+
                 await visit('/')
                 const stats = gameStatsTrigger(auditPage)
                 await stats.waitFor()
@@ -128,8 +168,9 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await scanArtViewer()
 
                 await visit('/works')
-                await auditPage.locator('a[href="https://example.invalid/work"]').waitFor()
+                await workControls(auditPage).card.waitFor()
                 await scan('works')
+                await scanWorkViewer()
 
                 await visit('/posts')
                 await auditPage
@@ -234,6 +275,9 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
 
                 await visit('/arts')
                 await scanArtViewer()
+
+                await visit('/works')
+                await scanWorkViewer()
 
                 await visit(POST_PATH)
                 await scan('post-detail')

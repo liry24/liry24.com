@@ -27,7 +27,10 @@ import type { TriggerDefinition, TriggerMenuSelectDetails } from '@ui-sdk/vue/tr
 import { onMounted, onUnmounted, shallowRef, useTemplateRef, watch, watchPostEffect } from 'vue'
 import type { VNode } from 'vue'
 
-import { highlightMarkdown } from './markdown'
+import { UIcon } from '#components'
+
+import { useUiIcons } from '../composables/icons'
+import { highlightMarkdown } from '../utils/markdown'
 
 const {
     codec: propCodec,
@@ -59,6 +62,7 @@ defineSlots<{
 
 const model = defineModel<string>({ required: true })
 const root = useTemplateRef('root')
+const icons = useUiIcons()
 const controller = createTokenInputController()
 const normalize = (text: string) => (multiline ? text : text.replaceAll(/\r\n|[\r\n]/g, ' '))
 const codec: TokenCodec = {
@@ -175,7 +179,9 @@ watchPostEffect((onCleanup) => {
             <template #token="{ token }">
                 <TokenInputToken class="ui-token">
                     <slot name="token" :token="token">{{ token.label }}</slot>
-                    <TokenInputTokenRemove class="ui-token-remove">×</TokenInputTokenRemove>
+                    <TokenInputTokenRemove class="ui-token-remove">
+                        <UIcon :name="icons.close" class="ui-icon ui-icon-xs" aria-hidden="true" />
+                    </TokenInputTokenRemove>
                 </TokenInputToken>
             </template>
         </TokenInput>

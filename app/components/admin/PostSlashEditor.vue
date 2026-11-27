@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { UiSlashEditor } from '@liry24/ui'
 import type {
     TokenCodec,
     TokenInsert,

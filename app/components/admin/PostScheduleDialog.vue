@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { UiButton, UiField, UiFormDialog, UiInput } from '@liry24/ui'
 import type { ContentSchedule } from '@vite-hub/content'
 
 const open = defineModel<boolean>('open', { required: true })
@@ -60,20 +59,14 @@ const handleSubmit = () => {
         @submit="handleSubmit"
     >
         <div class="grid gap-4">
-            <p v-if="displayError" class="ui-alert" role="alert">{{ displayError }}</p>
+            <UiAlert v-if="displayError">{{ displayError }}</UiAlert>
             <UiField
                 v-if="!schedules.length"
                 label="Schedule at"
                 description="Use your local time."
                 required
             >
-                <UiInput
-                    v-model="localInput"
-                    type="datetime-local"
-                    class="ui-input"
-                    :disabled="busy"
-                    required
-                />
+                <UiInput v-model="localInput" type="datetime-local" :disabled="busy" required />
             </UiField>
             <ul v-if="schedules.length" class="border-default divide-default divide-y border-t">
                 <li
@@ -86,10 +79,8 @@ const handleSubmit = () => {
                         · {{ entry.status }}
                     </span>
                     <UiButton
-                        type="button"
-                        class="ui-button"
-                        data-variant="ghost"
-                        data-tone="danger"
+                        variant="ghost"
+                        color="error"
                         :disabled="busy"
                         @click="emit('unschedule', entry.id)"
                     >

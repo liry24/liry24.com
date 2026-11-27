@@ -11,7 +11,9 @@ const { label, error, description, required } = defineProps<{
 
 <template>
     <Field class="ui-field" :invalid="Boolean(error)" :required="required">
-        <FieldLabel class="ui-label">{{ label }}</FieldLabel>
+        <FieldLabel class="ui-label" :data-required="required || undefined">
+            {{ label }}
+        </FieldLabel>
         <FieldDescription v-if="description" class="ui-description">
             {{ description }}
         </FieldDescription>

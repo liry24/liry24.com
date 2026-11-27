@@ -5,84 +5,50 @@ const { item } = defineProps<{
     item: PortfolioItem<'arts'>
 }>()
 
-const historyStateAdded = ref(false)
-let returnFocus: FocusableElement | null = null
-const restoreFocus = (event: Event) => {
-    if (returnFocus?.isConnected) {
-        event.preventDefault()
-        returnFocus.focus()
-    }
-}
-
-const onPopState = () => {
-    if (open.value) {
-        historyStateAdded.value = false
-        open.value = false
-    }
-}
-
-watch(
-    open,
-    (val) => {
-        if (import.meta.client) {
-            if (val) {
-                returnFocus = captureActiveFocus()
-                history.pushState(null, '')
-                historyStateAdded.value = true
-                window.addEventListener('popstate', onPopState)
-            } else {
-                window.removeEventListener('popstate', onPopState)
-                if (historyStateAdded.value) {
-                    history.back()
-                    historyStateAdded.value = false
-                }
-            }
-        }
-    },
-    { immediate: true },
-)
-
-onUnmounted(() => {
-    if (import.meta.client) window.removeEventListener('popstate', onPopState)
-})
+const hasMeta = computed(() => Boolean(item.data.authoredAt || item.data.images.length > 1))
 </script>
 
 <template>
-    <UModal
+    <EntryViewerModal
         v-model:open="open"
-        scrollable
         :title="item.data.title"
-        :content="{ onCloseAutoFocus: restoreFocus }"
-        :ui="{
-            content: 'max-w-full h-[calc(100dvh-4rem)] w-[calc(100dvw-4rem)] rounded-2xl',
-        }"
+        :share-path="`/arts?open=${encodeURIComponent(item.data.slug)}`"
+        :external-href="item.data.href"
+        external-label="Open artwork"
     >
-        <slot />
+        <template #trigger>
+            <slot />
+        </template>
 
-        <template #content>
-            <div class="grid gap-6 p-4 md:grid-cols-3 md:gap-12 md:p-16">
-                <div class="flex h-full min-w-0 flex-col gap-4 md:col-span-2">
-                    <ArtCarousel :data="item.data.images" />
-                </div>
+        <template #media>
+            <ArtCarousel :data="item.data.images" :title="item.data.title" />
+        </template>
 
-                <div class="flex min-w-0 flex-col gap-4">
-                    <div class="flex items-start justify-between gap-2">
-                        <h1 class="min-w-0 text-2xl font-bold wrap-break-word md:text-4xl">
-                            {{ item.data.title }}
-                        </h1>
-
-                        <UButton
-                            aria-label="Close"
-                            icon="mingcute:close-fill"
-                            variant="ghost"
-                            size="lg"
-                            class="ml-auto shrink-0"
-                            @click="open = false"
-                        />
-                    </div>
-                    <p>{{ item.data.description }}</p>
-                </div>
+        <template v-if="hasMeta" #meta>
+            <div class="text-muted flex flex-wrap items-center gap-x-2.5 gap-y-1 font-mono text-xs">
+                <NuxtTime
+                    v-if="item.data.authoredAt"
+                    :datetime="item.data.authoredAt"
+                    date-style="medium"
+                    class="tabular-nums"
+                />
+                <span
+                    v-if="item.data.authoredAt && item.data.images.length > 1"
+                    aria-hidden="true"
+                    class="text-dimmed"
+                    >·</span
+                >
+                <span v-if="item.data.images.length > 1" class="tabular-nums">
+                    {{ item.data.images.length }} images
+                </span>
             </div>
         </template>
-    </UModal>
+
+        <p
+            v-if="item.data.description"
+            class="text-toned text-sm leading-relaxed whitespace-pre-line sm:text-base"
+        >
+            {{ item.data.description }}
+        </p>
+    </EntryViewerModal>
 </template>
