@@ -30,21 +30,25 @@ const openViewer = () => {
     <button
         type="button"
         aria-haspopup="dialog"
-        class="hover:bg-muted mx-auto flex cursor-pointer flex-wrap items-center justify-center gap-2 rounded-xl px-6 py-3 text-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 motion-reduce:transition-none sm:text-2xl"
+        class="hover:bg-muted/40 mx-auto flex cursor-pointer flex-wrap items-center justify-center gap-1 rounded-xl px-6 py-3 font-[Geist] text-2xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 motion-reduce:transition-none"
         @click="openViewer"
     >
-        <span class="font-bold">{{ game.name }}</span>
-        <span v-if="latest?.period" class="text-muted font-light">{{ latest.period }}</span>
+        <span class="font-bold tracking-tight [text-box:trim-both_cap_alphabetic]">
+            {{ game.name.toUpperCase() }}
+        </span>
+        <span
+            v-if="latest?.period"
+            class="text-toned font-extralight tracking-tighter [text-box:trim-both_cap_alphabetic]"
+        >
+            {{ latest.period }}
+        </span>
         <img
             v-if="representativeImage"
             :src="representativeImage"
             :alt="representativeText !== '—' ? representativeText : ''"
             class="size-10 object-contain"
         />
-        <span
-            v-else-if="representativeText && representativeText !== '—'"
-            class="text-muted text-sm font-normal"
-        >
+        <span v-else-if="representativeText && representativeText !== '—'" class="text-sm">
             {{ representativeText }}
         </span>
     </button>

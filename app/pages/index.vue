@@ -137,13 +137,13 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                             class="text-toned size-8 shrink-0 sm:size-9 md:size-[42px]"
                         />
                         <h2
-                            class="text-highlighted ml-1 pt-0.5 text-3xl font-extrabold sm:text-4xl md:text-5xl"
+                            class="text-highlighted ml-1 pt-0.5 text-3xl font-extrabold tracking-[-0.04em] sm:text-4xl md:text-5xl"
                         >
                             Liria
                         </h2>
                     </span>
                     <p
-                        class="text-muted pt-0.5 text-3xl font-thin tracking-tighter before:content-['//'] sm:text-4xl md:text-5xl"
+                        class="text-muted pt-0.5 text-3xl font-thin tracking-[-0.07em] before:content-['//'] sm:text-4xl md:text-5xl"
                     >
                         Creation Circle
                     </p>
@@ -180,7 +180,7 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                     <NuxtLink
                         :to="app.liria.liriaGraphics"
                         target="_blank"
-                        class="group relative flex size-full flex-col items-center justify-center gap-4 rounded-xl p-10 focus-visible:outline-2 focus-visible:outline-offset-4"
+                        class="group relative flex size-full flex-col items-center justify-center gap-4 rounded-xl p-10 font-[Geist] focus-visible:outline-2 focus-visible:outline-offset-4"
                     >
                         <NuxtImg
                             src="/graphics-ss.png"
@@ -189,7 +189,7 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                         />
 
                         <span class="z-1 text-4xl font-extrabold tracking-tight sm:text-5xl">
-                            Liria<span class="font-thin tracking-tighter">Graphics</span>
+                            Liria<span class="font-thin tracking-[-0.07em]">Graphics</span>
                         </span>
 
                         <p class="text-toned z-1 text-center">
