@@ -2,7 +2,7 @@
 import { FieldControl } from '@ui-sdk/vue/field'
 
 const model = defineModel<string>({ required: true })
-defineProps<{
+const { options, placeholder, disabled } = defineProps<{
     options: Array<{ value: string; label: string }>
     placeholder?: string
     disabled?: boolean

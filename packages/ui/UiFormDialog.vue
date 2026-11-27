@@ -4,17 +4,21 @@ import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogTitle } from 
 import { useTemplateRef } from 'vue'
 
 const open = defineModel<boolean>('open', { required: true })
-defineProps<{
-    title: string
-    busy?: boolean
-    saving?: boolean
-    wide?: boolean
-    finalFocus?: () => HTMLElement | null
-    submitLabel?: string
-    submittingLabel?: string
-    hideSubmit?: boolean
-}>()
+
+const { title, busy, saving, wide, finalFocus, submitLabel, submittingLabel, hideSubmit } =
+    defineProps<{
+        title: string
+        busy?: boolean
+        saving?: boolean
+        wide?: boolean
+        finalFocus?: () => HTMLElement | null
+        submitLabel?: string
+        submittingLabel?: string
+        hideSubmit?: boolean
+    }>()
+
 defineEmits<{ submit: [] }>()
+
 const form = useTemplateRef('form')
 const initialFocus = () =>
     form.value?.querySelector<HTMLElement>(
@@ -39,8 +43,9 @@ const initialFocus = () =>
                         data-variant="ghost"
                         aria-label="Close"
                         :disabled="busy"
-                        >×</DialogClose
                     >
+                        ×
+                    </DialogClose>
                 </header>
                 <div class="ui-dialog-body">
                     <slot />

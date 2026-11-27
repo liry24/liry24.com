@@ -12,7 +12,7 @@ import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogTitle } from 
 import { useId, watch } from 'vue'
 
 const open = defineModel<boolean>('open', { required: true })
-const props = defineProps<{
+const { title, label, load, finalFocus, placeholder, minQueryText, emptyText } = defineProps<{
     title: string
     label: string
     load: (query: string, signal: AbortSignal) => Promise<Array<string>>
@@ -25,7 +25,7 @@ const emit = defineEmits<{ select: [value: string] }>()
 const inputId = useId()
 const { state, setQuery, reload } = useAsyncOptions(
     async (query, { signal }) =>
-        (await props.load(query, signal)).map((value) => ({ value, label: value })),
+        (await load(query, signal)).map((value) => ({ value, label: value })),
     { debounce: 280, minLength: 2 },
 )
 
@@ -54,8 +54,9 @@ function select(value: unknown) {
                     class="ui-button ui-dialog-close"
                     data-variant="ghost"
                     aria-label="Close search"
-                    >×</DialogClose
                 >
+                    ×
+                </DialogClose>
             </header>
             <div class="ui-search-picker-body">
                 <Combobox

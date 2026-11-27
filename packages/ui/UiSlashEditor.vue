@@ -29,7 +29,16 @@ import type { VNode } from 'vue'
 
 import { highlightMarkdown } from './markdown'
 
-const props = defineProps<{
+const {
+    codec: propCodec,
+    triggers,
+    placeholder,
+    multiline,
+    disabled,
+    required,
+    menuMessage,
+    onSelect,
+} = defineProps<{
     codec: TokenCodec
     triggers: Array<TriggerDefinition>
     placeholder: string
@@ -51,10 +60,10 @@ defineSlots<{
 const model = defineModel<string>({ required: true })
 const root = useTemplateRef('root')
 const controller = createTokenInputController()
-const normalize = (text: string) => (props.multiline ? text : text.replaceAll(/\r\n|[\r\n]/g, ' '))
+const normalize = (text: string) => (multiline ? text : text.replaceAll(/\r\n|[\r\n]/g, ' '))
 const codec: TokenCodec = {
-    format: (token) => props.codec.format(token),
-    parse: (text) => props.codec.parse(normalize(text)),
+    format: (token) => propCodec.format(token),
+    parse: (text) => propCodec.parse(normalize(text)),
 }
 const value = shallowRef(fromText(model.value, codec))
 
@@ -63,7 +72,7 @@ watch(model, (source) => {
 })
 
 function updateValue(next: TokenInputValue, details: TokenInputValueChangeDetails) {
-    if (!props.multiline && next.some((part) => typeof part === 'string' && /[\r\n]/.test(part))) {
+    if (!multiline && next.some((part) => typeof part === 'string' && /[\r\n]/.test(part))) {
         details.cancel()
         return
     }
@@ -72,7 +81,7 @@ function updateValue(next: TokenInputValue, details: TokenInputValueChangeDetail
 }
 
 function preventLineBreak(event: InputEvent) {
-    if (!props.multiline && ['insertParagraph', 'insertLineBreak'].includes(event.inputType)) {
+    if (!multiline && ['insertParagraph', 'insertLineBreak'].includes(event.inputType)) {
         event.preventDefault()
         event.stopPropagation()
     }
@@ -101,11 +110,11 @@ onUnmounted(() => window.removeEventListener('keydown', waitForMenuResults, true
 function select(item: string, details: TriggerMenuSelectDetails) {
     const before = controller.editor.textBefore(details.match.end)
     const prefix = before?.text.slice(0, details.match.start - before.offset) ?? ''
-    return props.onSelect?.(item, details, prefix.slice(prefix.lastIndexOf('\n') + 1))
+    return onSelect?.(item, details, prefix.slice(prefix.lastIndexOf('\n') + 1))
 }
 
 watchPostEffect((onCleanup) => {
-    if (!props.multiline || !value.value.length) return
+    if (!multiline || !value.value.length) return
 
     const editor = root.value?.querySelector<HTMLElement>('[data-slot="token-input-editor"]')
     if (editor) {

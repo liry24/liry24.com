@@ -13,13 +13,17 @@ import {
 import { computed, ref, useId } from 'vue'
 
 const model = defineModel<Array<string>>({ required: true })
-const props = defineProps<{ suggestions: Array<string>; disabled?: boolean }>()
+const { suggestions, disabled } = defineProps<{
+    suggestions: Array<string>
+    disabled?: boolean
+}>()
+
 const chipsId = useId()
 const query = ref('')
 const choices = computed(() => {
     const text = query.value.trim().toLowerCase()
     const selected = new Set(model.value)
-    return props.suggestions
+    return suggestions
         .filter((tag) => !selected.has(tag) && tag.toLowerCase().includes(text))
         .slice(0, 12)
 })

@@ -2,7 +2,7 @@
 import { Button } from '@ui-sdk/vue/button'
 import { FileInput, FileInputDropzone, FileInputTrigger } from '@ui-sdk/vue/file-input'
 
-defineProps<{
+const { label, images, multiple, busy, disabled, accept, maxSize } = defineProps<{
     label: string
     images: Array<{ id: string; src: string; label: string }>
     multiple?: boolean
