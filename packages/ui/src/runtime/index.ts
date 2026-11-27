@@ -8,6 +8,7 @@ export { default as UiFileInputTrigger } from './components/FileInputTrigger.vue
 export { default as UiFormDialog } from './components/FormDialog.vue'
 export { default as UiImagePicker } from './components/ImagePicker.vue'
 export { default as UiInput } from './components/Input.vue'
+export { default as UiMarkdownEditor } from './components/MarkdownEditor.vue'
 export { default as UiReorderList } from './components/ReorderList.vue'
 export { default as UiSearchPicker } from './components/SearchPicker.vue'
 export { default as UiSelect } from './components/Select.vue'

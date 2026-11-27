@@ -39,7 +39,10 @@ export type GameSearchResult = Pick<GameData, 'igdbId' | 'slug' | 'name' | 'cove
 
 export type GameMentionData = Pick<GameData, 'name' | 'slug' | 'icon' | 'cover'>
 
-export type GameStatsDisplay = Pick<GameData, 'name' | 'slug' | 'primaryMetric' | 'metrics'>
+export type GameStatsDisplay = Pick<
+    GameData,
+    'name' | 'slug' | 'cover' | 'icon' | 'primaryMetric' | 'metrics'
+>
 
 export interface GameStatsPage {
     items: Array<PortfolioItem<'gameStats'>>

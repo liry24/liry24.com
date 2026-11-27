@@ -37,6 +37,7 @@ const {
     triggers,
     placeholder,
     multiline,
+    compact,
     disabled,
     required,
     menuMessage,
@@ -46,6 +47,7 @@ const {
     triggers: Array<TriggerDefinition>
     placeholder: string
     multiline?: boolean
+    compact?: boolean
     disabled?: boolean
     required?: boolean
     menuMessage?: (trigger: string | null, argument: string | null) => string
@@ -141,6 +143,7 @@ watchPostEffect((onCleanup) => {
             <TokenInputEditor
                 class="ui-input ui-editor"
                 :class="{ 'ui-editor-multiline': multiline }"
+                :data-compact="compact || undefined"
                 :placeholder="placeholder"
                 @beforeinput.capture="preventLineBreak"
             >

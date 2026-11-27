@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 
 import type { GameMetric } from '../shared/types/games'
-import { gameValueIssues, formatGameValue } from '../shared/utils/games'
+import { formatGameValue, gameValueIssues, igdbCoverUrl } from '../shared/utils/games'
 const metrics: Array<GameMetric> = [
     {
         key: 'peakRank',
@@ -36,4 +36,18 @@ test('game stats validate configured metrics and preserve zero separately from m
     expect(
         formatGameValue({ key: 'peakRank', value: 2123, label: 'Immortal 1 23 RR' }, metrics[0]),
     ).toBe('Immortal 1 23 RR')
+})
+
+test('igdbCoverUrl upgrades IGDB thumbnail URLs and preserves other URLs', () => {
+    expect(igdbCoverUrl(undefined)).toBeUndefined()
+    expect(igdbCoverUrl(null)).toBeUndefined()
+    expect(igdbCoverUrl('https://images.igdb.com/igdb/image/upload/t_thumb/co1234.jpg')).toBe(
+        'https://images.igdb.com/igdb/image/upload/t_cover_big_2x/co1234.jpg',
+    )
+    expect(
+        igdbCoverUrl('https://images.igdb.com/igdb/image/upload/t_thumb/co1234.jpg', 't_cover_big'),
+    ).toBe('https://images.igdb.com/igdb/image/upload/t_cover_big/co1234.jpg')
+    expect(igdbCoverUrl('https://example.com/custom-cover.png')).toBe(
+        'https://example.com/custom-cover.png',
+    )
 })

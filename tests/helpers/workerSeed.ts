@@ -21,6 +21,10 @@ export const ARTWORK_TITLE = 'Accessibility artwork'
 export const ARTWORK_PATH = '/arts?open=accessibility-artwork'
 export const POST_PATH = '/posts/synthetic-game-mention'
 export const ATTACHED_PROFILE = 'https://example.invalid/apex'
+export const VALORANT_IGDB_THUMB =
+    'https://images.igdb.com/igdb/image/upload/t_thumb/co1valorant.jpg'
+export const VALORANT_IGDB_COVER =
+    'https://images.igdb.com/igdb/image/upload/t_cover_big_2x/co1valorant.jpg'
 
 export async function multipartRequest(
     form: FormData,
@@ -142,6 +146,7 @@ export async function seedBrowserFixtures(app: BuiltWorker, admin: Record<string
         igdbId: 126_459,
         slug: 'valorant',
         name: 'VALORANT',
+        cover: VALORANT_IGDB_THUMB,
         primaryMetric: 'rank',
         order: 0,
         metrics: [
@@ -149,7 +154,17 @@ export async function seedBrowserFixtures(app: BuiltWorker, admin: Record<string
                 key: 'rank',
                 label: 'Peak Rank',
                 format: 'integer',
-                positions: [{ label: 'Immortal', value: 2100, color: '#FF4655' }],
+                positions: [
+                    { label: 'Diamond', value: 1900, color: '#B489C4' },
+                    { label: 'Ascendant', value: 2000, color: '#22AA66' },
+                    { label: 'Immortal', value: 2100, color: '#FF4655' },
+                ],
+            },
+            {
+                key: 'winRate',
+                label: 'Win Rate',
+                format: 'percent',
+                positions: [],
             },
         ],
     })
@@ -168,15 +183,66 @@ export async function seedBrowserFixtures(app: BuiltWorker, admin: Record<string
     await submitAndPublish(app, admin, 'game-stats', 'gameStats', {
         data: {
             game: valorantId,
+            periodKey: 'act-0',
+            period: 'Act 0',
+            order: 0,
+            values: [
+                {
+                    key: 'rank',
+                    value: 1940,
+                    label: 'Diamond 2',
+                    image: uploadedMedia,
+                    color: '#B489C4',
+                },
+                {
+                    key: 'winRate',
+                    value: 52.4,
+                    color: '#3B82F6',
+                },
+            ],
+        },
+    })
+
+    await submitAndPublish(app, admin, 'game-stats', 'gameStats', {
+        data: {
+            game: valorantId,
             periodKey: 'act-1',
             period: 'Act 1',
             order: 1,
             values: [
                 {
                     key: 'rank',
-                    value: 2100,
+                    value: 2040,
+                    label: 'Ascendant 2',
+                    image: uploadedMedia,
+                    color: '#22AA66',
+                },
+                {
+                    key: 'winRate',
+                    value: 56.1,
+                    color: '#22AA66',
+                },
+            ],
+        },
+    })
+
+    await submitAndPublish(app, admin, 'game-stats', 'gameStats', {
+        data: {
+            game: valorantId,
+            periodKey: 'act-2',
+            period: 'Act 2',
+            order: 2,
+            values: [
+                {
+                    key: 'rank',
+                    value: 2120,
                     label: 'Immortal 1',
                     image: uploadedMedia,
+                    color: '#FF4655',
+                },
+                {
+                    key: 'winRate',
+                    value: 58.3,
                     color: '#FF4655',
                 },
             ],
@@ -206,7 +272,8 @@ export async function seedBrowserFixtures(app: BuiltWorker, admin: Record<string
             title: ARTWORK_TITLE,
             slug: 'accessibility-artwork',
             images: [uploadedMedia],
-            description: 'Synthetic artwork for accessibility audit.',
+            description:
+                'Synthetic **artwork** for accessibility audit.\n\n- Built with `Blender`\n- Reference [notes](https://example.invalid/art-notes)',
             order: 0,
         },
     })
@@ -217,7 +284,8 @@ export async function seedBrowserFixtures(app: BuiltWorker, admin: Record<string
             slug: 'accessibility-large-work',
             style: 'large',
             category: 'Tooling',
-            description: 'Synthetic work for accessibility audit.',
+            description:
+                'Synthetic **work** for accessibility audit with `Markdown` and a [guide](https://example.invalid/work-guide).',
             image: uploadedMedia,
             href: 'https://example.invalid/work',
             order: 0,

@@ -34,8 +34,8 @@ const copyShareLink = () => {
             content: cn(
                 'divide-y-0 overflow-hidden rounded-2xl p-0 shadow-2xl',
                 hasMedia
-                    ? 'max-h-[calc(100dvh-2rem)] w-[calc(100vw-1.5rem)] max-w-6xl sm:max-h-[calc(100dvh-4rem)] sm:w-[calc(100vw-3rem)]'
-                    : 'max-h-[calc(100dvh-2rem)] w-[calc(100vw-1.5rem)] max-w-xl sm:max-h-[calc(100dvh-4rem)] sm:w-[calc(100vw-3rem)]',
+                    ? 'max-h-[calc(100dvh-2rem)] w-[calc(100vw-1.5rem)] max-w-6xl sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)] lg:h-[min(calc(100dvh-4rem),54rem)]'
+                    : 'max-h-[calc(100dvh-2rem)] w-[calc(100vw-1.5rem)] max-w-2xl sm:max-h-[calc(100dvh-3rem)] sm:min-h-112 sm:w-[calc(100vw-3rem)]',
             ),
         }"
     >
@@ -47,18 +47,18 @@ const copyShareLink = () => {
                     cn(
                         'grid min-h-0 flex-1 overflow-x-hidden overflow-y-auto',
                         hasMedia &&
-                            'lg:grid-cols-[minmax(0,1.45fr)_minmax(19rem,0.9fr)] lg:overflow-hidden',
+                            'lg:h-full lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.9fr)] lg:overflow-hidden',
                     )
                 "
             >
                 <div
                     v-if="hasMedia && $slots.media"
-                    class="bg-muted/45 border-default flex min-w-0 flex-col justify-center border-b p-4 sm:p-6 lg:min-h-0 lg:overflow-y-auto lg:border-e lg:border-b-0 lg:p-8 dark:bg-neutral-950/60"
+                    class="bg-muted/45 border-default flex min-h-72 min-w-0 flex-col justify-center border-b p-4 sm:min-h-96 sm:p-6 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:border-e lg:border-b-0 lg:p-8 dark:bg-neutral-950/60"
                 >
                     <slot name="media" />
                 </div>
 
-                <div class="flex min-h-0 min-w-0 flex-col">
+                <div class="flex min-h-0 min-w-0 flex-col lg:h-full">
                     <header
                         class="border-default flex items-center justify-between gap-3 border-b px-5 py-4 sm:px-6"
                     >

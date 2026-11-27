@@ -3,6 +3,18 @@ import type { GameMetric, GameValue } from '../types/games.js'
 export const gameSlugPattern = /^[a-z0-9][a-z0-9-]*$/
 export const gameColorPattern = /^#[0-9a-fA-F]{6}$/
 
+const igdbThumbPrefix = 'https://images.igdb.com/igdb/image/upload/t_thumb/'
+
+export function igdbCoverUrl(
+    cover: string | null | undefined,
+    size: 't_cover_big' | 't_cover_big_2x' = 't_cover_big_2x',
+): string | undefined {
+    if (!cover) return undefined
+    if (cover.startsWith(igdbThumbPrefix))
+        return `https://images.igdb.com/igdb/image/upload/${size}/${cover.slice(igdbThumbPrefix.length)}`
+    return cover
+}
+
 export function formatGameValue(value: GameValue | undefined, metric?: GameMetric): string {
     if (!value) return '—'
 

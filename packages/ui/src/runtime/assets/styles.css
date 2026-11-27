@@ -674,6 +674,10 @@
         overflow-wrap: anywhere;
     }
 
+    .ui-editor-multiline[data-compact] {
+        min-height: 10rem;
+    }
+
     .ui-editor[data-empty]::before {
         position: absolute;
         max-width: calc(100% - 1.5rem);

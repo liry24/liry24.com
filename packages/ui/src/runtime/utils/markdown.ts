@@ -1,4 +1,5 @@
 import { GFM, parser } from '@lezer/markdown'
+import type { TriggerDefinition, TriggerMenuSelectDetails } from '@ui-sdk/vue/trigger-menu'
 
 export const markdownParser = parser.configure(GFM)
 
@@ -33,6 +34,163 @@ const highlightNames = new Map(
         HorizontalRule: 'md-syntax',
     }),
 )
+
+const plainTextSkipNodes = new Set([
+    'HeaderMark',
+    'EmphasisMark',
+    'QuoteMark',
+    'ListMark',
+    'LinkMark',
+    'CodeMark',
+    'TaskMarker',
+    'HorizontalRule',
+    'LinkTitle',
+    'LinkLabel',
+    'CodeInfo',
+    'Comment',
+    'CommentBlock',
+    'HTMLTag',
+])
+
+export const markdownPlainText = (source: string): string => {
+    if (!source) return ''
+
+    const skipped: Array<[number, number]> = []
+    let autolinkDepth = 0
+    markdownParser.parse(source).iterate({
+        enter({ name, from, to }) {
+            if (name === 'Autolink') {
+                autolinkDepth += 1
+                return
+            }
+            if (name === 'Escape' && to > from) {
+                skipped.push([from, from + 1])
+                return
+            }
+            if (plainTextSkipNodes.has(name) || (name === 'URL' && autolinkDepth === 0)) {
+                if (to > from) skipped.push([from, to])
+                return false
+            }
+        },
+        leave({ name }) {
+            if (name === 'Autolink') autolinkDepth = Math.max(0, autolinkDepth - 1)
+        },
+    })
+
+    if (!skipped.length) return source.replaceAll(/\s+/g, ' ').trim()
+
+    skipped.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    let output = ''
+    let cursor = 0
+    for (const [from, to] of skipped) {
+        if (from > cursor) output += source.slice(cursor, from)
+        if (to > cursor) cursor = to
+    }
+    if (cursor < source.length) output += source.slice(cursor)
+
+    return output.replaceAll(/\s+/g, ' ').trim()
+}
+
+export const markdownHeadingLevels = ['1', '2', '3', '4', '5', '6']
+
+const directArguments = (query: string) =>
+    query.trim() ? [{ value: query.trim(), label: query.trim() }] : []
+
+export const createMarkdownSlashCommands = ({ includeMore = false } = {}) => [
+    {
+        value: 'heading',
+        label: 'heading',
+        arguments: [
+            {
+                name: 'level',
+                hint: '<1-6>',
+                required: true,
+                items: markdownHeadingLevels,
+                allowCustomValue: false,
+            },
+        ],
+    },
+    { value: 'code', label: 'code', arguments: [{ name: 'lang', hint: '[language]' }] },
+    { value: 'quote', label: 'quote' },
+    { value: 'list', label: 'list' },
+    { value: 'ordered', label: 'ordered' },
+    { value: 'task', label: 'task' },
+    {
+        value: 'link',
+        label: 'link',
+        arguments: [
+            { name: 'url', hint: '<URL>', required: true },
+            { name: 'label', hint: '[label]' },
+        ],
+    },
+    { value: 'divider', label: 'divider' },
+    ...(includeMore ? [{ value: 'more', label: 'more' }] : []),
+]
+
+export const markdownDirectTriggers: Array<TriggerDefinition> = [
+    { char: '/heading ', items: markdownHeadingLevels },
+    { char: '/code ', items: directArguments },
+    {
+        char: '/link ',
+        items: directArguments,
+        spaces: true,
+        maxLength: 2048,
+        pattern: /[^\s]/u,
+    },
+]
+
+export const applyMarkdownSlashCommand = (
+    value: string,
+    details: TriggerMenuSelectDetails,
+    precedingLine: string,
+): boolean => {
+    const command = details.trigger === '/' ? value : details.trigger.slice(1).trim()
+    const direct = details.trigger === '/' ? '' : value
+    const blockStart = precedingLine.trim() ? '\n\n' : ''
+
+    switch (command) {
+        case 'heading':
+            details.insert(`${blockStart}${'#'.repeat(Number(details.arguments.level ?? direct))} `)
+            return true
+        case 'code': {
+            const language = (details.arguments.lang ?? direct).replaceAll(/[^\w+.-]/g, '')
+            details.insert(`${blockStart}\`\`\`${language}\n\n\`\`\`\n`)
+            return true
+        }
+        case 'quote':
+            details.insert(`${blockStart}> `)
+            return true
+        case 'list':
+            details.insert(`${blockStart}- `)
+            return true
+        case 'ordered':
+            details.insert(`${blockStart}1. `)
+            return true
+        case 'task':
+            details.insert(`${blockStart}- [ ] `)
+            return true
+        case 'link': {
+            const [url = '', ...label] = direct.split(/\s+/)
+            const href = (details.arguments.url ?? url).replaceAll(/[\s<>]/g, (char) =>
+                encodeURIComponent(char),
+            )
+            const text = (details.arguments.label ?? (label.join(' ') || href)).replaceAll(
+                /[\\[\]]/g,
+                String.raw`\$&`,
+            )
+            details.insert(`[${text}](<${href}>)`)
+            return true
+        }
+        case 'divider':
+            details.insert(`${blockStart || '\n'}---\n\n`)
+            return true
+        case 'more':
+            details.insert(`${blockStart}<!-- more -->\n\n`)
+            return true
+        default:
+            return false
+    }
+}
 
 export const highlightMarkdown = (editor: HTMLElement) => {
     if (!globalThis.CSS?.highlights || typeof Highlight === 'undefined') return

@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { motion } from 'motion-v'
 
-import { LazyStacksModal } from '#components'
+import { LazyGameStatsViewer, LazyStacksModal } from '#components'
 
+const route = useRoute()
 const appConfig = useAppConfig()
 const { app } = appConfig
 const overlay = useOverlay()
 
 const modalStacks = overlay.create(LazyStacksModal)
+const modalGameStats = overlay.create(LazyGameStatsViewer)
 
 const arts = usePortfolioData('arts')
 const socials = usePortfolioData('socials')
@@ -41,6 +43,12 @@ const rotateArray = <T>(arr: Array<T>, n: number): Array<T> => {
 }
 
 useKeyCommand(modalStacks.open)
+
+onMounted(() => {
+    const slug = typeof route.query.game === 'string' ? route.query.game : undefined
+    const matched = slug ? statGames.value.find((entry) => entry.data.slug === slug) : undefined
+    if (matched) modalGameStats.open({ game: matched.data, periods: matched.periods })
+})
 
 useHead({ titleTemplate: null })
 useSeoMeta({ title: 'Liry24', description: 'Personal website of Liry24.' })
@@ -117,85 +125,74 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
             :animate="{ opacity: 1, y: 0 }"
             :transition="{ delay: 0.15 }"
         >
-            <section class="flex w-full flex-col items-center gap-5">
-                <div class="flex flex-col items-center gap-3">
-                    <div
-                        class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 leading-none"
-                    >
-                        <span class="inline-flex items-center gap-2.5">
-                            <Icon
-                                name="liria:liria"
-                                data-icon-ic="false"
-                                aria-hidden="true"
-                                class="text-toned size-9 shrink-0 sm:size-10 md:size-11"
-                            />
-                            <h2
-                                class="text-highlighted text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl"
-                            >
-                                Liria
-                            </h2>
-                        </span>
-                        <p
-                            class="text-muted text-2xl font-extralight tracking-tight sm:text-4xl md:text-5xl"
+            <section class="flex w-full flex-col items-center gap-2">
+                <div
+                    class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 leading-none"
+                >
+                    <span class="inline-flex items-center gap-3">
+                        <Icon
+                            name="liria:liria"
+                            data-icon-ic="false"
+                            aria-hidden="true"
+                            class="text-toned size-8 shrink-0 sm:size-9 md:size-[42px]"
+                        />
+                        <h2
+                            class="text-highlighted ml-1 pt-0.5 text-3xl font-extrabold sm:text-4xl md:text-5xl"
                         >
-                            <span aria-hidden="true" class="text-dimmed mr-1.5">//</span>Creation
-                            Circle
-                        </p>
-                    </div>
-
-                    <div class="flex items-center gap-1">
-                        <UButton
-                            :to="app.liria.website"
-                            target="_blank"
-                            aria-label="Liria Website"
-                            icon="mingcute:world-2-fill"
-                            color="neutral"
-                            variant="ghost"
-                        />
-                        <UButton
-                            :to="app.liria.x"
-                            target="_blank"
-                            aria-label="Liria X"
-                            icon="mingcute:social-x-fill"
-                            color="neutral"
-                            variant="ghost"
-                        />
-                        <UButton
-                            :to="app.liria.github"
-                            target="_blank"
-                            aria-label="Liria GitHub"
-                            icon="mingcute:github-fill"
-                            color="neutral"
-                            variant="ghost"
-                        />
-                    </div>
+                            Liria
+                        </h2>
+                    </span>
+                    <p
+                        class="text-muted pt-0.5 text-3xl font-thin tracking-tighter before:content-['//'] sm:text-4xl md:text-5xl"
+                    >
+                        Creation Circle
+                    </p>
                 </div>
 
-                <div class="grid w-full max-w-6xl grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+                <div class="mt-4 flex items-center gap-2">
+                    <UButton
+                        :to="app.liria.website"
+                        target="_blank"
+                        aria-label="Liria Website"
+                        icon="mingcute:world-2-fill"
+                        color="neutral"
+                        variant="ghost"
+                    />
+                    <UButton
+                        :to="app.liria.x"
+                        target="_blank"
+                        aria-label="Liria X"
+                        icon="mingcute:social-x-fill"
+                        color="neutral"
+                        variant="ghost"
+                    />
+                    <UButton
+                        :to="app.liria.github"
+                        target="_blank"
+                        aria-label="Liria GitHub"
+                        icon="mingcute:github-fill"
+                        color="neutral"
+                        variant="ghost"
+                    />
+                </div>
+
+                <div class="grid w-full max-w-6xl grid-cols-1 gap-6 md:grid-cols-2">
                     <NuxtLink
                         :to="app.liria.liriaGraphics"
                         target="_blank"
-                        class="group bg-muted/45 ring-default/80 hover:bg-muted/70 hover:ring-accented relative flex size-full min-h-48 flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl p-8 ring-1 transition-[background-color,box-shadow] duration-200 ease-out focus-visible:outline-2 focus-visible:outline-offset-4 motion-reduce:transition-none sm:min-h-56 sm:p-10"
+                        class="group relative flex size-full flex-col items-center justify-center gap-4 rounded-xl p-10 focus-visible:outline-2 focus-visible:outline-offset-4"
                     >
                         <NuxtImg
                             src="/graphics-ss.png"
                             alt=""
-                            class="pointer-events-none absolute inset-0 size-full overflow-clip mask-x-from-55% mask-x-to-95% object-cover object-[0%_10%] opacity-10 transition-opacity duration-200 ease-out group-hover:opacity-25 motion-reduce:transition-none"
+                            class="pointer-events-none absolute inset-0 size-full overflow-clip mask-x-from-60% mask-x-to-90% object-cover object-[0%_10%] opacity-10 transition-opacity group-hover:opacity-30 motion-reduce:transition-none"
                         />
 
-                        <UIcon
-                            :name="appConfig.ui.icons.external"
-                            aria-hidden="true"
-                            class="text-muted group-hover:text-highlighted absolute top-4 right-4 z-1 size-5 transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none"
-                        />
-
-                        <span
-                            class="text-highlighted z-1 text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl"
-                        >
+                        <span class="z-1 text-4xl font-extrabold tracking-tight sm:text-5xl">
                             Liria<span class="font-thin tracking-tighter">Graphics</span>
                         </span>
 
-                        <p class="text-toned z-1 max-w-sm text-center text-sm sm:text-base">
+                        <p class="text-toned z-1 text-center">
                             Digital Assets Store for VRChat Avatars. Available on BOOTH.
                         </p>
                     </NuxtLink>
@@ -203,28 +200,20 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                     <NuxtLink
                         :to="app.liria.avatio"
                         target="_blank"
-                        class="group bg-muted/45 ring-default/80 hover:bg-muted/70 hover:ring-accented relative flex size-full min-h-48 flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl p-8 ring-1 transition-[background-color,box-shadow] duration-200 ease-out focus-visible:outline-2 focus-visible:outline-offset-4 motion-reduce:transition-none sm:min-h-56 sm:p-10"
+                        class="group relative flex size-full flex-col items-center justify-center gap-4 rounded-xl p-10 focus-visible:outline-2 focus-visible:outline-offset-4"
                     >
                         <UColorModeImage
                             light="/avatio-ss-light.png"
                             dark="/avatio-ss-dark.png"
                             alt=""
-                            class="pointer-events-none absolute inset-0 size-full overflow-clip mask-x-from-55% mask-x-to-95% object-cover object-[0%_10%] opacity-10 transition-opacity duration-200 ease-out group-hover:opacity-25 motion-reduce:transition-none"
+                            class="pointer-events-none absolute inset-0 size-full overflow-clip mask-x-from-60% mask-x-to-90% object-cover object-[0%_10%] opacity-10 transition-opacity group-hover:opacity-30 motion-reduce:transition-none"
                         />
 
-                        <UIcon
-                            :name="appConfig.ui.icons.external"
-                            aria-hidden="true"
-                            class="text-muted group-hover:text-highlighted absolute top-4 right-4 z-1 size-5 transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none"
-                        />
-
-                        <span
-                            class="text-highlighted z-1 text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl"
-                        >
+                        <span class="z-1 text-4xl font-extrabold tracking-tight sm:text-5xl">
                             Avatio
                         </span>
 
-                        <p class="text-toned z-1 max-w-sm text-center text-sm sm:text-base">
+                        <p class="text-toned z-1 text-center">
                             VR-SNS Avatar Setups Sharing Platform.
                         </p>
                     </NuxtLink>
@@ -280,10 +269,10 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                 <h2
                     class="text-muted before:text-dimmed font-mono text-sm leading-none text-nowrap before:content-['//_']"
                 >
-                    Ranks
+                    Game Stats
                 </h2>
 
-                <div class="flex flex-col gap-2.5">
+                <div class="grid gap-3">
                     <GameStats
                         v-for="game in statGames"
                         :key="game.id"

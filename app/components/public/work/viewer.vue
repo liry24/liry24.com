@@ -69,7 +69,7 @@ const openLightbox = () => {
                 <NuxtImg
                     :src="imageSrc"
                     alt=""
-                    class="max-h-[48dvh] w-auto max-w-full rounded-xl object-contain sm:max-h-[54dvh] lg:max-h-[68dvh]"
+                    class="max-h-[54dvh] w-auto max-w-full rounded-xl object-contain sm:max-h-[60dvh] lg:max-h-[min(calc(100dvh-8rem),46rem)]"
                 />
                 <span
                     aria-hidden="true"
@@ -109,11 +109,11 @@ const openLightbox = () => {
             </dl>
         </template>
 
-        <p
+        <Markdown
             v-if="item.data.description"
-            class="text-toned text-sm leading-relaxed whitespace-pre-line sm:text-base"
-        >
-            {{ item.data.description }}
-        </p>
+            :value="item.data.description"
+            :plugins="[postMarkdownSecurity]"
+            class="min-w-0 text-sm leading-relaxed wrap-break-word *:first:mt-0 *:last:mb-0"
+        />
     </EntryViewerModal>
 </template>

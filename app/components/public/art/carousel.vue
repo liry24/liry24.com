@@ -55,8 +55,8 @@ useEventListener('keydown', (event) => {
 </script>
 
 <template>
-    <div class="flex w-full min-w-0 flex-col gap-4">
-        <div class="relative flex w-full items-center justify-center">
+    <div class="flex h-full w-full min-w-0 flex-col justify-center gap-4">
+        <div class="relative flex min-h-0 w-full flex-1 items-center justify-center">
             <UCarousel
                 ref="carousel"
                 v-slot="{ item }"
@@ -78,7 +78,14 @@ useEventListener('keydown', (event) => {
                     <NuxtImg
                         :src="mediaUrl(item)"
                         alt=""
-                        class="max-h-[45dvh] w-auto max-w-full rounded-xl object-contain sm:max-h-[52dvh] lg:max-h-[64dvh]"
+                        :class="
+                            cn(
+                                'w-auto max-w-full rounded-xl object-contain',
+                                hasMultiple
+                                    ? 'max-h-[52dvh] sm:max-h-[58dvh] lg:max-h-[min(calc(100dvh-13rem),40rem)]'
+                                    : 'max-h-[54dvh] sm:max-h-[60dvh] lg:max-h-[min(calc(100dvh-8rem),46rem)]',
+                            )
+                        "
                     />
                     <span
                         aria-hidden="true"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { markdownPlainText } from '@liry24/ui/markdown'
 import { MasonryWall } from '@yeger/vue-masonry-wall'
 
 import { LazyWorkViewer } from '#components'
@@ -97,7 +98,7 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
                                 v-if="item.data.description"
                                 class="text-muted line-clamp-3 text-sm leading-relaxed"
                             >
-                                {{ item.data.description }}
+                                {{ markdownPlainText(item.data.description) }}
                             </p>
                         </div>
                     </div>
@@ -160,7 +161,7 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
                                 v-if="item.data.description"
                                 class="text-muted line-clamp-2 text-sm leading-relaxed"
                             >
-                                {{ item.data.description }}
+                                {{ markdownPlainText(item.data.description) }}
                             </p>
                         </div>
                     </div>

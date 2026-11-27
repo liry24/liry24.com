@@ -44,11 +44,11 @@ const hasMeta = computed(() => Boolean(item.data.authoredAt || item.data.images.
             </div>
         </template>
 
-        <p
+        <Markdown
             v-if="item.data.description"
-            class="text-toned text-sm leading-relaxed whitespace-pre-line sm:text-base"
-        >
-            {{ item.data.description }}
-        </p>
+            :value="item.data.description"
+            :plugins="[postMarkdownSecurity]"
+            class="min-w-0 text-sm leading-relaxed wrap-break-word *:first:mt-0 *:last:mb-0"
+        />
     </EntryViewerModal>
 </template>

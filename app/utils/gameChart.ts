@@ -53,6 +53,7 @@ const horizontalGradient = (mark: ChartMark): ChartMark => ({
 
 export function gameChart(periods: Array<GamePeriod>, metric: GameMetric, id: string) {
     const ordered = [...periods].sort((a, b) => a.order - b.order)
+    const periodLabels = new Map(ordered.map((period) => [period.periodKey, period.period]))
     const runs: Array<Array<RankPoint>> = []
     let run: Array<RankPoint> = []
     for (const period of ordered) {
@@ -66,6 +67,23 @@ export function gameChart(periods: Array<GamePeriod>, metric: GameMetric, id: st
         run.push({ x: period.periodKey, value: record.value, record, period })
     }
     if (run.length) runs.push(run)
+
+    const allValues = runs.flatMap((points) => points.map((point) => point.value))
+    const dataMin = allValues.length ? Math.min(...allValues) : 0
+    const dataMax = allValues.length ? Math.max(...allValues) : 0
+    const span = dataMax - dataMin
+    const zoomed = span > 0 && dataMin > span * 1.5
+    const rawStep = span > 0 ? 10 ** Math.floor(Math.log10(span)) : 1
+    const step = span / rawStep < 3 ? rawStep / 2 : rawStep
+    const baseline = zoomed ? Math.max(0, Math.floor((dataMin - span * 0.35) / step) * step) : 0
+    const yMax = zoomed ? Math.ceil((dataMax + span * 0.15) / step) * step : undefined
+    const visiblePositions = metric.positions?.length
+        ? metric.positions.filter(
+              (position) =>
+                  position.value >= baseline &&
+                  position.value <= (yMax ?? Math.ceil(dataMax + (span || dataMax * 0.1 || 1))),
+          )
+        : []
 
     const gradients = runs.map((points, index) => ({
         id: `${id}-${index}`,
@@ -87,11 +105,11 @@ export function gameChart(periods: Array<GamePeriod>, metric: GameMetric, id: st
                     decorative(
                         areaY(points, {
                             x: 'x',
-                            y1: 0,
+                            y1: baseline,
                             y2: 'value',
                             curve: chartCurves.monotone,
                             fill: paint,
-                            fillOpacity: 0.15,
+                            fillOpacity: 0.22,
                         }),
                     ),
                     ...points.map((point) =>
@@ -99,7 +117,7 @@ export function gameChart(periods: Array<GamePeriod>, metric: GameMetric, id: st
                             dot([point], {
                                 x: 'x',
                                 y: 'value',
-                                r: 2.5,
+                                r: 3.5,
                                 fill: point.record.color || '#94a3b8',
                             }),
                         ),
@@ -110,7 +128,7 @@ export function gameChart(periods: Array<GamePeriod>, metric: GameMetric, id: st
                             y: 'value',
                             curve: chartCurves.monotone,
                             stroke: paint,
-                            strokeWidth: 2,
+                            strokeWidth: 2.5,
                             points: false,
                         }),
                     ),
@@ -124,24 +142,33 @@ export function gameChart(periods: Array<GamePeriod>, metric: GameMetric, id: st
                     scalePoint()
                         .domain(ordered.map((period) => period.periodKey))
                         .padding(0),
-                axis: false,
+                axis: ordered.length
+                    ? {
+                          ticks: {
+                              format: (value: string) => periodLabels.get(value) ?? value,
+                          },
+                      }
+                    : false,
             },
             y: {
-                scale: scaleLinear,
-                nice: true,
+                scale:
+                    yMax !== undefined ? () => scaleLinear().domain([baseline, yMax]) : scaleLinear,
+                nice: yMax === undefined,
                 grid: true,
                 axis: {
-                    label: metric.label,
-                    ticks: metric.positions?.length
+                    ticks: visiblePositions.length
                         ? {
                               values: [
-                                  ...new Set(metric.positions.map((position) => position.value)),
+                                  ...new Set(visiblePositions.map((position) => position.value)),
                               ],
                               format: (value: number) =>
-                                  metric.positions?.find((position) => position.value === value)
+                                  visiblePositions.find((position) => position.value === value)
                                       ?.label ?? String(value),
                           }
-                        : undefined,
+                        : {
+                              format: (value: number) =>
+                                  formatGameValue({ key: metric.key, value }, metric),
+                          },
                 },
             },
         },
