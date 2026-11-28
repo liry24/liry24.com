@@ -23,7 +23,6 @@ const props = defineProps<{
 const model = defineModel<string>({ required: true })
 const emit = defineEmits<{
     game: [game: GameSearchResult]
-    pending: [delta: number]
 }>()
 
 const codec: TokenCodec = {
@@ -32,16 +31,17 @@ const codec: TokenCodec = {
 }
 
 const searchWarning = ref('')
-const importWarning = ref('')
+const searchSource = ref<GameSearchSource>()
 const candidates = new Map<string, GameSearchResult>()
-const imports = new Map<number, AbortController>()
 
-onScopeDispose(() => {
-    for (const controller of imports.values()) controller.abort()
-})
+const tokenImageSrc = (slug: string) => {
+    const game = props.games.get(slug)
+    return mediaUrl(game?.icon) || game?.cover || undefined
+}
 
 const findGames: TriggerItemsLoader = async (query, { signal }) => {
     searchWarning.value = ''
+    searchSource.value = undefined
     try {
         const result = await $fetch('/api/admin/games', {
             query: { q: query.trim().slice(0, 100) },
@@ -49,6 +49,7 @@ const findGames: TriggerItemsLoader = async (query, { signal }) => {
         })
         signal.throwIfAborted()
         searchWarning.value = result.warning
+        searchSource.value = result.source
         candidates.clear()
         const items = result.games.map((game) => {
             const value = `game:${game.igdbId}`
@@ -103,48 +104,23 @@ const gameToken = (key: string): TokenInsert => {
     return { type: 'game', value: game?.slug ?? '', label: game?.name ?? '' }
 }
 
-const importGame = async (game: GameSearchResult): Promise<Partial<TokenInsert>> => {
-    const controller = new AbortController()
-    imports.set(game.igdbId, controller)
-    emit('pending', 1)
-    importWarning.value = ''
-    try {
-        const saved = await $fetch('/api/admin/games', {
-            method: 'POST',
-            body: { igdbId: game.igdbId },
-            signal: controller.signal,
-        })
-        emit('game', saved)
-        return { value: saved.slug, label: saved.name }
-    } catch (error) {
-        if (!controller.signal.aborted)
-            importWarning.value = 'Could not import the game. Use /game to try again.'
-
-        throw error
-    } finally {
-        imports.delete(game.igdbId)
-        emit('pending', -1)
-    }
+const menuMessage = (trigger: string | null, argument: string | null) => {
+    if (trigger !== '/game ' && argument !== 'game') return ''
+    if (searchWarning.value) return searchWarning.value
+    return searchSource.value === 'emulator' ? 'Local IGDB emulator active.' : ''
 }
 
-const menuMessage = (trigger: string | null, argument: string | null) =>
-    trigger === '/game ' || argument === 'game' ? searchWarning.value : ''
-
 const select = (value: string, details: TriggerMenuSelectDetails, precedingLine: string) => {
-    importWarning.value = ''
     const gameKey = details.arguments.game ?? (details.trigger === '/game ' ? value : '')
     if (gameKey) {
         const game = candidates.get(gameKey)
-        if (!game || imports.has(game.igdbId)) {
+        if (!game) {
             details.preventDefault()
             return
         }
-        if (game.id) {
-            emit('game', game)
-            details.insert(gameToken(gameKey))
-            return
-        }
-        return importGame(game)
+        emit('game', game)
+        details.insert(gameToken(gameKey))
+        return
     }
 
     if (!applyMarkdownSlashCommand(value, details, precedingLine)) details.preventDefault()
@@ -166,14 +142,13 @@ const select = (value: string, details: TriggerMenuSelectDetails, precedingLine:
         >
             <template #token="{ token }">
                 <img
-                    v-if="games.get(token.value)?.cover"
-                    :src="games.get(token.value)?.cover || undefined"
+                    v-if="tokenImageSrc(token.value)"
+                    :src="tokenImageSrc(token.value)"
                     alt=""
                     class="size-4 shrink-0 rounded-sm object-cover"
                 />
                 {{ games.get(token.value)?.name ?? token.label }}
             </template>
         </UiSlashEditor>
-        <p v-if="importWarning" role="alert" class="ui-error">{{ importWarning }}</p>
     </div>
 </template>

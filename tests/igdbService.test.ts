@@ -158,3 +158,39 @@ test('cached token returning 401 refreshes once and retries the IGDB request', a
         fetch.mock.calls.filter(([url]) => url === 'https://api.igdb.com/v4/games'),
     ).toHaveLength(3)
 })
+
+test('emulator never activates in production, and serves fixture queries without fetch in test mode', async () => {
+    const fetch = vi.fn(() => Promise.reject(new Error('Network must not be called')))
+    vi.stubGlobal('fetch', fetch)
+    vi.stubEnv('IGDB_CLIENT_ID', '')
+    vi.stubEnv('IGDB_CLIENT_SECRET', '')
+    vi.stubEnv('APP_ENV', 'production')
+    vi.stubEnv('LIRY24_IGDB_EMULATOR', 'true')
+
+    const prod = await import('../server/utils/igdb')
+    expect(prod.isIgdbEmulatorEnabled()).toBe(false)
+    await expect(prod.queryIgdb({ search: 'sf6' })).rejects.toMatchObject({ status: 503 })
+    expect(fetch).not.toHaveBeenCalled()
+
+    vi.resetModules()
+    vi.stubEnv('APP_ENV', 'test')
+    vi.stubEnv('LIRY24_IGDB_EMULATOR', 'true')
+    const testEnv = await import('../server/utils/igdb')
+    expect(testEnv.isIgdbEmulatorEnabled()).toBe(true)
+
+    const searchResult = await testEnv.queryIgdbWithSource({ search: 'sf6' })
+    expect(searchResult.source).toBe('emulator')
+    expect(searchResult.games).toEqual(
+        expect.arrayContaining([
+            expect.objectContaining({
+                igdbId: 191_692,
+                slug: 'street-fighter-6',
+                name: 'Street Fighter 6',
+            }),
+        ]),
+    )
+    expect(await testEnv.queryIgdb({ slug: 'vrchat' })).toEqual([
+        { igdbId: 27_789, slug: 'vrchat', name: 'VRChat', cover: null },
+    ])
+    expect(fetch).not.toHaveBeenCalled()
+})

@@ -1,4 +1,4 @@
-import type { MediaReference, PortfolioItem } from '../types/content.js'
+import type { GameRecordData, MediaReference, PortfolioItem } from '../types/content.js'
 
 type GamePosition = {
     value: number
@@ -33,8 +33,32 @@ type GameData = {
     metrics?: Array<GameMetric> | null
 }
 
-export type GameSearchResult = Pick<GameData, 'igdbId' | 'slug' | 'name' | 'cover'> & {
+export type GameSearchResult = Pick<GameData, 'igdbId' | 'slug' | 'name' | 'cover' | 'icon'> & {
     id?: string
+}
+
+export type GameSearchSource = 'igdb' | 'emulator'
+
+export interface GameSearchResponse {
+    games: Array<GameSearchResult>
+    warning: string
+    source?: GameSearchSource
+}
+
+export interface GameCatalogItem {
+    id: string
+    data: GameRecordData
+}
+
+export interface GameCatalogMeta {
+    postCount: number
+    publishedMetricKeys: Array<string>
+    draftMetricStatIds: Record<string, Array<string>>
+}
+
+export interface GameCatalogResponse {
+    items: Array<GameCatalogItem>
+    meta?: Record<string, GameCatalogMeta>
 }
 
 export type GameMentionData = Pick<GameData, 'name' | 'slug' | 'icon' | 'cover'>

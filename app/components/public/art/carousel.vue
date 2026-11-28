@@ -59,7 +59,7 @@ useEventListener('keydown', (event) => {
         <div class="relative flex min-h-0 w-full flex-1 items-center justify-center">
             <UCarousel
                 ref="carousel"
-                v-slot="{ item }"
+                v-slot="{ item, index }"
                 :items="data"
                 :ui="{
                     container: 'items-center',
@@ -78,13 +78,15 @@ useEventListener('keydown', (event) => {
                     <NuxtImg
                         :src="mediaUrl(item)"
                         alt=""
+                        :width="1400"
+                        format="webp"
+                        decoding="async"
+                        :loading="Math.abs(index - activeIndex) > 1 ? 'lazy' : undefined"
+                        class="w-auto max-w-full rounded-xl object-contain"
                         :class="
-                            cn(
-                                'w-auto max-w-full rounded-xl object-contain',
-                                hasMultiple
-                                    ? 'max-h-[52dvh] sm:max-h-[58dvh] lg:max-h-[min(calc(100dvh-13rem),40rem)]'
-                                    : 'max-h-[54dvh] sm:max-h-[60dvh] lg:max-h-[min(calc(100dvh-8rem),46rem)]',
-                            )
+                            hasMultiple
+                                ? 'max-h-[52dvh] sm:max-h-[58dvh] lg:max-h-[min(calc(100dvh-13rem),40rem)]'
+                                : 'max-h-[54dvh] sm:max-h-[60dvh] lg:max-h-[min(calc(100dvh-8rem),46rem)]'
                         "
                     />
                     <span
@@ -143,6 +145,9 @@ useEventListener('keydown', (event) => {
                         alt=""
                         :width="52"
                         :height="52"
+                        format="webp"
+                        decoding="async"
+                        loading="lazy"
                         class="size-12 object-cover sm:size-13"
                     />
                 </button>

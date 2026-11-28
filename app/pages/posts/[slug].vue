@@ -8,24 +8,37 @@ const { isSupported: isShareSupported, share } = useShare(() => ({
 const { isSupported: isCopySupported, copy, copied } = useClipboard()
 
 const slugParam = computed(() => String(route.params.slug ?? ''))
-const { data: entry, error } = await useFetch(
+const { data: post, error } = await useFetch<PostDetailResponse>(
     () => `/api/posts/${encodeURIComponent(slugParam.value)}`,
 )
 if (error.value) throw error.value
 
-const post = computed(() => (entry.value && 'body' in entry.value ? entry.value : null))
+provide(
+    postGameMentionsKey,
+    computed(() => post.value?.games ?? {}),
+)
 
 const data = computed(() =>
     post.value
         ? {
               ...post.value.data,
               date: post.value.data.authoredAt ?? post.value.publishedAt ?? post.value.updatedAt,
-              body: post.value.body,
           }
         : null,
 )
 
 if (!data.value) throw createError({ status: 404, statusText: 'Post not found' })
+defineOgImage(
+    'Post.takumi',
+    {
+        title: data.value.plainTitle || data.value.title || 'Post',
+        description: post.value?.description,
+        date: data.value.date?.slice(0, 10),
+        tags: data.value.tags.filter((tag): tag is string => Boolean(tag)).slice(0, 3),
+        cover: mediaUrl(data.value.cover),
+    },
+    { width: 1200, height: 630 },
+)
 
 if (post.value?.url && post.value.url !== route.path)
     await navigateTo(post.value.url, { redirectCode: 301 })
@@ -45,7 +58,6 @@ useSeoMeta({
     ogDescription: () => post.value?.description,
     ogType: 'article',
     ogUrl: () => canonicalUrl.value,
-    ogImage: () => mediaUrl(data.value?.cover),
     articlePublishedTime: () => data.value?.date ?? undefined,
     articleModifiedTime: () => post.value?.updatedAt ?? undefined,
 })
@@ -56,7 +68,7 @@ useHead({
 </script>
 
 <template>
-    <UPage v-if="data" :ui="{ center: 'flex flex-col gap-6 items-center' }">
+    <UPage v-if="post && data" :ui="{ center: 'flex flex-col gap-6 items-center' }">
         <UContainer class="flex max-w-4xl flex-col items-center gap-6">
             <h1 class="text-heading text-center">
                 <PostTitle :title="data.title" />
@@ -123,11 +135,7 @@ useHead({
             <div class="flex w-full max-w-[65ch] flex-col gap-6">
                 <USeparator decorative class="my-4" />
 
-                <Markdown
-                    :value="data.body"
-                    :plugins="[postMarkdownSecurity]"
-                    class="px-1 *:first:mt-0 *:last:mb-0"
-                />
+                <MarkdownDocument :value="post.document" class="px-1 *:first:mt-0 *:last:mb-0" />
             </div>
         </UContainer>
     </UPage>

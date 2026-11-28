@@ -14,9 +14,7 @@ export default defineEventHandler(async (event) => {
 
     event.res.headers.set('Cache-Control', 'private, no-store')
 
-    const id = `igdb-${input.data.igdbId}`
-    const games = gameCatalog()
-    const existing = await games.byIgdbId(input.data.igdbId)
+    const existing = await gameCatalog().byIgdbId(input.data.igdbId)
     if (existing) {
         const { igdbId, slug, name, cover } = existing.data
         return {
@@ -28,19 +26,8 @@ export default defineEventHandler(async (event) => {
         }
     }
 
-    const remoteGames = await queryIgdb({ id: input.data.igdbId })
-    const game = remoteGames.find((entry) => entry.igdbId === input.data.igdbId)
-    if (!game) throw createError({ status: 404, statusText: 'Game not found in IGDB' })
-
-    const order = appendOrder(await games.list())
-    await games.insert(
-        id,
-        gameFieldsSchema.parse({ ...game, cover: game.cover ?? undefined, order }),
-    )
-    const saved = await games.byIgdbId(game.igdbId)
-    if (!saved)
-        throw createError({ status: 409, statusText: 'The game changed. Reload and try again.' })
-
+    const remoteGame = await resolveRemoteCatalogGame({ id: input.data.igdbId })
+    const saved = await insertCatalogGame(remoteGame)
     const { igdbId, slug, name, cover } = saved.data
     return { id: saved.id, igdbId, slug, name, cover: cover ?? null }
 })

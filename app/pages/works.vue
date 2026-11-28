@@ -36,7 +36,7 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
             :max-columns="3"
             :ssr-columns="2"
         >
-            <template #default="{ item }">
+            <template #default="{ item, index }">
                 <button
                     type="button"
                     class="group bg-default ring-default/80 hover:bg-muted/45 hover:ring-accented block w-full cursor-pointer overflow-hidden rounded-2xl text-left ring-1 transition-[background-color,box-shadow] duration-200 ease-out focus-visible:outline-2 focus-visible:outline-offset-4 motion-reduce:transition-none"
@@ -48,7 +48,10 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
                             :src="mediaUrl(item.data.image)"
                             alt=""
                             :width="160"
+                            :height="160"
                             format="webp"
+                            decoding="async"
+                            :loading="index >= 4 ? 'lazy' : undefined"
                             class="bg-muted ring-default/60 size-20 shrink-0 rounded-xl object-cover ring-1"
                         />
                         <span
@@ -113,6 +116,9 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
                                 alt=""
                                 :width="520"
                                 format="webp"
+                                sizes="(max-width: 640px) 100vw, 520px"
+                                decoding="async"
+                                :loading="index >= 2 ? 'lazy' : undefined"
                                 class="w-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                             />
                         </div>

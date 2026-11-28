@@ -57,19 +57,15 @@ const showIgdbAttribution = computed(() => route.path === '/' || route.path.star
                         @mouseenter="handleMouseEnter"
                         @mouseleave="handleMouseLeave"
                     >
-                        <NuxtImg
+                        <img
                             v-if="route.path === '/'"
-                            v-slot="{ src, imgAttrs, isLoaded }"
-                            src="/avatar.png"
+                            :src="'/avatar.webp?size=112'"
                             alt=""
+                            width="56"
+                            height="56"
+                            loading="eager"
                             class="ring-default/70 aspect-square size-11 shrink-0 rounded-full object-cover ring-1 sm:size-13 md:size-14"
-                        >
-                            <img v-if="isLoaded" v-bind="imgAttrs" :src />
-                            <USkeleton
-                                v-else
-                                class="aspect-square size-11 shrink-0 rounded-full sm:size-13 md:size-14"
-                            />
-                        </NuxtImg>
+                        />
                         <Icon
                             v-if="titleHovered"
                             name="mingcute:arrow-left-fill"
@@ -86,13 +82,25 @@ const showIgdbAttribution = computed(() => route.path === '/' || route.path.star
                     </NuxtLink>
 
                     <div class="flex items-center gap-1.5 sm:gap-2">
-                        <UNavigationMenu
-                            :items="tabs"
-                            color="neutral"
-                            variant="link"
-                            orientation="horizontal"
-                            class="text-toned font-mono text-base font-medium sm:text-lg"
-                        />
+                        <nav
+                            aria-label="Primary"
+                            class="text-toned flex items-center gap-3 font-mono text-base font-medium sm:gap-4 sm:text-lg"
+                        >
+                            <NuxtLink
+                                v-for="tab in tabs"
+                                :key="tab.to"
+                                :to="tab.to"
+                                :aria-current="route.path.startsWith(tab.to) ? 'page' : undefined"
+                                :class="
+                                    cn(
+                                        'hover:text-highlighted rounded-md px-1.5 py-1 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none',
+                                        route.path.startsWith(tab.to) && 'text-highlighted',
+                                    )
+                                "
+                            >
+                                {{ tab.label }}
+                            </NuxtLink>
+                        </nav>
 
                         <ColorModeButton />
                     </div>

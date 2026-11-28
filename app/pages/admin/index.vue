@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const { data: postOverview } = await useFetch('/api/admin/content/posts', {
-    key: 'admin-posts-overview',
+    key: 'admin-posts',
 })
 
 const totalPosts = computed(() => postOverview.value?.items.length ?? 0)

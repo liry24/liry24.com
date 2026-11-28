@@ -89,14 +89,6 @@ useHead({ title: meta.title })
             <UDashboardNavbar :title="meta.title" :icon="meta.icon">
                 <template #right>
                     <UButton
-                        v-if="model === 'gameStats'"
-                        to="/admin/games"
-                        label="Game settings"
-                        icon="mingcute:settings-1-line"
-                        variant="outline"
-                        color="neutral"
-                    />
-                    <UButton
                         icon="mingcute:refresh-2-line"
                         aria-label="Refresh items"
                         variant="ghost"

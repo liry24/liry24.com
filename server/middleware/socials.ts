@@ -1,5 +1,3 @@
-import content from '#server/content'
-
 export default defineEventHandler(async (event) => {
     if (!['GET', 'HEAD'].includes(event.req.method)) return
 
@@ -14,7 +12,6 @@ export default defineEventHandler(async (event) => {
     }
     if (!socialSlug(slug)) return
 
-    const socials = await listAllCollectionItems(content.collection('socials'), 'published')
-    const target = socials.find((doc) => doc.data.slug === slug)?.data.href
+    const target = (await getPublishedSocialsMap()).get(slug)
     if (target) return sendRedirect(event, target, 302)
 })

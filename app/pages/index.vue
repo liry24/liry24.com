@@ -17,6 +17,11 @@ const careers = usePortfolioData('careers')
 const gameStats = useFetch('/api/portfolio/gameStats')
 const posts = useFetch<PostCardsPage>('/api/posts/cards', { query: { limit: 10 } })
 await Promise.all([arts, socials, careers, gameStats, posts])
+provide(
+    postGameMentionsKey,
+    computed(() => posts.data.value?.games ?? {}),
+)
+
 const data = computed(() => ({
     arts: arts.data.value || [],
     socials: socials.data.value?.map((entry) => entry.data) || [],
@@ -42,6 +47,11 @@ const rotateArray = <T>(arr: Array<T>, n: number): Array<T> => {
     return [...arr.slice(-shift), ...arr.slice(0, -shift)]
 }
 
+const rotatedArts = computed(() => rotateArray(data.value.arts, 1))
+const marqueeRepeat = computed(() =>
+    Math.min(4, Math.max(2, Math.ceil(6 / Math.max(rotatedArts.value.length, 1)))),
+)
+
 useKeyCommand(modalStacks.open)
 
 onMounted(() => {
@@ -61,18 +71,19 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
 <template>
     <div v-if="data" class="flex flex-col gap-14 sm:gap-16">
         <UMarquee
-            v-if="data.arts.length"
+            v-if="rotatedArts.length"
             pause-on-hover
+            :repeat="marqueeRepeat"
             :overlay="false"
             :ui="{ content: 'gap-5 sm:gap-8 md:gap-10 lg:gap-12' }"
             class="my-2 mask-x-from-88% mask-x-to-100% [--duration:42s]"
         >
             <Motion
-                v-for="(art, index) in rotateArray(data.arts, 1)"
+                v-for="(art, index) in rotatedArts"
                 :key="art.id"
-                :initial="{ scale: 1.04, opacity: 0 }"
-                :animate="{ scale: 1, opacity: 1 }"
-                :transition="{ delay: Math.min(0.05 + index * 0.04, 0.25) }"
+                :initial="{ scale: 1.1, opacity: 0, filter: 'blur(20px)' }"
+                :animate="{ scale: 1, opacity: 1, filter: 'blur(0px)' }"
+                :transition="{ delay: 0.2 + index * 0.1 }"
             >
                 <NuxtLink
                     :to="`/arts?open=${art.data.slug}`"
@@ -81,8 +92,13 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                     <NuxtImg
                         :src="mediaUrl(art.data.images[0])"
                         :alt="art.data.title"
+                        :width="320"
                         :height="320"
                         format="webp"
+                        sizes="224px sm:256px md:288px lg:320px"
+                        decoding="async"
+                        :fetchpriority="index < 3 ? 'high' : undefined"
+                        :loading="index >= 4 ? 'lazy' : undefined"
                         class="aspect-square size-56 object-cover transition-transform duration-200 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100 sm:size-64 md:size-72 lg:size-80"
                     />
                     <div
@@ -183,8 +199,12 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                         class="group relative flex size-full flex-col items-center justify-center gap-4 rounded-xl p-10 font-[Geist] focus-visible:outline-2 focus-visible:outline-offset-4"
                     >
                         <NuxtImg
-                            src="/graphics-ss.png"
+                            src="/graphics-ss.webp"
                             alt=""
+                            width="1075"
+                            height="957"
+                            loading="lazy"
+                            decoding="async"
                             class="pointer-events-none absolute inset-0 size-full overflow-clip mask-x-from-60% mask-x-to-90% object-cover object-[0%_10%] opacity-10 transition-opacity group-hover:opacity-30 motion-reduce:transition-none"
                         />
 
@@ -202,11 +222,9 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                         target="_blank"
                         class="group relative flex size-full flex-col items-center justify-center gap-4 rounded-xl p-10 focus-visible:outline-2 focus-visible:outline-offset-4"
                     >
-                        <UColorModeImage
-                            light="/avatio-ss-light.png"
-                            dark="/avatio-ss-dark.png"
-                            alt=""
-                            class="pointer-events-none absolute inset-0 size-full overflow-clip mask-x-from-60% mask-x-to-90% object-cover object-[0%_10%] opacity-10 transition-opacity group-hover:opacity-30 motion-reduce:transition-none"
+                        <div
+                            aria-hidden="true"
+                            class="pointer-events-none absolute inset-0 size-full overflow-clip bg-[url('/avatio-ss-light.webp')] mask-x-from-60% mask-x-to-90% bg-cover bg-[0%_10%] opacity-10 transition-opacity group-hover:opacity-30 motion-reduce:transition-none dark:bg-[url('/avatio-ss-dark.webp')]"
                         />
 
                         <span class="z-1 text-4xl font-extrabold tracking-tight sm:text-5xl">

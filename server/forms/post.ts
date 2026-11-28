@@ -7,6 +7,15 @@ const postFormSchema = z.object({
     id: z.string().optional(),
     data: postFieldsSchema.omit({ generateSlugOnPublish: true }).partial({ slug: true }),
     body: z.string(),
+    mentionedGames: z
+        .array(
+            z.object({
+                slug: z.string().regex(gameSlugPattern),
+                igdbId: z.number().int().positive(),
+            }),
+        )
+        .max(100)
+        .optional(),
 })
 
 export default defineForm({
@@ -18,9 +27,9 @@ export default defineForm({
     maxBytes: 262_144,
     onSubmit: async (submission) => {
         try {
-            const { id, data, body } = submission.data
+            const { id, data, body, mentionedGames } = submission.data
             const posts = content.collection('posts')
-            const games = await resolvePostGames(data.title, body)
+            const games = await resolvePostGames(data.title, body, mentionedGames)
             const checkSlug = !id?.trim() || data.slug !== undefined
             const [occupied, published] = checkSlug
                 ? await Promise.all([
@@ -46,7 +55,8 @@ export default defineForm({
                 allowGeneratedKey: (slug) => isPostSlugAllowed(slug) && !occupied.has(slug),
                 fields: (slug, order, previous) => ({
                     ...data,
-                    ...games,
+                    plainTitle: games.plainTitle,
+                    gameMentions: games.gameMentions,
                     slug,
                     generateSlugOnPublish:
                         data.slug === undefined
@@ -89,6 +99,7 @@ export default defineForm({
                     )
                         throw postSlugConflict()
                 },
+                beforeSave: () => games.persistMissingGames(),
             })
             return Response.json(saved, { status: 201 })
         } catch (error) {

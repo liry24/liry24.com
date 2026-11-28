@@ -1,4 +1,12 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
+
+function catalogLookupValues(values: ReadonlyArray<string>) {
+    const unique = [...new Set(values)]
+    // D1 limits each statement to 100 bound parameters.
+    return unique.length <= 100
+        ? unique
+        : sql`(SELECT value FROM json_each(${JSON.stringify(unique)}))`
+}
 
 export function gameCatalog() {
     const { db, schema } = useDatabase('default')
@@ -49,11 +57,42 @@ export function gameCatalog() {
         async bySlug(slug: string) {
             return await db.select(selection).from(table).where(eq(table.slug, slug)).get()
         },
+        async byIds(ids: ReadonlyArray<string>) {
+            if (!ids.length) return []
+            return await db
+                .select(selection)
+                .from(table)
+                .where(inArray(table.id, catalogLookupValues(ids)))
+        },
+        async bySlugs(slugs: ReadonlyArray<string>) {
+            if (!slugs.length) return []
+            return await db
+                .select(selection)
+                .from(table)
+                .where(inArray(table.slug, catalogLookupValues(slugs)))
+        },
+        async existingIds(ids: ReadonlyArray<string>): Promise<Set<string>> {
+            if (!ids.length) return new Set()
+            const rows = await db
+                .select({ id: table.id })
+                .from(table)
+                .where(inArray(table.id, catalogLookupValues(ids)))
+            return new Set(rows.map(({ id }) => id))
+        },
+        async nextOrder() {
+            const row = await db.get<{ nextOrder: number }>(sql`
+                SELECT coalesce(max(cast(json_extract(${table.data}, '$.order') AS integer)), -1) + 1 AS nextOrder
+                FROM ${table}
+            `)
+            return row?.nextOrder ?? 0
+        },
         async insert(id: string, data: GameRecordData) {
             return await db
                 .insert(table)
                 .values({ id, igdbId: data.igdbId, slug: data.slug, data })
                 .onConflictDoNothing({ target: table.igdbId })
+                .returning(selection)
+                .get()
         },
         async update(id: string, previous: GameRecordData, data: GameRecordData) {
             return await db
@@ -67,4 +106,62 @@ export function gameCatalog() {
             await db.delete(table).where(eq(table.id, id))
         },
     }
+}
+
+export function gameMentionDataBySlug(
+    games: ReadonlyArray<GameCatalogItem>,
+): Record<string, GameMentionData> {
+    return Object.fromEntries(
+        games.map(({ data: { slug, name, icon, cover } }) => [slug, { slug, name, icon, cover }]),
+    )
+}
+
+export function catalogGameId(igdbId: number): string {
+    return `igdb-${igdbId}`
+}
+
+export async function resolveRemoteCatalogGame(
+    query: { id: number } | { slug: string },
+): Promise<GameSearchResult> {
+    const remoteGames = await queryIgdb(query)
+    const matched =
+        'id' in query
+            ? remoteGames.find((entry) => entry.igdbId === query.id)
+            : remoteGames.find((entry) => entry.slug === query.slug)
+    if (!matched) throw createError({ status: 404, statusText: 'Game not found in IGDB' })
+
+    return matched
+}
+
+export async function insertCatalogGame(
+    game: GameSearchResult,
+    overrides?: {
+        primaryMetric?: string
+        metrics?: GameRecordData['metrics']
+    },
+) {
+    const games = gameCatalog()
+    const id = catalogGameId(game.igdbId)
+    const order = await games.nextOrder()
+    const parsed = gameFieldsSchema.parse({
+        igdbId: game.igdbId,
+        slug: game.slug,
+        name: game.name,
+        cover: game.cover ?? undefined,
+        order,
+        primaryMetric: overrides?.primaryMetric || undefined,
+        metrics: overrides?.metrics ?? [],
+    })
+    const saved = (await games.insert(id, parsed)) ?? (await games.byIgdbId(game.igdbId))
+    if (!saved)
+        throw createError({ status: 409, statusText: 'The game changed. Reload and try again.' })
+
+    return saved
+}
+
+export function hasGameConfigDiff(previous: GameRecordData, next: GameRecordData): boolean {
+    return (
+        (previous.primaryMetric ?? undefined) !== (next.primaryMetric ?? undefined) ||
+        JSON.stringify(previous.metrics) !== JSON.stringify(next.metrics)
+    )
 }

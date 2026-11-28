@@ -2,9 +2,10 @@ export const useGameSearch = (query: () => string | null) => {
     const { session } = useAppSession()
     const games = ref<Array<GameSearchResult>>([])
     const warning = ref('')
+    const source = ref<GameSearchSource>()
     const loading = ref(false)
     const importing = ref(false)
-    const cache = new Map<string, { games: Array<GameSearchResult>; warning: string }>()
+    const cache = new Map<string, GameSearchResponse>()
     let search: AbortController | undefined
     let insertion: AbortController | undefined
 
@@ -22,6 +23,7 @@ export const useGameSearch = (query: () => string | null) => {
             cache.set(text, result)
             games.value = result.games
             warning.value = result.warning
+            source.value = result.source
         } catch {
             if (!controller.signal.aborted)
                 warning.value = 'Search unavailable. You can continue editing.'
@@ -55,6 +57,7 @@ export const useGameSearch = (query: () => string | null) => {
             }
             games.value = []
             warning.value = ''
+            source.value = undefined
             if (text === null) return
 
             const controller = (search = new AbortController())
@@ -96,5 +99,5 @@ export const useGameSearch = (query: () => string | null) => {
         insertion?.abort()
     })
 
-    return { games, warning, loading, importing, importGame }
+    return { games, warning, source, loading, importing, importGame }
 }

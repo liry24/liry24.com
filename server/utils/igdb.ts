@@ -1,5 +1,5 @@
-import { createIgdbClient, eq, IgdbError } from '@liry24/igdb'
-import type { IgdbClientOptions } from '@liry24/igdb'
+import { createIgdbClient, createMemoryTokenCache, eq, IgdbError } from '@liry24/igdb'
+import type { IgdbClient } from '@liry24/igdb'
 import { log } from 'evlog'
 import { z } from 'zod'
 
@@ -8,17 +8,13 @@ interface IgdbCredentials {
     secret?: string
 }
 
-interface CachedIgdbToken {
-    clientId: string
-    clientSecret: string
-    accessToken: string
-    expiresAt: number
-}
-
-type IgdbFetch = NonNullable<IgdbClientOptions['fetch']>
 type IgdbQuery = { search: string } | { id: number } | { slug: string }
 
 const IGDB_TIMEOUT_MS = 5000
+
+// Cache only plain token data across requests; never store Promises or stateful clients across requests in workerd.
+const tokenCache = createMemoryTokenCache()
+let emulatorLogged = false
 
 function readIgdbCredentials(): IgdbCredentials {
     try {
@@ -38,27 +34,24 @@ function readIgdbCredentials(): IgdbCredentials {
     }
 }
 
-async function fetchWithoutRedirects(
-    input: RequestInfo | URL,
-    init?: RequestInit,
-): Promise<Response> {
-    const rejectRedirects = init?.redirect === 'error'
-    const nextInit = rejectRedirects ? { ...init, redirect: 'manual' as const } : init
-    const response = await globalThis.fetch(input, nextInit)
-    // workerd throws TypeError on redirect: "error", so reject 3xx responses under manual mode.
-    if (rejectRedirects && response.status >= 300 && response.status < 400) {
-        if (response.body) await response.body.cancel().catch(() => undefined)
-
-        throw new TypeError('IGDB upstream returned an unexpected redirect.')
-    }
-    return response
+function isNonProductionRuntime(): boolean {
+    return (
+        (import.meta.dev && !readProcessEnv('VITEST')) ||
+        readProcessEnv('LIRY24_TEST_LOCAL') === 'true' ||
+        readProcessEnv('APP_ENV') === 'test'
+    )
 }
 
-function createIgdbFetch(): IgdbFetch {
-    return (input, init) => fetchWithoutRedirects(input, init)
+export function isIgdbEmulatorEnabled(credentials?: IgdbCredentials): boolean {
+    if (!isNonProductionRuntime()) return false
+
+    if (readProcessEnv('LIRY24_IGDB_EMULATOR') === 'true') return true
+
+    const resolved = credentials ?? readIgdbCredentials()
+    return import.meta.dev && !readProcessEnv('VITEST') && (!resolved.client || !resolved.secret)
 }
 
-function logIgdbFailure(error: unknown, credentials: { client: string; secret: string }): void {
+function logIgdbFailure(error: unknown, credentials: IgdbCredentials): void {
     if (error instanceof IgdbError) {
         log.error({
             event: 'igdb.request_failed',
@@ -70,22 +63,18 @@ function logIgdbFailure(error: unknown, credentials: { client: string; secret: s
         })
         return
     }
-    const rawMessage = error instanceof Error ? error.message : String(error)
+    let sanitized = error instanceof Error ? error.message : String(error)
+    if (credentials.client) sanitized = sanitized.replaceAll(credentials.client, '[redacted]')
+    if (credentials.secret) sanitized = sanitized.replaceAll(credentials.secret, '[redacted]')
+
     log.error({
         event: 'igdb.unexpected_error',
         name: error instanceof Error ? error.name : 'UnknownError',
-        message: rawMessage
-            .replaceAll(credentials.client, '[redacted]')
-            .replaceAll(credentials.secret, '[redacted]'),
+        message: sanitized,
     })
 }
 
-const twitchTokenSchema = z.object({
-    access_token: z.string().refine((value) => value.trim().length > 0 && !/[\r\n]/.test(value)),
-    expires_in: z.number().finite().positive(),
-})
-
-const result = z.array(
+const resultSchema = z.array(
     z.object({
         id: z.number().int().positive(),
         slug: z.string().regex(gameSlugPattern),
@@ -94,90 +83,48 @@ const result = z.array(
     }),
 )
 
-// Cache only plain token data across requests; never store Promises or stateful clients across requests in workerd.
-let cachedToken: CachedIgdbToken | undefined
-
-async function fetchTwitchAccessToken(
-    clientId: string,
-    clientSecret: string,
-): Promise<CachedIgdbToken> {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), IGDB_TIMEOUT_MS)
-    try {
-        let response: Response
-        try {
-            response = await fetchWithoutRedirects('https://id.twitch.tv/oauth2/token', {
-                method: 'POST',
-                body: new URLSearchParams({
-                    client_id: clientId,
-                    client_secret: clientSecret,
-                    grant_type: 'client_credentials',
-                }),
-                redirect: 'error',
-                signal: controller.signal,
-            })
-        } catch {
-            throw new IgdbError(controller.signal.aborted ? 'TIMEOUT' : 'NETWORK_ERROR', 'auth')
+async function resolveIgdbClient(
+    credentials: IgdbCredentials,
+): Promise<{ client: IgdbClient; source: GameSearchSource }> {
+    if (isIgdbEmulatorEnabled(credentials)) {
+        if (!emulatorLogged) {
+            emulatorLogged = true
+            log.info({ event: 'igdb.emulator_active' })
         }
-
-        if (!response.ok) {
-            if (response.body) await response.body.cancel().catch(() => undefined)
-
-            throw new IgdbError('HTTP_ERROR', 'auth', { status: response.status })
-        }
-
-        let payload: unknown
-        try {
-            payload = await response.json()
-        } catch {
-            throw new IgdbError(controller.signal.aborted ? 'TIMEOUT' : 'INVALID_RESPONSE', 'auth')
-        }
-
-        const parsed = twitchTokenSchema.safeParse(payload)
-        if (!parsed.success) throw new IgdbError('INVALID_RESPONSE', 'auth')
-
-        const expiresMs = parsed.data.expires_in * 1000
+        const { createIgdbEmulator } = await import('@liry24/igdb/emulator')
         return {
-            clientId,
-            clientSecret,
-            accessToken: parsed.data.access_token,
-            expiresAt: Date.now() + expiresMs - Math.min(60_000, expiresMs / 10),
+            client: createIgdbClient({
+                emulator: createIgdbEmulator(),
+                timeoutMs: IGDB_TIMEOUT_MS,
+            }),
+            source: 'emulator',
         }
-    } finally {
-        clearTimeout(timer)
+    }
+
+    if (!credentials.client || !credentials.secret) {
+        log.error({
+            event: 'igdb.credentials_missing',
+            hasClientId: Boolean(credentials.client),
+            hasClientSecret: Boolean(credentials.secret),
+        })
+        throw createError({
+            status: 503,
+            statusText: 'IGDB search is not configured. Saved games are still available.',
+        })
+    }
+
+    return {
+        client: createIgdbClient({
+            clientId: credentials.client,
+            clientSecret: credentials.secret,
+            tokenCache,
+            timeoutMs: IGDB_TIMEOUT_MS,
+        }),
+        source: 'igdb',
     }
 }
 
-async function resolveIgdbAccessToken(
-    clientId: string,
-    clientSecret: string,
-    forceRefresh = false,
-): Promise<{ token: string; fromCache: boolean }> {
-    if (
-        !forceRefresh &&
-        cachedToken &&
-        cachedToken.clientId === clientId &&
-        cachedToken.clientSecret === clientSecret &&
-        cachedToken.expiresAt > Date.now()
-    )
-        return { token: cachedToken.accessToken, fromCache: true }
-
-    const fresh = await fetchTwitchAccessToken(clientId, clientSecret)
-    cachedToken = fresh
-    return { token: fresh.accessToken, fromCache: false }
-}
-
-async function runIgdbQuery(
-    clientId: string,
-    accessToken: string,
-    query: IgdbQuery,
-): Promise<Array<unknown>> {
-    const client = createIgdbClient({
-        clientId,
-        accessToken,
-        timeoutMs: IGDB_TIMEOUT_MS,
-        fetch: createIgdbFetch(),
-    })
+async function runIgdbQuery(client: IgdbClient, query: IgdbQuery): Promise<Array<unknown>> {
     const games = client.query('games').fields('id', 'slug', 'name', 'cover.image_id')
     if ('id' in query) return await games.where((game) => eq(game.id, query.id)).limit(1)
 
@@ -186,57 +133,24 @@ async function runIgdbQuery(
     return await games.search(query.search).limit(10)
 }
 
-async function executeIgdbQuery(
-    clientId: string,
-    clientSecret: string,
+export async function queryIgdbWithSource(
     query: IgdbQuery,
-): Promise<Array<unknown>> {
-    const { token, fromCache } = await resolveIgdbAccessToken(clientId, clientSecret)
-    try {
-        return await runIgdbQuery(clientId, token, query)
-    } catch (error) {
-        if (
-            fromCache &&
-            error instanceof IgdbError &&
-            error.code === 'HTTP_ERROR' &&
-            error.status === 401
-        ) {
-            if (cachedToken?.accessToken === token) cachedToken = undefined
-
-            const refreshed = await resolveIgdbAccessToken(clientId, clientSecret, true)
-            return await runIgdbQuery(clientId, refreshed.token, query)
-        }
-        throw error
-    }
-}
-
-export async function queryIgdb(query: IgdbQuery): Promise<Array<GameSearchResult>> {
-    const { client, secret } = readIgdbCredentials()
-
-    if (!client || !secret) {
-        log.error({
-            event: 'igdb.credentials_missing',
-            hasClientId: Boolean(client),
-            hasClientSecret: Boolean(secret),
-        })
-        throw createError({
-            status: 503,
-            statusText: 'IGDB search is not configured. Saved games are still available.',
-        })
-    }
+): Promise<{ games: Array<GameSearchResult>; source: GameSearchSource }> {
+    const credentials = readIgdbCredentials()
+    const { client, source } = await resolveIgdbClient(credentials)
 
     let response: Array<unknown>
     try {
-        response = await executeIgdbQuery(client, secret, query)
+        response = await runIgdbQuery(client, query)
     } catch (error) {
-        logIgdbFailure(error, { client, secret })
+        logIgdbFailure(error, credentials)
         throw createError({
             status: 502,
             statusText: 'IGDB is unavailable. Continue writing or choose a saved game.',
         })
     }
 
-    const parsed = result.safeParse(response)
+    const parsed = resultSchema.safeParse(response)
     if (!parsed.success) {
         log.error({
             event: 'igdb.response_invalid',
@@ -253,12 +167,19 @@ export async function queryIgdb(query: IgdbQuery): Promise<Array<GameSearchResul
         })
     }
 
-    return parsed.data.map((game) => ({
-        igdbId: game.id,
-        slug: game.slug,
-        name: game.name,
-        cover: game.cover
-            ? `https://images.igdb.com/igdb/image/upload/t_thumb/${game.cover.image_id}.jpg`
-            : null,
-    }))
+    return {
+        source,
+        games: parsed.data.map((game) => ({
+            igdbId: game.id,
+            slug: game.slug,
+            name: game.name,
+            cover: game.cover
+                ? `https://images.igdb.com/igdb/image/upload/t_thumb/${game.cover.image_id}.jpg`
+                : null,
+        })),
+    }
+}
+
+export async function queryIgdb(query: IgdbQuery): Promise<Array<GameSearchResult>> {
+    return (await queryIgdbWithSource(query)).games
 }

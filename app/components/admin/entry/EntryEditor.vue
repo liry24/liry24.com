@@ -4,6 +4,9 @@ import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 const props = defineProps<{
     model: PortfolioCollectionName
     item?: AdminEntryRecord
+    initialData?: AdminEntryData
+    catalogItems?: Array<GameCatalogItem>
+    catalogMeta?: Record<string, GameCatalogMeta>
     finalFocus: () => HTMLElement | null
 }>()
 const open = defineModel<boolean>('open', { required: true })
@@ -32,7 +35,7 @@ const title = computed(() =>
 
 watch(open, (value) => {
     if (value) {
-        data.value = { ...props.item?.data }
+        data.value = { ...(props.item?.data ?? props.initialData) }
         manualSlug.value = false
         if (props.model === 'works') data.value.style ??= 'small'
         errors.value = {}
@@ -81,19 +84,41 @@ async function save() {
     if (props.model === 'works' || props.model === 'arts' || props.model === 'gameStats')
         payload.href = payload.href?.trim() || undefined
 
+    let gameConfig:
+        | {
+              igdbId: number
+              primaryMetric?: string
+              metrics: GameRecordData['metrics']
+          }
+        | undefined
+
     if (props.model === 'gameStats') {
-        const result = stats.value?.getValues()
+        const result = stats.value?.getSubmission()
         if (!result || Object.keys(result.errors).length) {
             await showErrors('Check the highlighted fields.', result?.errors)
             return
         }
+        payload.game = result.game
         payload.values = result.values
+        gameConfig = result.gameConfig
+    }
+
+    type EntryFormSubmission = {
+        id?: string
+        data: AdminEntryData
+        gameConfig?: {
+            igdbId: number
+            primaryMetric?: string
+            metrics: GameRecordData['metrics']
+        }
     }
 
     saving.value = true
     let failed: { message: string; fields?: Record<string, string> } | undefined
     try {
-        const submission = props.item ? { data: payload, id: props.item.id } : { data: payload }
+        const submission: EntryFormSubmission = { data: payload }
+        if (props.item) submission.id = props.item.id
+        if (gameConfig) submission.gameConfig = gameConfig
         const [error] = await submitForm(meta.value.endpoint, submission)
         if (error) failed = { message: error.message, fields: fieldErrors(error) }
     } catch (error) {
@@ -164,6 +189,9 @@ async function save() {
                 v-model="data"
                 :errors="errors"
                 :busy="busy"
+                :editing-id="item?.id"
+                :catalog-items="catalogItems"
+                :catalog-meta="catalogMeta"
                 @busy="uploading = $event"
             />
             <AdminEntrySlug

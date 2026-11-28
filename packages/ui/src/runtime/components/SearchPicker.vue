@@ -7,7 +7,7 @@ import {
     ComboboxItem,
     ComboboxList,
 } from '@ui-sdk/vue/combobox'
-import { useId, watch } from 'vue'
+import { computed, shallowRef, useId, watch } from 'vue'
 
 import { UIcon } from '#components'
 
@@ -20,7 +20,11 @@ const open = defineModel<boolean>('open', { required: true })
 const { title, label, load, finalFocus, placeholder, minQueryText, emptyText } = defineProps<{
     title: string
     label: string
-    load: (query: string, signal: AbortSignal) => Promise<Array<string>>
+    load: (
+        query: string,
+        signal: AbortSignal,
+        update?: (items: Array<string>) => void,
+    ) => Promise<Array<string>>
     finalFocus?: DialogFinalFocus
     placeholder?: string
     minQueryText?: string
@@ -30,15 +34,45 @@ const emit = defineEmits<{ select: [value: string] }>()
 
 const inputId = useId()
 const icons = useUiIcons()
+const toItems = (values: Array<string>) => values.map((value) => ({ value, label: value }))
+const partialItems = shallowRef<ReturnType<typeof toItems>>([])
 const { state, setQuery, reload } = useAsyncOptions(
-    async (query, { signal }) =>
-        (await load(query, signal)).map((value) => ({ value, label: value })),
+    async (query, { signal }): Promise<ReturnType<typeof toItems>> => {
+        partialItems.value = []
+        const items = await load(query, signal, (next) => {
+            if (
+                open.value &&
+                !signal.aborted &&
+                state.value.query === query &&
+                state.value.status === 'loading'
+            )
+                partialItems.value = toItems(next)
+        })
+        return toItems(items)
+    },
     { debounce: 280, minLength: 2 },
 )
-
-watch(open, (value) => {
-    if (!value) setQuery('')
+const visibleItems = computed(() => {
+    if (state.value.status === 'loading') return partialItems.value
+    return state.value.status === 'idle' ? state.value.items : []
 })
+
+watch(
+    open,
+    (value) => {
+        if (!value) {
+            partialItems.value = []
+            setQuery('')
+        }
+    },
+    { flush: 'sync' },
+)
+
+function search(query: string) {
+    if (!open.value) return
+    if (query !== state.value.query) partialItems.value = []
+    setQuery(query)
+}
 
 function select(value: unknown) {
     if (typeof value !== 'string' || !value) return
@@ -59,11 +93,12 @@ function select(value: unknown) {
     >
         <div class="ui-search-picker-body">
             <Combobox
-                :items="state.status === 'idle' ? state.items : []"
+                :items="visibleItems"
+                :query="state.query"
                 :status="state.status"
                 :filter="false"
                 :auto-highlight="true"
-                @query-change="setQuery"
+                @query-change="search"
                 @value-change="select"
             >
                 <div class="ui-search-picker-field">
@@ -83,7 +118,7 @@ function select(value: unknown) {
                 <ComboboxContent class="ui-search-picker-results">
                     <ComboboxList class="ui-search-picker-list">
                         <ComboboxItem
-                            v-for="item in state.status === 'idle' ? state.items : []"
+                            v-for="item in visibleItems"
                             :key="item.value"
                             :value="item.value"
                             :label="item.label"

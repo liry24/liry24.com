@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PromptInputSubmit } from '@vite-hub/ui'
 
+import 'vite-hub/ui/styles.css'
+
 const input = ref('')
 const agent = useAgent('assistant')
 const { messages, status, error, sendMessage, stop, clearError } = useChat(agent)

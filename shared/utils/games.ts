@@ -2,6 +2,29 @@ import type { GameMetric, GameValue } from '../types/games.js'
 
 export const gameSlugPattern = /^[a-z0-9][a-z0-9-]*$/
 export const gameColorPattern = /^#[0-9a-fA-F]{6}$/
+export const gameMetricKeyPattern = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/
+
+const integerFormatter = new Intl.NumberFormat('ja', { maximumFractionDigits: 0 })
+const decimalFormatter = new Intl.NumberFormat('ja', { maximumFractionDigits: 2 })
+
+export function deriveGameMetricKey(label: string, existingKeys: ReadonlySet<string>): string {
+    const ascii = label
+        .normalize('NFKD')
+        .replaceAll(/\p{M}/gu, '')
+        .replaceAll(/([a-z0-9])([A-Z])/gu, '$1_$2')
+        .toLowerCase()
+        .replaceAll(/[^a-z0-9]+/gu, '_')
+        .replaceAll(/^_+|_+$/gu, '')
+    const base = (/^[a-z]/u.test(ascii) ? ascii : ascii ? `m_${ascii}` : 'metric').slice(0, 56)
+
+    if (!existingKeys.has(base)) return base
+
+    for (let suffix = 2; ; suffix++) {
+        const suffixText = `_${suffix}`
+        const candidate = `${base.slice(0, 64 - suffixText.length)}${suffixText}`
+        if (!existingKeys.has(candidate)) return candidate
+    }
+}
 
 const igdbThumbPrefix = 'https://images.igdb.com/igdb/image/upload/t_thumb/'
 
@@ -20,10 +43,9 @@ export function formatGameValue(value: GameValue | undefined, metric?: GameMetri
 
     if (value.label) return value.label
 
+    const formatter = metric?.format === 'integer' ? integerFormatter : decimalFormatter
     return (
-        new Intl.NumberFormat('ja', {
-            maximumFractionDigits: metric?.format === 'integer' ? 0 : 2,
-        }).format(value.value) +
+        formatter.format(value.value) +
         (metric?.format === 'percent' ? '%' : metric?.unit ? ` ${metric.unit}` : '')
     )
 }
@@ -34,8 +56,12 @@ export function gameValueIssues(
 ): Array<string> {
     const issues: Array<string> = [],
         seen = new Set<string>()
+    const metricsByKey = new Map<string, GameMetric>()
+    for (const metric of metrics)
+        if (!metricsByKey.has(metric.key)) metricsByKey.set(metric.key, metric)
+
     for (const value of values) {
-        const metric = metrics.find((item) => item.key === value.key)
+        const metric = metricsByKey.get(value.key)
         if (!metric || seen.has(value.key)) issues.push(`Unknown or repeated metric: ${value.key}`)
 
         seen.add(value.key)

@@ -12,6 +12,7 @@ import type {
     socialFieldsSchema,
     workFieldsSchema,
 } from '../utils/contentSchemas.js'
+import type { GameMentionData } from './games.js'
 
 export interface MediaReference {
     pathname: string
@@ -64,18 +65,33 @@ export interface PostItem {
     updatedAt?: string
 }
 
+export interface PostRenderedDocument {
+    nodes: Array<Node>
+    frontmatter: Record<string, never>
+    meta: Record<string, never>
+}
+
 export type PostCard = Omit<PostData, 'generateSlugOnPublish'> & {
     id: string
     url: string | null
     date: string | null
-    excerpt: {
-        nodes: Array<Node>
-        frontmatter: Record<string, never>
-        meta: Record<string, never>
-    }
+    excerpt: PostRenderedDocument
 }
 
 export interface PostCardsPage {
     items: Array<PostCard>
     total: number
+    games?: Record<string, GameMentionData>
+}
+
+export interface PostDetailResponse {
+    id: string
+    url: string | null
+    data: Omit<PostData, 'generateSlugOnPublish'>
+    body: string
+    document: PostRenderedDocument
+    games: Record<string, GameMentionData>
+    description?: string
+    publishedAt?: string
+    updatedAt?: string
 }

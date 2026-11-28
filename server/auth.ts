@@ -164,6 +164,9 @@ export default defineAuth(({ env, request, requestOrigin }) => {
         ],
         advanced: {
             cookiePrefix: local ? 'liry24-local' : 'liry24-pocket',
+            database: {
+                joins: true,
+            },
             ipAddress: {
                 ipAddressHeaders: ['x-forwarded-for', 'x-real-ip', 'cf-connecting-ip'],
                 disableIpTracking: false,

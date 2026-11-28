@@ -36,6 +36,9 @@ export default defineEventHandler(async (event) => {
         status: upstream.status,
         headers: {
             'Content-Type': upstream.headers.get('Content-Type') ?? 'application/octet-stream',
+            ...(upstream.ok && {
+                'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+            }),
         },
     })
 })

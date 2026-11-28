@@ -1,5 +1,4 @@
 diff --git a/dist/api/index.mjs b/dist/api/index.mjs
-index 9082167a86d2d7232638ae75944f74b2132fa0a1..eca8a98e83f49c37e73c643427bcf6cda6d72d22 100644
 --- a/dist/api/index.mjs
 +++ b/dist/api/index.mjs
 @@ -155,7 +155,7 @@ const router = (ctx, options) => {
@@ -28,7 +27,6 @@ index 9082167a86d2d7232638ae75944f74b2132fa0a1..eca8a98e83f49c37e73c643427bcf6cd
  };
  export { APIError, NO_STORE_HEADERS, accountInfo, addOAuthServerContext, callbackOAuth, changeEmail, changePassword, checkEndpointConflicts, createAuthEndpoint, createAuthMiddleware, createEmailVerificationToken, deleteUser, deleteUserCallback, dispatchAuthEndpoint, error, formCsrfMiddleware, freshSessionMiddleware, generateGenericState, getAccessToken, getAuthoritativeSessionFromCtx, getEndpoints, getIP, getOAuthState, getSession, getSessionFromCtx, getShouldSkipSessionRefresh, isAPIError, isStateful, linkSocialAccount, listSessions, listUserAccounts, markSessionOutsideStore, ok, optionsMiddleware, originCheck, originCheckMiddleware, parseGenericState, refreshToken, requestOnlySessionMiddleware, requestPasswordReset, requestPasswordResetCallback, requireOrgRole, requireResourceOwnership, resetPassword, revokeOtherSessions, revokeSession, revokeSessions, router, sendVerificationEmail, sendVerificationEmailFn, sensitiveSessionMiddleware, sessionMiddleware, setPassword, setShouldSkipSessionRefresh, signInEmail, signInSocial, signOut, signUpEmail, unlinkAccount, updateSession, updateUser, verifyEmail, verifyPassword };
 diff --git a/dist/api/rate-limiter/index.mjs b/dist/api/rate-limiter/index.mjs
-index 4ee625230b0a611c0ce539f0b6abc36cc006e1de..188177ef6285fdf0cb3eb47f2dc134d8502e4666 100644
 --- a/dist/api/rate-limiter/index.mjs
 +++ b/dist/api/rate-limiter/index.mjs
 @@ -234,7 +234,7 @@ function getRateLimitStorage(ctx, rateLimitSettings) {

@@ -72,9 +72,12 @@ const codec: TokenCodec = {
     parse: (text) => propCodec.parse(normalize(text)),
 }
 const value = shallowRef(fromText(model.value, codec))
+let lastEmitted = model.value
 
 watch(model, (source) => {
+    if (source === lastEmitted) return
     if (source !== toText(value.value, codec)) value.value = fromText(source, codec)
+    lastEmitted = source
 })
 
 function updateValue(next: TokenInputValue, details: TokenInputValueChangeDetails) {
@@ -83,7 +86,8 @@ function updateValue(next: TokenInputValue, details: TokenInputValueChangeDetail
         return
     }
     value.value = next
-    model.value = toText(next, codec)
+    lastEmitted = toText(next, codec)
+    model.value = lastEmitted
 }
 
 function preventLineBreak(event: InputEvent) {
@@ -119,14 +123,27 @@ function select(item: string, details: TriggerMenuSelectDetails) {
     return onSelect?.(item, details, prefix.slice(prefix.lastIndexOf('\n') + 1))
 }
 
+let highlighted = false
 watchPostEffect((onCleanup) => {
     if (!multiline || !value.value.length) return
 
     const editor = root.value?.querySelector<HTMLElement>('[data-slot="token-input-editor"]')
-    if (editor) {
-        const clear = highlightMarkdown(editor)
-        if (clear) onCleanup(clear)
+    if (!editor) return
+
+    let clear: (() => void) | undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const highlight = () => {
+        clear = highlightMarkdown(editor)
     }
+    if (highlighted) timer = setTimeout(highlight, 50)
+    else {
+        highlighted = true
+        highlight()
+    }
+    onCleanup(() => {
+        clearTimeout(timer)
+        clear?.()
+    })
 })
 </script>
 

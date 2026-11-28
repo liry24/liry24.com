@@ -35,7 +35,7 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'arts' }, [
             :max-columns="3"
             :ssr-columns="2"
         >
-            <template #default="{ item }">
+            <template #default="{ item, index }">
                 <button
                     type="button"
                     :aria-label="`View ${item.data.title}`"
@@ -47,6 +47,10 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'arts' }, [
                         :alt="item.data.title"
                         :width="520"
                         format="webp"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 520px"
+                        decoding="async"
+                        :fetchpriority="index < 2 ? 'high' : undefined"
+                        :loading="index >= 4 ? 'lazy' : undefined"
                         class="size-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                     />
 

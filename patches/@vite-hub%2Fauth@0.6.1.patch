@@ -1,0 +1,245 @@
+diff --git a/dist/database.js b/dist/database.js
+index 70e7a5a3409db26842542fa32b01de0ab855544b..ce69091ea8d738ac8979635e51d045286d5f4131 100644
+--- a/dist/database.js
++++ b/dist/database.js
+@@ -3,7 +3,7 @@ import { a as authDatabaseSchemaError, t as assertAuthDatabaseIdStrategy } from
+ import { t as assertAuthDatabaseNames } from "./database-schema-options-peXHNLkJ.js";
+ import { getAuthTables } from "better-auth/db";
+ import { getTableColumns, is, isTable } from "drizzle-orm";
+-import { drizzleAdapter } from "better-auth/adapters/drizzle";
++import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
+ import { databases } from "@vite-hub/database/runtime/registry";
+ import { PgAsyncDatabase } from "drizzle-orm/pg-core";
+ // src/database.ts
+diff --git a/dist/schema.d.ts b/dist/schema.d.ts
+index 7c1e266ace468e5528cf2c16b0b4bccf48de2572..a9cbea2445a746c123ac845121c8e5f3e64f5f61 100644
+--- a/dist/schema.d.ts
++++ b/dist/schema.d.ts
+@@ -1,5 +1,5 @@
+ import { a as AuthSchemaPlugin, c as AuthTableSpec, d as resolveAuthTableSpecs, i as AuthSchemaOptions, l as authPluginSchemas, n as AuthCoreTableSpecs, o as AuthTableField, r as AuthPluginSchemas, s as AuthTableName, t as AuthCoreModel, u as authTableSpecs } from "./table-specs-P4LvbOlX.js";
+-import { $Type, BuildColumns, HasDefault, IsPrimaryKey, NotNull } from "drizzle-orm";
++import { $Type, BuildColumns, ExtractTablesFromSchema, ExtractTablesWithRelationsParts, HasDefault, IsPrimaryKey, Many, NotNull, One } from "drizzle-orm";
+ import { PgBigInt53Builder, PgBooleanBuilder, PgBuildColumns, PgColumn, PgIntegerBuilder, PgJsonbBuilder, PgTableWithColumns, PgTextBuilder, PgTimestampBuilder } from "drizzle-orm/pg-core";
+ import { SQLiteBooleanBuilder, SQLiteColumn, SQLiteIntegerBuilder, SQLiteTableWithColumns, SQLiteTextBuilder, SQLiteTextJsonBuilder, SQLiteTimestampBuilder } from "drizzle-orm/sqlite-core";
+ interface AuthExistingColumn {
+@@ -168,8 +168,88 @@ type ExistingColumns<TExisting, TModel extends string> = [TExisting] extends [Re
+ export type AuthSqliteSchemaFor<TOptions extends AuthSchemaOptions, TExisting extends AuthExistingTables | undefined = undefined> = { readonly [TModel in AuthTableName]: AuthSqliteTableOf<TableFields<TOptions, TModel>, ExistingColumns<TExisting, TModel>>; } & { readonly [TTable in keyof PluginTables<SchemaPlugins<TOptions>>]: AuthSqliteTableOf<PluginTableFields<TOptions, TTable>, ExistingColumns<TExisting, TTable & string>>; };
+ /** The Better Auth tables for Postgres, with the plugin tables and the plugin and additional columns of `TOptions`. */
+ export type AuthPostgresSchemaFor<TOptions extends AuthSchemaOptions> = { readonly [TModel in AuthTableName]: AuthPostgresTableOf<TableFields<TOptions, TModel>>; } & { readonly [TTable in keyof PluginTables<SchemaPlugins<TOptions>>]: AuthPostgresTableOf<PluginTableFields<TOptions, TTable>>; };
++type CoreAuthRelationConfig = {
++  user: {
++    sessions: Many<"session">;
++    accounts: Many<"account">;
++    oauthClients: Many<"oauthClient">;
++    oauthRefreshTokens: Many<"oauthRefreshToken">;
++    oauthAccessTokens: Many<"oauthAccessToken">;
++    oauthConsents: Many<"oauthConsent">;
++    members: Many<"member">;
++    invitations: Many<"invitation">;
++    passkeys: Many<"passkey">;
++  };
++  session: {
++    user: One<"user", true>;
++    oauthRefreshTokens: Many<"oauthRefreshToken">;
++    oauthAccessTokens: Many<"oauthAccessToken">;
++  };
++  account: {
++    user: One<"user", true>;
++  };
++  oauthClient: {
++    user: One<"user", true>;
++    oauthClientResources: Many<"oauthClientResource">;
++    oauthRefreshTokens: Many<"oauthRefreshToken">;
++    oauthAccessTokens: Many<"oauthAccessToken">;
++    oauthConsents: Many<"oauthConsent">;
++  };
++  oauthResource: {
++    oauthClientResources: Many<"oauthClientResource">;
++  };
++  oauthClientResource: {
++    oauthClient: One<"oauthClient", true>;
++    oauthResource: One<"oauthResource", true>;
++  };
++  oauthRefreshToken: {
++    oauthClient: One<"oauthClient", true>;
++    session: One<"session", true>;
++    user: One<"user", true>;
++    oauthAccessTokens: Many<"oauthAccessToken">;
++  };
++  oauthAccessToken: {
++    oauthClient: One<"oauthClient", true>;
++    session: One<"session", true>;
++    user: One<"user", true>;
++    oauthRefreshToken: One<"oauthRefreshToken", true>;
++  };
++  oauthConsent: {
++    oauthClient: One<"oauthClient", true>;
++    user: One<"user", true>;
++  };
++  organization: {
++    members: Many<"member">;
++    invitations: Many<"invitation">;
++  };
++  member: {
++    organization: One<"organization", true>;
++    user: One<"user", true>;
++  };
++  invitation: {
++    organization: One<"organization", true>;
++    user: One<"user", true>;
++  };
++  passkey: {
++    user: One<"user", true>;
++  };
++};
++type TwoFactorAuthRelationConfig = Omit<CoreAuthRelationConfig, "user"> & {
++  user: CoreAuthRelationConfig["user"] & {
++    twoFactors: Many<"twoFactor">;
++  };
++  twoFactor: {
++    user: One<"user", true>;
++  };
++};
++type AuthRelationConfig<TOptions extends AuthSchemaOptions = {}> = "twoFactor" extends SchemaPlugins<TOptions> ? TwoFactorAuthRelationConfig : CoreAuthRelationConfig;
++export type AuthSqliteRelations = ExtractTablesWithRelationsParts<CoreAuthRelationConfig, ExtractTablesFromSchema<AuthSqliteSchema>>;
++export type AuthPostgresRelations = ExtractTablesWithRelationsParts<CoreAuthRelationConfig, ExtractTablesFromSchema<AuthPostgresSchema>>;
++export type AuthRelationsFor<TSchema extends Record<string, unknown>, TOptions extends AuthSchemaOptions = {}> = ExtractTablesWithRelationsParts<AuthRelationConfig<TOptions>, ExtractTablesFromSchema<TSchema>>;
+ export declare const authSqliteSchema: AuthSqliteSchema;
+ export declare const authPostgresSchema: AuthPostgresSchema;
++export declare const authSqliteRelations: AuthSqliteRelations;
++export declare const authPostgresRelations: AuthPostgresRelations;
+ /**
+  * The Better Auth tables for SQLite, libSQL, and Cloudflare D1, with the plugins and additional fields of `options`. The
+  * Auth Vite plugin writes a module that calls it when the Auth Definition adds fields or imports a plugin of
+@@ -182,4 +262,6 @@ export declare const authPostgresSchema: AuthPostgresSchema;
+ export declare function createAuthSqliteSchema<const TOptions extends AuthSchemaOptions, const TExisting extends AuthExistingTables | undefined = AuthExistingTables | undefined>(options: TOptions, existing?: TExisting): AuthSqliteSchemaFor<TOptions, TExisting>;
+ /** The Better Auth tables for Postgres, with the plugins and additional fields of `options`, typed from its literal. */
+ export declare function createAuthPostgresSchema<const TOptions extends AuthSchemaOptions>(options: TOptions): AuthPostgresSchemaFor<TOptions>;
++/** Drizzle v1 relations for the Better Auth tables created by `createAuthSqliteSchema()` or `createAuthPostgresSchema()`. */
++export declare function createAuthRelations<TSchema extends Record<string, unknown>, const TOptions extends AuthSchemaOptions = {}>(tables: TSchema, options?: TOptions): AuthRelationsFor<TSchema, TOptions>;
+ export { type AuthCoreModel, type AuthCoreTableSpecs, type AuthPluginSchemas, type AuthSchemaOptions, type AuthSchemaPlugin, type AuthTableField, type AuthTableName, type AuthTableSpec, authPluginSchemas, authTableSpecs, resolveAuthTableSpecs };
+\ No newline at end of file
+diff --git a/dist/schema.js b/dist/schema.js
+index dbe38aa7dc87908e9a2b59a6ab9f0cebc3c15d7b..c1eccfd170dcc5d1d53d72db4751ed32104f161a 100644
+--- a/dist/schema.js
++++ b/dist/schema.js
+@@ -1,5 +1,5 @@
+ import { i as resolveAuthTableSpecs, n as authSqlName, r as authTableSpecs, t as authPluginSchemas } from "./table-specs-CCSY4tiS.js";
+-import { sql } from "drizzle-orm";
++import { defineRelationsPart, sql } from "drizzle-orm";
+ import { bigint, boolean, foreignKey, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+ import { foreignKey as foreignKey$1, index as index$1, integer as integer$1, sqliteTable, text as text$1, uniqueIndex as uniqueIndex$1 } from "drizzle-orm/sqlite-core";
+ // src/schema.ts
+@@ -129,6 +129,63 @@ const postgresDialect = {
+ };
+ const authSqliteSchema = buildTables(sqliteDialect, authTableSpecs);
+ const authPostgresSchema = buildTables(postgresDialect, authTableSpecs);
++function capitalize(value) {
++	return value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
++}
++function pluralizeModel(model) {
++	return model.endsWith("s") ? model : `${model}s`;
++}
++function buildAuthRelations(tables, specs) {
++	return defineRelationsPart(tables, (r) => {
++		const config = {};
++		for (const [model, spec] of Object.entries(specs)) {
++			if (!Object.hasOwn(tables, model)) continue;
++			const modelRelations = {};
++			const oneTargets = /* @__PURE__ */ new Map();
++			for (const [fieldName, field] of Object.entries(spec.fields)) {
++				const reference = field.references;
++				if (!reference || !Object.hasOwn(tables, reference.model)) continue;
++				const target = reference.model;
++				const count = oneTargets.get(target) ?? 0;
++				oneTargets.set(target, count + 1);
++				const key = count > 0 ? `${capitalize(fieldName)}${capitalize(target)}` : target;
++				if (key === "id" || Object.hasOwn(spec.fields, key) || Object.hasOwn(modelRelations, key)) continue;
++				modelRelations[key] = r.one[target]({
++					from: r[model][fieldName],
++					to: r[target][reference.field]
++				});
++			}
++			for (const [otherModel, otherSpec] of Object.entries(specs)) {
++				if (otherModel === model || !Object.hasOwn(tables, otherModel)) continue;
++				const pointingHere = Object.entries(otherSpec.fields).filter(([, field]) => field.references?.model === model);
++				if (!pointingHere.length) continue;
++				const nonUnique = pointingHere.filter(([, field]) => !field.unique);
++				if (nonUnique.length) {
++					for (const [fkFieldName, fkField] of nonUnique) {
++						const baseKey = pluralizeModel(otherModel);
++						const key = nonUnique.length > 1 ? `${baseKey}By${capitalize(fkFieldName)}` : baseKey;
++						if (key === "id" || Object.hasOwn(spec.fields, key) || Object.hasOwn(modelRelations, key)) continue;
++						modelRelations[key] = r.many[otherModel]({
++							from: r[model][fkField.references.field],
++							to: r[otherModel][fkFieldName]
++						});
++					}
++				} else {
++					const [fkFieldName, fkField] = pointingHere[0];
++					if (otherModel === "id" || Object.hasOwn(spec.fields, otherModel) || Object.hasOwn(modelRelations, otherModel)) continue;
++					modelRelations[otherModel] = r.one[otherModel]({
++						from: r[model][fkField.references.field],
++						to: r[otherModel][fkFieldName]
++					});
++				}
++			}
++			if (Object.keys(modelRelations).length) config[model] = modelRelations;
++		}
++		return config;
++	});
++}
++const authSqliteRelations = buildAuthRelations(authSqliteSchema, authTableSpecs);
++const authPostgresRelations = buildAuthRelations(authPostgresSchema, authTableSpecs);
+ /**
+ * The Better Auth tables for SQLite, libSQL, and Cloudflare D1, with the plugins and additional fields of `options`. The
+ * Auth Vite plugin writes a module that calls it when the Auth Definition adds fields or imports a plugin of
+@@ -145,4 +202,8 @@ function createAuthSqliteSchema(options, existing) {
+ function createAuthPostgresSchema(options) {
+ 	return buildTables(postgresDialect, resolveAuthTableSpecs(options));
+ }
+-export { authPluginSchemas, authPostgresSchema, authSqliteSchema, authTableSpecs, createAuthPostgresSchema, createAuthSqliteSchema, resolveAuthTableSpecs };
++/** Drizzle v1 relations for the Better Auth tables created by `createAuthSqliteSchema()` or `createAuthPostgresSchema()`. */
++function createAuthRelations(tables, options = {}) {
++	return buildAuthRelations(tables, resolveAuthTableSpecs(options));
++}
++export { authPluginSchemas, authPostgresRelations, authPostgresSchema, authSqliteRelations, authSqliteSchema, authTableSpecs, createAuthPostgresSchema, createAuthRelations, createAuthSqliteSchema, resolveAuthTableSpecs };
+diff --git a/dist/vite-CpWhT1Wi.js b/dist/vite-CpWhT1Wi.js
+index 79b6c8bf10fb45965c45a2457491cfe1db6aeb67..5b7221887ddb846c4f15654be53bea66741a250f 100644
+--- a/dist/vite-CpWhT1Wi.js
++++ b/dist/vite-CpWhT1Wi.js
+@@ -1439,10 +1439,12 @@ function renderAuthSchemaModule(schema, existing, importBase) {
+ 	return [
+ 		"// Generated by the Auth Vite plugin from the plugins and additional fields of the Auth Definition, and from the Auth",
+ 		"// tables of the latest migration of the Database.",
+-		`import { createAuthPostgresSchema, createAuthSqliteSchema } from ${JSON.stringify(`${importBase}/schema`)}`,
++		`import { createAuthPostgresSchema, createAuthRelations, createAuthSqliteSchema } from ${JSON.stringify(`${importBase}/schema`)}`,
+ 		"",
+ 		`export const authSqliteSchema = createAuthSqliteSchema(${options}${existing ? `, ${JSON.stringify(existing)}` : ""})`,
++		`export const authSqliteRelations = createAuthRelations(authSqliteSchema, ${options})`,
+ 		`export const authPostgresSchema = createAuthPostgresSchema(${options})`,
++		`export const authPostgresRelations = createAuthRelations(authPostgresSchema, ${options})`,
+ 		""
+ 	].join("\n");
+ }
+@@ -1745,6 +1747,7 @@ function hubAuth(options, internalOptions = {}) {
+ 						module: generated ? schemaModule : `${importBase}/schema`,
+ 						export: dialect === "postgresql" ? "authPostgresSchema" : "authSqliteSchema"
+ 					},
++					relations: dialect === "postgresql" ? "authPostgresRelations" : "authSqliteRelations",
+ 					tables,
+ 					reason: "Stores the Better Auth users, sessions, accounts, and verifications, the tables and columns of the plugins and additional fields that the Auth Definition adds, and the Console MCP OAuth clients and tokens of authDatabase()."
+ 				}];
+diff --git a/dist/vite.d.ts b/dist/vite.d.ts
+index 8c41f6f7c4c0b63e7a7f028717887518318a3372..4c30f899cb6300e9fbce6770ce14e1959293d4cf 100644
+--- a/dist/vite.d.ts
++++ b/dist/vite.d.ts
+@@ -135,6 +135,8 @@ export interface AuthDatabaseContribution {
+     module: string;
+     export: "authPostgresSchema" | "authSqliteSchema";
+   };
++  /** The Drizzle v1 relations export of `definition.module` for the Auth tables. */
++  relations: "authPostgresRelations" | "authSqliteRelations";
+   /** The schema keys and SQL names of the tables, so the Database lists them without loading the schema module. */
+   tables: Readonly<Record<string, string>>;
+   reason: string;

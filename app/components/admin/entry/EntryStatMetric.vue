@@ -1,13 +1,15 @@
 <script setup lang="ts">
 const props = defineProps<{
-    metric: GameMetric
+    metric: Pick<GameMetric, 'key' | 'label' | 'format' | 'unit'>
+    pathPrefix?: string
     errors: Record<string, string>
     disabled: boolean
 }>()
 const draft = defineModel<AdminStatDraft>({ required: true })
 defineEmits<{ busy: [busy: boolean] }>()
 
-const path = computed(() => `data.values.${props.metric.key}`)
+const path = computed(() => props.pathPrefix ?? `data.values.${props.metric.key}`)
+const displayLabel = computed(() => props.metric.label.trim() || props.metric.key || 'New metric')
 const unit = computed(() => (props.metric.format === 'percent' ? '%' : props.metric.unit))
 const format = computed(
     () =>
@@ -20,8 +22,17 @@ const format = computed(
 </script>
 
 <template>
-    <section class="ui-card grid gap-2 p-3" :aria-label="metric.label">
-        <UiField :label="metric.label" :description="format" :error="errors[path]">
+    <section class="ui-card grid gap-3 p-3" :aria-label="displayLabel">
+        <div v-if="$slots.actions" class="flex flex-wrap items-center justify-between gap-2">
+            <span class="text-sm font-medium">{{ displayLabel }}</span>
+            <div class="flex flex-wrap items-center gap-2">
+                <slot name="actions" />
+            </div>
+        </div>
+        <div v-if="$slots.config" class="border-default bg-elevated/30 rounded-lg border p-3">
+            <slot name="config" />
+        </div>
+        <UiField :label="displayLabel" :description="format" :error="errors[path]">
             <div class="flex items-center gap-2">
                 <UiInput
                     v-model="draft.number"
