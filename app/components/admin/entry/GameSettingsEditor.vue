@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { UiButton, UiFormDialog } from '@liry24/ui'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 
 const props = defineProps<{
@@ -61,7 +60,7 @@ async function showErrors(message: string, fields: Record<string, string> = {}) 
     errorMessage.value = message
     errors.value = fields
     await nextTick()
-    const invalid = summary.value
+    const invalid = summary.value?.el
         ?.closest('form')
         ?.querySelector<HTMLElement>('[aria-invalid="true"]')
     if (invalid) {
@@ -122,15 +121,9 @@ async function save() {
         :final-focus="finalFocus"
         @submit="save"
     >
-        <p
-            v-if="errorMessage"
-            ref="summary"
-            class="ui-alert mb-4 w-full"
-            role="alert"
-            tabindex="-1"
-        >
+        <UiAlert v-if="errorMessage" ref="summary" class="mb-4 w-full" tabindex="-1">
             {{ errorMessage }}
-        </p>
+        </UiAlert>
 
         <fieldset v-if="open && game" :disabled="busy" class="grid min-w-0 gap-5">
             <div class="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-start">
@@ -159,7 +152,7 @@ async function save() {
             <section class="grid gap-3" aria-label="Game metrics">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <h3 class="text-sm font-semibold">Metrics</h3>
-                    <UiButton type="button" class="ui-button" :disabled="busy" @click="addMetric">
+                    <UiButton type="button" :disabled="busy" @click="addMetric">
                         <Icon name="mingcute:add-line" aria-hidden="true" />
                         Add metric
                     </UiButton>
@@ -174,10 +167,10 @@ async function save() {
                     {{ errors['gameConfig.metrics'] }}
                 </p>
 
-                <div
+                <UiCard
                     v-for="(metricDraft, index) in metricsDraft"
                     :key="metricDraft.uid"
-                    class="ui-card p-3"
+                    class="p-3"
                 >
                     <AdminEntryGameMetricConfigFields
                         v-model="metricsDraft[index]!"
@@ -190,7 +183,7 @@ async function save() {
                         @set-primary="togglePrimary(metricDraft.uid)"
                         @remove="removeMetric(metricDraft.uid)"
                     />
-                </div>
+                </UiCard>
             </section>
         </fieldset>
     </UiFormDialog>

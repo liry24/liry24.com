@@ -49,7 +49,8 @@ export default defineEventHandler(async (event): Promise<GameSearchResponse> => 
 
     const limited = saved
         .filter(
-            (game) => game.name.toLowerCase().includes(lowerQuery) || game.slug.includes(lowerQuery),
+            (game) =>
+                game.name.toLowerCase().includes(lowerQuery) || game.slug.includes(lowerQuery),
         )
         .sort(sortGames)
         .slice(0, 100)

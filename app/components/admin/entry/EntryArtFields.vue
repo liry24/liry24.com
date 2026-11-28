@@ -30,12 +30,11 @@ defineEmits<{ busy: [busy: boolean] }>()
                 :error="errors['data.title']"
                 required
             />
-            <AdminEntryText
+            <AdminEntryMarkdown
                 v-model="data.description"
                 label="Description"
-                name="data.description"
                 :error="errors['data.description']"
-                :rows="3"
+                :disabled="busy"
             />
             <AdminEntryText
                 v-model="data.href"

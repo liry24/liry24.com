@@ -27,13 +27,27 @@ import type { TriggerDefinition, TriggerMenuSelectDetails } from '@ui-sdk/vue/tr
 import { onMounted, onUnmounted, shallowRef, useTemplateRef, watch, watchPostEffect } from 'vue'
 import type { VNode } from 'vue'
 
-import { highlightMarkdown } from './markdown'
+import { UIcon } from '#components'
 
-const props = defineProps<{
+import { useUiIcons } from '../composables/icons'
+import { highlightMarkdown } from '../utils/markdown'
+
+const {
+    codec: propCodec,
+    triggers,
+    placeholder,
+    multiline,
+    compact,
+    disabled,
+    required,
+    menuMessage,
+    onSelect,
+} = defineProps<{
     codec: TokenCodec
     triggers: Array<TriggerDefinition>
     placeholder: string
     multiline?: boolean
+    compact?: boolean
     disabled?: boolean
     required?: boolean
     menuMessage?: (trigger: string | null, argument: string | null) => string
@@ -50,11 +64,12 @@ defineSlots<{
 
 const model = defineModel<string>({ required: true })
 const root = useTemplateRef('root')
+const icons = useUiIcons()
 const controller = createTokenInputController()
-const normalize = (text: string) => (props.multiline ? text : text.replaceAll(/\r\n|[\r\n]/g, ' '))
+const normalize = (text: string) => (multiline ? text : text.replaceAll(/\r\n|[\r\n]/g, ' '))
 const codec: TokenCodec = {
-    format: (token) => props.codec.format(token),
-    parse: (text) => props.codec.parse(normalize(text)),
+    format: (token) => propCodec.format(token),
+    parse: (text) => propCodec.parse(normalize(text)),
 }
 const value = shallowRef(fromText(model.value, codec))
 let lastEmitted = model.value
@@ -66,7 +81,7 @@ watch(model, (source) => {
 })
 
 function updateValue(next: TokenInputValue, details: TokenInputValueChangeDetails) {
-    if (!props.multiline && next.some((part) => typeof part === 'string' && /[\r\n]/.test(part))) {
+    if (!multiline && next.some((part) => typeof part === 'string' && /[\r\n]/.test(part))) {
         details.cancel()
         return
     }
@@ -76,7 +91,7 @@ function updateValue(next: TokenInputValue, details: TokenInputValueChangeDetail
 }
 
 function preventLineBreak(event: InputEvent) {
-    if (!props.multiline && ['insertParagraph', 'insertLineBreak'].includes(event.inputType)) {
+    if (!multiline && ['insertParagraph', 'insertLineBreak'].includes(event.inputType)) {
         event.preventDefault()
         event.stopPropagation()
     }
@@ -105,12 +120,12 @@ onUnmounted(() => window.removeEventListener('keydown', waitForMenuResults, true
 function select(item: string, details: TriggerMenuSelectDetails) {
     const before = controller.editor.textBefore(details.match.end)
     const prefix = before?.text.slice(0, details.match.start - before.offset) ?? ''
-    return props.onSelect?.(item, details, prefix.slice(prefix.lastIndexOf('\n') + 1))
+    return onSelect?.(item, details, prefix.slice(prefix.lastIndexOf('\n') + 1))
 }
 
 let highlighted = false
 watchPostEffect((onCleanup) => {
-    if (!props.multiline || !value.value.length) return
+    if (!multiline || !value.value.length) return
 
     const editor = root.value?.querySelector<HTMLElement>('[data-slot="token-input-editor"]')
     if (!editor) return
@@ -145,6 +160,7 @@ watchPostEffect((onCleanup) => {
             <TokenInputEditor
                 class="ui-input ui-editor"
                 :class="{ 'ui-editor-multiline': multiline }"
+                :data-compact="compact || undefined"
                 :placeholder="placeholder"
                 @beforeinput.capture="preventLineBreak"
             >
@@ -183,7 +199,9 @@ watchPostEffect((onCleanup) => {
             <template #token="{ token }">
                 <TokenInputToken class="ui-token">
                     <slot name="token" :token="token">{{ token.label }}</slot>
-                    <TokenInputTokenRemove class="ui-token-remove">×</TokenInputTokenRemove>
+                    <TokenInputTokenRemove class="ui-token-remove">
+                        <UIcon :name="icons.close" class="ui-icon ui-icon-xs" aria-hidden="true" />
+                    </TokenInputTokenRemove>
                 </TokenInputToken>
             </template>
         </TokenInput>

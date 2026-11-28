@@ -5,6 +5,10 @@ import { usePrimitive } from '@ui-sdk/vue/primitive'
 import { computed, nextTick, useId, watch } from 'vue'
 import type { VNode } from 'vue'
 
+import { UIcon } from '#components'
+
+import { useUiIcons } from '../composables/icons'
+
 type ReorderOptions = {
     value: Array<string>
     disabled: boolean
@@ -55,6 +59,7 @@ const props = defineProps<{
 defineSlots<{ default: (props: { item: T }) => Array<VNode> }>()
 
 const instructionsId = useId()
+const icons = useUiIcons()
 const itemsById = computed(() => new Map(props.items.map((item) => [item.id, item])))
 const handle = usePrimitive(reorderList, () => ({
     value: value.value,
@@ -96,22 +101,22 @@ async function move(event: MouseEvent, id: string, index: number) {
 </script>
 
 <template>
-    <p v-if="active" :id="instructionsId" class="sr-only">
+    <p v-if="active" :id="instructionsId" class="ui-visually-hidden">
         Press Space or Enter to pick up an item. Use the arrow keys to move it, Space or Enter to
         drop it, and Escape to cancel.
     </p>
-    <ul class="relative flex flex-col gap-3" role="list">
+    <ul class="ui-reorder-list" role="list">
         <li
             v-for="(item, index) in orderedItems"
             :key="item.id"
             v-bind="handle.slot('item', { value: item.id })"
             :data-item-id="item.id"
-            class="flex min-w-0 items-center gap-2"
+            class="ui-reorder-item"
         >
-            <div v-if="active" class="flex shrink-0 flex-col items-center">
+            <div v-if="active" class="ui-reorder-controls">
                 <button
                     type="button"
-                    class="reorder-control reorder-handle"
+                    class="ui-reorder-control ui-reorder-handle"
                     :aria-label="`Reorder ${label(item)}`"
                     :aria-describedby="instructionsId"
                     :aria-pressed="moving?.key === item.id"
@@ -119,69 +124,32 @@ async function move(event: MouseEvent, id: string, index: number) {
                     @pointerdown="handle.api.reorder.pointerdown($event, item.id)"
                     @keydown="handle.api.reorder.keydown($event, item.id)"
                 >
-                    <span aria-hidden="true">⠿</span>
+                    <UIcon :name="icons.drag" class="ui-icon" aria-hidden="true" />
                 </button>
                 <button
                     type="button"
-                    class="reorder-control"
+                    class="ui-reorder-control"
                     data-direction="up"
                     :aria-label="`Move ${label(item)} up`"
                     :aria-disabled="disabled || !!moving || index === 0"
                     @click="move($event, item.id, index - 1)"
                 >
-                    <span aria-hidden="true">↑</span>
+                    <UIcon :name="icons.arrowUp" class="ui-icon" aria-hidden="true" />
                 </button>
                 <button
                     type="button"
-                    class="reorder-control"
+                    class="ui-reorder-control"
                     data-direction="down"
                     :aria-label="`Move ${label(item)} down`"
                     :aria-disabled="disabled || !!moving || index === orderedItems.length - 1"
                     @click="move($event, item.id, index + 1)"
                 >
-                    <span aria-hidden="true">↓</span>
+                    <UIcon :name="icons.arrowDown" class="ui-icon" aria-hidden="true" />
                 </button>
             </div>
-            <div class="min-w-0 flex-1">
+            <div class="ui-reorder-content">
                 <slot :item="item" />
             </div>
         </li>
     </ul>
 </template>
-
-<style scoped>
-.reorder-control {
-    display: grid;
-    min-width: 2rem;
-    min-height: 2rem;
-    place-items: center;
-    border-radius: 0.375rem;
-    color: var(--foreground);
-}
-
-.reorder-control:hover:not([aria-disabled='true'], :disabled),
-.reorder-control[aria-pressed='true'] {
-    background: var(--surface-hover);
-}
-
-.reorder-control:focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: -2px;
-}
-
-.reorder-handle {
-    cursor: grab;
-    touch-action: none;
-    user-select: none;
-}
-
-.reorder-handle:active {
-    cursor: grabbing;
-}
-
-.reorder-control[aria-disabled='true'],
-.reorder-control:disabled {
-    color: var(--text-muted);
-    cursor: default;
-}
-</style>

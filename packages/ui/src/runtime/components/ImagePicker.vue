@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { Button } from '@ui-sdk/vue/button'
-import { FileInput, FileInputDropzone, FileInputTrigger } from '@ui-sdk/vue/file-input'
+import { FileInput, FileInputDropzone } from '@ui-sdk/vue/file-input'
 
-defineProps<{
+import { UIcon } from '#components'
+
+import { useUiIcons } from '../composables/icons'
+import UiButton from './Button.vue'
+import UiFileInputTrigger from './FileInputTrigger.vue'
+
+const { label, images, multiple, busy, disabled, accept, maxSize } = defineProps<{
     label: string
     images: Array<{ id: string; src: string; label: string }>
     multiple?: boolean
@@ -19,6 +24,7 @@ const emit = defineEmits<{
 }>()
 
 const emptyFiles: Array<File> = []
+const icons = useUiIcons()
 </script>
 
 <template>
@@ -28,35 +34,38 @@ const emptyFiles: Array<File> = []
                 <img :src="image.src" :alt="image.label" />
                 <div class="ui-image-picker-actions">
                     <span v-if="multiple && index === 0" class="ui-image-picker-cover">Cover</span>
-                    <Button
+                    <UiButton
                         v-if="multiple"
-                        type="button"
-                        class="ui-button"
-                        data-variant="ghost"
+                        variant="ghost"
+                        size="xs"
+                        square
                         :aria-label="`Move image ${index + 1} earlier`"
                         :disabled="disabled || busy || index === 0"
                         @click="emit('move', index, index - 1)"
-                        >↑</Button
                     >
-                    <Button
+                        <UIcon :name="icons.arrowUp" class="ui-icon" aria-hidden="true" />
+                    </UiButton>
+                    <UiButton
                         v-if="multiple"
-                        type="button"
-                        class="ui-button"
-                        data-variant="ghost"
+                        variant="ghost"
+                        size="xs"
+                        square
                         :aria-label="`Move image ${index + 1} later`"
                         :disabled="disabled || busy || index === images.length - 1"
                         @click="emit('move', index, index + 1)"
-                        >↓</Button
                     >
-                    <Button
-                        type="button"
-                        class="ui-button"
-                        data-variant="ghost"
+                        <UIcon :name="icons.arrowDown" class="ui-icon" aria-hidden="true" />
+                    </UiButton>
+                    <UiButton
+                        variant="ghost"
+                        size="xs"
+                        square
                         :aria-label="multiple ? `Remove image ${index + 1}` : `Remove ${label}`"
                         :disabled="disabled || busy"
                         @click="emit('remove', index)"
-                        >×</Button
                     >
+                        <UIcon :name="icons.close" class="ui-icon" aria-hidden="true" />
+                    </UiButton>
                 </div>
             </li>
         </ul>
@@ -76,7 +85,8 @@ const emptyFiles: Array<File> = []
             "
         >
             <FileInputDropzone class="ui-image-picker-drop">
-                <FileInputTrigger class="ui-button">
+                <UiFileInputTrigger>
+                    <UIcon :name="icons.upload" class="ui-icon" aria-hidden="true" />
                     {{
                         busy
                             ? 'Uploading…'
@@ -86,7 +96,7 @@ const emptyFiles: Array<File> = []
                                 ? 'Replace image'
                                 : 'Choose image'
                     }}
-                </FileInputTrigger>
+                </UiFileInputTrigger>
                 <span class="ui-description"
                     >or drop {{ multiple ? 'images' : 'an image' }} here</span
                 >

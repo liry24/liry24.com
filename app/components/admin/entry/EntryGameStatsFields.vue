@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { UiButton } from '@liry24/ui'
-
 interface GameDraftState {
     game: GameSearchResult
     metricsDraft: Array<AdminMetricDraft>
@@ -20,7 +18,6 @@ export interface GameStatsSubmissionResult {
     }
     errors: Record<string, string>
 }
-
 const data = defineModel<AdminEntryData>({ required: true })
 const props = defineProps<{
     errors: Record<string, string>
@@ -290,7 +287,7 @@ defineExpose({ getSubmission })
 
             <div v-if="fetchError && shouldFetchCatalog" class="flex flex-wrap items-center gap-2">
                 <p class="ui-error" role="alert">Could not load saved games.</p>
-                <UiButton type="button" class="ui-button" @click="refreshCatalog()">Retry</UiButton>
+                <UiButton type="button" @click="refreshCatalog()">Retry</UiButton>
             </div>
 
             <AdminEntryText
@@ -314,13 +311,7 @@ defineExpose({ getSubmission })
         <section class="grid gap-3" aria-label="Metrics">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <h3 class="text-sm font-semibold">Metrics</h3>
-                <UiButton
-                    v-if="activeState"
-                    type="button"
-                    class="ui-button"
-                    :disabled="busy"
-                    @click="addMetric"
-                >
+                <UiButton v-if="activeState" type="button" :disabled="busy" @click="addMetric">
                     <Icon name="mingcute:add-line" aria-hidden="true" />
                     Add metric
                 </UiButton>
@@ -346,16 +337,16 @@ defineExpose({ getSubmission })
                     {{ errors['gameConfig.metrics'] }}
                 </p>
 
-                <div
+                <UiCard
                     v-for="key in activeState.unavailableKeys"
                     :key="key"
-                    class="ui-card flex flex-wrap items-center justify-between gap-2 p-3 text-sm"
+                    class="flex flex-wrap items-center justify-between gap-2 p-3 text-sm"
                 >
                     <span>Unavailable metric <strong class="font-mono">{{ key }}</strong></span>
-                    <UiButton type="button" class="ui-button" @click="removeUnavailableKey(key)">
+                    <UiButton type="button" size="sm" @click="removeUnavailableKey(key)">
                         Remove
                     </UiButton>
-                </div>
+                </UiCard>
 
                 <template
                     v-for="(metricDraft, index) in activeState.metricsDraft"
@@ -376,17 +367,17 @@ defineExpose({ getSubmission })
                         @busy="$emit('busy', $event)"
                     >
                         <template #actions>
-                            <span
+                            <UBadge
                                 v-if="activeState.primaryUid === metricDraft.uid"
-                                class="ui-badge"
-                                data-tone="success"
+                                variant="soft"
+                                color="success"
+                                size="sm"
                             >
                                 Primary
-                            </span>
+                            </UBadge>
                             <UiButton
                                 type="button"
-                                class="ui-button"
-                                data-variant="ghost"
+                                variant="ghost"
                                 :aria-expanded="isExpanded(metricDraft.uid)"
                                 @click="toggleExpanded(metricDraft.uid)"
                             >

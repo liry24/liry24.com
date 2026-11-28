@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { UiField, UiInput } from '@liry24/ui'
-
 const props = defineProps<{
     metric: Pick<GameMetric, 'key' | 'label' | 'format' | 'unit'>
     pathPrefix?: string
@@ -41,7 +39,6 @@ const format = computed(
                     :name="path"
                     :inputmode="metric.format === 'integer' ? 'numeric' : 'decimal'"
                     placeholder="—"
-                    class="ui-input"
                 />
                 <span v-if="unit" class="ui-description shrink-0">{{ unit }}</span>
             </div>

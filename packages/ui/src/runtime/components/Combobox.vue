@@ -11,6 +11,10 @@ import {
 import { computed, ref, useId, watch } from 'vue'
 import type { VNode } from 'vue'
 
+import { UIcon } from '#components'
+
+import { useUiIcons } from '../composables/icons'
+
 const props = defineProps<{
     items: Array<T>
     value?: string
@@ -35,6 +39,7 @@ defineSlots<{
 }>()
 
 const controlId = useId()
+const icons = useUiIcons()
 const open = ref(false)
 const query = ref(props.displayLabel ?? '')
 const comboboxItems = computed(() =>
@@ -105,7 +110,7 @@ function handleValueChange(next: unknown) {
                 class="ui-token-remove"
                 :aria-label="triggerLabel ?? 'Toggle options'"
             >
-                <span class="ui-tag-chevron" aria-hidden="true" />
+                <UIcon :name="icons.chevronDown" class="ui-icon ui-icon-xs" aria-hidden="true" />
             </ComboboxTrigger>
         </div>
         <ComboboxContent

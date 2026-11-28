@@ -21,7 +21,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
 
     const nuxt = useNuxtApp()
-    const verification = useAdminSessionVerification()
     if (
         nuxt.isHydrating &&
         nuxt.payload.serverRendered &&
@@ -29,13 +28,13 @@ export default defineNuxtRouteMiddleware(async (to) => {
         verifiedPath.value === to.path
     ) {
         verifiedPath.value = ''
-        verification.update(true)
+        setAdminSessionVerified(true)
         return
     }
-    if (verification.verified) return
+    if (isAdminSessionVerified()) return
 
     const { data: session, error } = await authClient.getSession()
-    verification.update(!error && session?.user.role === 'admin')
+    setAdminSessionVerified(!error && session?.user.role === 'admin')
     if (error) {
         throw createError({
             status: error.status || 500,

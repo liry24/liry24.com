@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { UiButton, UiReorderList, useShortcut, useShortcutHint } from '@liry24/ui'
-
 const route = useRoute()
 
 const modelParam = String(route.params.model ?? '')
@@ -101,9 +99,8 @@ useHead({ title: meta.title })
                     />
                     <UiButton
                         ref="addButton"
-                        type="button"
-                        class="ui-button"
-                        data-variant="primary"
+                        variant="solid"
+                        color="primary"
                         :aria-keyshortcuts="canAdd ? addKeys : undefined"
                         :disabled="!canAdd"
                         @click="openCreate"

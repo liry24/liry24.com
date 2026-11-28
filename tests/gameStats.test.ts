@@ -6,8 +6,8 @@ import {
     formatGameValue,
     gameMetricKeyPattern,
     gameValueIssues,
+    igdbCoverUrl,
 } from '../shared/utils/games'
-
 const metrics: Array<GameMetric> = [
     {
         key: 'peakRank',
@@ -60,4 +60,18 @@ test('deriveGameMetricKey generates unique, schema-valid metric keys from labels
     const longKey = deriveGameMetricKey('A'.repeat(120), new Set(['a'.repeat(56)]))
     expect(longKey.length).toBeLessThanOrEqual(64)
     expect(gameMetricKeyPattern.test(longKey)).toBe(true)
+})
+
+test('igdbCoverUrl upgrades IGDB thumbnail URLs and preserves other URLs', () => {
+    expect(igdbCoverUrl(undefined)).toBeUndefined()
+    expect(igdbCoverUrl(null)).toBeUndefined()
+    expect(igdbCoverUrl('https://images.igdb.com/igdb/image/upload/t_thumb/co1234.jpg')).toBe(
+        'https://images.igdb.com/igdb/image/upload/t_cover_big_2x/co1234.jpg',
+    )
+    expect(
+        igdbCoverUrl('https://images.igdb.com/igdb/image/upload/t_thumb/co1234.jpg', 't_cover_big'),
+    ).toBe('https://images.igdb.com/igdb/image/upload/t_cover_big/co1234.jpg')
+    expect(igdbCoverUrl('https://example.com/custom-cover.png')).toBe(
+        'https://example.com/custom-cover.png',
+    )
 })

@@ -29,7 +29,7 @@ export default defineEventHandler(async (event): Promise<PostDetailResponse | Re
     if (!full) throw createError({ status: 404, statusText: 'Post not found' })
 
     if (applyPublicCacheHeaders(event, `post-${revision}-${full.digest}`))
-        return new Response(null, { status: 304 })
+        return notModifiedResponse(event)
 
     const { generateSlugOnPublish: _generateSlugOnPublish, ...data } = full.data
     const [{ document, description }, games] = await Promise.all([

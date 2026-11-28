@@ -13,7 +13,10 @@ const { data: post, error } = await useFetch<PostDetailResponse>(
 )
 if (error.value) throw error.value
 
-provide(postGameMentionsKey, computed(() => post.value?.games ?? {}))
+provide(
+    postGameMentionsKey,
+    computed(() => post.value?.games ?? {}),
+)
 
 const data = computed(() =>
     post.value

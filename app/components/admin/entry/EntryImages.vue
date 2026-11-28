@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { UiField, UiImagePicker } from '@liry24/ui'
-
 const model = defineModel<Array<MediaReference>>({ required: true })
 const props = defineProps<{
     label: string

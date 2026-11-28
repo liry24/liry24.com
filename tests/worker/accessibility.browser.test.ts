@@ -11,6 +11,8 @@ import {
     ARTWORK_TITLE,
     ATTACHED_PROFILE,
     POST_PATH,
+    VALORANT_IGDB_COVER,
+    VALORANT_IGDB_THUMB,
     expectFocus,
     observeBrowserErrors,
     seedBrowserFixtures,
@@ -27,8 +29,25 @@ function artworkControls(page: Page) {
     return { card, dialog, enlarge, image }
 }
 
-const gameStatsTrigger = (page: Page) =>
-    page.getByRole('main').getByRole('button').and(page.locator('[aria-haspopup="dialog"]'))
+const WORK_TITLE = 'Accessibility large work'
+
+function workControls(page: Page) {
+    const card = page.getByRole('button').filter({
+        has: page.getByRole('heading', { name: WORK_TITLE, exact: true }),
+    })
+    const dialog = page.getByRole('dialog', { name: WORK_TITLE, exact: true })
+    const enlarge = dialog.getByTestId('enlarge-work-image')
+    const image = page
+        .getByRole('dialog')
+        .filter({ hasNot: page.getByTestId('enlarge-work-image') })
+    return { card, dialog, enlarge, image }
+}
+
+const gameStatsTrigger = (page: Page, name = 'VALORANT') =>
+    page
+        .getByRole('main')
+        .getByRole('button', { name: new RegExp(name, 'i') })
+        .and(page.locator('[aria-haspopup="dialog"]'))
 
 test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
     'public and admin UI meet WCAG 2.2 A/AA, mobile navigation, and reduced-motion requirements',
@@ -39,7 +58,7 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
 
         try {
             const admin = await app.session('a11y-admin', 'admin', 'owner@example.invalid')
-            await seedBrowserFixtures(app, admin)
+            const { fixtureBytes } = await seedBrowserFixtures(app, admin)
 
             browser = await chromium.launch({ headless: true })
             const sessionCookies = toPlaywrightCookies(admin.cookie, app.url)
@@ -51,11 +70,17 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                     colorScheme,
                     viewport: { width: 1280, height: 900 },
                 })
-                await auditContext.route('**/*', (route) =>
-                    new URL(route.request().url()).origin === app.url.origin
-                        ? route.continue()
-                        : route.abort(),
-                )
+                await auditContext.route('**/*', (route) => {
+                    const url = route.request().url()
+                    if (url === VALORANT_IGDB_COVER || url === VALORANT_IGDB_THUMB) {
+                        return route.fulfill({
+                            status: 200,
+                            contentType: 'image/png',
+                            body: fixtureBytes,
+                        })
+                    }
+                    return new URL(url).origin === app.url.origin ? route.continue() : route.abort()
+                })
                 await auditContext.addCookies(sessionCookies)
                 const auditPage = await auditContext.newPage()
                 observeBrowserErrors(auditPage, app.url.origin, errors, `${colorScheme} `)
@@ -109,18 +134,76 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                     await dialog.waitFor({ state: 'hidden' })
                 }
 
+                const scanWorkViewer = async () => {
+                    const { card, dialog, enlarge, image } = workControls(auditPage)
+                    await card.click()
+                    await dialog.waitFor()
+                    await dialog.locator('a[href="https://example.invalid/work"]').waitFor()
+                    await scan('works-viewer')
+                    const fitsViewport = await dialog.evaluate((element) => {
+                        const bounds = element.getBoundingClientRect()
+                        return (
+                            bounds.left >= 0 &&
+                            bounds.right <= innerWidth &&
+                            element.scrollWidth <= element.clientWidth
+                        )
+                    })
+                    expect(fitsViewport, 'The work dialog stays within the viewport').toBe(true)
+
+                    await enlarge.click()
+                    await image.waitFor()
+                    await scan('work-image-viewer')
+                    await auditPage.keyboard.press('Escape')
+                    await image.waitFor({ state: 'hidden' })
+                    await auditPage.keyboard.press('Escape')
+                    await dialog.waitFor({ state: 'hidden' })
+                    await expectFocus(card)
+                }
+
+                const scanGameStatsViewer = async () => {
+                    const valorant = gameStatsTrigger(auditPage, 'VALORANT')
+                    const apex = gameStatsTrigger(auditPage, 'Apex Legends')
+                    await valorant.waitFor()
+                    await apex.waitFor()
+
+                    const dialog = auditPage.getByRole('dialog', { name: 'VALORANT', exact: true })
+                    await valorant.click()
+                    await dialog.getByRole('table').waitFor()
+                    await dialog.getByRole('img', { name: 'VALORANT cover', exact: true }).waitFor()
+                    await dialog.getByRole('button', { name: 'Win Rate', exact: true }).click()
+                    await scan('game-stats-dialog')
+                    const fitsViewport = await dialog.evaluate((element) => {
+                        const bounds = element.getBoundingClientRect()
+                        return (
+                            bounds.left >= 0 &&
+                            bounds.right <= innerWidth &&
+                            element.scrollWidth <= element.clientWidth
+                        )
+                    })
+                    expect(fitsViewport, 'The game stats dialog stays within the viewport').toBe(
+                        true,
+                    )
+                    await auditPage.keyboard.press('Escape')
+                    await dialog.waitFor({ state: 'hidden' })
+                    await expectFocus(valorant)
+
+                    const apexDialog = auditPage.getByRole('dialog', {
+                        name: 'Apex Legends',
+                        exact: true,
+                    })
+                    await apex.click()
+                    await apexDialog.locator(`a[href="${ATTACHED_PROFILE}"]`).first().waitFor()
+                    await auditPage.keyboard.press('Escape')
+                    await apexDialog.waitFor({ state: 'hidden' })
+                    await expectFocus(apex)
+                }
+
                 await visit('/')
                 const stats = gameStatsTrigger(auditPage)
                 await stats.waitFor()
-                await auditPage.locator(`a[href="${ATTACHED_PROFILE}"]`).getByRole('img').waitFor()
                 await scan('home')
-
+                await scanGameStatsViewer()
                 const dialog = auditPage.getByRole('dialog')
-                await stats.click()
-                await dialog.getByRole('table').waitFor()
-                await scan('game-stats-dialog')
-                await auditPage.keyboard.press('Escape')
-                await dialog.waitFor({ state: 'hidden' })
 
                 await visit('/arts')
                 await artworkControls(auditPage).card.waitFor()
@@ -128,8 +211,9 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await scanArtViewer()
 
                 await visit('/works')
-                await auditPage.locator('a[href="https://example.invalid/work"]').waitFor()
+                await workControls(auditPage).card.waitFor()
                 await scan('works')
+                await scanWorkViewer()
 
                 await visit('/posts')
                 await auditPage
@@ -255,9 +339,13 @@ test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
                 await visit('/')
                 await stats.waitFor()
                 await scan('home')
+                await scanGameStatsViewer()
 
                 await visit('/arts')
                 await scanArtViewer()
+
+                await visit('/works')
+                await scanWorkViewer()
 
                 await visit(POST_PATH)
                 await scan('post-detail')

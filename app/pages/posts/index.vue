@@ -11,7 +11,10 @@ const { data, error } = await useFetch<PostCardsPage>('/api/posts/cards', {
 })
 if (error.value) throw error.value
 
-provide(postGameMentionsKey, computed(() => data.value?.games ?? {}))
+provide(
+    postGameMentionsKey,
+    computed(() => data.value?.games ?? {}),
+)
 
 const filtered = computed(() => data.value?.items ?? [])
 

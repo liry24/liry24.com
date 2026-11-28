@@ -12,7 +12,7 @@ interface PublishedPostsSnapshot {
 }
 
 interface SnapshotCache<T> {
-    current?: { revision: string; pending: Promise<T | undefined> }
+    current?: { revision: string; pending: Promise<T> }
 }
 
 const postsCache: SnapshotCache<PublishedPostsSnapshot> = {}
@@ -27,36 +27,20 @@ async function readPublishedSnapshot<T>(
     cache: SnapshotCache<T>,
     load: (revision: string) => Promise<T>,
 ): Promise<T | undefined> {
-    for (;;) {
-        const previous = cache.current
-        const revision = await getPublishedRevision()
-        if (revision === null) {
-            if (cache.current === previous) cache.current = undefined
-            return
-        }
+    const revision = await getPublishedRevision()
+    if (revision === null) {
+        cache.current = undefined
+        return
+    }
+    if (cache.current?.revision === revision) return cache.current.pending
 
-        if (cache.current?.revision !== revision) {
-            if (cache.current !== previous) continue
-
-            // Collection lists follow the ref, so retry if it moves while loading.
-            const pending = load(revision).then(
-                async (snapshot) =>
-                    (await getPublishedRevision()) === revision ? snapshot : undefined,
-                async (error: unknown) => {
-                    if ((await getPublishedRevision()) === revision) throw error
-                },
-            )
-            cache.current = { revision, pending }
-        }
-
-        const current = cache.current
-        let snapshot: T | undefined
-        try {
-            snapshot = await current.pending
-            if (snapshot !== undefined) return snapshot
-        } finally {
-            if (snapshot === undefined && cache.current === current) cache.current = undefined
-        }
+    const entry = { revision, pending: load(revision) }
+    cache.current = entry
+    try {
+        return await entry.pending
+    } catch (error) {
+        if (cache.current === entry) cache.current = undefined
+        throw error
     }
 }
 
@@ -78,9 +62,7 @@ export async function getPublishedSocialsMap(): Promise<Map<string, string>> {
     const snapshot = await readPublishedSnapshot(socialsCache, async (revision) => {
         const items = await listAllCollectionItems(content.collection('socials'), 'published')
         const bySlug = new Map<string, string>()
-        for (const { data } of items) {
-            if (!bySlug.has(data.slug)) bySlug.set(data.slug, data.href)
-        }
+        for (const { data } of items) if (!bySlug.has(data.slug)) bySlug.set(data.slug, data.href)
         return { revision, bySlug }
     })
     return snapshot?.bySlug ?? new Map()
@@ -127,4 +109,8 @@ export function applyPublicCacheHeaders(
 
     event.res.status = 304
     return true
+}
+
+export function notModifiedResponse(event: RequestEvent): Response {
+    return new Response(null, { status: 304, headers: new Headers(event.res.headers) })
 }

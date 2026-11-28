@@ -60,11 +60,12 @@ export function useAdminIconSearch(isOpen: () => boolean) {
             } catch (error) {
                 signal.throwIfAborted()
                 if (active !== session || model.backend !== 'webgpu') throw error
+                let fallbackPromise = predictor
                 if (predictor === pending) {
                     model.dispose()
-                    cachePredictor(createPredictor({ backend: 'cpu' }))
+                    fallbackPromise = cachePredictor(createPredictor({ backend: 'cpu' }))
                 }
-                const fallback = await predictor
+                const fallback = await fallbackPromise
                 signal.throwIfAborted()
                 if (!fallback || active !== session) return []
                 return await fallback.predict(query, { limit: 2, signal })

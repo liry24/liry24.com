@@ -4,9 +4,8 @@ export default defineEventHandler(async (event): Promise<GameCatalogResponse> =>
     await requireAdminSession(event)
     event.res.headers.set('Cache-Control', 'private, no-store')
     const query = getQuery(event)
-    if (query.meta !== '1' && query.meta !== 'true') {
+    if (query.meta !== '1' && query.meta !== 'true')
         return { items: await gameCatalog().listOrdered() }
-    }
 
     const statsCol = content.collection('gameStats')
     const postsCol = content.collection('posts')

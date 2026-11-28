@@ -2,7 +2,7 @@
 import { Textarea } from '@ui-sdk/vue/textarea'
 
 const model = defineModel<string>()
-withDefaults(defineProps<{ rows?: number }>(), { rows: 3 })
+const { rows = 3 } = defineProps<{ rows?: number }>()
 </script>
 
 <template>

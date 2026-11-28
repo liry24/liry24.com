@@ -23,7 +23,7 @@ export default defineEventHandler(async (event): Promise<PostCardsPage | Respons
     const snapshot = await getPublishedPostsSnapshot()
     const revision = snapshot.revision
     const etag = `post-cards-${revision ?? 'empty'}-${input.game ?? ''}-${input.limit}-${input.offset}`
-    if (applyPublicCacheHeaders(event, etag)) return new Response(null, { status: 304 })
+    if (applyPublicCacheHeaders(event, etag)) return notModifiedResponse(event)
 
     if (!revision) {
         return {

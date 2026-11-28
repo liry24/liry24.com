@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { UiCombobox, UiField } from '@liry24/ui'
-
 interface GameOptionItem {
     value: string
     label: string

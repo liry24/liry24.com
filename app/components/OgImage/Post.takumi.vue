@@ -36,7 +36,14 @@ const clippedDescription = computed(() => {
         <div
             v-if="cover"
             class="absolute inset-0 size-full"
-            style="background: linear-gradient(135deg, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.72) 55%, rgba(0, 0, 0, 0.94) 100%)"
+            style="
+                background: linear-gradient(
+                    135deg,
+                    rgba(0, 0, 0, 0.92) 0%,
+                    rgba(0, 0, 0, 0.72) 55%,
+                    rgba(0, 0, 0, 0.94) 100%
+                );
+            "
         />
 
         <div class="relative flex items-center justify-between">
@@ -53,7 +60,7 @@ const clippedDescription = computed(() => {
         </div>
 
         <div class="relative flex flex-col gap-5">
-            <h1 :class="titleSize" class="font-bold leading-[1.2] tracking-tight text-white">
+            <h1 :class="titleSize" class="leading-[1.2] font-bold tracking-tight text-white">
                 {{ title }}
             </h1>
             <p v-if="description" class="text-[26px] leading-[1.5] text-zinc-300">

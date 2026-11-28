@@ -4,10 +4,10 @@
     "private": true,
     "type": "module",
     "exports": {
-        ".": "./index.ts",
-        "./editor": "./UiSlashEditor.vue",
-        "./markdown": "./markdown.ts",
-        "./styles.css": "./styles.css"
+        ".": "./src/runtime/index.ts",
+        "./nuxt": "./src/module.ts",
+        "./markdown": "./src/runtime/utils/markdown.ts",
+        "./styles.css": "./src/runtime/assets/styles.css"
     },
     "dependencies": {
         "@lezer/markdown": "1.8.2",
@@ -15,6 +15,20 @@
         "@ui-sdk/vue": "0.1.0-beta.17"
     },
     "peerDependencies": {
+        "@nuxt/kit": "^4.0.0 || ^5.0.0-0",
+        "@nuxt/ui": "^4.0.0",
+        "nuxt": "^4.0.0 || ^5.0.0-0",
         "vue": "^3.5.0"
+    },
+    "peerDependenciesMeta": {
+        "@nuxt/kit": {
+            "optional": true
+        },
+        "@nuxt/ui": {
+            "optional": true
+        },
+        "nuxt": {
+            "optional": true
+        }
     }
 }

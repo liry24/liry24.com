@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { UiField, UiInput, UiTextarea } from '@liry24/ui'
-
 const model = defineModel<string | undefined>()
 defineProps<{
     label: string
@@ -31,7 +29,6 @@ defineProps<{
             :required="required"
             :placeholder="placeholder"
             :type="type ?? 'text'"
-            class="ui-input"
             @update:model-value="model = $event"
         />
     </UiField>

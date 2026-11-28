@@ -26,6 +26,18 @@ export function deriveGameMetricKey(label: string, existingKeys: ReadonlySet<str
     }
 }
 
+const igdbThumbPrefix = 'https://images.igdb.com/igdb/image/upload/t_thumb/'
+
+export function igdbCoverUrl(
+    cover: string | null | undefined,
+    size: 't_cover_big' | 't_cover_big_2x' = 't_cover_big_2x',
+): string | undefined {
+    if (!cover) return undefined
+    if (cover.startsWith(igdbThumbPrefix))
+        return `https://images.igdb.com/igdb/image/upload/${size}/${cover.slice(igdbThumbPrefix.length)}`
+    return cover
+}
+
 export function formatGameValue(value: GameValue | undefined, metric?: GameMetric): string {
     if (!value) return '—'
 
@@ -45,9 +57,8 @@ export function gameValueIssues(
     const issues: Array<string> = [],
         seen = new Set<string>()
     const metricsByKey = new Map<string, GameMetric>()
-    for (const metric of metrics) {
+    for (const metric of metrics)
         if (!metricsByKey.has(metric.key)) metricsByKey.set(metric.key, metric)
-    }
 
     for (const value of values) {
         const metric = metricsByKey.get(value.key)

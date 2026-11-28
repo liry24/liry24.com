@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { UiButton, UiField, UiInput, UiSelect } from '@liry24/ui'
-
 const draft = defineModel<AdminMetricDraft>({ required: true })
 const props = defineProps<{
     locked?: boolean
@@ -21,13 +19,13 @@ const formatOptions: Array<{ value: GameMetric['format']; label: string }> = [
     { value: 'percent', label: 'Percentage (%)' },
 ]
 
-function updateLabel(next: string) {
+function updateLabel(next = '') {
     draft.value.label = next
     if (draft.value.autoKey && !props.locked)
         draft.value.key = next.trim() ? deriveGameMetricKey(next, props.existingKeys) : ''
 }
 
-function updateKey(next: string) {
+function updateKey(next = '') {
     draft.value.autoKey = false
     draft.value.key = next
 }
@@ -64,7 +62,6 @@ const hasAdvancedError = computed(() =>
                     :name="`${errorPrefix}.label`"
                     placeholder="Peak Rank"
                     :disabled="disabled"
-                    class="ui-input"
                     @update:model-value="updateLabel"
                 />
             </UiField>
@@ -89,7 +86,6 @@ const hasAdvancedError = computed(() =>
                     :name="`${errorPrefix}.unit`"
                     placeholder="RR"
                     :disabled="disabled || locked"
-                    class="ui-input"
                 />
             </UiField>
 
@@ -127,7 +123,7 @@ const hasAdvancedError = computed(() =>
                         :name="`${errorPrefix}.key`"
                         placeholder="peak_rank"
                         :disabled="disabled || locked"
-                        class="ui-input font-mono"
+                        class="font-mono"
                         @update:model-value="updateKey"
                     />
                 </UiField>
@@ -140,12 +136,7 @@ const hasAdvancedError = computed(() =>
                                 Optional labeled Y-axis ticks (e.g. rank tiers on the chart).
                             </p>
                         </div>
-                        <UiButton
-                            type="button"
-                            class="ui-button"
-                            :disabled="disabled"
-                            @click="addPosition"
-                        >
+                        <UiButton type="button" :disabled="disabled" @click="addPosition">
                             Add marker
                         </UiButton>
                     </div>
@@ -169,7 +160,6 @@ const hasAdvancedError = computed(() =>
                                 :inputmode="draft.format === 'integer' ? 'numeric' : 'decimal'"
                                 placeholder="2100"
                                 :disabled="disabled"
-                                class="ui-input"
                             />
                         </UiField>
                         <UiField
@@ -181,7 +171,6 @@ const hasAdvancedError = computed(() =>
                                 :name="`${errorPrefix}.positions.${position.uid}.label`"
                                 placeholder="Immortal 1"
                                 :disabled="disabled"
-                                class="ui-input"
                             />
                         </UiField>
                         <UiField
@@ -193,15 +182,14 @@ const hasAdvancedError = computed(() =>
                                 :name="`${errorPrefix}.positions.${position.uid}.color`"
                                 placeholder="#EF4444"
                                 :disabled="disabled"
-                                class="ui-input font-mono"
+                                class="font-mono"
                             />
                         </UiField>
                         <div class="flex items-end pt-6">
                             <UiButton
                                 type="button"
-                                class="ui-button"
-                                data-variant="ghost"
-                                data-tone="danger"
+                                variant="ghost"
+                                color="error"
                                 :aria-label="
                                     `Remove marker ${position.label || position.value || ''}`.trim()
                                 "
@@ -219,9 +207,8 @@ const hasAdvancedError = computed(() =>
         <div class="flex justify-end">
             <UiButton
                 type="button"
-                class="ui-button"
-                data-variant="ghost"
-                data-tone="danger"
+                variant="ghost"
+                color="error"
                 :disabled="disabled || locked"
                 @click="emit('remove')"
             >

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { UiButton, UiReorderList, useShortcut, useShortcutHint } from '@liry24/ui'
-
 const toast = useToast()
 
 const [
@@ -34,7 +32,7 @@ const statItems = computed<Array<StatItem>>(() =>
 )
 const catalogItems = computed<Array<GameCatalogItem>>(() => catalogData.value?.items ?? [])
 const catalogMeta = shallowRef<Record<string, GameCatalogMeta>>({})
-const catalogMetaRequest = shallowRef<Promise<GameCatalogResponse>>()
+const catalogMetaRequest = shallowRef<Promise<boolean>>()
 let catalogMetaLoaded = false
 
 function invalidateCatalogMeta() {
@@ -42,29 +40,32 @@ function invalidateCatalogMeta() {
     catalogMetaRequest.value = undefined
 }
 
-async function ensureCatalogMeta() {
-    if (catalogMetaLoaded) return true
-    if (catalogMetaRequest.value) return false
+function ensureCatalogMeta(): Promise<boolean> {
+    if (catalogMetaLoaded) return Promise.resolve(true)
+    if (catalogMetaRequest.value) return catalogMetaRequest.value
 
     const request = $fetch('/api/admin/games/catalog', { query: { meta: '1' } })
-    catalogMetaRequest.value = request
-    try {
-        const { meta } = await request
-        if (catalogMetaRequest.value !== request) return false
+        .then(({ meta }) => {
+            if (catalogMetaRequest.value !== request) return false
 
-        catalogMeta.value = meta ?? {}
-        catalogMetaLoaded = true
-        return true
-    } catch (error) {
-        if (catalogMetaRequest.value === request)
-            toast.add({
-                title: adminErrorMessage(error, 'Could not load game catalog details.'),
-                color: 'error',
-            })
-        return false
-    } finally {
-        if (catalogMetaRequest.value === request) catalogMetaRequest.value = undefined
-    }
+            catalogMeta.value = meta ?? {}
+            catalogMetaLoaded = true
+            return true
+        })
+        .catch((error: unknown) => {
+            if (catalogMetaRequest.value === request) {
+                toast.add({
+                    title: adminErrorMessage(error, 'Could not load game catalog details.'),
+                    color: 'error',
+                })
+            }
+            return false
+        })
+        .finally(() => {
+            if (catalogMetaRequest.value === request) catalogMetaRequest.value = undefined
+        })
+    catalogMetaRequest.value = request
+    return request
 }
 
 onScopeDispose(invalidateCatalogMeta)
@@ -373,8 +374,8 @@ useHead({ title: 'Game Stats' })
                     <UiButton
                         ref="addButton"
                         type="button"
-                        class="ui-button"
-                        data-variant="primary"
+                        variant="solid"
+                        color="primary"
                         :aria-keyshortcuts="canAdd ? addKeys : undefined"
                         :disabled="!canAdd"
                         @click="openCreate()"

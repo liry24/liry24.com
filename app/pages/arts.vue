@@ -25,10 +25,12 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'arts' }, [
 
 <template>
     <div v-if="data" class="grid gap-8">
+        <p v-if="!data.length" class="text-muted py-12 text-center text-sm">No artworks yet.</p>
         <MasonryWall
+            v-else
             :items="data"
-            :column-width="240"
-            :gap="24"
+            :column-width="260"
+            :gap="20"
             :min-columns="1"
             :max-columns="3"
             :ssr-columns="2"
@@ -37,7 +39,7 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'arts' }, [
                 <button
                     type="button"
                     :aria-label="`View ${item.data.title}`"
-                    class="group relative block w-full cursor-pointer overflow-clip rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-4"
+                    class="group bg-muted/50 ring-default/60 hover:ring-accented relative block w-full cursor-pointer overflow-clip rounded-2xl text-left ring-1 transition-shadow duration-200 ease-out focus-visible:outline-2 focus-visible:outline-offset-4 motion-reduce:transition-none"
                     @click="modalArtViewer.open({ item })"
                 >
                     <NuxtImg
@@ -45,24 +47,30 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'arts' }, [
                         :alt="item.data.title"
                         :width="520"
                         format="webp"
-                        sizes="100vw 641px:50vw 1025px:520px"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 520px"
                         decoding="async"
                         :fetchpriority="index < 2 ? 'high' : undefined"
                         :loading="index >= 4 ? 'lazy' : undefined"
-                        class="size-full"
+                        class="size-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                     />
 
                     <div
-                        class="absolute inset-0 flex flex-col gap-3 bg-black/50 p-4 text-zinc-100 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                        aria-hidden="true"
+                        class="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/80 via-black/35 to-transparent px-4 pt-14 pb-4 text-white opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
                     >
-                        <span class="font-[Special_Gothic_Expanded_One] text-3xl font-bold">
+                        <span
+                            class="line-clamp-2 text-base leading-snug font-semibold tracking-tight sm:text-lg"
+                        >
                             {{ item.data.title }}
                         </span>
 
-                        <div class="mt-auto ml-auto flex items-center gap-1">
-                            <Icon name="mingcute:photo-album-fill" size="20" />
-                            <span class="font-bold">{{ item.data.images.length }}</span>
-                        </div>
+                        <span
+                            v-if="item.data.images.length > 1"
+                            class="inline-flex shrink-0 items-center gap-1 font-mono text-xs font-medium tabular-nums"
+                        >
+                            <Icon name="mingcute:photo-album-fill" class="size-4" />
+                            <span>{{ item.data.images.length }}</span>
+                        </span>
                     </div>
                 </button>
             </template>

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { UiButton, UiFormDialog } from '@liry24/ui'
-
 const open = defineModel<boolean>('open', { required: true })
 const props = defineProps<{
     items: Array<GameCatalogItem>
@@ -74,9 +72,9 @@ async function deleteGame(item: GameCatalogItem) {
                 posts. Customize icons, adjust metrics, or remove unused games here.
             </p>
 
-            <p v-if="deleteError" class="ui-alert" role="alert">
+            <UiAlert v-if="deleteError">
                 {{ deleteError }}
-            </p>
+            </UiAlert>
 
             <p v-if="!items.length" class="ui-description py-4 text-center">
                 No registered games yet.
@@ -110,18 +108,24 @@ async function deleteGame(item: GameCatalogItem) {
                             <p class="truncate font-medium">{{ item.data.name }}</p>
                             <div class="mt-0.5 flex flex-wrap items-center gap-2 text-xs">
                                 <span class="text-muted font-mono">{{ item.data.slug }}</span>
-                                <span
+                                <UBadge
                                     v-if="statsCount(item.id) > 0"
-                                    class="ui-badge"
-                                    data-tone="success"
+                                    variant="soft"
+                                    color="success"
+                                    size="sm"
                                 >
                                     {{ statsCount(item.id) }}
                                     {{ statsCount(item.id) === 1 ? 'stat' : 'stats' }}
-                                </span>
-                                <span v-if="postsCount(item.id) > 0" class="ui-badge">
+                                </UBadge>
+                                <UBadge
+                                    v-if="postsCount(item.id) > 0"
+                                    variant="soft"
+                                    color="neutral"
+                                    size="sm"
+                                >
                                     {{ postsCount(item.id) }}
                                     {{ postsCount(item.id) === 1 ? 'post' : 'posts' }}
-                                </span>
+                                </UBadge>
                                 <span v-if="!isReferenced(item.id)" class="text-muted">Unused</span>
                             </div>
                         </div>
@@ -130,7 +134,6 @@ async function deleteGame(item: GameCatalogItem) {
                     <div class="flex flex-wrap items-center gap-2">
                         <UiButton
                             type="button"
-                            class="ui-button"
                             :disabled="Boolean(busyId)"
                             @click="openSettings($event, item)"
                         >
@@ -138,9 +141,8 @@ async function deleteGame(item: GameCatalogItem) {
                         </UiButton>
                         <UiButton
                             type="button"
-                            class="ui-button"
-                            data-variant="ghost"
-                            data-tone="danger"
+                            variant="ghost"
+                            color="error"
                             :disabled="Boolean(busyId) || isReferenced(item.id)"
                             :title="
                                 isReferenced(item.id)

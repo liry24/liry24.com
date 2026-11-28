@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { markdownPlainText } from '@liry24/ui/markdown'
+
 const data = defineModel<AdminEntryData>({ required: true })
 defineProps<{ errors: Record<string, string>; busy: boolean }>()
 defineEmits<{ busy: [busy: boolean]; search: [event: MouseEvent] }>()
@@ -6,6 +8,9 @@ const styles = [
     { value: 'small', label: 'Small' },
     { value: 'large', label: 'Large' },
 ] as const
+const previewDescription = computed(() =>
+    data.value.description ? markdownPlainText(data.value.description) : '',
+)
 </script>
 
 <template>
@@ -24,12 +29,11 @@ const styles = [
                 name="data.category"
                 :error="errors['data.category']"
             />
-            <AdminEntryText
+            <AdminEntryMarkdown
                 v-model="data.description"
                 label="Description"
-                name="data.description"
                 :error="errors['data.description']"
-                :rows="3"
+                :disabled="busy"
             />
             <AdminEntryText
                 v-model="data.href"
@@ -86,10 +90,10 @@ const styles = [
                     <div class="min-w-0">
                         <p class="font-semibold break-words">{{ data.title || 'Project title' }}</p>
                         <p
-                            v-if="data.style !== 'large' && data.description"
+                            v-if="data.style !== 'large' && previewDescription"
                             class="text-muted mt-1 line-clamp-3 break-words"
                         >
-                            {{ data.description }}
+                            {{ previewDescription }}
                         </p>
                     </div>
                 </div>

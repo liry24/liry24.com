@@ -29,13 +29,15 @@ export async function parsePostContent(body: string): Promise<{
 
 export async function postCards(
     entries: Array<PostItem & { digest?: string }>,
-    parseContent?: (digest: string | undefined, body: string) => ReturnType<typeof parsePostContent>,
+    parseContent?: (
+        digest: string | undefined,
+        body: string,
+    ) => ReturnType<typeof parsePostContent>,
 ): Promise<Array<PostCard>> {
     return await Promise.all(
         entries.map(async (entry) => {
-            const { excerpt } = await (
-                parseContent?.(entry.digest, entry.body) ?? parsePostContent(entry.body)
-            )
+            const { excerpt } = await (parseContent?.(entry.digest, entry.body) ??
+                parsePostContent(entry.body))
             const { generateSlugOnPublish: _generateSlugOnPublish, ...data } = entry.data
             return {
                 ...data,

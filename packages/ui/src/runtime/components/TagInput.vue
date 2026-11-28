@@ -12,14 +12,23 @@ import {
 } from '@ui-sdk/vue/combobox'
 import { computed, ref, useId } from 'vue'
 
+import { UIcon } from '#components'
+
+import { useUiIcons } from '../composables/icons'
+
 const model = defineModel<Array<string>>({ required: true })
-const props = defineProps<{ suggestions: Array<string>; disabled?: boolean }>()
+const { suggestions, disabled } = defineProps<{
+    suggestions: Array<string>
+    disabled?: boolean
+}>()
+
 const chipsId = useId()
+const icons = useUiIcons()
 const query = ref('')
 const choices = computed(() => {
     const text = query.value.trim().toLowerCase()
     const selected = new Set(model.value)
-    return props.suggestions
+    return suggestions
         .filter((tag) => !selected.has(tag) && tag.toLowerCase().includes(text))
         .slice(0, 12)
 })
@@ -45,7 +54,7 @@ function select(value: unknown) {
             <ComboboxChip v-for="tag in model" :key="tag" :value="tag" class="ui-token">
                 {{ tag }}
                 <ComboboxChipRemove class="ui-token-remove" :aria-label="`Remove ${tag}`">
-                    ×
+                    <UIcon :name="icons.close" class="ui-icon ui-icon-xs" aria-hidden="true" />
                 </ComboboxChipRemove>
             </ComboboxChip>
             <ComboboxInput class="ui-tag-query" placeholder="Add a tag…" />
@@ -55,7 +64,7 @@ function select(value: unknown) {
                 class="ui-token-remove"
                 aria-label="Show tag suggestions"
             >
-                <span class="ui-tag-chevron" aria-hidden="true" />
+                <UIcon :name="icons.chevronDown" class="ui-icon ui-icon-xs" aria-hidden="true" />
             </ComboboxTrigger>
         </ComboboxChips>
         <ComboboxContent

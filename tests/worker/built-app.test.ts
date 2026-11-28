@@ -313,4 +313,117 @@ describe.runIf(process.env.LIRY24_TEST_BUILT_WORKER === 'true')('built Worker', 
         })
         expect((await savePostDraft({ title: 'Keep this slug' })).slug).toBe('keep-this-slug-2')
     })
+
+    test('serves parsed documents, preserves ETag/Cache-Control on 304, and invalidates on publish', async () => {
+        const draftResponse = await post(
+            '/_vitehub/forms/post',
+            {
+                data: { title: 'Snapshot Cache Test', slug: 'snapshot-cache-test' },
+                body: 'First intro paragraph.\n\n<!-- more -->\n\nSecond paragraph.',
+            },
+            admin,
+        )
+        expect(draftResponse.status, await draftResponse.clone().text()).toBe(201)
+        const created = z
+            .object({ id: z.string(), slug: z.string(), digest: z.string() })
+            .parse(await draftResponse.json())
+
+        await publishPostDraft(created)
+
+        const detailRes = await fetch(`/api/posts/${created.slug}`)
+        expect(detailRes.status).toBe(200)
+        const detailEtag = detailRes.headers.get('etag')
+        const detailCacheControl = detailRes.headers.get('cache-control')
+        expect(detailEtag).toBeTruthy()
+        expect(detailCacheControl).toContain('s-maxage=')
+        const detailJson = z
+            .object({
+                document: z.object({ nodes: z.array(z.unknown()) }),
+                games: z.record(z.string(), z.unknown()),
+                description: z.string(),
+            })
+            .parse(await detailRes.json())
+        expect(detailJson.document.nodes.length).toBeGreaterThan(0)
+        expect(detailJson.description).toContain('First intro paragraph.')
+
+        const detail304 = await fetch(`/api/posts/${created.slug}`, {
+            headers: { 'if-none-match': detailEtag! },
+        })
+        expect(detail304.status).toBe(304)
+        expect(await detail304.text()).toBe('')
+        expect(detail304.headers.get('etag')).toBe(detailEtag)
+        expect(detail304.headers.get('cache-control')).toBe(detailCacheControl)
+
+        const cardsRes = await fetch('/api/posts/cards')
+        expect(cardsRes.status).toBe(200)
+        const cardsEtag = cardsRes.headers.get('etag')
+        const cardsCacheControl = cardsRes.headers.get('cache-control')
+        expect(cardsEtag).toBeTruthy()
+        expect(cardsCacheControl).toContain('s-maxage=')
+        const cardsJson = z
+            .object({
+                items: z.array(z.object({ id: z.string() })),
+                games: z.record(z.string(), z.unknown()),
+            })
+            .parse(await cardsRes.json())
+        expect(cardsJson.items.some((item) => item.id === created.id)).toBe(true)
+
+        const cards304 = await fetch('/api/posts/cards', {
+            headers: { 'if-none-match': cardsEtag! },
+        })
+        expect(cards304.status).toBe(304)
+        expect(await cards304.text()).toBe('')
+        expect(cards304.headers.get('etag')).toBe(cardsEtag)
+        expect(cards304.headers.get('cache-control')).toBe(cardsCacheControl)
+
+        const missingGameCards = await fetch('/api/posts/cards?game=nonexistent-game-slug')
+        expect(missingGameCards.status).toBe(200)
+        expect(await missingGameCards.json()).toEqual({ items: [], total: 0, games: {} })
+
+        const updatedDraft = await post(
+            '/_vitehub/forms/post',
+            {
+                id: created.id,
+                data: { title: 'Snapshot Cache Updated', slug: created.slug },
+                body: 'Updated intro paragraph.\n\n<!-- more -->\n\nUpdated body.',
+            },
+            admin,
+        )
+        expect(updatedDraft.status, await updatedDraft.clone().text()).toBe(201)
+        const updated = z
+            .object({ id: z.string(), digest: z.string() })
+            .parse(await updatedDraft.json())
+        await publishPostDraft(updated)
+
+        const afterPublish = await fetch(`/api/posts/${created.slug}`, {
+            headers: { 'if-none-match': detailEtag! },
+        })
+        expect(afterPublish.status).toBe(200)
+        expect(afterPublish.headers.get('etag')).not.toBe(detailEtag)
+        expect(await afterPublish.json()).toMatchObject({
+            data: { title: 'Snapshot Cache Updated' },
+            description: 'Updated intro paragraph.',
+        })
+    })
+
+    test('renders Takumi OG image metadata and PNG image for post routes', async () => {
+        const htmlRes = await fetch('/posts/snapshot-cache-test')
+        expect(htmlRes.status).toBe(200)
+        const html = await htmlRes.text()
+        const metaMatch = html.match(/<meta\b[^>]*\bproperty=["']og:image["'][^>]*>/i)
+        expect(
+            metaMatch,
+            'Expected og:image meta tag in /posts/snapshot-cache-test SSR HTML',
+        ).toBeTruthy()
+
+        const contentMatch = metaMatch![0].match(/\bcontent=["']([^"']+)["']/i)
+        expect(contentMatch).toBeTruthy()
+        const ogUrl = new URL(contentMatch![1]!, app.url)
+        const ogRes = await fetch(`${ogUrl.pathname}${ogUrl.search}`)
+        expect(ogRes.status, `Failed fetching OG image ${ogUrl.pathname}${ogUrl.search}`).toBe(200)
+        expect(ogRes.headers.get('content-type')).toMatch(/^image\/png\b/u)
+        const bytes = new Uint8Array(await ogRes.arrayBuffer())
+        expect(bytes.length).toBeGreaterThan(100)
+        expect(Array.from(bytes.slice(0, 4))).toEqual([0x89, 0x50, 0x4e, 0x47])
+    })
 })
