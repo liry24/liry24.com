@@ -18,8 +18,7 @@ export default defineForm({
             const { id } = submission.data
             const games = gameCatalog()
             const existing = await games.get(id)
-            if (!existing)
-                throw createError({ status: 404, statusText: 'Import the game from IGDB first.' })
+            if (!existing) throw createError({ status: 404, statusText: 'Game not found.' })
 
             const data = {
                 ...submission.data.data,

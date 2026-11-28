@@ -1,7 +1,13 @@
 import { expect, test } from 'vitest'
 
 import type { GameMetric } from '../shared/types/games'
-import { gameValueIssues, formatGameValue } from '../shared/utils/games'
+import {
+    deriveGameMetricKey,
+    formatGameValue,
+    gameMetricKeyPattern,
+    gameValueIssues,
+} from '../shared/utils/games'
+
 const metrics: Array<GameMetric> = [
     {
         key: 'peakRank',
@@ -13,6 +19,7 @@ const metrics: Array<GameMetric> = [
     { key: 'kd', label: 'K/D', format: 'decimal' },
     { key: 'matches', label: 'Matches', format: 'integer' },
 ]
+
 test('game stats validate configured metrics and preserve zero separately from missing values', () => {
     expect(
         gameValueIssues(metrics, [
@@ -36,4 +43,21 @@ test('game stats validate configured metrics and preserve zero separately from m
     expect(
         formatGameValue({ key: 'peakRank', value: 2123, label: 'Immortal 1 23 RR' }, metrics[0]),
     ).toBe('Immortal 1 23 RR')
+})
+
+test('deriveGameMetricKey generates unique, schema-valid metric keys from labels', () => {
+    const empty = new Set<string>()
+    expect(deriveGameMetricKey('Peak Rank', empty)).toBe('peak_rank')
+    expect(deriveGameMetricKey('Win Rate (%)', empty)).toBe('win_rate')
+    expect(deriveGameMetricKey('K/D Ratio', empty)).toBe('k_d_ratio')
+    expect(deriveGameMetricKey('1st Place', empty)).toBe('m_1st_place')
+    expect(deriveGameMetricKey('最高ランク', empty)).toBe('metric')
+
+    const existing = new Set(['peak_rank', 'peak_rank_2', 'metric'])
+    expect(deriveGameMetricKey('Peak Rank', existing)).toBe('peak_rank_3')
+    expect(deriveGameMetricKey('最高ランク', existing)).toBe('metric_2')
+
+    const longKey = deriveGameMetricKey('A'.repeat(120), new Set(['a'.repeat(56)]))
+    expect(longKey.length).toBeLessThanOrEqual(64)
+    expect(gameMetricKeyPattern.test(longKey)).toBe(true)
 })

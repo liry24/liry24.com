@@ -265,12 +265,34 @@ export default defineNuxtConfig({
         },
     },
 
+    image: { none: {} },
+
     fonts: {
         defaults: { weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
         families: [
-            { name: 'Inter', provider: 'google', preload: true, global: true },
+            {
+                name: 'Inter',
+                weights: [100, 200, 300, 400, 500, 600, 700, 800],
+                provider: 'google',
+                preload: true,
+                global: true,
+            },
             { name: 'Geist', weights: [200], provider: 'google', preload: false, global: true },
-            { name: 'Geist Mono', provider: 'google', preload: true, global: true },
+            {
+                name: 'Geist Mono',
+                weights: [300, 400, 500, 700],
+                styles: ['normal'],
+                provider: 'google',
+                preload: true,
+                global: true,
+            },
+            {
+                name: 'Noto Sans JP',
+                weights: [400, 700],
+                provider: 'google',
+                preload: false,
+                global: false,
+            },
             {
                 name: 'Special Gothic Expanded One',
                 weights: [400],

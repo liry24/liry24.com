@@ -1,47 +1,104 @@
 import content from '#server/content'
 
+export interface PostGameHint {
+    slug: string
+    igdbId: number
+}
+
 function invalidField(message: string): never {
     throw createError({ status: 400, statusText: message, message })
+}
+
+async function resolveMissingMentionGame(
+    slug: string,
+    hintIgdbId?: number,
+): Promise<GameSearchResult | undefined> {
+    if (hintIgdbId !== undefined) {
+        const byId = await queryIgdb({ id: hintIgdbId })
+        const matched = byId.find((entry) => entry.igdbId === hintIgdbId && entry.slug === slug)
+        if (matched) return matched
+    }
+    const bySlug = await queryIgdb({ slug })
+    return bySlug.find((entry) => entry.slug === slug)
 }
 
 export async function resolvePostGames(
     title: string,
     body: string,
-): Promise<Pick<PostData, 'plainTitle' | 'gameMentions'>> {
-    const slugs = await postGameSlugs(title, body)
-    const gameDocs = slugs.length ? await gameCatalog().list() : []
-    const bySlug = new Map(gameDocs.map((doc) => [doc.data.slug, doc]))
-    const matchedIds: Array<string> = []
-    for (const slug of slugs) {
-        const doc = bySlug.get(slug)
-        if (!doc) invalidField('Choose an imported game for every game mention.')
-
-        matchedIds.push(doc.id)
+    mentionedGames?: Array<PostGameHint>,
+): Promise<
+    Pick<PostData, 'plainTitle' | 'gameMentions'> & {
+        persistMissingGames: () => Promise<void>
     }
+> {
+    const slugs = await postGameSlugs(title, body)
+    const catalog = gameCatalog()
+    const gameDocs = await catalog.bySlugs(slugs)
+    const bySlug = new Map(gameDocs.map((doc) => [doc.data.slug, doc]))
+    const hints = new Map((mentionedGames ?? []).map((entry) => [entry.slug, entry.igdbId]))
+    const matchedIds: Array<string> = []
+    const resolvedNames = new Map<string, string>()
+    const missingRemote: Array<GameSearchResult> = []
+
+    for (let offset = 0; offset < slugs.length; offset += 3) {
+        const matches = await Promise.all(
+            slugs.slice(offset, offset + 3).map(async (slug) => {
+                const doc = bySlug.get(slug)
+                if (doc) return { slug, id: doc.id, name: doc.data.name }
+
+                const remote = await resolveMissingMentionGame(slug, hints.get(slug)).catch(
+                    () => undefined,
+                )
+                if (!remote) invalidField('Choose a valid game for every game mention.')
+
+                const existing = await catalog.byIgdbId(remote.igdbId)
+                if (existing) return { slug, id: existing.id, name: existing.data.name }
+
+                return { slug, id: catalogGameId(remote.igdbId), name: remote.name, remote }
+            }),
+        )
+        for (const { slug, id, name, remote } of matches) {
+            matchedIds.push(id)
+            resolvedNames.set(slug, name)
+            if (remote) missingRemote.push(remote)
+        }
+    }
+
     const plainTitle = gameTitleParts(title)
         .map((part) => {
             if (!part.slug) return part.text
 
-            const matchedDoc = bySlug.get(part.slug)
-            return matchedDoc?.data.name ?? part.text
+            return resolvedNames.get(part.slug) ?? part.text
         })
         .join('')
-    return { plainTitle, gameMentions: matchedIds }
+
+    return {
+        plainTitle,
+        gameMentions: matchedIds,
+        async persistMissingGames() {
+            for (const remote of missingRemote) {
+                const existing = await catalog.byIgdbId(remote.igdbId)
+                if (!existing) await insertCatalogGame(remote)
+            }
+        },
+    }
 }
 
-export async function validateGameSave(options: {
-    id: string
-    data: GameRecordData
-    previous: GameRecordData
+export async function validateGameMetrics(options: {
+    gameId?: string
+    metrics: GameRecordData['metrics']
+    primaryMetric?: string
+    previousMetrics?: GameRecordData['metrics']
+    ignoreDraftStatId?: string
 }) {
-    const { id, data, previous } = options
-    const metricKeys = new Set(data.metrics.map((item) => item.key))
-    if (metricKeys.size !== data.metrics.length) invalidField('Metric keys must be unique.')
+    const { gameId, metrics, primaryMetric, previousMetrics, ignoreDraftStatId } = options
+    const metricKeys = new Set(metrics.map((item) => item.key))
+    if (metricKeys.size !== metrics.length) invalidField('Metric keys must be unique.')
 
-    if (data.primaryMetric && !data.metrics.some((item) => item.key === data.primaryMetric))
+    if (primaryMetric && !metrics.some((item) => item.key === primaryMetric))
         invalidField('Choose an existing metric.')
 
-    for (const metric of data.metrics) {
+    for (const metric of metrics) {
         for (const position of metric.positions ?? []) {
             const issues = gameValueIssues([metric], [{ ...position, key: metric.key }])
             const firstIssue = issues[0]
@@ -49,17 +106,20 @@ export async function validateGameSave(options: {
         }
     }
 
-    if (
-        previous.igdbId !== data.igdbId ||
-        previous.slug !== data.slug ||
-        previous.name !== data.name
-    )
-        invalidField('IGDB identity cannot be edited. Import the game from search.')
+    if (!gameId || !previousMetrics) return
 
-    const stats = await gameStatsEntries()
+    const stats = content.collection('gameStats')
+    const [draft, published] = await Promise.all([
+        listAllCollectionItems(stats, 'draft'),
+        listAllCollectionItems(stats, 'published'),
+    ])
+    const relevantStats = [
+        ...published,
+        ...draft.filter((doc) => !ignoreDraftStatId || doc.id !== ignoreDraftStatId),
+    ]
     const recordedKeys = new Set(
-        stats
-            .filter((doc) => doc.data.game === id)
+        relevantStats
+            .filter((doc) => doc.data.game === gameId)
             .flatMap((doc) => (Array.isArray(doc.data.values) ? doc.data.values : []))
             .map((entry) =>
                 entry &&
@@ -73,8 +133,8 @@ export async function validateGameSave(options: {
     for (const key of recordedKeys) {
         if (!key) continue
 
-        const before = previous.metrics.find((metric) => metric.key === key)
-        const after = data.metrics.find((metric) => metric.key === key)
+        const before = previousMetrics.find((metric) => metric.key === key)
+        const after = metrics.find((metric) => metric.key === key)
         if (
             !after ||
             after.format !== before?.format ||
@@ -84,18 +144,40 @@ export async function validateGameSave(options: {
     }
 }
 
+export async function validateGameSave(options: {
+    id: string
+    data: GameRecordData
+    previous: GameRecordData
+}) {
+    const { id, data, previous } = options
+    if (
+        previous.igdbId !== data.igdbId ||
+        previous.slug !== data.slug ||
+        previous.name !== data.name
+    )
+        invalidField('IGDB identity cannot be edited.')
+
+    await validateGameMetrics({
+        gameId: id,
+        metrics: data.metrics,
+        primaryMetric: data.primaryMetric,
+        previousMetrics: previous.metrics,
+    })
+}
+
 export async function validateGameStatsSave(options: {
     id: string
     data: Omit<GameStatsRecordData, 'order'>
+    game?: GameRecordData
 }) {
     const { id, data } = options
     if (data.start && data.end && Date.parse(data.start) > Date.parse(data.end))
         invalidField('End must follow start.')
 
-    const game = await gameCatalog().get(data.game)
-    if (!game) invalidField('Choose a saved game.')
+    const game = options.game ?? (await gameCatalog().get(data.game))?.data
+    if (!game) invalidField('Choose a valid game.')
 
-    const issues = gameValueIssues(game.data.metrics, data.values)
+    const issues = gameValueIssues(game.metrics, data.values)
     const firstIssue = issues[0]
     if (firstIssue) invalidField(firstIssue)
 

@@ -55,6 +55,18 @@ export const highlightMarkdown = (editor: HTMLElement) => {
         } else if (node.nodeName === 'SPAN') source += '\uFFFC'
     }
 
+    const lowerBound = (from: number) => {
+        let start = 0
+        let end = textNodes.length
+        while (start < end) {
+            const middle = Math.floor((start + end) / 2)
+            const text = textNodes[middle]
+            if (text && text.to <= from) start = middle + 1
+            else end = middle
+        }
+        return start
+    }
+
     const ranges: Array<{ name: string; highlight: Highlight; range: Range }> = []
     markdownParser.parse(source).iterate({
         enter({ name, from, to }) {
@@ -64,10 +76,9 @@ export const highlightMarkdown = (editor: HTMLElement) => {
             const highlight = CSS.highlights.get(group) ?? new Highlight()
             CSS.highlights.set(group, highlight)
             highlight.priority = group === 'md-syntax' ? 2 : group === 'md-quote' ? 0 : 1
-            for (const text of textNodes) {
-                if (text.from >= to) break
-
-                if (text.to <= from) continue
+            for (let index = lowerBound(from); index < textNodes.length; index++) {
+                const text = textNodes[index]
+                if (!text || text.from >= to) break
 
                 const start = text.offsets[Math.max(from, text.from) - text.from]
                 const end = text.offsets[Math.min(to, text.to) - text.from - 1]

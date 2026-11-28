@@ -34,16 +34,29 @@ async function upload(files: Array<File>) {
     uploadError.value = ''
     selectionError.value = ''
     emit('busy', true)
-    const failed: Array<string> = []
-    try {
-        for (const file of files) {
+    const images: Array<MediaReference> = []
+    const errors: Array<string> = []
+    let next = 0
+    async function uploadNext() {
+        while (next < files.length) {
+            const index = next++
+            const file = files[index]
+            if (!file) continue
+
             try {
-                const image = await uploadImage(file)
-                model.value = props.multiple ? [...model.value, image] : [image]
+                images[index] = await uploadImage(file)
             } catch (error) {
-                failed.push(`${file.name} (${adminErrorMessage(error, 'upload failed')})`)
+                errors[index] = `${file.name} (${adminErrorMessage(error, 'upload failed')})`
             }
         }
+    }
+    try {
+        await Promise.all(Array.from({ length: Math.min(files.length, 3) }, uploadNext))
+        const uploaded = images.filter(Boolean)
+        const lastImage = uploaded.at(-1)
+        if (lastImage) model.value = props.multiple ? [...model.value, ...uploaded] : [lastImage]
+
+        const failed = errors.filter(Boolean)
         if (failed.length)
             uploadError.value = `Could not upload ${failed.join(', ')}. Choose the failed files again to retry.`
     } finally {

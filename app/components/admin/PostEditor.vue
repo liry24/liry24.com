@@ -33,9 +33,12 @@ const { uploading, uploadSingle } = useAdminMediaUpload('posts')
 const formError = ref('')
 const errors = ref<Record<string, string>>({})
 const showPreview = ref(false)
+const previewMounted = ref(false)
+watch(showPreview, (visible) => {
+    if (visible) previewMounted.value = true
+})
 const games = reactive(new Map<string, GameSearchResult>())
-const pendingGames = ref(0)
-const busy = computed(() => !!pendingAction.value || uploading.value || pendingGames.value > 0)
+const busy = computed(() => !!pendingAction.value || uploading.value)
 const displayTitle = computed(() =>
     gameTitleParts(title.value)
         .map((part) => (part.slug ? (games.get(part.slug)?.name ?? part.slug) : part.text))
@@ -47,33 +50,35 @@ const rememberGame = (game: GameSearchResult) => {
     games.set(game.slug, game)
 }
 
+let loadGeneration = 0
+onScopeDispose(() => {
+    loadGeneration++
+})
+
+async function loadMentionedGames(missing: Array<string>, generation: number) {
+    const lookups = Array.from({ length: Math.ceil(missing.length / 40) }, async (_, index) => {
+        const result = await request('/api/admin/games', {
+            query: { slug: missing.slice(index * 40, (index + 1) * 40) },
+        })
+        if (generation === loadGeneration) result.games.forEach(rememberGame)
+    })
+    try {
+        await Promise.all(lookups)
+    } catch {
+        if (generation === loadGeneration)
+            toast.add({ title: 'Could not load game names', color: 'warning' })
+    }
+}
+
 const loadDocument = async () => {
     if (!docId.value) return
 
+    const generation = ++loadGeneration
     const doc = await request(`/api/admin/content/posts/${encodeURIComponent(docId.value)}`)
+    if (generation !== loadGeneration) return
     if (!isPostData(doc.data)) throw new Error('Invalid post document')
 
     const post = doc.data
-    const missing = [
-        ...new Set(
-            [
-                ...postEditorMentionParts(post.title ?? '', false),
-                ...postEditorMentionParts(doc.body ?? '', true),
-            ].flatMap(({ slug: gameSlug }) => (gameSlug && !games.has(gameSlug) ? [gameSlug] : [])),
-        ),
-    ]
-    if (missing.length) {
-        try {
-            for (let index = 0; index < missing.length; index += 40) {
-                const result = await request('/api/admin/games', {
-                    query: { slug: missing.slice(index, index + 40) },
-                })
-                result.games.forEach(rememberGame)
-            }
-        } catch {
-            toast.add({ title: 'Could not load game names', color: 'warning' })
-        }
-    }
     docId.value = doc.id
     title.value = post.title ?? ''
     slug.value = post.slug ?? doc.id
@@ -84,6 +89,18 @@ const loadDocument = async () => {
     body.value = doc.body ?? ''
     status.value = doc.status
     schedules.value = doc.schedules
+
+    if (import.meta.server) return
+
+    const missing = [
+        ...new Set(
+            [
+                ...postEditorMentionParts(title.value, false),
+                ...postEditorMentionParts(body.value, true),
+            ].flatMap(({ slug: gameSlug }) => (gameSlug && !games.has(gameSlug) ? [gameSlug] : [])),
+        ),
+    ]
+    if (missing.length) void loadMentionedGames(missing, generation)
 }
 
 if (id) await loadDocument()
@@ -115,10 +132,20 @@ const saveDraft = async () => {
         return
     }
 
+    const titleParts = postEditorMentionParts(title.value, false)
+    const bodyParts = postEditorMentionParts(body.value, true)
+    const mentionedSlugs = new Set(
+        [...titleParts, ...bodyParts].flatMap((part) => (part.slug ? [part.slug] : [])),
+    )
+    const mentionedGames = [...mentionedSlugs].flatMap((gameSlug) => {
+        const entry = games.get(gameSlug)
+        return entry ? [{ slug: entry.slug, igdbId: entry.igdbId }] : []
+    })
+
     const [submitError, result] = await submitForm('post', {
         id: docId.value || undefined,
         data: {
-            title: postEditorMentionParts(title.value, false)
+            title: titleParts
                 .map((part) => (part.slug ? formatGameMention(part.slug) : part.text))
                 .join(''),
             slug: manualValue,
@@ -127,9 +154,10 @@ const saveDraft = async () => {
             authoredAt: toIsoFromLocalInput(authoredAtLocal.value),
             order: Number(order.value) || 0,
         },
-        body: postEditorMentionParts(body.value, true)
+        body: bodyParts
             .map((part) => (part.slug ? formatGameMention(part.slug) : part.text))
             .join(''),
+        mentionedGames: mentionedGames.length ? mentionedGames : undefined,
     })
     if (submitError) {
         formError.value = submitError.message
@@ -290,7 +318,6 @@ const publishActions: Array<DropdownMenuItem> = [
                         :disabled="!!pendingAction"
                         required
                         @game="rememberGame"
-                        @pending="pendingGames += $event"
                     />
                 </UiField>
 
@@ -346,7 +373,8 @@ const publishActions: Array<DropdownMenuItem> = [
                 description="Start with an introductory paragraph for the post excerpt. Type / to insert Markdown or mention a game."
             >
                 <div
-                    v-if="showPreview"
+                    v-if="previewMounted"
+                    v-show="showPreview"
                     class="ui-card prose dark:prose-invert min-h-80 max-w-none p-4"
                 >
                     <Markdown :value="body" :plugins="[postMarkdownSecurity]" />
@@ -359,7 +387,6 @@ const publishActions: Array<DropdownMenuItem> = [
                     :disabled="!!pendingAction"
                     multiline
                     @game="rememberGame"
-                    @pending="pendingGames += $event"
                 />
             </UiField>
 

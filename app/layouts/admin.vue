@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import '@liry24/ui/styles.css'
+
 const { user, load, signOut, isLocalAdmin } = useAppSession()
 await load()
 

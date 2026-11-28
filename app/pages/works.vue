@@ -27,7 +27,7 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
             :max-columns="4"
             :ssr-columns="2"
         >
-            <template #default="{ item }">
+            <template #default="{ item, index }">
                 <component
                     :is="item.href ? 'a' : 'div'"
                     :href="item.href || undefined"
@@ -49,6 +49,11 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
                                 v-if="item.image"
                                 :src="item.image"
                                 :alt="item.title"
+                                :width="128"
+                                :height="128"
+                                format="webp"
+                                decoding="async"
+                                :loading="index >= 4 ? 'lazy' : undefined"
                                 class="size-32 rounded-lg"
                             />
 
@@ -74,6 +79,11 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'works' }, [
                             v-if="item.image"
                             :src="item.image"
                             :alt="item.title"
+                            :width="520"
+                            format="webp"
+                            sizes="100vw 641px:520px"
+                            decoding="async"
+                            :loading="index >= 2 ? 'lazy' : undefined"
                             class="rounded-lg"
                         />
 

@@ -6,7 +6,7 @@ function isUnconfiguredIgdbError(error: unknown): boolean {
     return 'statusCode' in error && error.statusCode === 503
 }
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async (event): Promise<GameSearchResponse> => {
     await requireAdminSession(event)
     const params = getQuery(event)
     const query = String(params.q ?? '').trim()
@@ -14,51 +14,60 @@ export default defineEventHandler(async (event) => {
 
     event.res.headers.set('Cache-Control', 'private, no-store')
 
-    const slugs = new Set(Array.isArray(params.slug) ? params.slug : [params.slug].filter(Boolean))
+    const slugs = Array.isArray(params.slug) ? params.slug : params.slug ? [params.slug] : []
     const numericId = /^\d+$/.test(query) ? Number(query) : 0
     const id = Number.isSafeInteger(numericId) && numericId > 0 ? numericId : undefined
-    const docs = await gameCatalog().list()
+    const catalog = gameCatalog()
+    let docs: Array<GameCatalogItem>
+    if (slugs.length) docs = await catalog.bySlugs(slugs)
+    else if (id === undefined) docs = await catalog.list()
+    else {
+        const match = await catalog.byIgdbId(id)
+        docs = match ? [match] : []
+    }
+
     const lowerQuery = query.toLowerCase()
     const saved: Array<GameSearchResult> = []
 
     for (const doc of docs) {
-        const { igdbId, slug, name, cover } = doc.data
+        const { igdbId, slug, name, cover, icon } = doc.data
         saved.push({
             id: doc.id,
             igdbId,
             slug,
             name,
             cover: cover ?? null,
+            icon: icon ?? null,
         })
     }
+
+    if (slugs.length || (id !== undefined && saved.length)) return { games: saved, warning: '' }
 
     const sortGames = (a: GameSearchResult, b: GameSearchResult) =>
         Number(b.slug === lowerQuery) - Number(a.slug === lowerQuery) ||
         a.name.localeCompare(b.name)
-    if (slugs.size) return { games: saved.filter((game) => slugs.has(game.slug)), warning: '' }
 
     const limited = saved
-        .filter((game) =>
-            id !== undefined
-                ? game.igdbId === id
-                : game.name.toLowerCase().includes(lowerQuery) || game.slug.includes(lowerQuery),
+        .filter(
+            (game) => game.name.toLowerCase().includes(lowerQuery) || game.slug.includes(lowerQuery),
         )
         .sort(sortGames)
         .slice(0, 100)
     if (!query) return { games: limited, warning: '' }
 
     try {
-        if (id !== undefined && limited.length) return { games: limited, warning: '' }
-
-        const remote = await queryIgdb(id === undefined ? { search: query } : { id })
+        const remoteResult = await queryIgdbWithSource(
+            id === undefined ? { search: query } : { id },
+        )
+        const remote = [...remoteResult.games]
         if (
             gameSlugPattern.test(lowerQuery) &&
             lowerQuery.includes('-') &&
             !limited.some((game) => game.slug === lowerQuery) &&
             !remote.some((game) => game.slug === lowerQuery)
         ) {
-            const exact = await queryIgdb({ slug: lowerQuery })
-            remote.push(...exact)
+            const exact = await queryIgdbWithSource({ slug: lowerQuery })
+            remote.push(...exact.games)
         }
         const canonical = new Map(saved.map((game) => [game.igdbId, game]))
         const matches = new Map(limited.map((game) => [game.igdbId, game]))
@@ -67,6 +76,7 @@ export default defineEventHandler(async (event) => {
         return {
             games: [...matches.values()].sort(sortGames),
             warning: '',
+            source: remoteResult.source,
         }
     } catch (error) {
         return {

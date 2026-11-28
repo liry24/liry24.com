@@ -2,12 +2,26 @@
 const { slug } = defineProps<{ slug: string }>()
 
 const previewGames = inject(postPreviewGamesKey, null)
-const published = previewGames
-    ? null
-    : await useFetch(() => `/api/posts/game-mentions/${encodeURIComponent(slug)}`)
-const game = computed(() => published?.data.value)
+const injectedGames = inject(postGameMentionsKey, null)
+const providedGame = computed(() => {
+    const games = injectedGames?.value
+    return games && Object.hasOwn(games, slug) ? games[slug] : undefined
+})
+const published =
+    previewGames || providedGame.value
+        ? null
+        : await useFetch<GameMentionData | null>(
+              () => `/api/posts/game-mentions/${encodeURIComponent(slug)}`,
+          )
+const game = computed(() => {
+    if (previewGames) return null
+    return providedGame.value ?? published?.data.value
+})
 const gameImageSrc = computed(() => mediaUrl(game.value?.icon) || game.value?.cover || undefined)
 const previewGame = computed(() => previewGames?.get(slug))
+const previewImageSrc = computed(
+    () => mediaUrl(previewGame.value?.icon) || previewGame.value?.cover || undefined,
+)
 </script>
 
 <template>
@@ -27,8 +41,8 @@ const previewGame = computed(() => previewGames?.get(slug))
 
     <span v-else class="bg-muted inline-flex max-w-full items-baseline gap-1 rounded-md px-2">
         <img
-            v-if="previewGame?.cover"
-            :src="previewGame.cover"
+            v-if="previewImageSrc"
+            :src="previewImageSrc"
             alt=""
             class="relative top-[0.13em] inline-block size-[1em] shrink-0 rounded-sm object-cover"
         />

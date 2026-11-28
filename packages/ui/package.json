@@ -5,6 +5,7 @@
     "type": "module",
     "exports": {
         ".": "./index.ts",
+        "./editor": "./UiSlashEditor.vue",
         "./markdown": "./markdown.ts",
         "./styles.css": "./styles.css"
     },

@@ -1,7 +1,7 @@
-diff --git a/dist/vite-Cs72qoig.js b/dist/vite-Cs72qoig.js
---- a/dist/vite-Cs72qoig.js
-+++ b/dist/vite-Cs72qoig.js
-@@ -2748,7 +2748,7 @@ function hubDatabase(options) {
+diff --git a/dist/vite-KZl-iRTp.js b/dist/vite-KZl-iRTp.js
+--- a/dist/vite-KZl-iRTp.js
++++ b/dist/vite-KZl-iRTp.js
+@@ -2749,7 +2749,7 @@ function hubDatabase(options) {
  	}
  	function installNitroDevRegistry() {
  		if (!nitroOptions?.dev || !runtimeConfig) return;

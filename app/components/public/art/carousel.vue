@@ -25,7 +25,7 @@ const select = (index: number) => {
     <div class="flex w-full flex-col gap-4">
         <UCarousel
             ref="carousel"
-            v-slot="{ item }"
+            v-slot="{ item, index }"
             :items="data"
             :ui="{ container: 'items-center' }"
             class="mx-auto w-full"
@@ -43,7 +43,15 @@ const select = (index: number) => {
                     })
                 "
             >
-                <NuxtImg :src="mediaUrl(item)" alt="" class="max-h-[70svh] rounded-lg" />
+                <NuxtImg
+                    :src="mediaUrl(item)"
+                    alt=""
+                    :width="1400"
+                    format="webp"
+                    decoding="async"
+                    :loading="Math.abs(index - activeIndex) > 1 ? 'lazy' : undefined"
+                    class="max-h-[70svh] rounded-lg"
+                />
             </button>
         </UCarousel>
 
@@ -63,6 +71,9 @@ const select = (index: number) => {
                     alt=""
                     :width="48"
                     :height="48"
+                    format="webp"
+                    decoding="async"
+                    loading="lazy"
                     class="size-12 cursor-pointer rounded-lg object-cover"
                 />
             </button>

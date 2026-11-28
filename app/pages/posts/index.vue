@@ -11,6 +11,8 @@ const { data, error } = await useFetch<PostCardsPage>('/api/posts/cards', {
 })
 if (error.value) throw error.value
 
+provide(postGameMentionsKey, computed(() => data.value?.games ?? {}))
+
 const filtered = computed(() => data.value?.items ?? [])
 
 watch(
@@ -29,7 +31,7 @@ defineOgImage('Home.takumi', { title: 'Liry24', subpath: 'posts' }, [
 
 <template>
     <div v-if="route.query.game" class="mb-4 flex items-center gap-2">
-        <GameMention :slug="String(route.query.game)" /><UButton
+        <GameMention :key="String(route.query.game)" :slug="String(route.query.game)" /><UButton
             to="/posts"
             label="All posts"
             variant="ghost"

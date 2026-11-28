@@ -15,6 +15,8 @@ const careers = usePortfolioData('careers')
 const gameStats = useFetch('/api/portfolio/gameStats')
 const posts = useFetch<PostCardsPage>('/api/posts/cards', { query: { limit: 10 } })
 await Promise.all([arts, socials, careers, gameStats, posts])
+provide(postGameMentionsKey, computed(() => posts.data.value?.games ?? {}))
+
 const data = computed(() => ({
     arts: arts.data.value || [],
     socials: socials.data.value?.map((entry) => entry.data) || [],
@@ -40,6 +42,11 @@ const rotateArray = <T>(arr: Array<T>, n: number): Array<T> => {
     return [...arr.slice(-shift), ...arr.slice(0, -shift)]
 }
 
+const rotatedArts = computed(() => rotateArray(data.value.arts, 1))
+const marqueeRepeat = computed(() =>
+    Math.min(4, Math.max(2, Math.ceil(6 / Math.max(rotatedArts.value.length, 1)))),
+)
+
 useKeyCommand(modalStacks.open)
 
 useHead({ titleTemplate: null })
@@ -54,12 +61,13 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
     <div v-if="data" class="flex flex-col gap-16">
         <UMarquee
             pause-on-hover
+            :repeat="marqueeRepeat"
             :ui="{ content: 'gap-8 md:gap-12 lg:gap-16' }"
             class="my-8 [--duration:40s]"
         >
             <Motion
-                v-for="(art, index) in rotateArray(data.arts, 1)"
-                :key="index"
+                v-for="(art, index) in rotatedArts"
+                :key="art.id"
                 :initial="{ scale: 1.1, opacity: 0, filter: 'blur(20px)' }"
                 :animate="{ scale: 1, opacity: 1, filter: 'blur(0px)' }"
                 :transition="{ delay: 0.2 + index * 0.1 }"
@@ -68,8 +76,13 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                     <NuxtImg
                         :src="mediaUrl(art.data.images[0])"
                         :alt="art.data.title"
+                        :width="320"
                         :height="320"
                         format="webp"
+                        sizes="256px md:288px lg:320px"
+                        decoding="async"
+                        :fetchpriority="index < 3 ? 'high' : undefined"
+                        :loading="index >= 4 ? 'lazy' : undefined"
                         class="aspect-square size-64 cursor-pointer rounded-xl object-cover md:size-72 lg:size-80"
                     />
                 </NuxtLink>
@@ -134,8 +147,12 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                         class="group relative flex size-full flex-col items-center justify-center gap-4 rounded-xl p-10"
                     >
                         <NuxtImg
-                            src="/graphics-ss.png"
+                            src="/graphics-ss.webp"
                             alt=""
+                            width="1075"
+                            height="957"
+                            loading="lazy"
+                            decoding="async"
                             class="absolute inset-0 size-full overflow-clip mask-x-from-60% mask-x-to-90% object-cover object-[0%_10%] opacity-10 transition-opacity group-hover:opacity-30"
                         />
 
@@ -153,11 +170,9 @@ defineOgImage('Home.takumi', { title: 'Liry24' }, [
                         target="_blank"
                         class="group relative flex size-full flex-col items-center justify-center gap-4 rounded-xl p-10"
                     >
-                        <UColorModeImage
-                            light="/avatio-ss-light.png"
-                            dark="/avatio-ss-dark.png"
-                            alt=""
-                            class="absolute inset-0 size-full overflow-clip mask-x-from-60% mask-x-to-90% object-cover object-[0%_10%] opacity-10 transition-opacity group-hover:opacity-30"
+                        <div
+                            aria-hidden="true"
+                            class="absolute inset-0 size-full overflow-clip bg-[url('/avatio-ss-light.webp')] bg-cover bg-[0%_10%] mask-x-from-60% mask-x-to-90% opacity-10 transition-opacity group-hover:opacity-30 dark:bg-[url('/avatio-ss-dark.webp')]"
                         />
 
                         <span class="z-1 text-5xl font-extrabold tracking-tight"> Avatio </span>

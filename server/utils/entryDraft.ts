@@ -48,6 +48,7 @@ export async function saveEntryDraft<
         sameScope?: (data: NoInfer<Data>) => boolean
         allowGeneratedKey?: (slug: string) => boolean
         validate?: (id: string, data: NoInfer<Data>, previous?: NoInfer<Data>) => Promise<void>
+        beforeSave?: (id: string, data: NoInfer<Data>, previous?: NoInfer<Data>) => Promise<void>
     },
 ) {
     const { key, data } = options
@@ -112,6 +113,7 @@ export async function saveEntryDraft<
 
     const fields = options.fields(slug, order, previous)
     await options.validate?.(id, fields, previous)
+    await options.beforeSave?.(id, fields, previous)
     const saved = await collection.save(
         id,
         { data: fields, body: options.body },

@@ -1,5 +1,3 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { generateText } from 'ai'
 import { customAlphabet } from 'nanoid'
 
 const slugFormats = {
@@ -21,6 +19,10 @@ export async function suggestEntrySlug(
     const { pattern, instruction } = slugFormats[style]
     if (apiKey && label.trim()) {
         try {
+            const [{ createGoogleGenerativeAI }, { generateText }] = await Promise.all([
+                import('@ai-sdk/google'),
+                import('ai'),
+            ])
             const google = createGoogleGenerativeAI({ apiKey })
             const { text } = await generateText({
                 model: google(editorialModelId),

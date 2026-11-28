@@ -60,11 +60,23 @@ async function exerciseIconPicker(page: Page) {
     await expectFocus(add)
 }
 
+async function chooseGameOption(dialog: Locator, page: Page, query: string, optionLabel: string) {
+    const combobox = dialog.getByRole('combobox', { name: 'Game', exact: true })
+    await combobox.click()
+    await combobox.fill(query)
+    const option = page.getByRole('option', { name: new RegExp(`^${optionLabel}\\b`, 'i') }).first()
+    await option.waitFor()
+    await option.click()
+}
+
 async function exerciseStatsEditor(page: Page) {
+    // Grouped by game
+    const valorantGroup = page.locator('[data-game-group="igdb-126459"]')
+    await valorantGroup.waitFor()
+
     await page.getByRole('button', { name: 'Add', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'New stat period' })
-    const game = dialog.getByLabel('Game', { exact: true })
-    await game.selectOption('igdb-126459')
+    await chooseGameOption(dialog, page, 'VALORANT', 'VALORANT')
     await dialog.getByLabel('Period label', { exact: true }).fill('New synthetic period')
     expect(await dialog.getByRole('textbox', { name: 'Period key' }).count()).toBe(0)
 
@@ -74,11 +86,11 @@ async function exerciseStatsEditor(page: Page) {
     await save.click()
     await dialog.getByRole('alert').first().waitFor()
     await peak.fill('0')
-    await game.selectOption('igdb-114795')
+    await chooseGameOption(dialog, page, 'Apex', 'Apex Legends')
     const rank = dialog.getByRole('textbox', { name: 'Rank', exact: true })
     expect(await rank.inputValue()).toBe('')
     await rank.fill('7')
-    await game.selectOption('igdb-126459')
+    await chooseGameOption(dialog, page, 'VALORANT', 'VALORANT')
     expect(await peak.inputValue()).toBe('0')
 
     const [response] = await Promise.all([
@@ -88,7 +100,10 @@ async function exerciseStatsEditor(page: Page) {
         save.click(),
     ])
     expect(response.status()).toBe(201)
-    expect(await response.json()).toEqual({ id: 'igdb-126459-new_synthetic_period' })
+    expect(await response.json()).toEqual({
+        id: 'igdb-126459-new_synthetic_period',
+        gameId: 'igdb-126459',
+    })
     expect(response.request().postDataJSON()).toMatchObject({
         data: { game: 'igdb-126459', values: [{ key: 'rank', value: 0 }] },
     })
@@ -101,6 +116,48 @@ async function exerciseStatsEditor(page: Page) {
     )
     await page.keyboard.press('Escape')
     await edit.waitFor({ state: 'hidden' })
+
+    // Create a brand-new game + metric + stat period in one flow using the IGDB emulator
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    await dialog.waitFor()
+    await chooseGameOption(dialog, page, 'sf6', 'Street Fighter 6')
+    await dialog.getByLabel('Period label', { exact: true }).fill('Act 5')
+    await dialog.getByRole('button', { name: 'Add metric' }).click()
+    await dialog.getByLabel('Metric label', { exact: true }).fill('Master Rate')
+    await dialog.getByLabel('Unit', { exact: true }).fill('MR')
+    await dialog.getByRole('textbox', { name: 'Master Rate', exact: true }).fill('1650')
+
+    const [createdNewGame] = await Promise.all([
+        page.waitForResponse(
+            (entry) => new URL(entry.url()).pathname === '/_vitehub/forms/game-stats',
+        ),
+        dialog.getByRole('button', { name: 'Save draft' }).click(),
+    ])
+    expect(createdNewGame.status()).toBe(201)
+    expect(await createdNewGame.json()).toEqual({
+        id: 'igdb-191692-act_5',
+        gameId: 'igdb-191692',
+    })
+    await dialog.waitFor({ state: 'hidden' })
+    const sf6Group = page.locator('[data-game-group="igdb-191692"]')
+    await sf6Group.waitFor()
+    await sf6Group.getByText('Master Rate: 1,650 MR').waitFor()
+
+    // Group-level "Add period" presets the game automatically
+    await sf6Group.getByRole('button', { name: 'Add period' }).click()
+    await dialog.waitFor()
+    expect(await dialog.getByRole('combobox', { name: 'Game', exact: true }).inputValue()).toBe(
+        'Street Fighter 6',
+    )
+    await page.keyboard.press('Escape')
+    await dialog.waitFor({ state: 'hidden' })
+
+    // Manage games modal lists registered games without any import UI
+    await page.getByRole('button', { name: 'Manage games' }).click()
+    const manageDialog = page.getByRole('dialog', { name: 'Manage games' })
+    await manageDialog.locator('[data-catalog-game-id="igdb-191692"]').waitFor()
+    await page.keyboard.press('Escape')
+    await manageDialog.waitFor({ state: 'hidden' })
 }
 
 async function exerciseArtworkEditor(page: Page, bytes: Buffer) {
@@ -265,7 +322,9 @@ async function exercisePostEditor(page: Page) {
 test.runIf(process.env.LIRY24_TEST_ACCESSIBILITY_BROWSER === 'true')(
     'admin editorial flows handle icon search, entry editing, media uploads, scheduling, and reordering',
     async () => {
-        const app = await builtWorker({ env: { NUXT_PUBLIC_IMAGES_DOMAIN: '' } })
+        const app = await builtWorker({
+            env: { NUXT_PUBLIC_IMAGES_DOMAIN: '', LIRY24_IGDB_EMULATOR: 'true' },
+        })
         let browser: Browser | undefined
         const errors: Array<string> = []
 

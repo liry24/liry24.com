@@ -1,133 +1,197 @@
 <script setup lang="ts">
-import { UiFileInput, UiFileInputTrigger } from '@liry24/ui'
+import { UiButton, UiFormDialog } from '@liry24/ui'
 import { fieldErrors, submitForm } from 'vite-hub/forms/client'
 
-const props = defineProps<{ item?: AdminEntryRecord<GameRecordData> }>()
+const props = defineProps<{
+    item?: AdminEntryRecord<GameRecordData>
+    meta?: GameCatalogMeta
+    finalFocus?: () => HTMLElement | null
+}>()
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ saved: [] }>()
 const toast = useToast()
+
 const game = ref<GameRecordData>()
-const metricsText = ref('')
-const iconFiles = shallowRef<Array<File>>([])
+const metricsDraft = ref<Array<AdminMetricDraft>>([])
+const primaryUid = ref<string>()
 const saving = ref(false)
-const { uploading, uploadSingle } = useAdminMediaUpload('games')
+const uploading = ref(false)
+const busy = computed(() => saving.value || uploading.value)
 const errorMessage = ref('')
 const errors = ref<Record<string, string>>({})
+const summary = useTemplateRef('summary')
 
 watch(open, (value) => {
     if (!value || !props.item) return
     game.value = { ...props.item.data }
-    metricsText.value = JSON.stringify(game.value.metrics ?? [], null, 2)
+    metricsDraft.value = toMetricDrafts(props.item.data.metrics ?? [])
+    primaryUid.value = metricsDraft.value.find(
+        (metric) => metric.key === props.item?.data.primaryMetric,
+    )?.uid
     errorMessage.value = ''
     errors.value = {}
 })
 
-async function upload(files: Array<File>) {
-    iconFiles.value = files
-    const file = files[0]
-    if (!file || !game.value || saving.value) return
-    try {
-        const uploaded = await uploadSingle(file, {
-            successTitle: 'Uploaded image',
-            fallbackError: 'Could not upload image.',
-        })
-        if (uploaded) game.value.icon = uploaded
-    } finally {
-        iconFiles.value = []
+function existingKeysExcept(uid: string): ReadonlySet<string> {
+    return new Set(
+        metricsDraft.value
+            .filter((item) => item.uid !== uid)
+            .map((item) => item.key.trim())
+            .filter(Boolean),
+    )
+}
+
+function addMetric() {
+    const existingKeys = new Set(metricsDraft.value.map((item) => item.key.trim()).filter(Boolean))
+    const next = createMetricDraft(existingKeys)
+    metricsDraft.value.push(next)
+    if (!primaryUid.value) primaryUid.value = next.uid
+}
+
+function togglePrimary(uid: string) {
+    primaryUid.value = primaryUid.value === uid ? undefined : uid
+}
+
+function removeMetric(uid: string) {
+    metricsDraft.value = metricsDraft.value.filter((item) => item.uid !== uid)
+    if (primaryUid.value === uid) primaryUid.value = metricsDraft.value[0]?.uid
+}
+
+async function showErrors(message: string, fields: Record<string, string> = {}) {
+    errorMessage.value = message
+    errors.value = fields
+    await nextTick()
+    const invalid = summary.value
+        ?.closest('form')
+        ?.querySelector<HTMLElement>('[aria-invalid="true"]')
+    if (invalid) {
+        const details = invalid.closest('details')
+        if (details) details.open = true
+        invalid.focus()
+        if (document.activeElement === invalid) return
     }
+    summary.value?.focus()
 }
 
 async function save() {
-    if (!props.item || !game.value || saving.value || uploading.value) return
-    saving.value = true
+    if (!props.item || !game.value || busy.value) return
     errorMessage.value = ''
     errors.value = {}
+
+    const collected = collectAdminGameMetrics(metricsDraft.value, primaryUid.value)
+    if (Object.keys(collected.errors).length) {
+        await showErrors('Check the highlighted fields.', collected.errors)
+        return
+    }
+
+    saving.value = true
+    let failed: { message: string; fields?: Record<string, string> } | undefined
     try {
-        const { order: _order, ...data } = game.value
-        data.metrics = gameFieldsSchema.shape.metrics.parse(JSON.parse(metricsText.value || '[]'))
-        const [error] = await submitForm('game', { id: props.item.id, data })
-        if (error) {
-            errorMessage.value = error.message
-            errors.value = fieldErrors(error)
-            return
+        const { order: _order, ...rest } = game.value
+        const payload = {
+            ...rest,
+            primaryMetric: collected.primaryMetric,
+            metrics: collected.metrics,
         }
-        toast.add({ title: 'Saved game', color: 'success' })
-        open.value = false
-        emit('saved')
+        const [error] = await submitForm('game', { id: props.item.id, data: payload })
+        if (error) failed = { message: error.message, fields: fieldErrors(error) }
     } catch (error) {
-        errorMessage.value = adminErrorMessage(error, 'Invalid field data.')
+        failed = { message: adminErrorMessage(error, 'Could not save game settings.') }
     } finally {
         saving.value = false
     }
+
+    if (failed) {
+        await showErrors(failed.message, failed.fields)
+        return
+    }
+    toast.add({ title: 'Saved game settings', color: 'success' })
+    open.value = false
+    emit('saved')
 }
 </script>
 
 <template>
-    <UModal
+    <UiFormDialog
         v-model:open="open"
-        :title="`Edit Game settings: ${item?.id ?? ''}`"
-        :dismissible="!saving && !uploading"
+        :title="`Game settings: ${game?.name ?? item?.id ?? ''}`"
+        submit-label="Save settings"
+        :busy="busy"
+        :saving="saving"
+        wide
+        :final-focus="finalFocus"
+        @submit="save"
     >
-        <template #body>
-            <div v-if="game" class="grid gap-4">
-                <UAlert
-                    v-if="errorMessage"
-                    role="alert"
-                    :title="errorMessage"
-                    color="error"
-                    variant="subtle"
-                />
-                <UFormField label="Name" required>
-                    <UInput :model-value="game.name" disabled />
-                </UFormField>
-                <UFormField label="Primary metric" :error="errors['data.primaryMetric']">
-                    <UInput v-model="game.primaryMetric" />
-                </UFormField>
-                <UFormField label="Icon upload" :description="game.icon?.pathname">
-                    <div class="flex flex-wrap items-center gap-3">
-                        <UiFileInput
-                            :value="iconFiles"
-                            accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
-                            :disabled="uploading || saving"
-                            @value-change="upload"
-                            @reject="
-                                toast.add({
-                                    title: 'Choose a supported image file',
-                                    color: 'error',
-                                })
-                            "
-                        >
-                            <UiFileInputTrigger class="ui-button">
-                                {{ uploading ? 'Uploading…' : 'Choose image' }}
-                            </UiFileInputTrigger>
-                        </UiFileInput>
-                        <img
-                            v-if="game.icon"
-                            :src="mediaUrl(game.icon)"
-                            alt="Game icon preview"
-                            class="size-10 rounded object-cover"
-                        />
-                    </div>
-                </UFormField>
-                <UFormField label="Metrics JSON" :error="errors['data.metrics']">
-                    <UTextarea v-model="metricsText" :rows="6" class="font-mono" />
-                </UFormField>
-                <div class="flex justify-end gap-2">
-                    <UButton
-                        label="Cancel"
-                        variant="ghost"
-                        color="neutral"
-                        :disabled="saving || uploading"
-                        @click="open = false"
-                    />
-                    <UButton
-                        label="Save game"
-                        :loading="saving"
-                        :disabled="uploading"
-                        @click="save"
-                    />
+        <p
+            v-if="errorMessage"
+            ref="summary"
+            class="ui-alert mb-4 w-full"
+            role="alert"
+            tabindex="-1"
+        >
+            {{ errorMessage }}
+        </p>
+
+        <fieldset v-if="open && game" :disabled="busy" class="grid min-w-0 gap-5">
+            <div class="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-start">
+                <div>
+                    <p class="text-sm font-medium">{{ game.name }}</p>
+                    <p class="text-muted font-mono text-xs">
+                        {{ game.slug }} · IGDB #{{ game.igdbId }}
+                    </p>
                 </div>
             </div>
-        </template>
-    </UModal>
+
+            <div class="grid gap-2">
+                <AdminEntryImages
+                    :model-value="game.icon ? [game.icon] : []"
+                    label="Custom icon"
+                    folder="games"
+                    :disabled="busy"
+                    @update:model-value="game.icon = $event[0]"
+                    @busy="uploading = $event"
+                />
+                <p class="ui-description">
+                    Shown in post mentions and admin game lists instead of the IGDB cover.
+                </p>
+            </div>
+
+            <section class="grid gap-3" aria-label="Game metrics">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="text-sm font-semibold">Metrics</h3>
+                    <UiButton type="button" class="ui-button" :disabled="busy" @click="addMetric">
+                        <Icon name="mingcute:add-line" aria-hidden="true" />
+                        Add metric
+                    </UiButton>
+                </div>
+
+                <p v-if="!metricsDraft.length" class="ui-description">
+                    No metrics configured yet. Add metrics here or directly when creating a stat
+                    period.
+                </p>
+
+                <p v-if="errors['gameConfig.metrics']" class="ui-error" role="alert">
+                    {{ errors['gameConfig.metrics'] }}
+                </p>
+
+                <div
+                    v-for="(metricDraft, index) in metricsDraft"
+                    :key="metricDraft.uid"
+                    class="ui-card p-3"
+                >
+                    <AdminEntryGameMetricConfigFields
+                        v-model="metricsDraft[index]!"
+                        :locked="isGameMetricLocked(meta, metricDraft.key)"
+                        :is-primary="primaryUid === metricDraft.uid"
+                        :existing-keys="existingKeysExcept(metricDraft.uid)"
+                        :errors="errors"
+                        :error-prefix="`gameConfig.metrics.${metricDraft.uid}`"
+                        :disabled="busy"
+                        @set-primary="togglePrimary(metricDraft.uid)"
+                        @remove="removeMetric(metricDraft.uid)"
+                    />
+                </div>
+            </section>
+        </fieldset>
+    </UiFormDialog>
 </template>

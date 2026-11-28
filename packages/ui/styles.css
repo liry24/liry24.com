@@ -179,8 +179,40 @@
     background: var(--surface-active);
 }
 
-.ui-search-picker-results:has(.ui-search-picker-list:empty) {
+.ui-search-picker-results:has(.ui-search-picker-list:empty):not(:has(.ui-command-message)) {
     display: none;
+}
+
+.ui-combobox-control {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.ui-combobox-control:focus-within {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
+.ui-combobox-control:has([aria-invalid='true']) {
+    border-color: var(--danger);
+}
+
+.ui-combobox-input {
+    width: 100%;
+    min-width: 0;
+    flex: 1;
+    background: transparent;
+    color: inherit;
+    outline: none;
+}
+
+.ui-combobox-input::placeholder {
+    color: var(--text-muted);
+}
+
+.ui-combobox-results {
+    z-index: 65;
 }
 
 .ui-image-picker {

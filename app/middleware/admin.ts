@@ -13,9 +13,29 @@ export default defineNuxtRouteMiddleware(async (to) => {
             data: { retryAdminPath: pocketIdRetryPath(to.fullPath) },
         })
     }
-    if (import.meta.server) return
+    const verifiedPath = useState('admin-ssr-path', () => '')
+    if (import.meta.server) {
+        // The Nitro sign-in middleware has already authorized this request.
+        verifiedPath.value = to.path
+        return
+    }
+
+    const nuxt = useNuxtApp()
+    const verification = useAdminSessionVerification()
+    if (
+        nuxt.isHydrating &&
+        nuxt.payload.serverRendered &&
+        !useError().value &&
+        verifiedPath.value === to.path
+    ) {
+        verifiedPath.value = ''
+        verification.update(true)
+        return
+    }
+    if (verification.verified) return
 
     const { data: session, error } = await authClient.getSession()
+    verification.update(!error && session?.user.role === 'admin')
     if (error) {
         throw createError({
             status: error.status || 500,

@@ -11,12 +11,12 @@ export type {
     TriggerItemsLoader,
     TriggerMenuSelectDetails,
 } from '@ui-sdk/vue/trigger-menu'
+export { default as UiCombobox } from './UiCombobox.vue'
 export { default as UiField } from './UiField.vue'
 export { default as UiFormDialog } from './UiFormDialog.vue'
 export { default as UiImagePicker } from './UiImagePicker.vue'
 export { default as UiReorderList } from './UiReorderList.vue'
 export { default as UiSearchPicker } from './UiSearchPicker.vue'
 export { default as UiSelect } from './UiSelect.vue'
-export { default as UiSlashEditor } from './UiSlashEditor.vue'
 export { default as UiTagInput } from './UiTagInput.vue'
 export { default as UiTextarea } from './UiTextarea.vue'

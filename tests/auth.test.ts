@@ -1,10 +1,16 @@
+import { drizzleAdapter } from '@better-auth/drizzle-adapter/relations-v2'
 import { betterAuth } from 'better-auth'
-import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { createAuthEndpoint } from 'better-auth/api'
+import { admin } from 'better-auth/plugins'
 import { drizzle } from 'drizzle-orm/node-sqlite'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
+import { z } from 'zod'
 
-import { authSqliteSchema as schema } from '../.vitehub/auth/schema'
+import { authSqliteRelations, authSqliteSchema as schema } from '../.vitehub/auth/schema'
+import {
+    relations as mergedRelations,
+    schema as mergedSchema,
+} from '../.vitehub/database/schema/default'
 import { openTestDatabase } from './helpers/database'
 
 test('auth counters bound unknown paths and dynamic routes while preserving ingress rules', async () => {
@@ -14,7 +20,7 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
         const auth = betterAuth({
             baseURL: 'https://auth.invalid',
             secret: 'test-only-auth-secret-not-for-deployment',
-            database: drizzleAdapter(drizzle({ client: db }), {
+            database: drizzleAdapter(drizzle({ client: db, relations: authSqliteRelations }), {
                 provider: 'sqlite',
                 schema,
             }),
@@ -95,6 +101,76 @@ test('auth counters bound unknown paths and dynamic routes while preserving ingr
         db.exec('UPDATE rate_limit SET last_request = 0')
         expect((await request('/missing-after-expiry')).status).toBe(404)
         expect(db.prepare('SELECT COUNT(*) n FROM rate_limit').get()?.n).toBe(1)
+    } finally {
+        local.close()
+    }
+}, 60_000)
+
+test('auth resolves session and user via Drizzle v1 relations-v2 joins', async () => {
+    const local = openTestDatabase()
+    const db = local.sqlite
+    try {
+        const drizzleDb = drizzle({ client: db, relations: mergedRelations })
+        const auth = betterAuth({
+            baseURL: 'https://auth.invalid',
+            secret: 'test-only-auth-secret-not-for-deployment',
+            database: drizzleAdapter(drizzleDb, {
+                provider: 'sqlite',
+                schema: mergedSchema,
+            }),
+            emailAndPassword: { enabled: true },
+            session: {
+                cookieCache: { enabled: false },
+            },
+            plugins: [admin({ defaultRole: 'user' })],
+            advanced: {
+                database: { joins: true },
+            },
+        })
+
+        const signUp = await auth.handler(
+            new Request('https://auth.invalid/api/auth/sign-up/email', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    email: 'joins@example.invalid',
+                    name: 'Joins Tester',
+                    password: 'correct-horse-battery-staple',
+                }),
+            }),
+        )
+        expect(signUp.status).toBe(200)
+        const cookies = signUp.headers
+            .getSetCookie()
+            .map((value) => value.split(';')[0])
+            .filter(Boolean)
+            .join('; ')
+        expect(cookies).toContain('session_token=')
+
+        const sessionQuery = drizzleDb.query.session
+        if (!sessionQuery) throw new Error('Missing session relational query builder')
+        const findFirstSpy = vi.spyOn(sessionQuery, 'findFirst')
+        const sessionResponse = await auth.handler(
+            new Request('https://auth.invalid/api/auth/get-session', {
+                headers: { cookie: cookies },
+            }),
+        )
+        expect(sessionResponse.status).toBe(200)
+        expect(findFirstSpy).toHaveBeenCalledTimes(1)
+        const payload = z
+            .object({
+                session: z.object({ userId: z.string() }),
+                user: z.object({ email: z.string(), id: z.string() }),
+            })
+            .parse(await sessionResponse.json())
+        expect(payload.user.email).toBe('joins@example.invalid')
+        expect(payload.session.userId).toBe(payload.user.id)
+
+        const typedAuthDb = drizzle({ client: db, relations: authSqliteRelations })
+        const joined = await typedAuthDb.query.session.findFirst({
+            with: { user: true },
+        })
+        expect(joined?.user?.email).toBe('joins@example.invalid')
     } finally {
         local.close()
     }

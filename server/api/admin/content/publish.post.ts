@@ -62,11 +62,12 @@ async function validatePostGameReferences(id: string, digest: string) {
 
     if (!post.data.gameMentions?.length) return post
 
-    const gameIds = new Set((await gameCatalog().list()).map((game) => game.id))
+    const gameIds = await gameCatalog().existingIds(post.data.gameMentions)
     if (post.data.gameMentions.some((gameId) => !gameIds.has(gameId))) {
         throw createError({
             status: 400,
-            statusText: 'Import every mentioned game before publishing.',
+            statusText:
+                'Save the post again so every mentioned game is registered before publishing.',
         })
     }
     return post

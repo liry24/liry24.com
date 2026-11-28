@@ -53,14 +53,14 @@ const showIgdbAttribution = computed(() => route.path === '/' || route.path.star
                     >
                         <NuxtImg
                             v-if="route.path === '/'"
-                            v-slot="{ src, imgAttrs, isLoaded }"
-                            src="/avatar.png"
+                            src="/avatar.webp?size=112"
+                            provider="none"
                             alt=""
+                            :width="56"
+                            :height="56"
+                            loading="eager"
                             class="aspect-square size-14 rounded-full object-cover"
-                        >
-                            <img v-if="isLoaded" v-bind="imgAttrs" :src />
-                            <USkeleton v-else class="aspect-square size-14 rounded-full" />
-                        </NuxtImg>
+                        />
                         <Icon v-if="titleHovered" name="mingcute:arrow-left-fill" size="58" />
                         <HyperText
                             :text="title"
@@ -77,13 +77,25 @@ const showIgdbAttribution = computed(() => route.path === '/' || route.path.star
                     </NuxtLink>
 
                     <div class="ml-1 flex items-center gap-2">
-                        <UNavigationMenu
-                            :items="tabs"
-                            color="neutral"
-                            variant="link"
-                            orientation="horizontal"
-                            class="text-toned ml-auto font-mono text-lg font-medium"
-                        />
+                        <nav
+                            aria-label="Primary"
+                            class="text-toned ml-auto flex items-center gap-4 font-mono text-lg font-medium"
+                        >
+                            <NuxtLink
+                                v-for="tab in tabs"
+                                :key="tab.to"
+                                :to="tab.to"
+                                :aria-current="route.path.startsWith(tab.to) ? 'page' : undefined"
+                                :class="
+                                    cn(
+                                        'px-1.5 py-1 transition-colors hover:text-highlighted',
+                                        route.path.startsWith(tab.to) && 'text-highlighted',
+                                    )
+                                "
+                            >
+                                {{ tab.label }}
+                            </NuxtLink>
+                        </nav>
 
                         <ColorModeButton />
                     </div>
